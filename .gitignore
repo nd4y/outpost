@@ -1,0 +1,8 @@
+.env
+secrets/
+vendor/
+evidence/
+*.tar
+
+release/
+__pycache__/

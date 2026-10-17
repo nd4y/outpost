@@ -1,0 +1,116 @@
+name: Build, test and publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: outpost-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and test ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.26'
+          cache: false
+      - name: Check supervisor and deployment configuration
+        run: |
+          go test ./...
+          go vet ./...
+          python3 tests/validate-deploy.py
+      - name: Fetch and verify pinned upstream archives
+        run: python3 fetch-assets.py
+      - name: Build native image
+        run: |
+          docker build --platform "linux/$ARCH" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t outpost-hardened:ci .
+      - name: Test data round-trip and isolation
+        run: sudo env OUTPOST_TEST_IMAGE=outpost-hardened:ci python3 tests/integration.py
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: verification-${{ matrix.arch }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Publish tested architecture
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$ARCH"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag outpost-hardened:ci "$image:$tag"
+          docker push "$image:$tag"
+
+  publish:
+    name: Publish multi-platform image
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Promote both tested architectures
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          run_tag="run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          tags=(--tag "$image:$run_tag" --tag "$image:sha-$GITHUB_SHA")
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]
+            tags+=(--tag "$image:$version")
+            if [[ "$version" != *-* ]]; then tags+=(--tag "$image:latest"); fi
+          else
+            tags+=(--tag "$image:edge")
+          fi
+          docker buildx imagetools create "${tags[@]}" "$image:$run_tag-amd64" "$image:$run_tag-arm64"
+          docker buildx imagetools inspect "$image:$run_tag" | tee image-manifest.txt
+          {
+            echo "### Published image"
+            echo "\`$image:$run_tag\`"
+            echo 'Both native architecture builds passed unit, configuration and 21 integration checks.'
+            echo 'Real NetBird enrollment, ACL direction and Hyper Backup restore remain deployment acceptance checks.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: published-image
+          path: image-manifest.txt
+          retention-days: 30

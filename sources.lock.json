@@ -1,0 +1,18 @@
+{
+  "netbird": {
+    "version": "0.81.2",
+    "amd64": {
+      "url": "https://github.com/netbirdio/netbird/releases/download/v0.81.2/netbird_0.81.2_linux_amd64.tar.gz",
+      "sha256": "a3a5f97d67c8854b33aa562c0bf2244430f07c724cde5ab522f211b49c75c354"
+    },
+    "arm64": {
+      "url": "https://github.com/netbirdio/netbird/releases/download/v0.81.2/netbird_0.81.2_linux_arm64.tar.gz",
+      "sha256": "8152afcc5b5609463d304f8c5ce835fa0d645cc745b0b689c19b1cc4acd1197c"
+    }
+  },
+  "rsync": {
+    "version": "3.5.1",
+    "url": "https://github.com/RsyncProject/rsync/releases/download/v3.5.1/rsync-3.5.1.tar.gz",
+    "sha256": "c55f9c9dc10fb8bec397b399a0fdded53cc9a2d8e30891bb0d63724d25c37bef"
+  }
+}

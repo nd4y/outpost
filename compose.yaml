@@ -1,0 +1,43 @@
+# Remote backup receiver. No host ports or network privileges. Data: chosen bind; identity: dedicated volume.
+# CPU shares, not CFS quotas: some DSM kernels do not support cpus/NanoCPUs.
+services:
+  outpost:
+    image: ${OUTPOST_IMAGE:-ghcr.io/nd4y/outpost:edge}
+    container_name: outpost
+    hostname: ${NB_HOSTNAME:?set NB_HOSTNAME}
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: ${OUTPOST_MEMORY_LIMIT:-1g}
+    memswap_limit: ${OUTPOST_MEMORY_LIMIT:-1g}
+    cpu_shares: 256
+    stop_grace_period: 20s
+    environment:
+      NB_MANAGEMENT_URL: ${NB_MANAGEMENT_URL:?set NB_MANAGEMENT_URL}
+      NB_HOSTNAME: ${NB_HOSTNAME:?set NB_HOSTNAME}
+      NB_SETUP_KEY: ${NB_SETUP_KEY:-}
+      OUTPOST_RSYNC_USER: backup
+      OUTPOST_RSYNC_PASSWORD: ${OUTPOST_RSYNC_PASSWORD:?set OUTPOST_RSYNC_PASSWORD}
+    volumes:
+      - type: bind
+        source: ${BACKUP_PATH:?set BACKUP_PATH}
+        target: /data
+        bind:
+          create_host_path: false
+      - outpost-state:/state
+    tmpfs:
+      - /run/outpost:rw,noexec,nosuid,nodev,size=4m,uid=65532,gid=65532,mode=0700
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,uid=65532,gid=65532,mode=0700
+    networks: [outpost]
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+volumes:
+  outpost-state:
+    name: outpost-hardened-state
+networks:
+  outpost:
+    driver: bridge

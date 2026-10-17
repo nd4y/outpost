@@ -1,0 +1,11 @@
+.git
+.env
+secrets
+evidence
+README.md
+docs
+tests
+
+release
+.github
+__pycache__
