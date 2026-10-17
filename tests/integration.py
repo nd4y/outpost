@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 import time
 import uuid
+import urllib.request
 
 IMAGE = os.environ.get("OUTPOST_TEST_IMAGE", "outpost-hardened:0.2.0")
 PREFIX = "outpost-test-" + uuid.uuid4().hex[:10]
@@ -20,6 +21,7 @@ PASSWORD = secrets.token_urlsafe(32)
 ENV = dict(os.environ, RSYNC_PASSWORD=PASSWORD)
 checks = []
 containers = []
+volumes = [VOLUME]
 
 def call(args, good=True, **kwargs):
     p = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60, **kwargs)
@@ -36,16 +38,16 @@ def check(label, ok):
     checks.append(label)
     print("PASS", label, flush=True)
 
-def start(name, mode="receiver-local", extra=(), tmpdata=False):
+def start(name, mode="receiver-local", extra=(), tmpdata=False, state=VOLUME, credential=True):
     containers.append(name)
     args = ["run", "-d", "--name", name, "--user", "65532:65532",
             "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
             "--pids-limit", "128", "--memory", "1g", "--memory-swap", "1g", "--cpu-shares", "256",
             "--mount", ("type=tmpfs,dst=/data,tmpfs-size=524288,tmpfs-mode=0777" if tmpdata else f"type=bind,src={ROOT/'data'},dst=/data"),
-            "--mount", f"type=volume,src={VOLUME},dst=/state",
+            "--mount", f"type=volume,src={state},dst=/state",
             "--tmpfs", "/run/outpost:rw,noexec,nosuid,nodev,size=4m,uid=65532,gid=65532,mode=0700",
             "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,uid=65532,gid=65532,mode=0700",
-            "-e", "OUTPOST_RSYNC_PASSWORD", *extra, IMAGE, mode]
+            *( ["-e", "OUTPOST_RSYNC_PASSWORD"] if credential else []), *extra, IMAGE, mode]
     env = dict(os.environ, OUTPOST_RSYNC_PASSWORD=PASSWORD)
     return docker(*args, env=env).stdout.strip()
 
@@ -102,7 +104,25 @@ try:
     rsync(PREFIX, "-a", "rsync://backup@127.0.0.1:8873/backup/p31/", "/restore/update/")
     check("update and delete for HB rotation", (ROOT/"restore"/"update"/"payload.bin").read_bytes()==payload+b"changed"
           and not (ROOT/"data"/"p31"/"nested"/"small").exists())
+    pid = str(inspect["State"]["Pid"])
+    scrape = call(["nsenter", "-t", pid, "-n", "python3", "-c",
+        "import urllib.request; print(urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:9090/metrics',timeout=5).read().decode())"]).stdout
+    check("metrics report readiness and filesystem capacity", "outpost_up 1\n" in scrape
+          and "outpost_storage_statfs_success 1\n" in scrape and "outpost_storage_filesystem_available_bytes " in scrape)
+    values = dict(line.rsplit(" ",1) for line in scrape.splitlines() if line and not line.startswith("#"))
+    check("metrics count real rsync upload and restore", int(values['outpost_rsync_transferred_files_total{direction="receive"}']) > 0
+          and int(values['outpost_rsync_transferred_files_total{direction="send"}']) > 0
+          and int(values['outpost_rsync_transferred_bytes_total{direction="receive"}']) > 0
+          and int(values['outpost_rsync_last_transfer_timestamp_seconds']) > 0)
+    check("metrics do not expose credentials or filenames", PASSWORD not in scrape and "payload.bin" not in scrape
+          and "setup-key" not in scrape and "config.json" not in scrape)
     ip = next(iter(inspect["NetworkSettings"]["Networks"].values()))["IPAddress"]
+    try:
+        urllib.request.build_opener(urllib.request.ProxyHandler({})).open("http://"+ip+":9090/metrics",timeout=2)
+        reachable = True
+    except (OSError, urllib.error.URLError):
+        reachable = False
+    check("metrics listener unreachable on Docker LAN IP", not reachable)
     # A second ordinary bridge container must not reach the loopback listener.
     p = docker("run", "--rm", "--entrypoint", "/usr/bin/rsync", IMAGE, "--contimeout=2",
                f"rsync://{ip}:8873/", good=False)
@@ -137,6 +157,31 @@ try:
     check("full filesystem preserves previous file and daemon", (ROOT/"restore"/"full-restored.txt").read_bytes() == (ROOT/"source"/"русский пробел.txt").read_bytes()
           and docker("exec", full, "/usr/bin/outpost", "health", good=False).returncode == 0)
     docker("stop", "--time", "15", full)
+    # Installer bootstrap: no secret in Docker Env and no host configuration files.
+    bootstrap_state=PREFIX+"-bootstrap-state"
+    volumes.append(bootstrap_state)
+    key="00000000-0000-0000-0000-000000000000"
+    def bootstrap(good=True):
+        return docker("run","--rm","-i","--network","none","--user","65532:65532",
+            "--read-only","--cap-drop","ALL","--security-opt","no-new-privileges:true",
+            "--mount",f"type=bind,src={ROOT/'data'},dst=/data",
+            "--mount",f"type=volume,src={bootstrap_state},dst=/state",IMAGE,"bootstrap",input=key+"\n",good=good)
+    bootstrap()
+    check("bootstrap refuses existing identity and credentials", bootstrap(good=False).returncode!=0)
+    boot=PREFIX+"-bootstrap"
+    start(boot,state=bootstrap_state,credential=False)
+    for _ in range(50):
+        if docker("exec",boot,"/usr/bin/outpost","health",good=False).returncode==0: break
+        time.sleep(.1)
+    generated=docker("exec",boot,"/usr/bin/outpost","credentials").stdout.strip()
+    check("bootstrap generates persistent strong credentials", len(generated)==64 and all(c in "0123456789abcdef" for c in generated))
+    rsync(boot,"-a","/source/русский пробел.txt","rsync://backup@127.0.0.1:8873/backup/bootstrap/",password=generated)
+    check("generated bootstrap password authenticates real rsync", (ROOT/"data"/"bootstrap"/"русский пробел.txt").exists())
+    boot_env=json.loads(docker("inspect",boot).stdout)[0]["Config"]["Env"]
+    check("bootstrap secrets absent from container environment", not any(key in x or generated in x for x in boot_env))
+    docker("restart",boot)
+    check("bootstrap credentials survive restart", docker("exec",boot,"/usr/bin/outpost","credentials").stdout.strip()==generated)
+    docker("stop","--time","15",boot)
     # Enrollment failure must not leave a receiving daemon open.
     failed = PREFIX+"-enroll"
     start(failed, mode="run", extra=("-e","NB_MANAGEMENT_URL=https://outpost-test.invalid",
@@ -162,6 +207,7 @@ try:
 finally:
     for name in reversed(containers):
         docker("rm","-f",name,good=False)
-    docker("volume","rm",VOLUME,good=False)
+    for volume in volumes:
+        docker("volume","rm",volume,good=False)
     # Exact unique temporary fixture, never a production mount.
     shutil.rmtree(ROOT)

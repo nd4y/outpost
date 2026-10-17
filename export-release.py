@@ -22,9 +22,9 @@ for arch,image in (("amd64","outpost-hardened:0.2.0"),("arm64","outpost-hardened
     digest=hashlib.file_digest(target.open("rb"),"sha256").hexdigest()
     manifest["images"][arch]={"file":target.name,"sha256":digest,"image_id":info["Id"],"uncompressed_image_bytes":info["Size"],"archive_bytes":target.stat().st_size}
     print("exported",arch,target.stat().st_size,"bytes",flush=True)
-files=["README.md","Dockerfile","compose.yaml","docker-run.sh",".env.example",".dockerignore",".gitignore",
-       "go.mod","sources.lock.json","fetch-assets.py","export-release.py","cmd/outpost/main.go","cmd/outpost/main_test.go",
-       "tests/integration.py","tests/validate-deploy.py","tests/check-publication.py",".github/workflows/build.yml","docs/VALIDATION.md",
+files=["README.md","Dockerfile","compose.yaml","docker-run.sh","install.sh",".env.example",".dockerignore",".gitignore",
+       "go.mod","sources.lock.json","fetch-assets.py","export-release.py","cmd/outpost/main.go","cmd/outpost/main_test.go","cmd/outpost/bootstrap.go","cmd/outpost/metrics.go","cmd/outpost/metrics_test.go",
+       "tests/integration.py","tests/installer.py","tests/validate-deploy.py","tests/check-publication.py",".github/workflows/build.yml","docs/VALIDATION.md",
        "evidence/integration-amd64.json","evidence/integration-arm64.json"]
 bundle=destination/"outpost-hardened-0.2.0-source-and-deploy.zip"
 with zipfile.ZipFile(bundle,"w",zipfile.ZIP_DEFLATED) as archive:

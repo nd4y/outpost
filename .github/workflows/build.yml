@@ -42,7 +42,7 @@ jobs:
           cache: false
       - name: Check supervisor and deployment configuration
         run: |
-          go test ./...
+          go test -race ./...
           go vet ./...
           python3 tests/validate-deploy.py
           python3 tests/check-publication.py
@@ -56,6 +56,8 @@ jobs:
             -t outpost-hardened:ci .
       - name: Test data round-trip and isolation
         run: sudo env OUTPOST_TEST_IMAGE=outpost-hardened:ci python3 tests/integration.py
+      - name: Test interactive installer and cleanup
+        run: sudo env OUTPOST_TEST_IMAGE=outpost-hardened:ci python3 tests/installer.py
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -110,7 +112,7 @@ jobs:
           {
             echo "### Published image"
             echo "\`$image:$run_tag\`"
-            echo 'Both native architecture builds passed unit, configuration and 21 integration checks.'
+            echo 'Both native architecture builds passed unit, configuration and all integration and installer checks.'
             echo 'Real NetBird enrollment, ACL direction and Hyper Backup restore remain deployment acceptance checks.'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

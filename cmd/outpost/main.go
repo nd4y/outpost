@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/url"
@@ -35,10 +36,14 @@ func main() {
 		err = run(true)
 	case "receiver-local":
 		err = run(false) // diagnostic mode: still loopback-only
+	case "bootstrap":
+		err = bootstrap(os.Stdin, "/state", "/data")
+	case "credentials":
+		err = credentials()
 	case "health":
 		err = health()
 	default:
-		err = errors.New("supported commands: run, health, receiver-local")
+		err = errors.New("supported commands: run, health, receiver-local, bootstrap, credentials")
 	}
 	if err != nil {
 		log.Print(err)
@@ -48,6 +53,16 @@ func main() {
 
 func secret(name string) (string, error) {
 	value := os.Getenv(name)
+	if value == "" && os.Getenv(name+"_FILE") == "" {
+		if path := persistentSecret(name); path != "" {
+			data, err := os.ReadFile(path)
+			if err == nil {
+				value = strings.TrimSuffix(string(data), "\n")
+			} else if !os.IsNotExist(err) {
+				return "", errors.New("cannot read persistent secret")
+			}
+		}
+	}
 	if file := os.Getenv(name + "_FILE"); file != "" {
 		if value != "" {
 			return "", fmt.Errorf("set only %s or %s_FILE", name, name)
@@ -117,6 +132,8 @@ strict modes = yes
 [backup]
 path = /data
 comment = Outpost Hyper Backup
+transfer logging = yes
+log format = OUTPOST_TRANSFER %%o %%b %%l
 list = yes
 read only = no
 auth users = %s
@@ -164,10 +181,13 @@ func netbirdEnv() ([]string, error) {
 	return env, nil
 }
 
-func child(name string, args []string, env []string) (*exec.Cmd, <-chan error, error) {
+func child(name string, args []string, env []string, output ...io.Writer) (*exec.Cmd, <-chan error, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Env = env
 	cmd.Stdout = os.Stdout
+	if len(output) > 0 {
+		cmd.Stdout = io.MultiWriter(os.Stdout, output[0])
+	}
 	cmd.Stderr = os.Stderr
 	// A process group permits stopping rsync's worker children as well.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -197,6 +217,13 @@ func run(withNetbird bool) error {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
+	metrics := newMetrics(withNetbird)
+	server, metricsDone, err := startMetrics(metrics)
+	if err != nil {
+		return err
+	}
+	defer server.Close()
+	go metrics.monitor(ctx)
 	var nb *exec.Cmd
 	var nbDone <-chan error
 	if withNetbird {
@@ -245,8 +272,12 @@ func run(withNetbird bool) error {
 		if err != nil {
 			return errors.New("NetBird is not ready after enrollment")
 		}
+		metrics.netbirdReady.Store(true)
+		if err = os.Remove("/state/setup-key"); err != nil && !os.IsNotExist(err) {
+			return errors.New("cannot remove consumed setup key")
+		}
 	}
-	rs, rsDone, err := child("/usr/bin/rsync", []string{"--daemon", "--no-detach", "--config=/run/outpost/rsyncd.conf"}, []string{"PATH=/usr/bin", "HOME=/data"})
+	rs, rsDone, err := child("/usr/bin/rsync", []string{"--daemon", "--no-detach", "--config=/run/outpost/rsyncd.conf"}, []string{"PATH=/usr/bin", "HOME=/data"}, metrics)
 	if err != nil {
 		return err
 	}
@@ -255,6 +286,7 @@ func run(withNetbird bool) error {
 		return err
 	}
 	defer os.Remove("/run/outpost/ready")
+	metrics.receiverReady.Store(true)
 	log.Print("receiver started on loopback TCP 8873; no host port is required")
 	select {
 	case <-ctx.Done():
@@ -274,6 +306,8 @@ func run(withNetbird bool) error {
 			}
 		}
 		return nil
+	case <-metricsDone:
+		return errors.New("metrics server exited; stopping receiver")
 	case <-nbDone:
 		return errors.New("NetBird exited; stopping receiver")
 	case <-rsDone:
