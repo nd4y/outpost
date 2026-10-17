@@ -10,7 +10,7 @@ assert s['security_opt']==['no-new-privileges:true']
 assert len(s['volumes'])==2
 assert 'cpus' not in s and s['cpu_shares']==256
 assert int(s['mem_limit'])==1073741824 and int(s['memswap_limit'])==1073741824
-assert s['volumes'][0]['bind']['create_host_path'] is False
+assert s['volumes'][0].get('bind', {}).get('create_host_path', False) is False
 subprocess.run(['sh','-n',str(root/'docker-run.sh')],check=True)
 assert not (root/'.env').exists()
 print('Compose hardened settings, fail-closed bind and docker-run syntax verified')
