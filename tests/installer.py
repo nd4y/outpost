@@ -113,6 +113,7 @@ def run_case(label, mode='', existing=False, nonempty=False, preexisting=False, 
     state=json.loads((case/'state.json').read_text())
     success=not any((mode,nonempty,preexisting,hidden_interrupt))
     assert (code==0)==success,(label,code,output.decode(errors='replace'))
+    assert b'Illegal number' not in output and b'integer expression expected' not in output, 'shell rollback error'
     assert KEY.encode() not in output,'setup key echoed'
     assert KEY not in json.dumps(state),'setup key in Docker metadata or arguments'
     if success:

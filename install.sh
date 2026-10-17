@@ -45,8 +45,8 @@ main() {
             if [ "$volume_created" -eq 1 ]; then docker volume rm "$volume" >/dev/null 2>&1 || cleanup_failed=1; fi
             if [ "$created_data" -eq 1 ] && [ "$cleanup_failed" -eq 0 ]; then rmdir "$data" 2>/dev/null || :; fi
             if [ "$pulled_image" -eq 1 ]; then docker image rm "$image" >/dev/null 2>&1 || :; fi
-            if [ "" -ne 0 ]; then
-                printf 'Rollback incomplete. Check container outpost, helper %s and volume %s.\n' "" "" >&2
+            if [ "$cleanup_failed" -ne 0 ]; then
+                printf 'Rollback incomplete. Check container outpost, helper %s and volume %s.\n' "$helper" "$volume" >&2
             fi
             printf 'Installation did not complete. Rollback attempted; backup files are never deleted.\n' >&2
             printf 'If enrollment reached NetBird, remove the unused peer in its management console.\n' >&2
