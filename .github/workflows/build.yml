@@ -45,6 +45,7 @@ jobs:
           go test ./...
           go vet ./...
           python3 tests/validate-deploy.py
+          python3 tests/check-publication.py
       - name: Fetch and verify pinned upstream archives
         run: python3 fetch-assets.py
       - name: Build native image
@@ -103,6 +104,9 @@ jobs:
           fi
           docker buildx imagetools create "${tags[@]}" "$image:$run_tag-amd64" "$image:$run_tag-arm64"
           docker buildx imagetools inspect "$image:$run_tag" | tee image-manifest.txt
+          anonymous_config="$(mktemp -d)"
+          docker --config "$anonymous_config" manifest inspect "$image:$run_tag" > public-manifest.json
+          python3 -c 'import json; m=json.load(open("public-manifest.json")); assert sorted(x["platform"]["architecture"] for x in m["manifests"]) == ["amd64", "arm64"]; print("Anonymous multi-platform manifest verified")'
           {
             echo "### Published image"
             echo "\`$image:$run_tag\`"
@@ -112,5 +116,7 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: published-image
-          path: image-manifest.txt
+          path: |
+            image-manifest.txt
+            public-manifest.json
           retention-days: 30
