@@ -6,7 +6,7 @@ set -eu
 main() {
     [ "$#" -eq 0 ] || { printf 'Usage: install.sh (no arguments)\n' >&2; exit 1; }
     umask 077
-    for tool in docker stty od tr mkdir rmdir chown ls sleep; do
+    for tool in docker stty od tr mkdir rmdir chown ls sleep cat; do
         command -v "$tool" >/dev/null 2>&1 || { printf 'Required command missing: %s\n' "$tool" >&2; exit 1; }
     done
     docker info >/dev/null 2>&1 || { printf 'Docker is unavailable. Start Docker or run the installer with Docker permissions.\n' >&2; exit 1; }
@@ -35,7 +35,7 @@ main() {
         status=$?
         trap - 0 HUP INT TERM
         stty "$terminal_state" <&3 2>/dev/null || :
-        unset setup_key
+        unset setup_key telemetry_token
         cleanup_failed=0
         if [ "$helper_created" -eq 1 ] && docker container inspect "$helper" >/dev/null 2>&1; then
             docker rm -f "$helper" >/dev/null 2>&1 || cleanup_failed=1
@@ -88,6 +88,19 @@ main() {
     stty "$terminal_state" <&3
     printf '\n' >&3
     [ "${#setup_key}" -ge 16 ] && [ "${#setup_key}" -le 512 ] || { printf 'A valid setup key is required.\n' >&2; exit 1; }
+    metrics_url=${OUTPOST_METRICS_URL:-}
+    logs_url=${OUTPOST_LOGS_URL:-}
+    telemetry_token=${OUTPOST_TELEMETRY_TOKEN:-}
+    if [ -n "${OUTPOST_TELEMETRY_TOKEN_FILE:-}" ]; then
+        [ -z "$telemetry_token" ] || { printf 'Set token or token file, not both.\n' >&2; exit 1; }
+        telemetry_token=$(cat "$OUTPOST_TELEMETRY_TOKEN_FILE")
+    fi
+    if [ -n "$metrics_url" ] || [ -n "$logs_url" ]; then
+        [ -n "$metrics_url" ] && [ -n "$logs_url" ] || { printf 'Configure both metrics and logs URLs.\n' >&2; exit 1; }
+        printf 'Push telemetry: enabled, transport %s\n' "${OUTPOST_TELEMETRY_TRANSPORT:-netbird}" >&3
+    else
+        printf 'Push telemetry is not configured; set OUTPOST_METRICS_URL and OUTPOST_LOGS_URL. Logs remain in state.\n' >&3
+    fi
     token=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
     [ "${#token}" -eq 16 ] || { printf 'Cannot generate an installation identifier.\n' >&2; exit 1; }
     volume=outpost-state-$token
@@ -111,7 +124,7 @@ main() {
         --restart unless-stopped --user 65532:65532 --read-only --cap-drop ALL \
         --security-opt no-new-privileges:true --pids-limit 128 \
         --memory "${OUTPOST_MEMORY_LIMIT:-1g}" --memory-swap "${OUTPOST_MEMORY_LIMIT:-1g}" --cpu-shares 256 \
-        --stop-timeout 20 --log-opt max-size=5m --log-opt max-file=2 \
+        --stop-timeout 45 --log-opt max-size=5m --log-opt max-file=2 \
         --mount "type=bind,src=$data,dst=/data" --mount "type=volume,src=$volume,dst=/state" \
         --tmpfs /run/outpost:rw,noexec,nosuid,nodev,size=4m,uid=65532,gid=65532,mode=0700 \
         --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m,uid=65532,gid=65532,mode=0700 \
@@ -119,12 +132,16 @@ main() {
         -e OUTPOST_RSYNC_USER=backup "$image_id" >/dev/null
     container_created=1
     helper_created=1
-    printf '%s\n' "$setup_key" | docker run --rm -i --name "$helper" --network none \
+    { printf '%s\n' "$setup_key"
+      if [ -n "$metrics_url" ]; then
+          printf '%s\n' outpost-telemetry-v1 "$metrics_url" "$logs_url" "${OUTPOST_TELEMETRY_TRANSPORT:-netbird}" "$telemetry_token" "${OUTPOST_TELEMETRY_BUFFER:-1GiB}" "${OUTPOST_TELEMETRY_INTERVAL:-30s}"
+      fi
+    } | docker run --rm -i --name "$helper" --network none \
         --user 65532:65532 --read-only --cap-drop ALL --security-opt no-new-privileges:true \
         --pids-limit 32 --memory 64m --memory-swap 64m --log-driver none \
         --mount "type=bind,src=$data,dst=/data" --mount "type=volume,src=$volume,dst=/state" \
         "$image_id" bootstrap
-    unset setup_key
+    unset setup_key telemetry_token
     helper_created=0
     docker start outpost >/dev/null
     printf 'Waiting for NetBird enrollment and receiver readiness...\n' >&3
@@ -143,7 +160,7 @@ main() {
     password=$(docker exec outpost /usr/bin/outpost credentials)
     address=$(docker exec outpost /usr/bin/netbird status --ipv4) || address='see NetBird console'
     installed=1
-    printf '\nOutpost is ready.\nNetBird IPv4: %s\nRsync: port 8873, user backup, module backup\nRsync password: %s\nMetrics: http://<NetBird-IP>:9090/metrics\nState volume: %s\n' "$address" "$password" "$volume" >&3
+    printf '\nOutpost is ready.\nNetBird IPv4: %s\nRsync: port 8873, user backup, module backup\nRsync password: %s\nLocal metrics: docker exec outpost /usr/bin/outpost metrics\nState volume: %s\n' "$address" "$password" "$volume" >&3
     unset password
     printf 'Save the rsync password and enable client-side encryption in Hyper Backup.\n' >&3
     printf 'No installer files or host services were installed. Backup data, the container image and the named state volume remain for operation.\n' >&3

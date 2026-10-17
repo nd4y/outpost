@@ -39,7 +39,11 @@ if a[0]=='create':
  s['container']=True; s['create_args']=a; done(output='test-container')
 if a[0]=='run':
  key=sys.stdin.read()
- assert key.endswith('\n') and len(key.strip())==36
+ lines=key.splitlines()
+ assert len(lines[0])==36
+ if len(lines)>1:
+  assert len(lines)==8 and lines[1]=='outpost-telemetry-v1'
+  s['telemetry_bootstrap']=True
  assert '--network' in a and a[a.index('--network')+1]=='none'
  assert '--log-driver' in a and a[a.index('--log-driver')+1]=='none'
  done(1 if mode=='bootstrap' else 0)
@@ -54,7 +58,7 @@ if a[:2]==['image','rm']: s['image']=False; done()
 raise SystemExit('Unexpected Docker invocation')
 '''
 
-def run_case(label, mode='', existing=False, nonempty=False, preexisting=False, interrupt=False, hidden_interrupt=False):
+def run_case(label, mode='', existing=False, nonempty=False, preexisting=False, interrupt=False, hidden_interrupt=False, telemetry=False):
     case=ROOT/label; case.mkdir()
     binary=case/'bin'; binary.mkdir()
     (binary/'docker').write_text(FAKE); (binary/'docker').chmod(0o755)
@@ -73,6 +77,8 @@ def run_case(label, mode='', existing=False, nonempty=False, preexisting=False, 
         env=dict(os.environ,PATH=str(binary)+':'+os.environ['PATH'],FAKE_ROOT=str(case),FAKE_MODE=mode)
         for key in ('DOCKER_HOST','DOCKER_CONTEXT','NB_MANAGEMENT_URL','OUTPOST_IMAGE','OUTPOST_MEMORY_LIMIT'):
             env.pop(key,None)
+        if telemetry:
+            env.update(OUTPOST_METRICS_URL='https://metrics.example/api/v1/write',OUTPOST_LOGS_URL='https://logs.example/insert/native',OUTPOST_TELEMETRY_TOKEN='test-ingest-token-not-a-real-secret')
         os.execvpe('sh',['sh'],env)
     os.close(pipe_r)
     with os.fdopen(pipe_w, "wb") as source: source.write(SCRIPT)
@@ -118,6 +124,9 @@ def run_case(label, mode='', existing=False, nonempty=False, preexisting=False, 
     assert KEY not in json.dumps(state),'setup key in Docker metadata or arguments'
     if success:
         assert state['container'] and state['volume'] and state['image']
+        if telemetry:
+            assert state.get('telemetry_bootstrap')
+            assert 'test-ingest-token-not-a-real-secret' not in json.dumps(state)
         args=state['create_args']
         assert '--read-only' in args and '--cap-drop' in args and '--publish' not in args and '--privileged' not in args
         assert not any('PASSWORD=' in arg or 'SETUP_KEY=' in arg for arg in args)
@@ -136,6 +145,7 @@ try:
     assert os.geteuid()==0,'run the installer tests with sudo'
     run_case('piped-install-new-directory')
     run_case('piped-install-existing-directory',existing=True)
+    run_case('piped-telemetry-bootstrap',telemetry=True)
     for mode in ('pull','create','bootstrap','start','health','remote'):
         run_case('rollback-'+mode,mode=mode)
     run_case('preserve-existing-container',preexisting=True)

@@ -38,12 +38,18 @@ func main() {
 		err = run(false) // diagnostic mode: still loopback-only
 	case "bootstrap":
 		err = bootstrap(os.Stdin, "/state", "/data")
+	case "metrics":
+		agent := "metrics"
+		if len(os.Args) > 2 {
+			agent = os.Args[2]
+		}
+		err = printMetrics(agent)
 	case "credentials":
 		err = credentials()
 	case "health":
 		err = health()
 	default:
-		err = errors.New("supported commands: run, health, receiver-local, bootstrap, credentials")
+		err = errors.New("supported commands: run, health, receiver-local, bootstrap, credentials, metrics")
 	}
 	if err != nil {
 		log.Print(err)
@@ -169,6 +175,18 @@ func netbirdEnv() ([]string, error) {
 		"NB_LOG_LEVEL=warn", "NB_MANAGEMENT_URL=" + management,
 		"NB_ALLOW_SERVER_SSH=false", "NB_ALLOW_REMOTE_JOBS=false",
 	}
+	telemetry, err := loadTelemetry()
+	if err != nil {
+		return nil, err
+	}
+	if telemetry.MetricsURL != "" && telemetry.Transport == "netbird" {
+		for i, value := range env {
+			if strings.HasPrefix(value, "NB_NETSTACK_SKIP_PROXY=") {
+				env[i] = "NB_NETSTACK_SKIP_PROXY=false"
+			}
+		}
+		env = append(env, "NB_SOCKS5_LISTENER_ADDRESS=127.0.0.1", "NB_SOCKS5_LISTENER_PORT=1080")
+	}
 	if key != "" {
 		env = append(env, "NB_SETUP_KEY="+key)
 	}
@@ -186,16 +204,26 @@ func child(name string, args []string, env []string, output ...io.Writer) (*exec
 	cmd.Env = env
 	cmd.Stdout = os.Stdout
 	if len(output) > 0 {
-		cmd.Stdout = io.MultiWriter(os.Stdout, output[0])
+		cmd.Stdout = output[0]
+		cmd.Stderr = output[0]
+	} else {
+		cmd.Stderr = os.Stderr
 	}
-	cmd.Stderr = os.Stderr
 	// A process group permits stopping rsync's worker children as well.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}
 	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		if len(output) > 0 {
+			if writer, ok := output[0].(interface{ Flush() }); ok {
+				writer.Flush()
+			}
+		}
+		done <- err
+	}()
 	return cmd, done, nil
 }
 func stop(cmd *exec.Cmd) {
@@ -211,19 +239,54 @@ func nbCommand(ctx context.Context, env []string, args ...string) error {
 	cmd.Stderr = nil
 	return cmd.Run()
 }
-func run(withNetbird bool) error {
+func run(withNetbird bool) (runErr error) {
+	if os.Geteuid() == 0 {
+		return errors.New("Outpost must run as a non-root UID")
+	}
+	telemetry, err := loadTelemetry()
+	if err != nil {
+		return err
+	}
+	password, _ := secret("OUTPOST_RSYNC_PASSWORD")
+	key, _ := secret("NB_SETUP_KEY")
+	logs, err := openLogStore("/state/logs", []string{password, key, telemetry.Token})
+	if err != nil {
+		return err
+	}
+	log.SetOutput(logs.writer("outpost"))
+	defer func() {
+		if runErr != nil {
+			log.Print(runErr)
+		}
+		log.SetOutput(os.Stderr)
+		logs.close()
+	}()
 	if err := configure(); err != nil {
 		return err
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	metrics := newMetrics(withNetbird)
+	metrics.logFailures = logs.failures.Load
+	if err := metrics.loadCounters("/state/metrics-counters.json"); err != nil {
+		log.Print("saved counters could not be read")
+	}
+	defer func() {
+		if err := metrics.saveCounters("/state/metrics-counters.json"); err != nil {
+			log.Print("metrics counters could not be saved")
+		}
+	}()
 	server, metricsDone, err := startMetrics(metrics)
 	if err != nil {
 		return err
 	}
 	defer server.Close()
 	go metrics.monitor(ctx)
+	agents, err := startTelemetry(telemetry, logs)
+	if err != nil {
+		return err
+	}
+	defer agents.close()
 	var nb *exec.Cmd
 	var nbDone <-chan error
 	if withNetbird {
@@ -231,7 +294,7 @@ func run(withNetbird bool) error {
 		if err != nil {
 			return err
 		}
-		nb, nbDone, err = child("/usr/bin/netbird", []string{"service", "run"}, env)
+		nb, nbDone, err = child("/usr/bin/netbird", []string{"service", "run"}, env, logs.writer("netbird"))
 		if err != nil {
 			return err
 		}
@@ -277,7 +340,7 @@ func run(withNetbird bool) error {
 			return errors.New("cannot remove consumed setup key")
 		}
 	}
-	rs, rsDone, err := child("/usr/bin/rsync", []string{"--daemon", "--no-detach", "--config=/run/outpost/rsyncd.conf"}, []string{"PATH=/usr/bin", "HOME=/data"}, metrics)
+	rs, rsDone, err := child("/usr/bin/rsync", []string{"--daemon", "--no-detach", "--config=/run/outpost/rsyncd.conf"}, []string{"PATH=/usr/bin", "HOME=/data"}, &transferLog{counter: metrics, output: logs.writer("rsync")})
 	if err != nil {
 		return err
 	}

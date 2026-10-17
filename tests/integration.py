@@ -105,8 +105,7 @@ try:
     check("update and delete for HB rotation", (ROOT/"restore"/"update"/"payload.bin").read_bytes()==payload+b"changed"
           and not (ROOT/"data"/"p31"/"nested"/"small").exists())
     pid = str(inspect["State"]["Pid"])
-    scrape = call(["nsenter", "-t", pid, "-n", "python3", "-c",
-        "import urllib.request; print(urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:9090/metrics',timeout=5).read().decode())"]).stdout
+    scrape = docker("exec",PREFIX,"/usr/bin/outpost","metrics").stdout
     check("metrics report readiness and filesystem capacity", "outpost_up 1\n" in scrape
           and "outpost_storage_statfs_success 1\n" in scrape and "outpost_storage_filesystem_available_bytes " in scrape)
     values = dict(line.rsplit(" ",1) for line in scrape.splitlines() if line and not line.startswith("#"))
@@ -140,6 +139,8 @@ try:
         if docker("exec", PREFIX, "/usr/bin/outpost", "health", good=False).returncode==0:
             break
         time.sleep(.1)
+    restarted_metrics=docker("exec",PREFIX,"/usr/bin/outpost","metrics").stdout
+    check("completed transfer counters survive container restart", dict(line.rsplit(" ",1) for line in restarted_metrics.splitlines() if line and not line.startswith("#"))['outpost_rsync_transferred_files_total{direction="receive"}']==values['outpost_rsync_transferred_files_total{direction="receive"}'])
     rsync(PREFIX, "-a", "rsync://backup@127.0.0.1:8873/backup/p31/", "/restore/restarted/")
     check("data survives restart", (ROOT/"restore"/"restarted"/"payload.bin").read_bytes()==payload+b"changed")
     docker("stop", "--time", "15", PREFIX)

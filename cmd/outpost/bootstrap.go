@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,7 +25,7 @@ func bootstrap(input io.Reader, state, data string) error {
 	if len(entries) != 0 {
 		return errors.New("bootstrap requires an empty state volume")
 	}
-	scanner := bufio.NewScanner(io.LimitReader(input, 4097))
+	scanner := bufio.NewScanner(io.LimitReader(input, 16385))
 	if !scanner.Scan() {
 		return errors.New("bootstrap requires a setup key on stdin")
 	}
@@ -32,8 +33,28 @@ func bootstrap(input io.Reader, state, data string) error {
 	if len(key) < 16 || len(key) > 512 || strings.ContainsAny(key, "\r\n\x00") {
 		return errors.New("invalid setup key")
 	}
-	if scanner.Scan() || scanner.Err() != nil {
-		return errors.New("bootstrap accepts exactly one line")
+	var fields []string
+	for scanner.Scan() {
+		fields = append(fields, scanner.Text())
+		if len(fields) > 7 {
+			return errors.New("invalid bootstrap configuration")
+		}
+	}
+	if scanner.Err() != nil {
+		return errors.New("invalid bootstrap input")
+	}
+	var telemetry telemetryConfig
+	if len(fields) != 0 {
+		if len(fields) != 7 {
+			return errors.New("invalid bootstrap telemetry fields")
+		}
+		if fields[0] != "outpost-telemetry-v1" {
+			return errors.New("unsupported telemetry configuration")
+		}
+		telemetry = telemetryConfig{MetricsURL: fields[1], LogsURL: fields[2], Transport: fields[3], Token: fields[4], Buffer: fields[5], Interval: fields[6]}
+		if err = telemetry.validate(); err != nil {
+			return err
+		}
 	}
 	// Check the selected bind without changing existing host permissions.
 	f, err := os.CreateTemp(data, ".outpost-write-check-")
@@ -55,6 +76,12 @@ func bootstrap(input io.Reader, state, data string) error {
 	for filename, value := range map[string]string{"rsync-password": hex.EncodeToString(random), "setup-key": key} {
 		if err = os.WriteFile(filepath.Join(state, filename), []byte(value+"\n"), 0600); err != nil {
 			return errors.New("cannot write bootstrap state")
+		}
+	}
+	if telemetry.MetricsURL != "" {
+		data, _ := json.Marshal(telemetry)
+		if err = atomicState(filepath.Join(state, "telemetry.json"), data); err != nil {
+			return errors.New("cannot save telemetry configuration")
 		}
 	}
 	return nil

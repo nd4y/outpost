@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -26,6 +28,7 @@ type metrics struct {
 	lastTransfer    atomic.Int64
 	mu              sync.Mutex
 	pending         string
+	logFailures     func() uint64
 }
 
 func newMetrics(required bool) *metrics {
@@ -128,6 +131,7 @@ func (m *metrics) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	gauge := func(name, help string, value any) {
 		fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s gauge\n%s %v\n", name, help, name, name, value)
 	}
+	gauge("outpost_heartbeat_timestamp_seconds", "Wall clock time when this sample was collected.", time.Now().Unix())
 	gauge("outpost_up", "Receiver and required NetBird connection are ready; cached for up to 10 seconds.", boolMetric(m.receiverReady.Load() && (!m.netbirdRequired || m.netbirdReady.Load())))
 	gauge("outpost_rsync_up", "Local rsync listener is available.", boolMetric(m.receiverReady.Load()))
 	gauge("outpost_netbird_required", "NetBird is enabled for this process.", boolMetric(m.netbirdRequired))
@@ -148,10 +152,14 @@ func (m *metrics) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	runtime.ReadMemStats(&mem)
 	gauge("outpost_go_heap_alloc_bytes", "Go supervisor heap bytes; excludes child processes and filesystem cache.", mem.HeapAlloc)
 	gauge("outpost_go_goroutines", "Go supervisor goroutines.", runtime.NumGoroutine())
+	if m.logFailures != nil {
+		fmt.Fprintf(w, "# HELP outpost_log_write_failures_total Persistent log write or rotation failures.\n# TYPE outpost_log_write_failures_total counter\noutpost_log_write_failures_total %d\n", m.logFailures())
+	}
 }
 
 func startMetrics(m *metrics) (*http.Server, <-chan error, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:9090")
+	_ = os.Remove("/run/outpost/metrics.sock")
+	listener, err := net.Listen("unix", "/run/outpost/metrics.sock")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -159,4 +167,24 @@ func startMetrics(m *metrics) (*http.Server, <-chan error, error) {
 	done := make(chan error, 1)
 	go func() { done <- server.Serve(listener) }()
 	return server, done, nil
+}
+
+func printMetrics(agent string) error {
+	if agent != "metrics" && agent != "vmagent" && agent != "vlagent" {
+		return fmt.Errorf("unknown local metrics source")
+	}
+	transport := &http.Transport{DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "unix", "/run/outpost/"+agent+".sock")
+	}}
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	response, err := client.Get("http://outpost/metrics")
+	if err != nil {
+		return fmt.Errorf("local metrics are unavailable")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("local metrics returned an error")
+	}
+	_, err = io.Copy(os.Stdout, io.LimitReader(response.Body, 1024*1024))
+	return err
 }

@@ -31,6 +31,9 @@ COPY cmd ./cmd
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w -buildid=" -o /outpost ./cmd/outpost
 
+FROM victoriametrics/vmagent:v1.154.0@sha256:2a939a9df9c8591aa5447efcd21af8c4f2ecc60ca6a8e742ffd46b9c76ef7f17 AS vmagent
+FROM victoriametrics/vlagent:v1.53.0@sha256:a82f93ffecc153fb068606903e512368b070272739d823abe99fad0eff6e1849 AS vlagent
+
 FROM scratch
 LABEL org.opencontainers.image.title="Outpost Hyper Backup receiver" \
  org.opencontainers.image.description="Shellless non-root rsync with NetBird userspace networking" \
@@ -38,6 +41,8 @@ LABEL org.opencontainers.image.title="Outpost Hyper Backup receiver" \
 COPY --from=rsync-build /runtime/ /
 COPY --from=netbird /tmp/netbird /usr/bin/netbird
 COPY --from=supervisor /outpost /usr/bin/outpost
+COPY --from=vmagent /vmagent-prod /usr/bin/vmagent
+COPY --from=vlagent /vlagent-prod /usr/bin/vlagent
 USER 65532:65532
 WORKDIR /data
 ENV PATH=/usr/bin HOME=/state NB_DAEMON_ADDR=unix:///state/netbird.sock NB_CONFIG=/state/config.json NB_STATE_DIR=/state NB_LOG_FILE=console
