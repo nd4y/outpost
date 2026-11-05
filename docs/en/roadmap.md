@@ -2,7 +2,7 @@
 
 [Русский](../ru/roadmap.md)
 
-Current deliverable: specification 1.3, bilingual documentation, a pinned toolkit and the first [executable G1 fixture](g1-prototype.md). It checks a streaming standalone kit on synthetic data; full G1-G3, production releases, target installation/upgrade/restore and operational SLOs remain NOT VERIFIED.
+Current deliverable: bilingual specification, a pinned toolkit and the [independent file-kit implementation](file-kit-format.md). Its [G1 acceptance plan](g1-acceptance.md) includes full-scale cost limits, real process interruption, metadata and independent restoration. Full G1-G3, production releases, target installation/upgrade/restore and operational SLOs remain NOT VERIFIED until their evidence is accepted. The [native restic fixture](g1-prototype.md) is retained as a comparison.
 
 | Stage | Goal                                                                   | Required evidence                                                                    |
 | ----- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |

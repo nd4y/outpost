@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "observedDate": "2026-11-05",
-  "specVersion": "1.3",
+  "observedDate": "2026-11-06",
+  "specVersion": "1.4",
   "standardVersion": "0.4.0",
   "standardSourceRevision": "75833a42311832d1de665d0e441adac2b5b701d2",
-  "method": "Author design review and source traceability. Product behavior is not tested. Per-commit repository execution evidence is recorded in GitHub Actions and the owner's private task record.",
+  "method": "Author design review and source traceability. Specification 1.4 explicitly records the G1 component/format decision while preserving independent offline complete-replica acceptance. File-kit execution is a separate G1 evidence set, not whole-product verification. Exact-commit CI and private owner records remain separate.",
   "specSha256": {
-    "en": "8704af0245e8f2bdffc4ea4a83d36d44df95c5212566f760cc039c7c8b5d2ae1",
-    "ru": "c9f46cc2bc61da33faceed575d1505b37f7f57c57bcaef39c7b319e65051f8f2"
+    "en": "ffe5e4f21f8ddaee074edba5823d093a5b7a8dc97b3529345c1cbc1f4f850b97",
+    "ru": "b02599a63424cc54c8dd085e7a8e323c7786571b81bb8a74ceac324a46d46c32"
   },
   "rules": [
     {

@@ -31,6 +31,35 @@ for (const id of testIds)
     catalog.requirements.some((item) => item.acceptance.includes(id)),
     `Unmapped ${id}`,
   );
+// Keep the G1 trace attached to existing checks. Existence is not execution.
+const g1Trace = JSON.parse(read("docs/g1-trace.json"));
+assert.equal(g1Trace.schemaVersion, 1);
+assert.equal(g1Trace.gate, "G1");
+assert.deepEqual(
+  g1Trace.requirements.map((item) => item.id).sort(),
+  [...catalog.gates.G1.requirements].sort(),
+  "G1 trace must cover exactly its requirement set",
+);
+const fixtureSource = read("experiments/filekit/run.py");
+for (const item of g1Trace.requirements) {
+  const requirement = catalog.requirements.find((entry) => entry.id === item.id);
+  assert(item.tests.length && item.fixturePhases.length && item.acceptanceSubset.length);
+  for (const test of item.acceptanceSubset)
+    assert(
+      requirement.acceptance.includes(test),
+      `G1 acceptance link absent: ${item.id} -> ${test}`,
+    );
+  for (const test of item.tests) {
+    assert(/^internal\/filekit\/[a-z_]+_test\.go$/.test(test.path));
+    assert(/^Test[A-Za-z0-9]+$/.test(test.name));
+    assert(
+      read(test.path).includes(`func ${test.name}(t *testing.T)`),
+      `Missing G1 executable check: ${item.id} -> ${test.name}`,
+    );
+  }
+  for (const phase of item.fixturePhases)
+    assert(fixtureSource.includes(JSON.stringify(phase)), `Missing G1 fixture phase: ${phase}`);
+}
 // These failure-mode links are part of the reviewed specification contract.
 // Existence of a test elsewhere does not establish a scoped requirement's coverage.
 for (const [id, required] of Object.entries({

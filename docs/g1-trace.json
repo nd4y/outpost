@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "gate": "G1",
+  "scope": "Local file-kit portions only; this mapping does not accept complete release scenarios or G2/G3",
+  "requirements": [
+    {
+      "id": "REQ-09",
+      "acceptanceSubset": ["AT-02", "AT-03"],
+      "tests": [
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestIndependentVersionsAndAttributes"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestCrossFileCiphertextAndVersionSubstitution"
+        }
+      ],
+      "fixturePhases": [
+        "backup-base",
+        "backup-patched",
+        "backup-unchanged",
+        "backup-renamed",
+        "backup-scattered",
+        "backup-inserted"
+      ]
+    },
+    {
+      "id": "REQ-10",
+      "acceptanceSubset": ["AT-04", "AT-05", "AT-12"],
+      "tests": [
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestIndependentVersionsAndAttributes"
+        },
+        {
+          "path": "internal/filekit/gc_linux_test.go",
+          "name": "TestConfidentialNamesAndFileDomainIsolation"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestMultipartDescriptorIsSelfContained"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestTamperedKitNeverPublishesOutput"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestSpecialSourceAndOwnerInputsRejectWithoutBlocking"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestNamesRespectLinuxFilesystemBounds"
+        }
+      ],
+      "fixturePhases": [
+        "export-before-maintenance",
+        "independent-old-after-maintenance",
+        "independent-new-after-maintenance"
+      ]
+    },
+    {
+      "id": "REQ-11",
+      "acceptanceSubset": ["AT-04", "AT-05", "AT-12"],
+      "tests": [
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestRepackAndRetirePreserveKits"
+        },
+        { "path": "internal/filekit/crash_linux_test.go", "name": "TestSIGKILLCommitBoundaries" },
+        { "path": "internal/filekit/filekit_linux_test.go", "name": "TestReaderBlocksRetirement" },
+        {
+          "path": "internal/filekit/gc_linux_test.go",
+          "name": "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency"
+        }
+      ],
+      "fixturePhases": [
+        "repack",
+        "retire",
+        "independent-old-after-maintenance",
+        "independent-new-after-maintenance"
+      ]
+    }
+  ]
+}

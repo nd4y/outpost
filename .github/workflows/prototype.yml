@@ -25,11 +25,18 @@ jobs:
         env:
           GOMAXPROCS: 2
         run: |
-          test -z "$(gofmt -l cmd)"
+          test -z "$(gofmt -l cmd internal)"
           go test -count=1 ./...
           go vet ./...
           mkdir -p out
           CGO_ENABLED=0 go build -trimpath -o out/outpost-lab ./cmd/outpost-lab
+          CGO_ENABLED=0 go build -trimpath -o out/outpost-kit ./cmd/outpost-kit
+          CGO_ENABLED=0 go build -trimpath -o out/outpost-fixture ./cmd/outpost-fixture
+      - name: Independent file-kit fixture (bounded, not full-scale acceptance)
+        run: |
+          python3 experiments/filekit/run.py --root "$RUNNER_TEMP/outpost-filekit" \
+            --kit-binary "$PWD/out/outpost-kit" --fixture-binary "$PWD/out/outpost-fixture" \
+            --limits "$PWD/docs/g1-acceptance.json" --bytes 134217728
       - name: Checksum-pinned experimental restic
         run: |
           curl -fL --retry 2 -o out/restic.bz2 https://github.com/restic/restic/releases/download/v0.19.1/restic_0.19.1_linux_amd64.bz2
