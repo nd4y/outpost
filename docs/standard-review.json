@@ -1,0 +1,1937 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-11-05",
+  "specVersion": "1.1",
+  "standardVersion": "0.4.0",
+  "standardSourceRevision": "75833a42311832d1de665d0e441adac2b5b701d2",
+  "method": "Author design review and source traceability. Product behavior is not tested. Per-commit repository execution evidence is recorded in GitHub Actions and the owner's private task record.",
+  "specSha256": {
+    "en": "4732a302a782d089919f9454b4a54c7534e4df9ba47601bea44b4f7cae66e5d1",
+    "ru": "ec7b6903253afa94c1192cc813643466e3805962b76118a46396e1afdf00cac7"
+  },
+  "rules": [
+    {
+      "id": "GOV-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Record the user, three primary journeys, scope, supported platforms, data, dependencies, permissions, artifacts and support lifecycle. Give each journey an expected result and acceptance method. Another maintainer must be able to determine scope and completion without the chat history.",
+        "ru": "До расширения продукта зафиксированы пользователь, три главных сценария, границы функций, поддерживаемые платформы, данные, внешние зависимости, права, артефакты и статус поддержки. Для каждого сценария указаны ожидаемый результат и способ проверки. Проверка: другой исполнитель может определить, что нужно сделать и когда остановиться, без чтения всей истории чата."
+      },
+      "observation": {
+        "en": "Three actor workflows, boundaries, platforms and support are explicit.",
+        "ru": "Три пользовательских сценария, границы, платформы и поддержка зафиксированы."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/project.md",
+          "line": 1
+        },
+        {
+          "path": "docs/ru/project.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "GOV-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Specify applicable data volumes, concurrency, response or completion targets, CPU/RAM/disk and external spending budgets. Services define reliability indicators and measurement windows; stored data defines acceptable loss and recovery time. Label unknowns and measure them before advertising guarantees. Record test conditions.",
+        "ru": "Для применимых сценариев паспорт задаёт объём данных, параллелизм, допустимую задержку или время выполнения, бюджет CPU/RAM/диска и внешних расходов. Для непрерывного сервиса задаются показатели надёжности и окно измерения; для сохраняемых данных - допустимая потеря и время восстановления. Неизвестное обозначается как неизвестное с задачей измерения. Числа становятся гарантией только после проверки в указанных условиях. Подход к показателям надёжности опирается на [Google SRE](https://sre.google/workbook/implementing-slos/)."
+      },
+      "observation": {
+        "en": "Capacity and SLO values require measurements with an owner and milestone; no measured guarantee is claimed.",
+        "ru": "Пределы и SLO требуют измерений с владельцем и этапом; измеренные гарантии не заявлены."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-44", "REQ-53"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 281,
+          "requirement": "REQ-44"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 290,
+          "requirement": "REQ-44"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 428,
+          "requirement": "REQ-53"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 447,
+          "requirement": "REQ-53"
+        }
+      ]
+    },
+    {
+      "id": "GOV-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Rules have stable IDs, MUST/SHOULD levels, scope, rationale, verification and a commit, PR, release or operations gate. A failed or missing mandatory proof blocks its applicable gate. Do not reuse IDs. Pin the standard version; updates arrive as reviewed changes.",
+        "ru": "У каждого требования есть постоянный ID, уровень MUST или SHOULD, область применимости, ожидаемый результат, проверка и этап: commit, PR, release либо эксплуатация. MUST блокирует соответствующий этап при нарушении или отсутствии обязательного доказательства; SHOULD попадает в план улучшений. ID не переиспользуются. В карточке фиксируется версия стандарта; новые версии приходят отдельными проверяемыми изменениями."
+      },
+      "observation": {
+        "en": "Stable MUST IDs now declare scope, stage, milestone and acceptance.",
+        "ru": "Для постоянных MUST ID заданы область, этап, milestone и приёмка."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/requirements.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "SEC-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Separate user, administrator, agent and background-worker permissions; restrict operations to named objects. A LAN is not an authorization boundary by itself. Verify forbidden operations, other users' objects, revoked access and the wrong environment. Use applicable OWASP ASVS controls for web services.",
+        "ru": "Каждый компонент получает только нужные операции над конкретными объектами. Отдельно описаны пользователь, администратор, агент и фоновый исполнитель; локальная сеть сама по себе не даёт административных прав. Проверка перед выпуском затронутого пути: чужой объект, запрещённая операция, отозванный доступ и неверная среда отклоняются. Для веб-сервисов применимые требования выбираются из [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)."
+      },
+      "observation": {
+        "en": "Roles, domain/tenant rights and explicit placement/deletion authority are separated.",
+        "ru": "Разделены роли, domain/tenant и полномочия размещения/удаления."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-07", "REQ-16", "REQ-38", "REQ-40"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 87,
+          "requirement": "REQ-07"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 94,
+          "requirement": "REQ-07"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 137,
+          "requirement": "REQ-16"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 146,
+          "requirement": "REQ-16"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 253,
+          "requirement": "REQ-38"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 262,
+          "requirement": "REQ-38"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 261,
+          "requirement": "REQ-40"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 270,
+          "requirement": "REQ-40"
+        }
+      ]
+    },
+    {
+      "id": "SEC-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Never include secrets in Git history, artifacts, logs, diagnostics, screenshots or an external worker's context. Support replacement and revocation without reinstalling the product. Explain local/remote data flow, export and deletion. Scan and inspect actual data flow. Revoke leaked credentials before cleaning history.",
+        "ru": "Значения секретов не попадают в Git, сборки, журналирование, диагностику, снимки экрана и контекст внешнего исполнителя. Секрет можно заменить и отозвать без переустановки продукта. Пользователь понимает, что хранится локально, что уходит наружу и как удалить или экспортировать данные. Проверка: сканирование плюс проверка реального потока данных и очистки. Обнаруженный опубликованный ключ сначала отзывается; одна очистка истории не решает утечку."
+      },
+      "observation": {
+        "en": "Encryption, scoped credentials, recovery-key separation and publication scanning are required.",
+        "ru": "Заданы шифрование, ограниченные credentials, отдельные recovery-ключи и сканирование публикации."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-06", "REQ-07", "REQ-08", "REQ-43"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 83,
+          "requirement": "REQ-06"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 90,
+          "requirement": "REQ-06"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 87,
+          "requirement": "REQ-07"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 94,
+          "requirement": "REQ-07"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 91,
+          "requirement": "REQ-08"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 98,
+          "requirement": "REQ-08"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 277,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 286,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "SECURITY.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "SEC-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Validate files, paths, archives, URLs, webhooks, model output and external documents at the boundary. Bound size, duration, expansion and destinations. Use safe command, SQL and filesystem APIs. Retrieved instructions cannot authorize new actions. Test traversal, oversized input, forbidden internal destinations and malicious content.",
+        "ru": "Файлы, пути, URL, архивы, webhook, ответы модели и содержимое внешних документов проверяются на границе системы. Заданы ограничения размера, времени, распаковки и допустимых получателей. Команды, SQL и пути строятся безопасными API. Инструкции из документов и результатов поиска не дают агенту новых полномочий. Проверка: недопустимые пути, слишком большой ввод, внутренний URL вне разрешённого назначения и вредоносное содержимое не приводят к выходу за границы задачи."
+      },
+      "observation": {
+        "en": "Input paths, links, URLs, sizes and decompression limits now have negative acceptance.",
+        "ru": "Для путей, ссылок, URL, размеров и распаковки добавлена негативная приёмка."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-48", "REQ-40"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 418,
+          "requirement": "REQ-48"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 437,
+          "requirement": "REQ-48"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 261,
+          "requirement": "REQ-40"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 270,
+          "requirement": "REQ-40"
+        }
+      ]
+    },
+    {
+      "id": "SEC-004",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Administrative functions and external exposure require intentional configuration. Do not disable authentication, TLS verification or authorization to work around a failure. Define safe behavior for expired tokens, unavailable authorization and invalid configuration; failure must not expand access or disclose data.",
+        "ru": "Административные функции и внешняя публикация включаются осознанно. Аутентификация, проверка TLS и ограничения прав не выключаются для исправления ошибки. Для каждого опасного отказа определён допустимый режим. Проверка включает недоступность проверки прав, истечение токена и ошибку конфигурации; система не расширяет доступ и не раскрывает данные."
+      },
+      "observation": {
+        "en": "Unknown recipients are denied; expiry and dependency failures never widen access.",
+        "ru": "Неизвестные получатели запрещены; истечение и сбои не расширяют доступ."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-15", "REQ-18", "REQ-40", "REQ-48"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 125,
+          "requirement": "REQ-15"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 132,
+          "requirement": "REQ-15"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 145,
+          "requirement": "REQ-18"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 154,
+          "requirement": "REQ-18"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 261,
+          "requirement": "REQ-40"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 270,
+          "requirement": "REQ-40"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 418,
+          "requirement": "REQ-48"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 437,
+          "requirement": "REQ-48"
+        }
+      ]
+    },
+    {
+      "id": "DATA-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Define when an operation may report success. Protect writes against partial results, duplicates and concurrent lost updates. Test interrupted writes, retries and conflicts. Do not place a live SQLite database in a sync directory without a verified supported mechanism; use consistent exports or backups.",
+        "ru": "Успех означает достижение оговорённой границы сохранности. Запись файла или состояния защищена от частичного результата; повторы и конкурентные изменения не создают незаметную потерю или дубликат. Проверка: прерывание записи, повтор запроса и конфликт обновления. Рабочая SQLite-база не размещается в синхронизируемой папке без подтверждённо поддерживаемого механизма; для переноса используется согласованный экспорт или backup."
+      },
+      "observation": {
+        "en": "Durability boundary, idempotent jobs, atomic publication and crash checks are explicit.",
+        "ru": "Явно заданы сохранность, идемпотентность, атомарная публикация и аварийные проверки."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-13", "REQ-19", "REQ-22"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 115,
+          "requirement": "REQ-13"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 122,
+          "requirement": "REQ-13"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 149,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 158,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 163,
+          "requirement": "REQ-22"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 172,
+          "requirement": "REQ-22"
+        }
+      ]
+    },
+    {
+      "id": "DATA-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Declare supported starting versions, migrations, backup and recovery. Downgrading a binary does not reverse an incompatible schema. Test representative old data, an interrupted migration and isolated restoration with semantic and user-journey checks.",
+        "ru": "Известны поддерживаемые исходные версии, миграции, резервная копия и путь восстановления. Откат бинарника не считается откатом несовместимой схемы. Проверка затронутого релиза: обновление репрезентативных старых данных, прерывание миграции и восстановление в изоляции с проверкой содержимого и пользовательского сценария."
+      },
+      "observation": {
+        "en": "Recovery kits and interrupted migration/oldest-version upgrade are mandatory.",
+        "ru": "Обязательны recovery kit, прерывание миграции и обновление старейшей версии."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-08", "REQ-41", "REQ-50"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 91,
+          "requirement": "REQ-08"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 98,
+          "requirement": "REQ-08"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 267,
+          "requirement": "REQ-41"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 276,
+          "requirement": "REQ-41"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 422,
+          "requirement": "REQ-50"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 441,
+          "requirement": "REQ-50"
+        }
+      ]
+    },
+    {
+      "id": "DATA-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Keep source data until the transformed result is accepted under an explicit replacement/deletion policy. Jobs have stable identifiers, state and checkpoints. Test corrupt input, duplicates, cancellation, restart and disk exhaustion; incomplete work must not be marked complete.",
+        "ru": "Исходник сохраняется до принятия проверенного результата; замена или удаление имеют явную политику. У задания есть устойчивый ID, статус и контрольная точка. Проверка: повреждённый файл, повтор, отмена, перезапуск и заполненный диск не оставляют результат, ошибочно отмеченный готовым."
+      },
+      "observation": {
+        "en": "Source release follows acceptance; bounded buffers and last-good survive failures.",
+        "ru": "Источник освобождается по приёмке; ограниченные буферы и last-good переживают сбои."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-02", "REQ-04", "REQ-05", "REQ-19", "REQ-31"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 71,
+          "requirement": "REQ-02"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 78,
+          "requirement": "REQ-02"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 75,
+          "requirement": "REQ-04"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 82,
+          "requirement": "REQ-04"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 77,
+          "requirement": "REQ-05"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 84,
+          "requirement": "REQ-05"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 149,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 158,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 221,
+          "requirement": "REQ-31"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 230,
+          "requirement": "REQ-31"
+        }
+      ]
+    },
+    {
+      "id": "REL-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Each significant dependency has timeouts, bounded delayed retries and a degraded mode. Preserve the primary journey when an optional dependency fails. Test unavailable, slow and malformed responses and recovery. Never bypass authorization to improve availability.",
+        "ru": "Для каждой существенной зависимости описаны timeout, ограниченные повторы с задержкой и режим деградации. При недоступности необязательной функции основной сценарий сохраняется, где это возможно. Проверка: отключение зависимости, медленный ответ, некорректный ответ и восстановление. Отказы доступа не обходятся ради доступности."
+      },
+      "observation": {
+        "en": "Dependency outages, timeouts, retries and authorized fallback routes have defined behavior.",
+        "ru": "Задано поведение при отказах зависимостей, timeout, повторах и резервных путях."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-17", "REQ-18", "REQ-25", "REQ-27", "REQ-28"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 141,
+          "requirement": "REQ-17"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 150,
+          "requirement": "REQ-17"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 145,
+          "requirement": "REQ-18"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 154,
+          "requirement": "REQ-18"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 195,
+          "requirement": "REQ-25"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 204,
+          "requirement": "REQ-25"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 205,
+          "requirement": "REQ-27"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 214,
+          "requirement": "REQ-27"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 211,
+          "requirement": "REQ-28"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 220,
+          "requirement": "REQ-28"
+        }
+      ]
+    },
+    {
+      "id": "REL-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Reconcile actual state after restart and avoid repeating irreversible effects. Validate configuration before applying it and retain the last known good configuration where safe. Test restart mid-operation and duplicate event delivery.",
+        "ru": "После перезапуска система сверяет действительное состояние и продолжает работу без повторного необратимого действия. Настройки валидируются до применения; последняя корректная версия сохраняется там, где её использование допустимо. Проверка: перезапуск в середине операции и несколько повторных доставок одного события."
+      },
+      "observation": {
+        "en": "Persistent jobs/pins, replay protection and state reconciliation precede retries.",
+        "ru": "Устойчивые задания/pins, защита replay и сверка состояния предшествуют повторам."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-18", "REQ-19", "REQ-21", "REQ-33", "REQ-41"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 145,
+          "requirement": "REQ-18"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 154,
+          "requirement": "REQ-18"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 149,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 158,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 159,
+          "requirement": "REQ-21"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 168,
+          "requirement": "REQ-21"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 227,
+          "requirement": "REQ-33"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 236,
+          "requirement": "REQ-33"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 267,
+          "requirement": "REQ-41"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 276,
+          "requirement": "REQ-41"
+        }
+      ]
+    },
+    {
+      "id": "REL-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Bound the range, duration and rate of physical actions. Provide a safe stop or justified fallback. Disconnection and restart must not cause an unintended action. Preserve a recovery path for network control. Test on an authorized bench and the actual target device; simulation is a separate result.",
+        "ru": "Ограничены диапазон, длительность и частота воздействия; предусмотрен безопасный останов или другой обоснованный режим отказа. Разрыв связи и рестарт не запускают опасное действие самопроизвольно. Для сети предусмотрен путь восстановления управления. Проверка проводится на разрешённом стенде, затем на конкретном целевом устройстве; симулятор не заменяет этот этап."
+      },
+      "observation": {
+        "en": "No actuator or router administration is introduced; network recovery is tested in an authorized environment.",
+        "ru": "Управление физическими устройствами и роутерами не вводится; восстановление связи проверяется в разрешённом контуре."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-25", "REQ-39", "REQ-40", "REQ-52"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 195,
+          "requirement": "REQ-25"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 204,
+          "requirement": "REQ-25"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 257,
+          "requirement": "REQ-39"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 266,
+          "requirement": "REQ-39"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 261,
+          "requirement": "REQ-40"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 270,
+          "requirement": "REQ-40"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 426,
+          "requirement": "REQ-52"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 445,
+          "requirement": "REQ-52"
+        }
+      ]
+    },
+    {
+      "id": "CAP-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Use meaningful units: connections and bandwidth, probes per minute, file sizes, audio duration or visible records. Define normal load, supported maximum and resource budget. Record version, hardware, configuration and reproducible results; one fast request does not demonstrate capacity.",
+        "ru": "Для проекта выбраны естественные единицы нагрузки: соединения и Мбит/с, пробы в минуту, файлы и их размер, длительность аудио, число объектов на экране. Зафиксированы обычный режим, поддерживаемый максимум и ресурсный бюджет. Проверка: воспроизводимый сценарий с версией, оборудованием, настройками и результатами; единичный быстрый запрос не доказывает ёмкость системы."
+      },
+      "observation": {
+        "en": "A reproducible profile defines workloads and leaves actual capacity unverified until measurement.",
+        "ru": "Воспроизводимый профиль задаёт нагрузку; фактическая ёмкость ждёт измерений."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-44", "REQ-53"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 281,
+          "requirement": "REQ-44"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 290,
+          "requirement": "REQ-44"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 428,
+          "requirement": "REQ-53"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 447,
+          "requirement": "REQ-53"
+        }
+      ]
+    },
+    {
+      "id": "CAP-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Bound queues, concurrency, caches, temporary storage and retries. Above the limit, defer or reject work explicitly, preserve accepted work according to the contract and release resources after cancellation. Test controlled overload and recovery without manual cleanup.",
+        "ru": "Очереди, параллелизм, кеши, временные файлы и повторы имеют пределы. При превышении система откладывает или отклоняет работу с понятным статусом, сохраняет принятую работу согласно контракту и освобождает ресурсы после отмены. Проверка: контролируемая перегрузка и последующее восстановление без ручной очистки. Это соответствует подходу к [обработке перегрузки Google SRE](https://sre.google/sre-book/handling-overload/)."
+      },
+      "observation": {
+        "en": "Queues, temporary storage, concurrency and overload are bounded without deleting protected data.",
+        "ru": "Очереди, временное место, параллелизм и перегрузка ограничены без удаления защищённых данных."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-04", "REQ-19", "REQ-42", "REQ-44", "REQ-48"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 75,
+          "requirement": "REQ-04"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 82,
+          "requirement": "REQ-04"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 149,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 158,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 273,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 282,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 281,
+          "requirement": "REQ-44"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 290,
+          "requirement": "REQ-44"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 418,
+          "requirement": "REQ-48"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 437,
+          "requirement": "REQ-48"
+        }
+      ]
+    },
+    {
+      "id": "CAP-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Choose the next scaling step from measured bottlenecks and maintenance cost: an index, batching, worker, cache, larger node or component split. Introduce distributed architecture when justified. Compare before and after under stated conditions.",
+        "ru": "Для роста выбран следующий практический шаг и известное ограничение: индекс, пакетная обработка, дополнительный worker, кеш, более мощный узел либо разделение компонента. Распределённая архитектура вводится при подтверждённой потребности. Проверка решения: измерение до и после вместе со стоимостью сопровождения."
+      },
+      "observation": {
+        "en": "Parallel upload must justify gains with measured throughput and cost.",
+        "ru": "Параллельная отправка подтверждает пользу измерением скорости и стоимости."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-27", "REQ-53"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 205,
+          "requirement": "REQ-27"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 214,
+          "requirement": "REQ-27"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 428,
+          "requirement": "REQ-53"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 447,
+          "requirement": "REQ-53"
+        }
+      ]
+    },
+    {
+      "id": "UX-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Explain what the product does, its benefit and the first action. Provide useful defaults and progressive disclosure. Verify the first three journeys from public instructions without knowledge of internal architecture.",
+        "ru": "Первое знакомство отвечает на вопросы: что это, что даёт пользователю и что сделать сначала. Есть полезные значения по умолчанию и один очевидный следующий шаг; сложные настройки открываются по мере необходимости. Проверка: пройти первые три сценария по публичной инструкции без знания внутренней архитектуры."
+      },
+      "observation": {
+        "en": "Readmes and passport start with purpose, three workflows and the next step.",
+        "ru": "README и паспорт начинают с назначения, трёх сценариев и следующего шага."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-37", "REQ-47", "REQ-49"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 249,
+          "requirement": "REQ-37"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 258,
+          "requirement": "REQ-37"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 420,
+          "requirement": "REQ-49"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 439,
+          "requirement": "REQ-49"
+        },
+        {
+          "path": "README.md",
+          "line": 1
+        },
+        {
+          "path": "README.ru.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "UX-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Distinguish loading, empty results, errors, forbidden access, offline, stale data and success. Explain recovery and preserve input. Long work shows actual stages and supported cancellation/resumption, without invented percentages. Test each state and returning to the application.",
+        "ru": "Различаются загрузка, пустой результат, ошибка, отсутствие доступа, offline, устаревшие данные и успешное выполнение. Показаны последствия и способ исправления ошибки. Долгая операция показывает реальный этап, возможность отмены и возобновления; процент без измеримого основания не придумывается. Проверка охватывает эти состояния, сохранение введённых данных и поведение после возврата в приложение."
+      },
+      "observation": {
+        "en": "Loading, empty, forbidden, offline, stale, error and progress states are explicit.",
+        "ru": "Явно заданы загрузка, пусто, запрет, offline, устаревание, ошибки и прогресс."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-23", "REQ-37", "REQ-49"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 171,
+          "requirement": "REQ-23"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 180,
+          "requirement": "REQ-23"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 249,
+          "requirement": "REQ-37"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 258,
+          "requirement": "REQ-37"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 420,
+          "requirement": "REQ-49"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 439,
+          "requirement": "REQ-49"
+        }
+      ]
+    },
+    {
+      "id": "UX-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Target applicable WCAG 2.2 AA criteria for web interfaces, including keyboard, focus, labels, contrast, zoom and non-color cues. Use native platform accessibility for apps. Combine automated checks with manual journeys. Shared tokens preserve identity while native controls preserve platform behavior. Claim full conformance only after full verification.",
+        "ru": "Веб-интерфейс проектируется с целью WCAG 2.2 AA и проверкой применимых критериев: клавиатура, фокус, подписи элементов, контраст, масштабирование и отсутствие зависимости только от цвета. Нативные приложения используют возможности доступности платформы. Общие дизайн-токены сохраняют узнаваемость, платформенные элементы - ожидаемое поведение. Автоматический сканер дополняется ручным прохождением. Заявление о соответствии всему стандарту допустимо только при полной проверке. [WCAG 2.2](https://www.w3.org/TR/WCAG22/)."
+      },
+      "observation": {
+        "en": "WCAG 2.2 AA targets, manual keyboard checks and localization are now acceptance conditions.",
+        "ru": "Цель WCAG 2.2 AA, ручная проверка клавиатуры и локализация включены в приёмку."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-49"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 420,
+          "requirement": "REQ-49"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 439,
+          "requirement": "REQ-49"
+        }
+      ]
+    },
+    {
+      "id": "UX-004",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Offer undo for reversible actions where practical. Before irreversible actions show the target, volume and consequences. Avoid confirmations on ordinary navigation. Test duplicate taps, closing, back navigation, network loss and insufficient permissions.",
+        "ru": "Обратимые действия поддерживают отмену, где это возможно. Необратимые показывают объект, объём и последствия до выполнения. Обычная навигация не перегружается подтверждениями. Проверка: повторное нажатие, закрытие окна, возврат назад, потеря сети и попытка выполнить действие без прав."
+      },
+      "observation": {
+        "en": "Preview destructive scope, protect restores and make duplicate requests safe.",
+        "ru": "Показываются последствия удаления, защищается restore, повторы запросов безопасны."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-16", "REQ-19", "REQ-36", "REQ-49"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 137,
+          "requirement": "REQ-16"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 146,
+          "requirement": "REQ-16"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 149,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 158,
+          "requirement": "REQ-19"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 245,
+          "requirement": "REQ-36"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 254,
+          "requirement": "REQ-36"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 420,
+          "requirement": "REQ-49"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 439,
+          "requirement": "REQ-49"
+        }
+      ]
+    },
+    {
+      "id": "OBS-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Expose version, applied configuration, last successful operation, current error and data freshness. Correlate operation stages without logging secrets. CLI tools use correct exit codes, stdout/stderr and diagnostics; only operating services need service monitoring.",
+        "ru": "Видны версия, фактически применённая конфигурация, последняя успешная операция, текущая ошибка и свежесть данных. Логи связывают этапы одной операции идентификатором и не содержат секретов. Для CLI достаточно корректных exit code, stdout/stderr и диагностического режима; отдельная система мониторинга нужна только работающему сервису."
+      },
+      "observation": {
+        "en": "Show version, applied state, operation identity and freshness without leaking secrets.",
+        "ru": "Показываются версия, применённое состояние, ID операции и свежесть без секретов."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-23", "REQ-37", "REQ-42", "REQ-43"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 171,
+          "requirement": "REQ-23"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 180,
+          "requirement": "REQ-23"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 249,
+          "requirement": "REQ-37"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 258,
+          "requirement": "REQ-37"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 273,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 282,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 277,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 286,
+          "requirement": "REQ-43"
+        }
+      ]
+    },
+    {
+      "id": "OBS-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Each alert has a condition, recipient and useful action. Verify delivery, recovery and quiet unchanged state. Critical monitoring also has an independent failure signal. A configuration file is not delivery proof. Send test messages only through an authorized test route.",
+        "ru": "Известны условие, получатель и действие по алерту; проверяется доставка, восстановление и тишина при неизменном состоянии. Для критичных систем проверяется также отказ самого мониторинга независимым каналом. Наличие правила в файле не считается проверкой доставки. Проверочные сообщения отправляются только в разрешённом контуре."
+      },
+      "observation": {
+        "en": "Alert delivery, recovery, quiet unchanged states and monitoring failure require end-to-end tests.",
+        "ru": "Доставка, восстановление, тишина и отказ мониторинга требуют сквозной проверки."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-42", "REQ-43", "REQ-52"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 273,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 282,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 277,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 286,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 426,
+          "requirement": "REQ-52"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 445,
+          "requirement": "REQ-52"
+        }
+      ]
+    },
+    {
+      "id": "OBS-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Keep current architecture in the passport, procedures in runbooks and history in issues/incidents. Date observations, distinguish hypotheses from established causes. Runbooks state prerequisites, exact target, steps, acceptance and rollback. A tracker can replace tasks.md; avoid duplicate sources of truth.",
+        "ru": "Текущее устройство описано в паспорте, действия - в runbook, история и причины - в задачах и инцидентах. Наблюдения и измерения датированы; гипотеза отделена от установленной причины. Runbook содержит условия, точную цель, шаги, критерий результата и откат. Трекер может заменять отдельный tasks.md: одна запись не копируется вручную в несколько источников истины."
+      },
+      "observation": {
+        "en": "Runbooks require targets, steps, evidence and rollback; operations remain future work.",
+        "ru": "Runbook содержит цель, шаги, доказательства и откат; эксплуатация ещё не принята."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-43", "REQ-52"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 277,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 286,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 426,
+          "requirement": "REQ-52"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 445,
+          "requirement": "REQ-52"
+        },
+        {
+          "path": "docs/en/roadmap.md",
+          "line": 1
+        },
+        {
+          "path": "docs/ru/roadmap.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "ARCH-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Version APIs, configuration, schemas, export formats and protocols with compatibility rules. Separate product behavior from UI, external services and storage enough to test boundaries. Test changed contracts against supported consumers; libraries include a minimal consumer example.",
+        "ru": "API, конфигурация, схема данных, форматы экспорта и протоколы имеют описанные версии и правила совместимости. Логика продукта отделяется от UI, внешнего сервиса и хранения настолько, чтобы проверять границы отдельно. Изменение контракта проверяется на поддерживаемом потребителе; для библиотеки - на минимальном примере использования."
+      },
+      "observation": {
+        "en": "Versioned APIs, peer protocol, fixtures and a minimal consumer are required.",
+        "ru": "Требуются версионированные API, peer-протокол, фикстуры и минимальный потребитель."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-45", "REQ-46", "REQ-50"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 287,
+          "requirement": "REQ-45"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 296,
+          "requirement": "REQ-45"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 300,
+          "requirement": "REQ-46"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 309,
+          "requirement": "REQ-46"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 422,
+          "requirement": "REQ-50"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 441,
+          "requirement": "REQ-50"
+        }
+      ]
+    },
+    {
+      "id": "ARCH-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Assign an authoritative source for inventory, environment configuration, schemas and design tokens. Generate derived files or automatically check agreement. Extract shared libraries after stable repetition; do not force independent products into one platform without a reason.",
+        "ru": "Список узлов, настройки окружения, схема и дизайн-токены имеют назначенный первичный источник. Производные файлы генерируются или их согласованность проверяется автоматически. Общие библиотеки выделяются после появления устойчивого повторения; независимые продукты не объединяются в обязательную общую платформу без причины."
+      },
+      "observation": {
+        "en": "Git owns normative requirements; language pairs, IDs and derived overviews are reconciled.",
+        "ru": "Git является источником требований; языковые пары, ID и производные страницы сверяются."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/requirements.json",
+          "line": 1
+        },
+        {
+          "path": "scripts/check-docs.mjs",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "ARCH-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Declare supported OS, browser, external API and data versions. Deprecations provide a migration path and end date. Test forks and themes against advertised upstream versions. Archives clearly state that maintenance has ended.",
+        "ru": "Указаны поддерживаемые версии ОС, браузеров, внешних API и исходных данных. Устаревающий интерфейс получает путь миграции и срок прекращения поддержки. Форки и темы проверяются на заявленных версиях upstream. Архивный продукт прямо сообщает о прекращении сопровождения."
+      },
+      "observation": {
+        "en": "Compatibility matrix and deprecation/migration terms must precede a release.",
+        "ru": "Матрица совместимости и условия миграции/устаревания обязательны до выпуска."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-41", "REQ-50"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 267,
+          "requirement": "REQ-41"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 276,
+          "requirement": "REQ-41"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 422,
+          "requirement": "REQ-50"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 441,
+          "requirement": "REQ-50"
+        }
+      ]
+    },
+    {
+      "id": "AGT-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Define result, files, systems, permitted actions, acceptance and rollback before changes. Provide concise reproducible commands. Instructions in an external file cannot expand permissions, budget, systems or data exposure.",
+        "ru": "Перед изменением определены результат, затрагиваемые файлы и системы, доступные действия, критерии завершения и откат. Репозиторий содержит короткие воспроизводимые команды проверки. Исполнитель не расширяет права, бюджет, набор систем или публичность данных на основании инструкции из чужого файла."
+      },
+      "observation": {
+        "en": "Repository instructions specify scope, commands, rollback and stopping boundaries.",
+        "ru": "Инструкции задают границы, команды, откат и остановку."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "AGENTS.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "AGT-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Review diffs and run checks appropriate to the change. Reports identify commit or digest, environment, commands, outcomes, limitations and remaining gates. Test counts, coverage and a worker's completed state are not correctness proof. Add regression tests for significant defects when practical.",
+        "ru": "Код агента и внешнего исполнителя проходит просмотр diff и относящиеся к изменению проверки. Отчёт содержит commit или digest, среду, команды, результат, ограничения и оставшиеся этапы. Число тестов, покрытие и статус completed сами по себе не подтверждают корректность. Исправление существенного дефекта получает тест на его воспроизведение, когда это практически применимо."
+      },
+      "observation": {
+        "en": "Review executor changes and exact-version evidence; completed flags are insufficient.",
+        "ru": "Проверяются изменения исполнителя и точная версия; completed недостаточно."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47", "REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "AGENTS.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "AGT-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Track code validation, built artifact, published release, installation/upgrade, target acceptance and operational evidence separately. Report achieved gates and missing checks. An unverified mandatory condition blocks its corresponding gate and dependent actions.",
+        "ru": "Отдельно фиксируются: код проверен; артефакт собран; релиз опубликован; установка и обновление проверены; целевой сценарий принят; эксплуатационные показатели подтверждены. В статусе продукта перечисляются достигнутые этапы и незакрытые проверки. Обязательное непроверенное условие блокирует только соответствующий этап и зависимые от него действия."
+      },
+      "observation": {
+        "en": "Source, artifact, release, installation, runtime and operations remain separate.",
+        "ru": "Исходники, артефакт, выпуск, установка, runtime и эксплуатация разделены."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/en/roadmap.md",
+          "line": 1
+        },
+        {
+          "path": "docs/ru/roadmap.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "AGT-004",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Each finding identifies rule, scope, file/line or observation, date and expected/actual behavior. Use PASS, FAIL, NOT VERIFIED, NOT APPLICABLE with reason, or EXCEPTION with a decision. Missing tools cannot become a superficial manual PASS. Separate suggestions from violations. Read-only audit does not authorize remediation.",
+        "ru": "У каждого вывода есть ID правила, область, файл и строка либо наблюдение, дата, ожидаемое и фактическое поведение. Результаты: PASS, FAIL, NOT VERIFIED, NOT APPLICABLE с причиной, EXCEPTION со ссылкой на решение. Отсутствующий инструмент не превращается в PASS после поверхностного ручного просмотра. Предложения вне записанных правил выводятся отдельно. Аудит чтением не даёт права исправлять или применять изменения."
+      },
+      "observation": {
+        "en": "This 45-rule design audit records expected state, observations, scope and references.",
+        "ru": "Аудит 45 правил содержит ожидания, наблюдения, область и ссылки."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/standard-review.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-001",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Keep a versioned repository policy with kind, lifecycle, profiles, verification commands, artifacts and exceptions. Compose profiles in monorepos. Experiments do not imply stable support; document new product types before publishing.",
+        "ru": "Храни версионированную карточку: тип, статус поддержки, профили, команды проверок, артефакты и исключения. Профили компонентов совмещаются. Эксперимент не обещает стабильность; новый тип продукта получает критерии до публикации."
+      },
+      "observation": {
+        "en": "Experimental product lifecycle, ten profiles and adopting state are explicit.",
+        "ru": "Заданы экспериментальный статус продукта, десять профилей и adopting."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": ".repo-policy.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-002",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Scan staged content and every introduced commit with pinned Gitleaks; scan the full published history at initial adoption and before private-to-public publication. Cover branches, tags, LFS, submodules, logs, images and release assets. Redact findings; unavailable scanning fails closed. Revoke exposed credentials first. Add server push protection when available. Keep default detectors and narrow reviewed exceptions.",
+        "ru": "Gitleaks проверяет staged-содержимое и все добавляемые коммиты. При первичном подключении и private-to-public проверяется вся публикуемая история. Учитывай ветки, теги, LFS, сабмодули, логи, изображения и релизы. Значения маскируются; недоступный сканер блокирует этап. Опубликованный секрет сначала отзывается. Включай доступную серверную защиту; сохраняй стандартные детекторы и узкие согласованные исключения."
+      },
+      "observation": {
+        "en": "Pinned scanning covers staging, commit changes and full history; server enforcement is read back separately.",
+        "ru": "Закреплённое сканирование охватывает индекс, изменения и историю; серверная защита проверяется отдельно."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": ".github/workflows/repository-standard.yml",
+          "line": 1
+        },
+        {
+          "path": "scripts/check-standard-adoption.mjs",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-003",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Pin formatters and lock dependencies. Run Prettier for supported changed files in pre-commit and CI, with native formatters for other languages. Preserve partial staging and existing hooks. Document bootstrap, format, check, test and build commands. Legacy formatting migration is a separate reviewed change; record and eventually check the full baseline.",
+        "ru": "Фиксируй версии форматтеров и зависимости. Prettier проверяет поддерживаемые изменённые файлы в pre-commit и CI; остальные языки используют родные форматтеры. Сохраняй частичный staging и существующие hooks. Документируй bootstrap, format, check, test и build. Массовое форматирование старых файлов проводится отдельной правкой; полный baseline учитывается отдельно."
+      },
+      "observation": {
+        "en": "Checksum-pinned tools and portable bootstrap/format/check commands are provided.",
+        "ru": "Предоставлены закреплённые инструменты и переносимые bootstrap/format/check."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": ".standards/lock.json",
+          "line": 1
+        },
+        {
+          "path": "scripts/check-format.mjs",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-004",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Start with the name, authentic preview image or useful animation, one-sentence purpose, benefits and a quick start. Explain user journeys before architecture. State supported versions, limitations, privacy, license, support and release links. Preview media must match the product and contain no real secrets or customer data. Prefer a compact static alternative for animations.",
+        "ru": "Начинай с названия, настоящего превью или полезной анимации, краткого назначения, пользы и быстрого старта. Пользовательские сценарии идут раньше архитектуры. Укажи поддерживаемые версии, ограничения, приватность, лицензию, поддержку и релизы. Медиа соответствует продукту и не раскрывает данные; у анимации есть компактная статичная альтернатива."
+      },
+      "observation": {
+        "en": "Bilingual readmes present workflows, an honest architecture preview and current limitations.",
+        "ru": "README показывают сценарии, честную схему проекта и текущие ограничения."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "README.md",
+          "line": 1
+        },
+        {
+          "path": "README.ru.md",
+          "line": 1
+        },
+        {
+          "path": "docs/assets/architecture.svg",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-005",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Maintain English and Russian README and public documentation in the same change. Map language counterparts, share factual/generated sources and assets, and distinguish tutorials, task guides, reference and explanation. Document main and released versions accurately. Client-private material stays in its authorized location and language scope.",
+        "ru": "README и публичная документация на русском и английском обновляются одной правкой. Задай пары языковых страниц, общие фактические источники и медиа; раздели обучение, инструкции, справку и объяснение. Различай main и выпущенную версию. Клиентские материалы остаются в разрешённом месте и языковой области."
+      },
+      "observation": {
+        "en": "Complete specification language pairs share IDs and acceptance; meaning remains a review obligation.",
+        "ru": "Языковые версии ТЗ имеют общие ID и приёмку; смысл проверяется ревью."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "scripts/check-docs.mjs",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-006",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Strict mode requires meaningful changes to both README files and applicable documentation in both languages in the final PR diff. Whitespace, comments and deleted files do not qualify. Semantic relevance and translation quality require review; a file-touch check cannot prove them. Pre-commit checks index structure and signals pending documentation; CI checks the complete PR. An impact-based alternative requires an explicit owner policy change.",
+        "ru": "В strict итоговый PR содержит содержательные правки обоих README и относящейся к изменению документации двух языков. Пробелы, комментарии и удаление файла не засчитываются. Смысл и качество перевода проверяются ревью: изменение пути не доказывает актуальность. Pre-commit проверяет структуру индекса и сообщает о долге; CI проверяет весь PR. Переход на impact требует явного решения владельца."
+      },
+      "observation": {
+        "en": "Strict meaningful documentation changes are checked for the whole PR.",
+        "ru": "Содержательные двуязычные правки проверяются по всему PR в strict."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": ".repo-policy.json",
+          "line": 1
+        },
+        {
+          "path": ".github/workflows/repository-standard.yml",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-007",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Use branches and PRs for existing repositories, with protected main and required checks. Do not require an impossible second-human review for solo work. AGENTS.md gives exact commands, scope and stop conditions. Preserve authorship and upstream notices. The owner's existing rule reserves merge to the owner until explicitly changed. Review external worker diffs and actual checks.",
+        "ru": "Изменения существующих репозиториев идут через ветки и PR с защищённой основной веткой и обязательными проверками. Для solo не требуется невозможное ревью второго человека. AGENTS.md задаёт команды, границы и условия остановки. Сохраняй авторство и notices upstream. По действующему правилу merge выполняет владелец до явного изменения этого решения. Результат внешнего исполнителя проверяется отдельно."
+      },
+      "observation": {
+        "en": "After initial bootstrap, changes require owner-merged PRs and successful protected-branch checks.",
+        "ru": "После начальной публикации нужны PR, merge владельцем и обязательные проверки."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "AGENTS.md",
+          "line": 1
+        },
+        {
+          "path": ".github/workflows/repository-standard.yml",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-008",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Run required checks on the current PR revision. Missing, skipped, cancelled or stale mandatory checks are not passes. Use least-privilege tokens, SHA-pinned actions and isolated untrusted-PR runners without private infrastructure access. Never combine untrusted checkout with privileged pull_request_target execution. Pin dependencies, keep build secrets out of layers and retain release artifacts independently of temporary CI logs.",
+        "ru": "Обязательные проверки относятся к текущей ревизии PR. Пропуск, отмена и устаревший результат не являются успехом. Используй минимальные права, SHA actions и изолированные runners недоверенных PR без доступа к внутренней сети. Нельзя выполнять недоверенный checkout с привилегиями pull_request_target. Зависимости фиксируются, секреты сборки не попадают в слои; релизы хранятся отдельно от временных логов."
+      },
+      "observation": {
+        "en": "Read-only CI, pinned actions and public hosted runners require no private token or network.",
+        "ru": "CI имеет read-only права, SHA actions и публичные runners без приватного токена/сети."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": ".github/workflows/repository-standard.yml",
+          "line": 1
+        },
+        {
+          "path": ".github/workflows/documentation.yml",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-009",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Test meaningful behavior and regression risks, not arbitrary test counts. Distinguish source, build, published artifact, clean install, upgrade, restored data, target runtime and physical outcomes. Test relevant error states, migration interruption and restoration. Use the actual released artifact and supported targets; record missing evidence honestly.",
+        "ru": "Проверяй поведение и риск регрессии, а не число тестов. Различай исходники, сборку, опубликованный артефакт, чистую установку, обновление, восстановление, целевой runtime и физический результат. Проверяй ошибки, прерывание миграции и restore. Используй распространяемый артефакт и заявленные платформы; точно отмечай недостающие доказательства."
+      },
+      "observation": {
+        "en": "35 behavioral scenarios are specified; no unimplemented runtime acceptance is claimed.",
+        "ru": "Определены 35 сценариев поведения; приёмка отсутствующего runtime не заявлена."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/en/roadmap.md",
+          "line": 1
+        },
+        {
+          "path": "docs/ru/roadmap.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-010",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Apply every relevant product profile, including web, mobile, CLI, library/API, services, network, integrations, infrastructure, monitoring, data/media, ML and firmware. A service with a UI and database needs all three sets. Profile acceptance is additional to generic CI.",
+        "ru": "Подключай все подходящие профили: web, mobile, CLI, library/API, service, network, integration, infra, monitoring, data/media, ML и firmware. Сервис с UI и базой выполняет все три набора. Приёмка профиля дополняет общий CI."
+      },
+      "observation": {
+        "en": "Ten applicable profiles are selected; mobile, ML and firmware are outside scope.",
+        "ru": "Выбраны десять профилей; mobile, ML и firmware вне объёма."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": ".repo-policy.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-011",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Forks name upstream, divergence, licenses and update method. Exact mirrors stay byte/history faithful and are governed externally without injecting files. Verify refs and LFS when mirroring. Private-to-public copies have an explicit allowlist and history/artifact review. Test templates by instantiation. Archives state support status and are inventoried without reactivation.",
+        "ru": "Форки указывают upstream, отличия, лицензии и обновление. Точные зеркала сохраняют содержимое и историю, правила подключаются извне без внедрения файлов. Проверяй refs и LFS. Публичная копия приватного проекта имеет разрешённый состав и проверку истории/артефактов. Шаблон проверяется созданием проекта. Архив явно сообщает статус и учитывается без реактивации."
+      },
+      "observation": {
+        "en": "A new original history is separate from the renamed receiver; no archive or migration is inferred.",
+        "ru": "Новая история отделена от переименованного приёмника; архивирование и миграция не подразумеваются."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/project.md",
+          "line": 1
+        },
+        {
+          "path": "docs/ru/project.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-012",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "A release records version, commit, artifacts, checksums and bilingual changes. Preserve published versions; distinguish stable, preview and rolling. Verify download/install/upgrade as a user. Maintain license notices, a security-reporting route and support policy. Track dependencies and assess exploitable vulnerabilities; generate SBOM/provenance when supported. Describe data export and deletion.",
+        "ru": "Релиз содержит версию, commit, артефакты, суммы и описание изменений RU/EN. Выпущенные версии не перезаписываются; stable, preview и rolling различимы. Скачивание, установка и обновление проверяются как пользователем. Сохраняй лицензии, SECURITY и поддержку. Следи за зависимостями и эксплуатируемыми уязвимостями; формируй SBOM/provenance при поддержке. Опиши экспорт и удаление данных."
+      },
+      "observation": {
+        "en": "License, security and support policy exist; artifact release/provenance remains a later gate.",
+        "ru": "Лицензия, безопасность и поддержка описаны; выпуск артефактов и provenance остаются отдельным этапом."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "LICENSE",
+          "line": 1
+        },
+        {
+          "path": "SECURITY.md",
+          "line": 1
+        },
+        {
+          "path": "CHANGELOG.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-013",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Exceptions identify rule, scope, reason, risk, owner, compensation and expiry/review condition. No broad scanner suppression or silent weakening of policy. Emergency work stays small; reduced checks need explicit recorded authority and follow-up. Changes to merge protection, permissions and documentation mode remain visible decisions.",
+        "ru": "Исключение содержит правило, область, причину, риск, владельца, компенсацию и срок пересмотра. Запрещены широкое подавление сканирования и скрытое ослабление правил. Срочная правка остаётся небольшой; сокращение проверок требует явного записанного решения и последующего закрытия. Изменения защиты ветки, прав и docs-policy видны отдельно."
+      },
+      "observation": {
+        "en": "No broad exception is introduced; future exceptions require owner, scope, risk and expiry.",
+        "ru": "Широких исключений нет; будущие требуют владельца, области, риска и срока."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/development-standard.md",
+          "line": 1
+        },
+        {
+          "path": "docs/ru/development-standard.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-014",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Keep machine-specific paths, internal addresses, credentials, resource-admission rules and external-worker budgets in the owner's private execution profile. Public commands remain portable. Respect existing authorization boundaries and preserve other jobs. Do not copy private operational notes into the distributable kit.",
+        "ru": "Пути рабочей станции, внутренние адреса, доступы, правила допуска к общим ресурсам и бюджеты исполнителей находятся в приватном профиле владельца. Публичные команды переносимы. Сохраняй границы полномочий и чужие задания. Приватный журнал эксплуатации не включается в распространяемый пакет."
+      },
+      "observation": {
+        "en": "Public files exclude owner paths, internal hosts, credentials, inventories and private journals.",
+        "ru": "Публичные файлы исключают пути владельца, внутренние хосты, секреты, реестры и журналы."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "AGENTS.md",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "REPO-015",
+      "scope": "specification and repository design",
+      "expected": {
+        "en": "Inventory applicability and evidence. Test clean bootstrap, safe synthetic-secret rejection, bad formatting, missing/deleted language counterparts, documentation-only whitespace changes and unavailable checks. Verify hosting enforcement after merge, then installation and profile acceptance. Distribute versioned, checksummed public-safe files; owner inventory stays private. A green generic check does not certify the whole product.",
+        "ru": "Учитывай применимость и доказательства. Проверь чистый bootstrap, отклонение синтетического секрета, неверное форматирование, отсутствие/удаление языковой пары, фиктивные docs-правки и недоступный инструмент. После merge проверь защиту хостинга, затем установку и профильную приёмку. Распространяй версионированный пакет с суммами без приватного реестра. Зелёный общий CI не удостоверяет весь продукт."
+      },
+      "observation": {
+        "en": "Clean bootstrap and seven positive/negative toolkit scenarios are reproducible; full product adoption remains open.",
+        "ru": "Чистый bootstrap и семь позитивных/негативных сценариев воспроизводимы; приёмка продукта открыта."
+      },
+      "documentCoverage": "PASS",
+      "productVerification": "NOT_VERIFIED",
+      "requirements": ["REQ-47", "REQ-51"],
+      "references": [
+        {
+          "path": "docs/en/specification.md",
+          "line": 414,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 433,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 424,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 443,
+          "requirement": "REQ-51"
+        },
+        {
+          "path": "scripts/check-standard-adoption.mjs",
+          "line": 1
+        }
+      ]
+    }
+  ]
+}

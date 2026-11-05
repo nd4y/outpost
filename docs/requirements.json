@@ -1,0 +1,595 @@
+{
+  "gates": {
+    "G3": {
+      "milestone": "M0",
+      "requirements": ["REQ-13", "REQ-19", "REQ-22", "REQ-23", "REQ-25", "REQ-27"],
+      "status": "NOT_VERIFIED"
+    },
+    "G2": {
+      "milestone": "M0",
+      "requirements": ["REQ-20", "REQ-21", "REQ-22", "REQ-31", "REQ-32", "REQ-33"],
+      "status": "NOT_VERIFIED"
+    },
+    "G1": {
+      "milestone": "M0",
+      "requirements": ["REQ-09", "REQ-10", "REQ-11"],
+      "status": "NOT_VERIFIED"
+    }
+  },
+  "standardVersion": "0.4.0",
+  "acceptance": [
+    {
+      "id": "AT-01",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-02",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-03",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-04",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-05",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-06",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-07",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-08",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-09",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-10",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-11",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-12",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-13",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-14",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-15",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-16",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-17",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-18",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-19",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-20",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-21",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-22",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-23",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-24",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-25",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-26",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-27",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-28",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-29",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-30",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-31",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-32",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-33",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-34",
+      "status": "NOT_VERIFIED"
+    },
+    {
+      "id": "AT-35",
+      "status": "NOT_VERIFIED"
+    }
+  ],
+  "requirements": [
+    {
+      "scope": "engine",
+      "stage": "release",
+      "milestones": ["M0", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-24", "AT-25"],
+      "id": "REQ-01"
+    },
+    {
+      "scope": "source",
+      "stage": "release",
+      "milestones": ["M1", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-02", "AT-23"],
+      "id": "REQ-02"
+    },
+    {
+      "scope": "source",
+      "stage": "release",
+      "milestones": ["M1", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-02", "AT-23"],
+      "id": "REQ-03"
+    },
+    {
+      "scope": "source",
+      "stage": "release",
+      "milestones": ["M1", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-02", "AT-29"],
+      "id": "REQ-04"
+    },
+    {
+      "scope": "source",
+      "stage": "release",
+      "milestones": ["M1", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
+      "id": "REQ-05"
+    },
+    {
+      "scope": "encryption-and-recovery",
+      "stage": "release",
+      "milestones": ["M1"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
+      "id": "REQ-06"
+    },
+    {
+      "scope": "encryption-and-recovery",
+      "stage": "release",
+      "milestones": ["M1"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-06", "AT-20", "AT-21", "AT-27"],
+      "id": "REQ-07"
+    },
+    {
+      "scope": "encryption-and-recovery",
+      "stage": "release",
+      "milestones": ["M1"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-24"],
+      "id": "REQ-08"
+    },
+    {
+      "scope": "file-history-and-kits",
+      "stage": "release",
+      "milestones": ["M0", "M1"],
+      "level": "MUST",
+      "acceptance": ["AT-02", "AT-03"],
+      "id": "REQ-09"
+    },
+    {
+      "scope": "file-history-and-kits",
+      "stage": "release",
+      "milestones": ["M0", "M1"],
+      "level": "MUST",
+      "acceptance": ["AT-04", "AT-05", "AT-06", "AT-12", "AT-26"],
+      "id": "REQ-10"
+    },
+    {
+      "scope": "file-history-and-kits",
+      "stage": "release",
+      "milestones": ["M0", "M1"],
+      "level": "MUST",
+      "acceptance": ["AT-04", "AT-05", "AT-12"],
+      "id": "REQ-11"
+    },
+    {
+      "scope": "object-storage",
+      "stage": "release",
+      "milestones": ["M2", "M3"],
+      "level": "MUST",
+      "acceptance": ["AT-05", "AT-16"],
+      "id": "REQ-12"
+    },
+    {
+      "scope": "object-storage",
+      "stage": "release",
+      "milestones": ["M2", "M3"],
+      "level": "MUST",
+      "acceptance": ["AT-05", "AT-16"],
+      "id": "REQ-13"
+    },
+    {
+      "scope": "placement",
+      "stage": "release",
+      "milestones": ["M1", "M3"],
+      "level": "MUST",
+      "acceptance": ["AT-06", "AT-19", "AT-27"],
+      "id": "REQ-14"
+    },
+    {
+      "scope": "placement",
+      "stage": "release",
+      "milestones": ["M1", "M3"],
+      "level": "MUST",
+      "acceptance": ["AT-06", "AT-07", "AT-08", "AT-19", "AT-27"],
+      "id": "REQ-15"
+    },
+    {
+      "scope": "placement",
+      "stage": "release",
+      "milestones": ["M1", "M3"],
+      "level": "MUST",
+      "acceptance": ["AT-06", "AT-19", "AT-27"],
+      "id": "REQ-16"
+    },
+    {
+      "scope": "control-and-jobs",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
+      "id": "REQ-17"
+    },
+    {
+      "scope": "control-and-jobs",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
+      "id": "REQ-18"
+    },
+    {
+      "scope": "control-and-jobs",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20"],
+      "id": "REQ-19"
+    },
+    {
+      "scope": "generations",
+      "stage": "release",
+      "milestones": ["M0", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-17", "AT-18", "AT-20"],
+      "id": "REQ-20"
+    },
+    {
+      "scope": "generations",
+      "stage": "release",
+      "milestones": ["M0", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
+      "id": "REQ-21"
+    },
+    {
+      "scope": "generations",
+      "stage": "release",
+      "milestones": ["M0", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
+      "id": "REQ-22"
+    },
+    {
+      "scope": "replication",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-24"],
+      "id": "REQ-23"
+    },
+    {
+      "scope": "replication",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-07", "AT-24"],
+      "id": "REQ-24"
+    },
+    {
+      "scope": "replication",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-01", "AT-07", "AT-08"],
+      "id": "REQ-25"
+    },
+    {
+      "scope": "replication",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-09", "AT-11", "AT-18"],
+      "id": "REQ-26"
+    },
+    {
+      "scope": "external-storage",
+      "stage": "release",
+      "milestones": ["M3"],
+      "level": "MUST",
+      "acceptance": ["AT-14", "AT-15"],
+      "id": "REQ-27"
+    },
+    {
+      "scope": "external-storage",
+      "stage": "release",
+      "milestones": ["M3"],
+      "level": "MUST",
+      "acceptance": ["AT-16"],
+      "id": "REQ-28"
+    },
+    {
+      "scope": "external-storage",
+      "stage": "release",
+      "milestones": ["M3"],
+      "level": "MUST",
+      "acceptance": ["AT-14", "AT-15"],
+      "id": "REQ-29"
+    },
+    {
+      "scope": "archive-profile",
+      "stage": "release",
+      "milestones": ["M5"],
+      "level": "MUST",
+      "acceptance": ["AT-28"],
+      "id": "REQ-30"
+    },
+    {
+      "scope": "retention-and-gc",
+      "stage": "release",
+      "milestones": ["M0", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
+      "id": "REQ-31"
+    },
+    {
+      "scope": "retention-and-gc",
+      "stage": "release",
+      "milestones": ["M0", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
+      "id": "REQ-32"
+    },
+    {
+      "scope": "retention-and-gc",
+      "stage": "release",
+      "milestones": ["M0", "M2"],
+      "level": "MUST",
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
+      "id": "REQ-33"
+    },
+    {
+      "scope": "integrity-and-repair",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-13"],
+      "id": "REQ-34"
+    },
+    {
+      "scope": "integrity-and-repair",
+      "stage": "release",
+      "milestones": ["M2"],
+      "level": "MUST",
+      "acceptance": ["AT-13"],
+      "id": "REQ-35"
+    },
+    {
+      "scope": "recovery-and-management",
+      "stage": "release",
+      "milestones": ["M1", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-24"],
+      "id": "REQ-36"
+    },
+    {
+      "scope": "recovery-and-management",
+      "stage": "release",
+      "milestones": ["M1", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-17", "AT-19", "AT-30"],
+      "id": "REQ-37"
+    },
+    {
+      "scope": "recovery-and-management",
+      "stage": "release",
+      "milestones": ["M1", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-27"],
+      "id": "REQ-38"
+    },
+    {
+      "scope": "installation-and-authorization",
+      "stage": "release",
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-22", "AT-25", "AT-26"],
+      "id": "REQ-39"
+    },
+    {
+      "scope": "installation-and-authorization",
+      "stage": "release",
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26"],
+      "id": "REQ-40"
+    },
+    {
+      "scope": "installation-and-authorization",
+      "stage": "release",
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
+      "id": "REQ-41"
+    },
+    {
+      "scope": "operations-and-capacity",
+      "stage": "release",
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-22", "AT-25", "AT-26"],
+      "id": "REQ-42"
+    },
+    {
+      "scope": "operations-and-capacity",
+      "stage": "release",
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
+      "id": "REQ-43"
+    },
+    {
+      "scope": "operations-and-capacity",
+      "stage": "release",
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-02", "AT-03", "AT-23"],
+      "id": "REQ-44"
+    },
+    {
+      "scope": "contracts-and-compatibility",
+      "stage": "release",
+      "milestones": ["M0", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
+      "id": "REQ-45"
+    },
+    {
+      "scope": "contracts-and-compatibility",
+      "stage": "release",
+      "milestones": ["M0", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
+      "id": "REQ-46"
+    },
+    {
+      "documentChecks": ["scripts/check-docs.mjs", "scripts/check-standard-adoption.mjs"],
+      "stage": "pr-and-release",
+      "milestones": ["M0", "M4"],
+      "level": "MUST",
+      "scope": "requirement-and-repository-governance",
+      "acceptance": ["AT-30", "AT-34"],
+      "id": "REQ-47"
+    },
+    {
+      "milestones": ["M2", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-32", "AT-21", "AT-22"],
+      "id": "REQ-48",
+      "scope": "untrusted-input-and-overload",
+      "stage": "release"
+    },
+    {
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-31"],
+      "id": "REQ-49",
+      "scope": "ui-and-cli",
+      "stage": "release"
+    },
+    {
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-33", "AT-24", "AT-25"],
+      "id": "REQ-50",
+      "scope": "compatibility-and-migrations",
+      "stage": "release"
+    },
+    {
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-34"],
+      "id": "REQ-51",
+      "scope": "release-and-supply-chain",
+      "stage": "pr-and-release"
+    },
+    {
+      "milestones": ["M4"],
+      "level": "MUST",
+      "acceptance": ["AT-35", "AT-26"],
+      "id": "REQ-52",
+      "scope": "operations-and-alerting",
+      "stage": "operations"
+    },
+    {
+      "milestones": ["M0", "M4"],
+      "level": "MUST",
+      "acceptance": ["AT-02", "AT-14", "AT-22", "AT-30"],
+      "id": "REQ-53",
+      "scope": "capacity-and-cost",
+      "stage": "release"
+    }
+  ],
+  "specVersion": "1.1",
+  "schemaVersion": 1,
+  "normativeSources": {
+    "ru": "docs/ru/specification.md",
+    "en": "docs/en/specification.md"
+  }
+}

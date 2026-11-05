@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "standardVersion": "0.4.0",
+  "kind": "product",
+  "lifecycle": "experiment",
+  "adoption": "adopting",
+  "profiles": [
+    "web",
+    "cli",
+    "library",
+    "service",
+    "network",
+    "integration",
+    "infra",
+    "monitoring",
+    "data",
+    "docs"
+  ],
+  "docs": {
+    "mode": "strict",
+    "readmes": ["README.md", "README.ru.md"],
+    "roots": ["docs/en", "docs/ru"]
+  },
+  "evidence": {
+    "ci": {
+      "status": "NOT_VERIFIED",
+      "reference": "Per-commit CI: https://github.com/nd4y/outpost/actions. This declaration does not anticipate a future CI result."
+    },
+    "bootstrap": {
+      "status": "NOT_VERIFIED",
+      "reference": "docs/en/development-standard.md describes toolkit bootstrap; product installation is not implemented."
+    },
+    "release": {
+      "status": "NOT_VERIFIED",
+      "reference": "docs/en/roadmap.md"
+    },
+    "runtime": {
+      "status": "NOT_VERIFIED",
+      "reference": "docs/en/roadmap.md"
+    }
+  },
+  "standardSourceRevision": "75833a42311832d1de665d0e441adac2b5b701d2"
+}

@@ -1,0 +1,93 @@
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+
+const root = path.resolve(import.meta.dirname, "..");
+const read = (name) => fs.readFileSync(path.join(root, name), "utf8");
+const catalog = JSON.parse(read("docs/requirements.json"));
+const languages = ["en", "ru"];
+const ids = (text, pattern) => [...text.matchAll(pattern)].map((match) => match[1]).sort();
+const requireIds = catalog.requirements.map((item) => item.id).sort();
+const testIds = catalog.acceptance.map((item) => item.id).sort();
+assert.equal(new Set(requireIds).size, requireIds.length, "Duplicate catalog requirement");
+assert.equal(new Set(testIds).size, testIds.length, "Duplicate catalog acceptance");
+for (const lang of languages) {
+  const spec = read(`docs/${lang}/specification.md`);
+  assert.deepEqual(ids(spec, /^\*\*(REQ-\d{2})\./gm), requireIds, `${lang}: requirements differ`);
+  assert.deepEqual(ids(spec, /^\|\s*(AT-\d{2})\s*\|/gm), testIds, `${lang}: acceptance differs`);
+  assert.equal([...spec.matchAll(/^# \d+ /gm)].length, 26, `${lang}: incomplete sections`);
+  assert(spec.includes(catalog.specVersion), `${lang}: version missing`);
+}
+for (const requirement of catalog.requirements) {
+  assert.equal(requirement.level, "MUST");
+  assert(requirement.scope && requirement.stage && requirement.milestones.length);
+  assert(requirement.acceptance.length || requirement.documentChecks?.length);
+  for (const id of requirement.acceptance) assert(testIds.includes(id), `Unknown test ${id}`);
+}
+for (const id of testIds)
+  assert(
+    catalog.requirements.some((item) => item.acceptance.includes(id)),
+    `Unmapped ${id}`,
+  );
+const ruleIds = ids(read(".standards/rules.en.md"), /^## ([A-Z]+-\d{3}) /gm);
+const audit = JSON.parse(read("docs/standard-review.json"));
+for (const lang of languages) {
+  const digest = createHash("sha256")
+    .update(read(`docs/${lang}/specification.md`))
+    .digest("hex");
+  assert.equal(audit.specSha256[lang], digest, `${lang}: audit source changed; review it again`);
+}
+assert.deepEqual(
+  audit.rules.map((item) => item.id).sort(),
+  ruleIds,
+  "Audit must cover pinned rules",
+);
+for (const rule of audit.rules) {
+  assert(rule.expected.en && rule.expected.ru && rule.observation.en && rule.observation.ru);
+  assert(rule.references.length, `Evidence reference missing: ${rule.id}`);
+  for (const reference of rule.references) {
+    const lines = read(reference.path).split("\n");
+    assert(reference.line > 0 && reference.line <= lines.length, `Invalid reference: ${rule.id}`);
+    if (reference.requirement)
+      assert(
+        lines[reference.line - 1].startsWith(`**${reference.requirement}.`),
+        `Stale requirement reference: ${rule.id}`,
+      );
+  }
+  for (const id of rule.requirements) assert(requireIds.includes(id), `Unknown requirement ${id}`);
+}
+const pages = languages.map((lang) =>
+  fs
+    .readdirSync(path.join(root, "docs", lang))
+    .filter((name) => name.endsWith(".md"))
+    .sort(),
+);
+assert.deepEqual(pages[0], pages[1], "Documentation language pairs differ");
+const files = execFileSync(
+  "git",
+  ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+  {
+    cwd: root,
+    encoding: "utf8",
+  },
+)
+  .split("\0")
+  .filter(Boolean);
+const missing = [];
+for (const name of [...new Set(files)]) {
+  if (!name.endsWith(".md") || name.startsWith(".standards/")) continue;
+  const text = read(name);
+  for (const match of text.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+    const target = match[1].replace(/^<|>$/g, "").split(/[?#]/)[0];
+    if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) continue;
+    const resolved = path.resolve(root, path.dirname(name), decodeURIComponent(target));
+    if (!resolved.startsWith(root + path.sep) || !fs.existsSync(resolved))
+      missing.push(`${name}: ${target}`);
+  }
+}
+assert.deepEqual(missing, [], "Broken local links");
+console.log(
+  `PASS: ${requireIds.length} requirements, ${testIds.length} acceptance scenarios, ${ruleIds.length} rules, language pairs and local links`,
+);

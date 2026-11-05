@@ -1,0 +1,42 @@
+name: Documentation and adoption
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  documentation:
+    name: documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.18.0
+      - name: Install pinned dependencies
+        run: npm ci --prefix .standards --ignore-scripts --no-audit --no-fund
+      - name: Install checksum-verified scanner
+        run: node .standards/install-gitleaks.mjs
+      - name: Verify documentation and full formatting
+        run: |
+          node .standards/check.mjs structure
+          node scripts/check-docs.mjs
+          node scripts/check-format.mjs
+      - name: Verify adoption rejection cases
+        run: node scripts/check-standard-adoption.mjs

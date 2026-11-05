@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="430" viewBox="0 0 1100 430" role="img" aria-labelledby="title desc">
+  <title id="title">Outpost architecture / Архитектура Outpost</title>
+  <desc id="desc">Source encryption, trusted and untrusted nodes, permitted intermediate routes, and external storage. A design preview, not a running interface.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto-start-reverse"><path d="M0 0L8 4L0 8" fill="none" stroke="#9db5d1" stroke-width="1.5"/></marker>
+  </defs>
+  <rect width="1100" height="430" rx="20" fill="#101c2d"/>
+  <g font-family="Arial, sans-serif" fill="#edf3fa">
+    <text x="44" y="52" font-size="28" font-weight="700">Outpost</text>
+    <text x="44" y="82" font-size="16" fill="#b8cce2">Architecture preview / Схема проекта</text>
+    <g stroke="#9db5d1" stroke-width="2" fill="none" marker-end="url(#arrow)">
+      <path d="M300 196H414"/>
+      <path d="M640 196H753"/>
+      <path d="M532 238V295"/>
+      <path d="M868 246V346H762"/>
+    </g>
+    <rect x="44" y="142" width="256" height="104" rx="14" fill="#20354d" stroke="#7e9ab6"/>
+    <text x="65" y="178" font-size="20">Source / Источник</text>
+    <text x="65" y="207" font-size="16" fill="#bed2e6">Encrypt data and names</text>
+    <text x="65" y="229" font-size="14" fill="#bed2e6">Шифрование данных и имён</text>
+    <rect x="421" y="142" width="220" height="104" rx="14" fill="#153e3b" stroke="#71c9b6"/>
+    <text x="440" y="178" font-size="20">Trusted nodes</text>
+    <text x="440" y="206" font-size="16" fill="#c3e7dd">Доверенные ноды</text>
+    <text x="440" y="229" font-size="14" fill="#c3e7dd">Assigned full replicas</text>
+    <rect x="760" y="142" width="296" height="104" rx="14" fill="#423328" stroke="#d8b387"/>
+    <text x="780" y="178" font-size="20">Untrusted nodes</text>
+    <text x="780" y="206" font-size="16" fill="#f0d6b9">Недоверенные ноды</text>
+    <text x="780" y="229" font-size="14" fill="#f0d6b9">Ciphertext only / Шифротекст</text>
+    <rect x="420" y="305" width="342" height="82" rx="14" fill="#283448" stroke="#99afd0"/>
+    <text x="442" y="329" font-size="18">External storage</text>
+    <text x="442" y="350" font-size="16" fill="#bed2e6">Внешние хранилища</text>
+    <text x="442" y="373" font-size="16" fill="#bed2e6">S3, Mail.ru, WebDAV</text>
+    <text x="44" y="330" font-size="16" fill="#b8cce2">Every route requires policy permission.</text>
+    <text x="44" y="357" font-size="15" fill="#b8cce2">Каждый маршрут разрешается политикой.</text>
+    <text x="44" y="405" font-size="13" fill="#b8cce2">Workers hold no decryption keys. Trust category alone does not grant key access.</text>
+  </g>
+</svg>
