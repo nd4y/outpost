@@ -51,6 +51,7 @@ These commands validate documentation and the standard toolkit. They do not star
 - [G1 acceptance, cost bounds and commands](docs/en/g1-acceptance.md)
 - [Infrastructure profile contract](docs/en/infrastructure-profile.md)
 - [Machine-readable requirement trace](docs/requirements.json)
+- [G1 requirements linked to executable checks](docs/g1-trace.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.
 
