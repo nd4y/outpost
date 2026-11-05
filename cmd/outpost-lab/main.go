@@ -11,12 +11,13 @@ import (
 )
 
 func main() {
-	phase := flag.String("phase", "", "prepare or verify")
+	phase := flag.String("phase", "", "prepare, maintenance or verify")
 	work := flag.String("workdir", "", "new, dedicated prepare directory")
 	kit := flag.String("kit", "", "standalone kit repository (verify)")
 	key := flag.String("key", "", "recovery password file (verify)")
 	out := flag.String("output", "", "new restore directory (verify)")
 	expected := flag.String("expected", "", "synthetic test oracle; not a restore dependency")
+	versions := flag.String("versions", "v1,v2", "exact expected fixture versions: v1,v2 or v2")
 	restic := flag.String("restic", "restic", "restic 0.19.1 executable")
 	flag.Parse()
 	// Fixed fault injection for the native producer-status experiment: emit a
@@ -33,9 +34,11 @@ func main() {
 	case "prepare":
 		result, err = prepare(ctx, *restic, *work)
 	case "verify":
-		result, err = verify(ctx, *restic, *kit, *key, *out, *expected)
+		result, err = verify(ctx, *restic, *kit, *key, *out, *expected, *versions)
+	case "maintenance":
+		result, err = maintenance(ctx, *restic, *kit, *key, *work)
 	default:
-		err = fmt.Errorf("choose --phase prepare or verify; synthetic data only")
+		err = fmt.Errorf("choose --phase prepare, maintenance or verify; synthetic data only")
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "outpost-lab:", err)
