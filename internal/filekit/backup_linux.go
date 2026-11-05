@@ -67,7 +67,7 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 			reuse[b.Hash] = b
 		}
 	}
-	fd, err := syscall.Open(source, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
+	fd, err := syscall.Open(source, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return s.Stats, err
 	}

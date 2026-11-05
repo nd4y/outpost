@@ -8,7 +8,45 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"time"
 )
+
+func TestSpecialSourceAndOwnerInputsRejectWithoutBlocking(t *testing.T) {
+	base, s, source, _ := fixture(t, 64)
+	fifo := filepath.Join(base, "fifo")
+	if err := syscall.Mkfifo(fifo, 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(source, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{fifo, link, base} {
+		done := make(chan error, 1)
+		go func() {
+			_, err := s.Backup(context.Background(), name, BackupOptions{Names: []string{"file"}})
+			done <- err
+		}()
+		select {
+		case err := <-done:
+			if err == nil {
+				t.Fatal("special source accepted")
+			}
+		case <-time.After(time.Second):
+			t.Fatal("opening non-regular source blocked")
+		}
+	}
+	done := make(chan error, 1)
+	go func() { _, err := ReadOwner(fifo); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("FIFO owner accepted")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("opening owner FIFO blocked")
+	}
+}
 
 func forgedDescriptor(t *testing.T, s *Store, e Envelope, d Descriptor) {
 	t.Helper()

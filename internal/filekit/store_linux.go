@@ -391,7 +391,7 @@ func (s *Store) LoadVersion(version string) (Envelope, Descriptor, error) {
 
 func ReadOwner(name string) (Owner, error) {
 	var o Owner
-	f, err := os.Open(name)
+	f, err := os.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return o, err
 	}

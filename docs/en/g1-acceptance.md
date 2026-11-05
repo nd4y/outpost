@@ -17,6 +17,8 @@ G1 covers the independent file-kit architecture in REQ-09/10/11. The [format dec
 
 These checks cover the G1 portions of AT-03/04/05/12/23. They do not change whole-product acceptance statuses to PASS. AT-12 distributed pins, offline generations and publication receipts remain with G2/G3. Application-consistent source snapshots and full source-tree restore remain M1 work.
 
+`TestSpecialSourceAndOwnerInputsRejectWithoutBlocking` additionally checks FIFO/source-link/directory rejection and bounded failure while opening an invalid owner file. All three input classes (source, owner and encrypted objects) open without blocking on named pipes, then require a regular file.
+
 ## Commands
 
 On an authorized Linux ext4 test volume with xattr/POSIX ACL support:
