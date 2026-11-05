@@ -38,13 +38,15 @@ These commands validate documentation and the standard toolkit. They do not star
 ## Documentation
 
 - [Project passport and workflows](docs/en/project.md)
-- [Technical specification 1.1](docs/en/specification.md)
+- [Technical specification 1.2](docs/en/specification.md)
 - [Milestones and open acceptance](docs/en/roadmap.md)
 - [Development standard and commands](docs/en/development-standard.md)
 - [Audit against all 45 rules](docs/en/standard-review.md)
 - [Machine-readable requirement trace](docs/requirements.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.
+
+- [Infrastructure profile contract](docs/en/infrastructure-profile.md)
 
 ## Support and licensing
 

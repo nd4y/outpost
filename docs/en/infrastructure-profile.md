@@ -1,0 +1,25 @@
+# Infrastructure acceptance profile
+
+[Русский](../ru/infrastructure-profile.md)
+
+The specification defines product behavior. A private owner profile binds that behavior to actual sources, nodes and providers before a pilot. Keep addresses, machine identities, accounts, dataset names, observations and runbooks outside public Git. Static profile documents may be synchronized; mutable runtime databases may not use unsupported file synchronization.
+
+Each profile has a version, owner, review date, specification revision and status: proposed, measured or accepted. Each value records whether it is observed, proposed or unknown. Observations include time and evidence; unknowns include an owner, milestone and verification method. Unknown mandatory prerequisites block the affected operation. A profile is not deployment authority.
+
+| Area               | Required content                                                                                                                                                             | Acceptance                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Roles and scope    | Source agent, keyless worker, trusted maintenance, control plane and test host; assigned datasets and trust/transit permissions                                              | REQ-02/07/15/38, AT-06/27                                                                        |
+| Volume admission   | Expected filesystem identity, mount, dataset sentinel, initialization policy, unlock/mount/start dependencies and approved identity transition                               | REQ-39, AT-22/25; wrong/missing/locked/read-only volume causes no data writes on underlying root |
+| Runtime state      | Explicit non-synchronized state/cache/telemetry paths, locking/fsync behavior, exports, recovery and physical failure domains                                                | REQ-19/42, AT-22/26                                                                              |
+| Resources          | Hardware/kernel/container versions, detected controls, requested versus enforced limits; per-role CPU, memory plus page cache, queue, cache, bandwidth and telemetry budgets | REQ-39/48/53, AT-25/30/32; missing mandatory controls fail admission                             |
+| Capacity           | Assigned retained unique objects, pins, file kits, indexes, temporary/repack space, existing usage and reserve; source snapshot churn                                        | REQ-04/44/53, AT-22/29/30                                                                        |
+| Source and restore | Files, databases and NAS packages separately; snapshot/export provider, consistency, ACL/xattr, supported restore, legacy responsibility and migration condition             | REQ-02/03/36/46, AT-02/23/30                                                                     |
+| Network/providers  | Allowed graph/endpoints, outbound-only peers, real egress enforcement, credential scope, provider limits, eligible uploaders and shared-link limits                          | REQ-15/40, AT-01/06/14/16/18                                                                     |
+| Operations         | Recovery-kit custodian, update/retention authority, actual telemetry endpoints, alert recipients, authorized test environment and rollback                                   | REQ-08/41/42/52, AT-24/26/33/35                                                                  |
+| Test resources     | Reserved isolated storage and CPU/RAM, corpus and retained versions, source/target quotas, exact code/tools and observation period                                           | G1-G3, REQ-53, AT-03/30                                                                          |
+
+Distinguish a capability observation from an enforcement test. A Docker configuration field alone is not proof of its effect. A separate state directory on the data disk is not another replica. A container restart is not a cold-host-boot test. A file-only profile does not imply native NAS package recovery.
+
+Record the specific change needed to clear each blocked gate. The owner chooses assignments from measured capacity; do not assume compression or lower the reference reserve without recording the resulting profile. For example, a low-memory worker class and a source class on cgroup v1 may require different limits from a cgroup v2 test host. These are classes, not a claim of measured product support.
+
+Before full-scale acceptance, reserve enough space for the incompressible 100 GiB scenario, history, independent kits and scratch. Small fixtures establish only their stated behavior. G1 must declare acceptable amplification and cost bounds before selecting the format. Keep legacy coverage until the agreed replacement restore is accepted.
