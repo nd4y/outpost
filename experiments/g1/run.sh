@@ -41,6 +41,22 @@ run -v "$kit:/kit:ro" -v "$recovery/password:/key:ro" -v "$root/results:/result:
 run -v "$kit:/kit:ro" -v "$recovery:/recovery:ro" -v "$root/results:/result:rw" \
   "$tag" --phase verify --kit /kit --key /recovery/password --output /result/checked \
   --expected /recovery/expected.json --restic /tools/restic > "$root/results/checked.json"
+# Maintenance sees only the input kit/key and mutates a fresh disposable copy.
+mkdir "$root/maintenance"
+run -v "$kit:/kit:ro" -v "$recovery/password:/key:ro" -v "$root/maintenance:/maintenance:rw" \
+  "$tag" --phase maintenance --kit /kit --key /key --workdir /maintenance/run \
+  --restic /tools/restic > "$root/results/maintenance.json"
+for checkpoint in interrupted-retirement-kit kit; do
+  run -v "$root/maintenance/run/$checkpoint:/kit:ro" -v "$recovery/password:/key:ro" \
+    -v "$root/maintenance/run/expected-v2.json:/expected:ro" -v "$root/results:/result:rw" \
+    "$tag" --phase verify --kit /kit --key /key --versions v2 \
+    --expected /expected --output "/result/retirement-$checkpoint" \
+    --restic /tools/restic > "$root/results/retirement-$checkpoint.json"
+done
+# The original input kit must still retain both versions after maintenance.
+run -v "$kit:/kit:ro" -v "$recovery/password:/key:ro" -v "$root/results:/result:rw" \
+  "$tag" --phase verify --kit /kit --key /key --output /result/input-preserved \
+  --restic /tools/restic > "$root/results/input-preserved.json"
 printf 'incorrect-synthetic-password' > "$root/wrong-password"
 status=0
 run -v "$kit:/kit:ro" -v "$root/wrong-password:/key:ro" -v "$root/results:/result:rw" \
@@ -72,12 +88,17 @@ python3 - "$root" <<'PY'
 import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 prep = json.loads((root/'results/prepare.json').read_text())
+maintenance = json.loads((root/'results/maintenance.json').read_text())
+if maintenance['packsRemoved'] < 1 or maintenance['packsAdded'] < 1:
+    raise RuntimeError('physical repack not established')
 if not 0 < prep['kitBytesAddedV2'] < prep['fixtureBytes']:
     raise RuntimeError('incremental kit did not reuse unchanged payload')
 size = sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
 if size > 1024**3:
     raise RuntimeError('experiment exceeded 1GiB disk budget')
 report = {'fixture': 'PASS', 'wrongKeyRejected': True, 'corruptionRejected': True,
+          'publicationFailure': 'PASS', 'physicalRepack': 'PASS',
+          'retirementBoundaryRecovery': 'PASS', 'selectedVersionGC': 'PASS',
           'diskBytes': size, 'G1': 'PARTIAL_FIXTURE_ONLY', 'fullScale': 'NOT_VERIFIED'}
 (root/'results/result.json').write_text(json.dumps(report, indent=2)+'\n')
 print(json.dumps(report))

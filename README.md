@@ -8,6 +8,8 @@ Autonomous encrypted backups with complete assigned replicas, granular placement
 
 **Stage: M0 feasibility prototypes.** The [standalone file-kit experiment](docs/en/g1-prototype.md) is executable on synthetic data. There is no production backup service or accepted format yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
+The G1 fixture covers failed descriptor publication, physical pack replacement and recovery across selected-version retirement. Full-scale, crash/concurrency and production acceptance remain open.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.

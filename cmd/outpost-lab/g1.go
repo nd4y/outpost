@@ -230,7 +230,8 @@ func prepare(ctx context.Context, binary, work string) (any, error) {
 		}
 		primaryIDs = append(primaryIDs, id)
 		// Native producer-status checking prevents committing a truncated dump as a valid kit payload.
-		args := []string{"--stdin-filename", "payload", "--stdin-from-command", "--", binary, "--no-cache", "--repo", primary, "--password-file", key, "dump", id, filepath.ToSlash(payload)}
+		// Uncompressed packs make a later --repack-uncompressed probe observable.
+		args := []string{"--compression", "off", "--stdin-filename", "payload", "--stdin-from-command", "--", binary, "--no-cache", "--repo", primary, "--password-file", key, "dump", id, filepath.ToSlash(payload)}
 		payloadID, e := r.backup(kit, nil, args...)
 		if e != nil {
 			return nil, e
@@ -352,7 +353,7 @@ func (s *payloadSink) Write(p []byte) (int, error) {
 	return n, e
 }
 
-func verify(ctx context.Context, binary, kit, key, output, oracle string) (any, error) {
+func verify(ctx context.Context, binary, kit, key, output, oracle, versions string) (any, error) {
 	if !filepath.IsAbs(kit) || !filepath.IsAbs(key) {
 		return nil, errors.New("absolute kit/key paths required")
 	}
@@ -364,42 +365,14 @@ func verify(ctx context.Context, binary, kit, key, output, oracle string) (any, 
 	if err = r.checkVersion(); err != nil {
 		return nil, err
 	}
-	raw, err := r.run(kit, nil, "--no-lock", "snapshots", "--json", "--tag", descriptorTag)
+	catalog, err := r.catalog(kit, versions)
 	if err != nil {
 		return nil, err
 	}
-	var snapshots []struct {
-		ID string `json:"id"`
-	}
-	if err = json.Unmarshal(raw, &snapshots); err != nil {
-		return nil, err
-	}
-	if len(snapshots) != 2 {
-		return nil, errors.New("fixture requires exactly two descriptor snapshots")
-	}
 	got := map[string]descriptor{}
-	for _, snap := range snapshots {
-		if !snapshotID.MatchString(snap.ID) {
-			return nil, errors.New("invalid snapshot ID")
-		}
-		b, e := r.run(kit, nil, "--no-lock", "dump", snap.ID, "/descriptor.json")
-		if e != nil {
-			return nil, e
-		}
-		if len(b) > 64<<10 {
-			return nil, errors.New("descriptor too large")
-		}
-		var d descriptor
-		if e = json.Unmarshal(b, &d); e != nil {
-			return nil, e
-		}
-		if e = validDescriptor(d); e != nil {
-			return nil, e
-		}
-		if _, exists := got[d.Version]; exists {
-			return nil, errors.New("duplicate version")
-		}
-		if e = r.restore(kit, dir, d); e != nil {
+	for _, entry := range catalog {
+		d := entry.Descriptor
+		if e := r.restore(kit, dir, d); e != nil {
 			return nil, e
 		}
 		got[d.Version] = d
@@ -422,13 +395,15 @@ func verify(ctx context.Context, binary, kit, key, output, oracle string) (any, 
 		if e = json.Unmarshal(b, &expected); e != nil {
 			return nil, e
 		}
-		if len(expected) != 2 {
+		if len(expected) != len(got) {
 			return nil, errors.New("invalid oracle")
 		}
+		seen := map[string]bool{}
 		for _, want := range expected {
-			if got[want.Version] != want {
+			if seen[want.Version] || got[want.Version] != want {
 				return nil, errors.New("restored descriptor differs from fixture")
 			}
+			seen[want.Version] = true
 			st, e := os.Stat(filepath.Join(dir, want.Version+".bin"))
 			if e != nil {
 				return nil, e
@@ -438,5 +413,5 @@ func verify(ctx context.Context, binary, kit, key, output, oracle string) (any, 
 			}
 		}
 	}
-	return map[string]any{"phase": "verify", "versionsRecovered": len(got), "payloadHashLength": "PASS", "fixtureModeMtime": "applied; checked when oracle supplied", "oracleUsed": oracle != "", "G1": "PARTIAL_FIXTURE_ONLY", "unverified": []string{"full-scale cost", "ACL/xattr/hardlinks", "interrupted kit publication", "cross-version GC deletion", "opaque keyless transfer", "production source adapter"}}, nil
+	return map[string]any{"phase": "verify", "versionsRecovered": len(got), "payloadHashLength": "PASS", "fixtureModeMtime": "applied; checked when oracle supplied", "oracleUsed": oracle != "", "G1": "PARTIAL_FIXTURE_ONLY", "unverified": []string{"full-scale cost", "ACL/xattr/hardlinks", "publication/GC power-loss and concurrency", "opaque keyless transfer", "production source adapter"}}, nil
 }
