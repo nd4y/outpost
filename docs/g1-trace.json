@@ -48,6 +48,10 @@
         {
           "path": "internal/filekit/tamper_linux_test.go",
           "name": "TestSpecialSourceAndOwnerInputsRejectWithoutBlocking"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestNamesRespectLinuxFilesystemBounds"
         }
       ],
       "fixturePhases": [

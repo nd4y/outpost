@@ -12,6 +12,8 @@ The new candidate reuses restic's Rabin chunker, rather than a complete restic r
 
 Content-defined boundaries are 256 KiB minimum, 1 MiB target and 4 MiB maximum, with polynomial `0x3da3358b4dc173`. Reuse is confined to the same file identity and policy domain. Another file with identical plaintext receives different encrypted objects. Source-tree scanning, consistent application snapshots and assigning logical identities belong to subsequent source adapters.
 
+Incremental capture authenticates the previous descriptor and checks reused objects for presence and length; it does not reread all old payload as a scrub. Export/repack validate complete object hashes, and restoration also validates every chunk and the ordered plaintext. Capture success alone is not an integrity receipt for every replica.
+
 ## Keys and authenticated structure
 
 An owner file contains a random domain identity, a 256-bit master key, an Ed25519 verification key and, for the producer, a signing key. Recovery material omits the signing key. Store it separately with mode 0600. An ordinary replication worker receives none of these decryption keys. This CLI runs only as an explicitly trusted producer or recovery client; it does not implement worker enrollment.
@@ -31,6 +33,8 @@ A pre-created exported kit consists of `kit.json` and all descriptor/payload obj
 Recovery needs only that kit, recovery owner material, the expected version and the reader executable. It needs no global index, source file, other file's payload, control plane or original repository. Objects may arrive through several parts, but all named dependencies must be present before success. Restore creates a private staging directory, verifies bytes and attributes, then publishes a new directory using no-replace atomic rename. An existing destination is never overwritten. Authentication or missing dependencies must not produce successful output.
 
 Supported attributes are Linux permission bits, numeric UID/GID, nanosecond mtime, readable xattrs including POSIX ACLs, and explicitly supplied hard-link aliases. The caller needs permission to restore them; an unsupported or unauthorized attribute is an error. Directory metadata, symlink contents, device nodes, Windows ACLs, application quiescing and automatic hard-link discovery are not implemented by this regular-file gate. Metadata checks before/after capture detect ordinary source changes but do not replace an application/filesystem snapshot.
+
+Logical names use normalized relative UTF-8 paths with slash separators, no backslash/NUL, at most 255 bytes per component and 4095 bytes in total. Oversized or ambiguous names are rejected before source capture and when reading a descriptor. The boundary test restores an actual 255-byte filename; arbitrary Linux byte names outside this profile are not silently rewritten.
 
 ## Publication and maintenance
 

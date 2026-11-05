@@ -6,10 +6,23 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
+
+func TestNamesRespectLinuxFilesystemBounds(t *testing.T) {
+	base, s, source, data := fixture(t, 64)
+	for _, name := range []string{strings.Repeat("a", 256), "dir/" + strings.Repeat("я", 128), strings.Repeat("a/", 2047) + "aa"} {
+		if _, err := s.Backup(context.Background(), source, BackupOptions{Names: []string{name}}); err == nil {
+			t.Fatal("unrestorable name accepted")
+		}
+	}
+	name := strings.Repeat("a", 255)
+	v := mustBackup(t, s, source, BackupOptions{Names: []string{name}})
+	mustRestore(t, s, v.Version, filepath.Join(base, "maximum-component"), data, false)
+}
 
 func TestSpecialSourceAndOwnerInputsRejectWithoutBlocking(t *testing.T) {
 	base, s, source, _ := fixture(t, 64)

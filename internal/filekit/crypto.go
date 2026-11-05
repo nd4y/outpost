@@ -106,7 +106,15 @@ func decode(b []byte, v any) error {
 }
 
 func safeName(s string) bool {
-	return s != "" && len(s) <= 4096 && utf8.ValidString(s) && !strings.ContainsAny(s, "\\\x00") && !strings.HasPrefix(s, "/") && s != "." && s != ".." && !strings.HasPrefix(s, "../") && path.Clean(s) == s
+	if s == "" || len(s) > 4095 || !utf8.ValidString(s) || strings.ContainsAny(s, "\\\x00") || strings.HasPrefix(s, "/") || s == "." || s == ".." || strings.HasPrefix(s, "../") || path.Clean(s) != s {
+		return false
+	}
+	for _, component := range strings.Split(s, "/") {
+		if len(component) > 255 {
+			return false
+		}
+	}
+	return true
 }
 
 func validateDescriptor(d Descriptor) error {
