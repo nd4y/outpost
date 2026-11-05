@@ -6,10 +6,9 @@
 
 Autonomous encrypted backups with complete assigned replicas, granular placement and recovery after long disconnections.
 
-**Stage: M0 feasibility prototypes.** The [standalone file-kit experiment](docs/en/g1-prototype.md) is executable on synthetic data. There is no production backup service or accepted format yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
+**Stage: M0, independent file-kit implementation.** The [G1 format candidate](docs/en/file-kit-format.md) streams files into encrypted objects and restores a selected version without a global repository index. There is no production backup service yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
-The G1 fixture covers failed descriptor publication, physical pack replacement and recovery across selected-version retirement. Full-scale, crash/concurrency and production acceptance remain open.
-The optional 4 GiB/8 MiB development profile requires a verified dedicated filesystem and an explicit capacity budget.
+The [G1 acceptance plan](docs/en/g1-acceptance.md) covers encrypted names, old/new versions, attributes, multipart descriptors, tamper rejection, actual SIGKILL boundaries and concurrent maintenance. Its 100 GiB/8 MiB profile records reads, added ciphertext/metadata, objects, memory and storage. Full-scale acceptance is pending the recorded run; G2/G3 and production deployment remain separate.
 
 ## Planned workflows
 
@@ -36,16 +35,18 @@ node scripts/check-docs.mjs
 node scripts/check-format.mjs
 ```
 
-These commands validate documentation and the standard toolkit. They do not start a backup service. Development requires Git, Node.js 22+, npm, tar and a POSIX shell for hooks; CI pins its exact versions. Planned workers target Linux amd64/arm64. Restic 0.19.1 is the researched candidate; its suitability depends on G1-G3.
+These commands validate documentation and the standard toolkit. They do not start a backup service. Development requires Git, Node.js 22+, npm, tar and a POSIX shell for hooks; CI pins its exact versions. The G1 CLI targets Linux and reuses the pinned restic chunker with standard Go cryptography. The older restic 0.19.1 experiment remains a comparison; planned workers target Linux amd64/arm64.
 
 ## Documentation
 
 - [Project passport and workflows](docs/en/project.md)
-- [Technical specification 1.3](docs/en/specification.md)
+- [Technical specification 1.4](docs/en/specification.md)
 - [Milestones and open acceptance](docs/en/roadmap.md)
 - [Development standard and commands](docs/en/development-standard.md)
 - [Audit against all 45 rules](docs/en/standard-review.md)
 - [G1 executable experiment and limits](docs/en/g1-prototype.md)
+- [Independent file-kit format and engine decision](docs/en/file-kit-format.md)
+- [G1 acceptance, cost bounds and commands](docs/en/g1-acceptance.md)
 - [Infrastructure profile contract](docs/en/infrastructure-profile.md)
 - [Machine-readable requirement trace](docs/requirements.json)
 

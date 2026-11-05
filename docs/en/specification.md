@@ -1,6 +1,6 @@
 # Outpost technical specification
 
-Version 1.3, 5 November 2026. Outpost provides autonomous encrypted backup replicas. Restic is the baseline candidate for backup and native restoration; Outpost supplies placement, transfer, replica state and operations.
+Version 1.4, 6 November 2026. Outpost provides autonomous encrypted backup replicas. The G1 candidate reuses the restic chunker and standard cryptography in an independent Outpost file-kit format; the native restic workflow remains a comparison. Outpost supplies placement, transfer, replica state and operations.
 
 A release requires all applicable mandatory requirements and acceptance scenarios. Gates G1-G3 precede format selection and implementation at scale. If restic cannot satisfy a mandatory requirement, change the adapter or engine through a recorded decision instead of dropping the requirement.
 
@@ -38,12 +38,12 @@ The data owner approves trust boundaries and holds the recovery kit. Operators m
 
 # 3 Architecture and component boundaries
 
-**REQ-01. Reuse a proven engine.** Use restic for reading, chunking, deduplication, compression, encryption, snapshots and native restore. Isolate CLI/REST access behind an adapter. A normal complete replica must remain readable by an unmodified restic. Pin binaries and format versions per release; the researched baseline is restic 0.19.1. Assess upgrades separately.
+**REQ-01. Reuse proven components.** Reuse established chunking algorithms and cryptographic implementations; do not invent either. Pin engine/components and format versions per release. Select the engine/adapter through G1-G3 and a documented compatibility decision. A complete materialized replica must have a versioned independent offline reader without a running Outpost service. The researched restic 0.19.1 baseline remains a comparison; [the G1 decision](file-kit-format.md) uses restic/chunker with standard Go cryptography and an Outpost descriptor/object protocol. This changes native format compatibility explicitly; existing native experiments retain their reader, and no production archive is migrated.
 
-Rest-server may provide the HTTPS ingress but is not a complete peer protocol. Restic copy opens repositories and must not implement keyless fan-out. Use existing SDKs/rclone for supported storage protocols. Do not develop new cryptographic primitives or a new chunking algorithm.
+The transport adapter must remain separate from storage and recovery. A generic HTTPS ingress is not a complete peer protocol. Native repository copy commands must not implement keyless fan-out. Reuse existing SDKs or protocol libraries for supported storage APIs. The recorded G1 decision does not accept G2/G3 or authorize production deployment.
 
 1. A source agent obtains a consistent view and classifies storage domains.
-2. Restic encrypts on the trusted side and sends new objects to one authorized ingress.
+2. The selected file-kit engine encrypts on the trusted side and sends new objects to one authorized ingress.
 3. A trusted component seals and signs a consistent generation.
 4. Workers obtain missing ciphertext from authorized holders.
 5. Eligible workers divide external-storage uploads.
@@ -64,7 +64,7 @@ flowchart TD
 
 This is a logical domain-specific exchange. Every edge must be authorized. C initiates HTTPS and obtains data in responses; the bidirectional arrow does not require inbound connections to C. External storage participates only where allowed.
 
-Modules: source providers, restic adapter, generation catalog, policy engine, peer transport, scheduler, cloud adapters, retention controller, recovery tool, UI/API and telemetry adapter.
+Modules: source providers, file-kit/engine adapter, generation catalog, policy engine, peer transport, scheduler, cloud adapters, retention controller, recovery tool, UI/API and telemetry adapter.
 
 # 4 Sources and consistency
 
@@ -309,7 +309,7 @@ Configure CPU, RAM, cache, disk and bandwidth limits. Overload slows or pauses n
 
 Use stable IDs, tenant/domain scope, schema versions and validation. Critical requests carry operation_id. Clocks aid observation but do not replace signatures and epoch/sequence. Distinguish temporary failure, authorization, policy prohibition, corruption, capacity and format errors.
 
-**REQ-46. Recovery compatibility.** Every accepted format has reference fixtures, documented dependencies and an independent reader. Test native restic recovery from a materialized full replica separately from file-kit recovery. Neither a vendor service nor a live control-plane account may be needed to read saved data.
+**REQ-46. Recovery compatibility.** Every accepted format has reference fixtures, documented dependencies and an independent reader. Test offline recovery from a complete materialized replica separately from selected file-kit recovery. For the chosen format, use the pinned standalone reader with only the replica and owner kit while source, center and peers are unavailable; native restic compatibility is required only for the retained native comparison format. Neither a vendor service nor a live control-plane account may be needed to read saved data.
 
 # 20 Acceptance environment
 
@@ -377,7 +377,7 @@ Deliver reproducible scenarios, code version, limitations, measurements and an e
 | AT-21 | Compromised source credentials                    | Authorized new backups possible without destroying protected history; reject forged deletion plans                                                                                                                                                                                                                                                                                     |
 | AT-22 | Full disk/process/power loss                      | After process/power loss, full disk and journal recovery, retain the last complete version and avoid false durable ACKs. Test absent/locked/delayed/wrong/read-only volumes without backup/state writes to the underlying root filesystem. Preserve protected generations under quota and reject infeasible capacity; recover only after valid storage returns.                        |
 | AT-23 | Source consistency/metadata                       | Restore mandatory attributes and a usable application dump; no hidden best-effort downgrade                                                                                                                                                                                                                                                                                            |
-| AT-24 | Independent native restoration                    | Ordinary restic restores a materialized replica with kit while source, center and peers are off                                                                                                                                                                                                                                                                                        |
+| AT-24 | Independent offline restoration                   | The pinned standalone reader restores a complete materialized replica on a clean machine with the owner kit while source, center and peers are off; selected-file recovery alone is insufficient                                                                                                                                                                                       |
 | AT-25 | Isolation/install/upgrade                         | Verify amd64/arm64 isolation, scoped mounts and no destructive format reset. Verify initial enrollment and cold-boot unlock/mount ordering, volume identity/sentinel and supported identity migration. Check detected versus enforced controls and low-memory budgets including page cache/telemetry; unsupported required controls block admission.                                   |
 | AT-26 | Telemetry failure                                 | Preserve acknowledged queues within policy across outage/restart; telemetry exhaustion cannot delete backups; no secret/name leakage                                                                                                                                                                                                                                                   |
 | AT-27 | Domain/tenant separation                          | Identical names/content never bypass boundaries; credentials and prefixes isolated                                                                                                                                                                                                                                                                                                     |

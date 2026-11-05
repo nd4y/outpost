@@ -48,6 +48,6 @@ After initial bootstrap, use branches/PRs; the owner merges. Do not bypass prote
 
 ## Evidence, updates and rollback
 
-Record commit/digest, environment, commands, time, results and unverified paths. [requirements.json](../requirements.json) retains 53 requirements and 35 planned scenarios. The checker verifies structure; human review verifies bilingual meaning. Runtime tests belong to G1-G3 and M1-M5.
+Record commit/digest, environment, commands, time, results and unverified paths. [requirements.json](../requirements.json) retains 53 requirements and 35 planned scenarios. The [G1 trace](g1-acceptance.md) binds REQ-09/10/11 to actual file-kit checks and measured resource limits. The checker verifies structure; human review verifies bilingual meaning. Runtime tests belong to G1-G3 and M1-M5.
 
 Update the toolkit with a versioned reviewed PR after checking checksums and rejection behavior. To undo local hook installation, restore the previous hooksPath recorded in the local Git directory's repository-standard-hook.json; a previous hook is preserved. Removing public adoption files requires a reviewed PR preserving product checks. Owner infrastructure and build policies remain private.

@@ -13,7 +13,10 @@
     "G1": {
       "milestone": "M0",
       "requirements": ["REQ-09", "REQ-10", "REQ-11"],
-      "status": "NOT_VERIFIED"
+      "status": "NOT_VERIFIED",
+      "evidencePlan": "docs/en/g1-acceptance.md",
+      "limits": "docs/g1-acceptance.json",
+      "implementation": "internal/filekit"
     }
   },
   "standardVersion": "0.4.0",
@@ -586,7 +589,7 @@
       "stage": "release"
     }
   ],
-  "specVersion": "1.3",
+  "specVersion": "1.4",
   "schemaVersion": 1,
   "normativeSources": {
     "ru": "docs/ru/specification.md",

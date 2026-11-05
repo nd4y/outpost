@@ -2,6 +2,8 @@
 
 [Русский](../ru/g1-prototype.md)
 
+This page preserves the earlier native restic comparison. The current implementation and acceptance decision are in [file-kit format](file-kit-format.md) and [G1 acceptance](g1-acceptance.md); limitations below describe this comparison, not the later reader.
+
 This is the first executable M0 experiment, not a backup service or an accepted storage format. It evaluates a minimal native restic repository containing one file's payload versions and encrypted descriptors. The primary repository also contains another file; the kit receives only the selected stream. Neither source files nor primary repository/index/cache are mounted into the recovery container.
 
 The trusted experiment reads each selected version through `restic dump`, then uses `backup --stdin-from-command` to create a payload snapshot in the kit. A failed producer must not publish an empty or truncated snapshot. Descriptors are encrypted by native restic and refer to exact payload snapshots, length, SHA-256 and fixture metadata. The recovery password is separate. No new cryptographic primitive, chunker or pack format is introduced.

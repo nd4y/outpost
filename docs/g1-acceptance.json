@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "format": "outpost-filekit-1",
+  "status": "NOT_VERIFIED",
+  "sourceBytes": 107374182400,
+  "contiguousChangeBytes": 8388608,
+  "maximumIncrementalBytes": 134217728,
+  "maximumInitialKitRatio": 1.08,
+  "maximumSelectedKitObjects": 32768,
+  "maximumRestoreReadRatio": 4,
+  "restoreReadAllowanceBytes": 134217728,
+  "maximumSourceTemporaryBytes": 2147483648,
+  "containerMemoryBytes": 805306368,
+  "minimumFilesystemFreeRatio": 0.2,
+  "unchangedPayloadBytes": 0,
+  "renamePayloadBytes": 0,
+  "maximumObjectBytes": 8388608,
+  "maximumDescriptorPartBytes": 4194304,
+  "maximumDescriptorBytes": 67108864,
+  "maximumFileBytes": 137438953472,
+  "maximumBlocks": 524288,
+  "sourceReadRule": "exactly one full sequential source read per capture; no full source-local temporary repository",
+  "restoreRule": "materialized regular file checked byte-for-byte by the independent synthetic oracle, with metadata and hard-link identity",
+  "costCases": [
+    "baseline",
+    "8-MiB replacement",
+    "unchanged",
+    "rename",
+    "8 scattered 1-MiB changes",
+    "1-MiB insertion 64-MiB before EOF",
+    "physical repack",
+    "retirement"
+  ],
+  "independentRecovery": "pre-created copied kit, recovery-only owner key and expected version receipt; isolated container has no source, canonical store or other files' payloads",
+  "requirements": ["REQ-09", "REQ-10", "REQ-11"],
+  "gatesStillSeparate": [
+    "G2 distributed retention and offline pins",
+    "G3 transport/cloud acknowledgement and fencing",
+    "production deployment"
+  ]
+}

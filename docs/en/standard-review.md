@@ -2,7 +2,7 @@
 
 [Русский](../ru/standard-review.md)
 
-Review date: 5 November 2026. Specification 1.3, Development Standard 0.4.0, pinned source 75833a42311832d1de665d0e441adac2b5b701d2.
+Review date: 6 November 2026. Specification 1.4, Development Standard 0.4.0, pinned source 75833a42311832d1de665d0e441adac2b5b701d2.
 
 All 45 rules have a documented requirement or repository policy. PASS below means design coverage in this source revision. Product verification is NOT_VERIFIED for every rule: no production engine, full acceptance or release is implemented here; the synthetic G1 fixture is a separate partial result. Current repository execution and hosting evidence is read from the exact commit's Actions results and repository settings, separately from this author review.
 
@@ -11,6 +11,8 @@ The review found missing explicit requirement stages/traceability, a compact pro
 Revision 1.2 adds mount/identity admission, enforced resource profiles, complete capacity accounting, source restore scope and explicit crash/quota traceability. Private host facts remain outside Git. This is design coverage; target runtime and cold-boot acceptance remain NOT_VERIFIED.
 
 Revision 1.3 defines external storage by S3-compatible APIs and WebDAV, removes vendor-specific routes and archive branding, and keeps per-endpoint capability and credential-scope acceptance. REQ-28/30/40 and AT-16 remain traced; this does not declare every endpoint tested.
+
+Revision 1.4 records the G1 format decision in REQ-01/46 and AT-24: established chunking/cryptographic implementations with an independent Outpost reader, while preserving offline restoration of a complete replica. Native restic comparison data retains its native reader. [G1 evidence](g1-acceptance.md) now maps implementation checks and numeric costs separately; G2/G3, full-product acceptance and migrations remain unverified. No requirement ID or acceptance scenario was removed.
 
 | Rule     | Expected subject              | Coverage | Observation and source                                                                                                                                                                       |
 | -------- | ----------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
