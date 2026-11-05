@@ -29,7 +29,7 @@
     <rect x="420" y="305" width="342" height="82" rx="14" fill="#283448" stroke="#99afd0"/>
     <text x="442" y="329" font-size="18">External storage</text>
     <text x="442" y="350" font-size="16" fill="#bed2e6">Внешние хранилища</text>
-    <text x="442" y="373" font-size="16" fill="#bed2e6">S3, Mail.ru, WebDAV</text>
+    <text x="442" y="373" font-size="16" fill="#bed2e6">S3 API, WebDAV</text>
     <text x="44" y="330" font-size="16" fill="#b8cce2">Every route requires policy permission.</text>
     <text x="44" y="357" font-size="15" fill="#b8cce2">Каждый маршрут разрешается политикой.</text>
     <text x="44" y="405" font-size="13" fill="#b8cce2">Workers hold no decryption keys. Trust category alone does not grant key access.</text>

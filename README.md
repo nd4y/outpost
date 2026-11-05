@@ -9,6 +9,7 @@ Autonomous encrypted backups with complete assigned replicas, granular placement
 **Stage: M0 feasibility prototypes.** The [standalone file-kit experiment](docs/en/g1-prototype.md) is executable on synthetic data. There is no production backup service or accepted format yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
 The G1 fixture covers failed descriptor publication, physical pack replacement and recovery across selected-version retirement. Full-scale, crash/concurrency and production acceptance remain open.
+The optional 4 GiB/8 MiB development profile requires a verified dedicated filesystem and an explicit capacity budget.
 
 ## Planned workflows
 
@@ -18,7 +19,7 @@ The G1 fixture covers failed descriptor publication, physical pack replacement a
 
 ## Storage and privacy
 
-Policies distinguish **trusted nodes**, **untrusted nodes** and **external storage** such as S3, Mail.ru and WebDAV. Each dataset selects permitted categories, concrete recipients and transit routes. Untrusted workers receive ciphertext without decryption keys. Trusted worker status alone grants no decryption rights. External storage is a backend, not an implicit worker.
+Policies distinguish **trusted nodes**, **untrusted nodes** and **external storage** using S3-compatible APIs or WebDAV. Each dataset selects permitted categories, concrete recipients and transit routes. Untrusted workers receive ciphertext without decryption keys. Trusted worker status alone grants no decryption rights. External storage is a backend, not an implicit worker.
 
 Names and file metadata are encrypted at the source. Technical sizes, timing and block-reuse patterns are not hidden. A complete replica covers its assigned datasets and retained versions. Every cloud target must be independently complete for its assignments; eligible workers divide uploads.
 
@@ -40,7 +41,7 @@ These commands validate documentation and the standard toolkit. They do not star
 ## Documentation
 
 - [Project passport and workflows](docs/en/project.md)
-- [Technical specification 1.2](docs/en/specification.md)
+- [Technical specification 1.3](docs/en/specification.md)
 - [Milestones and open acceptance](docs/en/roadmap.md)
 - [Development standard and commands](docs/en/development-standard.md)
 - [Audit against all 45 rules](docs/en/standard-review.md)

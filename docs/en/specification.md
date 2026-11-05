@@ -1,6 +1,6 @@
 # Outpost technical specification
 
-Version 1.2, 5 November 2026. Outpost provides autonomous encrypted backup replicas. Restic is the baseline candidate for backup and native restoration; Outpost supplies placement, transfer, replica state and operations.
+Version 1.3, 5 November 2026. Outpost provides autonomous encrypted backup replicas. Restic is the baseline candidate for backup and native restoration; Outpost supplies placement, transfer, replica state and operations.
 
 A release requires all applicable mandatory requirements and acceptance scenarios. Gates G1-G3 precede format selection and implementation at scale. If restic cannot satisfy a mandatory requirement, change the adapter or engine through a recorded decision instead of dropping the requirement.
 
@@ -130,7 +130,7 @@ Object identity includes domain_id, object_id, length, ciphertext cryptographic 
 | ---------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Trusted node     | Worker in an administratively controlled zone accepted by the owner | Assigned datasets only; decryption requires a separately authorized trusted-component role |
 | Untrusted node   | Worker outside the owner's administrative control                   | Authorized ciphertext and least-privilege exchange, without decryption keys                |
-| External storage | S3, Mail.ru, WebDAV or another supported backend                    | Explicitly allowed datasets and operations; no embedded Outpost worker is assumed          |
+| External storage | S3-compatible API or WebDAV                                         | Explicitly allowed datasets and operations; no embedded Outpost worker is assumed          |
 
 Dataset policy combines allowed categories, concrete recipient identities and separate transit permissions. These restrictions apply together. A dataset may be limited to selected trusted nodes; another may additionally permit selected untrusted nodes or external storage. Rules are independent of the type of user files.
 
@@ -212,13 +212,13 @@ Consider verified local objects, availability, bandwidth, quotas, failures and p
 
 Central assignment may optimize work, but durable rules and worker coordination must allow authorized work/reassignment while the center is unavailable. Arbitration may permit duplicates without byte substitution, deletion of protected objects or false COMPLETE. No permanently online coordinator is required per upload.
 
-**REQ-28. Storage adapters.** The first functional release supports local node storage, S3-compatible storage, WebDAV and a separately verified Mail.ru route. Publish capabilities for size/object count, ranges, resume, conditional writes, atomic publication, checksum, listing, rate limits and deletion.
+**REQ-28. Storage adapters.** The first functional release supports local node storage, any S3-compatible storage implementing the required operations, and WebDAV. Compatibility is defined by protocol and measured endpoint capabilities, without a vendor allowlist or dedicated vendor adapter. Publish capabilities for size/object count, ranges, resume, conditional writes, atomic publication, checksum, listing, rate limits and deletion.
 
 Do not assume WebDAV offers S3 operations or that its ETag is a content hash. Without conditional writes, use unique attempt identifiers and safe immutable publication. Unknown stream length must not create a hidden complete temporary source-file copy.
 
 **REQ-29. Complete assigned cloud scope.** An external target contains all dependencies of its assigned domains and retained generations. Workers divide one complete target copy, not an arbitrary unrestorable sample. Exclude datasets forbidden from external storage or that specific target before creating upload tasks.
 
-**REQ-30. Archive profile.** Glacier and delayed-access classes have separate hot-metadata, retrieval initiation/waiting, cost, availability-window and expiry/retrieval behavior. Ordinary S3 acceptance does not close this profile. Mark it unavailable until accepted and never advertise an ordinary-storage RTO for it.
+**REQ-30. Archive profile.** Delayed-access archive classes have separate hot-metadata, retrieval initiation/waiting, cost, availability-window and expiry/retrieval behavior. Ordinary S3 acceptance does not close this profile. Mark it unavailable until accepted and never advertise an ordinary-storage RTO for it.
 
 # 14 Retention and garbage collection
 
@@ -272,7 +272,7 @@ A container bridge, non-root process and absence of TUN do not establish outboun
 
 A token grants no arbitrary filesystem, destination or command access. Validate approved endpoints against redirects and name substitution. Reject invalid signatures, domains, sizes and digests before publication.
 
-Scope external credentials to namespaces/operations. Never distribute broad Mail.ru account secrets to untrusted nodes for parallelism. If a provider cannot delegate scoped or per-upload access, only trusted holders or a separately accepted gateway handle that target. Reflect this restriction in the eligible worker count.
+Scope external credentials to namespaces/operations. Never distribute broad storage-account secrets to untrusted nodes for parallelism. If a provider cannot delegate scoped or per-upload access, only trusted holders or a separately accepted gateway handle that target. Reflect this restriction in the eligible worker count.
 
 **REQ-41. Upgrades.** Pin image/tool versions and digests; version local schemas and protocols. Before format changes, define offline-node compatibility, rollback and old-generation recovery. A migration must not destroy the only restorable representation.
 
@@ -319,7 +319,7 @@ These are initial reproducible test targets, not measured product guarantees. Ve
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Topology                | One source, full holders A/B/C; C only initiates HTTPS to A, with no direct B-C connection                                                   |
 | AT-14 extension         | Add holder D; A/B/D can reach the target. C still has no direct external-storage route                                                       |
-| External targets        | Controlled S3 and WebDAV environments; a separate actual Mail.ru route test                                                                  |
+| External targets        | Controlled S3-compatible and WebDAV endpoints; capability checks for each configured endpoint                                                |
 | Offline horizon         | Simulate 180 daily generations including maintenance/policy changes                                                                          |
 | Authority lifetime      | At least 187 days for the long-offline scenario; expiry/renewal tested separately                                                            |
 | Change fixture          | One incompressible 100 GiB file in a dedicated dataset; 8 MiB replacement, scattered edits and insertion                                     |
@@ -369,7 +369,7 @@ Deliver reproducible scenarios, code version, limitations, measurements and an e
 | AT-13 | Corruption and total loss                         | Repair from an allowed verified peer; total loss is explicit with affected versions                                                                                                                                                                                                                                                                                                    |
 | AT-14 | Three parallel cloud workers                      | Distinct concurrent completed objects, profile throughput and complete final target                                                                                                                                                                                                                                                                                                    |
 | AT-15 | Worker failure and duplicate job                  | Meet failover target on a healthy testbed; immutable bytes preserved; partial upload never ready                                                                                                                                                                                                                                                                                       |
-| AT-16 | Provider boundaries                               | Test limits, multipart objects, timeouts, throttling and incomplete listings; validate Mail.ru separately                                                                                                                                                                                                                                                                              |
+| AT-16 | Provider boundaries                               | Test limits, multipart objects, timeouts, throttling and incomplete listings; validate the capabilities of each configured S3-compatible or WebDAV endpoint                                                                                                                                                                                                                            |
 | AT-17 | Control-plane outage and worker restart           | Durable queues/pins, continued authorized work, no unknown recipient; local restore independent                                                                                                                                                                                                                                                                                        |
 | AT-18 | Authority expiry/rotation                         | Stop expired new transfers, preserve local restore; old/new data readable with the appropriate kit                                                                                                                                                                                                                                                                                     |
 | AT-19 | Policy conflict/change                            | Overlaps, links and aliases cannot bypass denial; expansion requires owner authority; no false deletion claim for an offline untrusted host                                                                                                                                                                                                                                            |
@@ -399,7 +399,7 @@ All results identify tested commit/artifact, environment, commands, observed sco
 | M0        | G1-G3, file-kit format, generations/GC model and cost measurements              | Prove restic plus adapter or accept another approach while preserving requirements |
 | M1        | Source providers, domains, encryption/history, recovery and file kits           | AT-02-AT-05 and AT-23; actual restoration, not backup creation alone               |
 | M2        | Durable jobs, HTTPS peers, intermediates, complete generations, pins and repair | AT-01, AT-07-AT-13, AT-17, AT-20-AT-22, AT-24 and AT-29                            |
-| M3        | S3, WebDAV, Mail.ru, distributed jobs and placement                             | AT-06, AT-14-AT-16, AT-18, AT-19 and AT-27                                         |
+| M3        | S3-compatible APIs, WebDAV, distributed jobs and placement                      | AT-06, AT-14-AT-16, AT-18, AT-19 and AT-27                                         |
 | M4        | UI/API, installation, upgrades, telemetry, documentation and measured limits    | AT-25, AT-26 and AT-30-AT-35 plus all applicable main workflows                    |
 | M5        | Delayed archive recovery                                                        | AT-28 plus affected integrity, maintenance and restore regression checks           |
 
@@ -452,5 +452,5 @@ Each shared acceptance scenario reports distinct assertions and evidence for eve
 - [Rest-server](https://github.com/restic/rest-server)
 - [Restic repository backends](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html)
 - [Restic tuning](https://restic.readthedocs.io/en/stable/047_tuning_parameters.html)
-- [Rclone Mail.ru backend](https://rclone.org/mailru/)
+- [WebDAV adapter capabilities](https://rclone.org/webdav/)
 - [Restic cold-storage FAQ](https://restic.readthedocs.io/en/stable/faq.html#are-cold-storages-supported)

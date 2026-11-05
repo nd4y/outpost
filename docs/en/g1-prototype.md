@@ -28,9 +28,22 @@ The destination must not exist. The script creates synthetic data and disposable
 
 The fixture creates a 32 MiB random file, changes a 32 KiB segment and builds two versions. It checks producer failure, prunes old primary history, maintains the kit, restores independently with only kit/key and repeats with an optional truth oracle. The oracle compares output only after restoration; recovery does not depend on it. Wrong password and corrupted encrypted pack must fail. Successful output is JSON with `G1: PARTIAL_FIXTURE_ONLY`; `prepare` alone never reports recovery success.
 
+## Larger development profile
+
+An opt-in profile uses a 4 GiB noncompressible file and an 8 MiB patch, with the same independent recovery, failure and maintenance checks. It retains materialized outputs for inspection. It requires 100 GiB for the bounded experiment plus an 8 GiB free-space reserve, and an explicitly supplied filesystem UUID. The script checks this identity before creating output and before every container, rejecting a missing or different volume without creating the run directory. This admission check does not fence an already-running writer after device loss and is not the complete REQ-39 runtime implementation.
+
+```sh
+# Set TEST_VOLUME_UUID to the already verified dedicated filesystem identity.
+OUTPOST_FIXTURE_MIB=4096 OUTPOST_VOLUME_UUID="$TEST_VOLUME_UUID" \
+  timeout 5400 sh experiments/g1/run.sh /mounted-test-volume/g1-large \
+  "$PWD/out/outpost-lab" "$PWD/out/restic"
+```
+
+Only 32 and 4096 MiB profiles are accepted; all phases must select the same profile with `--fixture-mib`. The larger profile allows 30 minutes per phase while retaining one CPU, 768 MiB memory and no container network. The 100 GiB experiment budget is checked from actual file sizes, not enforced as a filesystem quota. It measures a larger fixture, not the required 100 GiB source-file acceptance case. Reboot/mount-order acceptance and actual cloud endpoint compatibility remain separate tests.
+
 ## Publication, repacking and retirement
 
-The `maintenance` phase receives only a read-only kit, its recovery key and a new output directory. It copies regular files without hard links, rejects links and recursive destinations, and bounds each clone to 128 MiB. It never maintains the input repository in place.
+The `maintenance` phase receives only a read-only kit, its recovery key and a new output directory. It copies regular files without hard links, rejects links and recursive destinations, and bounds each clone to the profile's payload size plus 96 MiB (128 MiB for the small fixture). It never maintains the input repository in place.
 
 The experiment commits an orphan payload, then fails the descriptor producer after a nonempty prefix. Discovery must return the exact previous descriptors, and both versions must still restore. Initial payload packs deliberately disable compression; `prune --repack-uncompressed --max-unused 0` must remove and add physical pack IDs before both versions are restored again. A successful no-op prune is insufficient.
 
@@ -44,6 +57,6 @@ Record toolchain/image/source identity, commands, fixture size, added kit bytes,
 
 Open conditions include 100 GiB/8 MiB traffic acceptance, full cost bounds, publication/retirement crash consistency beyond the tested boundaries, concurrent maintenance, general source metadata (ACL/xattr/hardlinks), signed checkpoints, keyless replication and target installation. G1 is not complete until all applicable requirements pass; G2 and G3 remain separate. The tool has fixed fixture validation and no production enrollment or arbitrary-file backup interface.
 
-Capacity must include source, primary repository, standalone kit, clone checkpoints, repack overlap and restored outputs. Even the primary and kit copies alone exceed 200 GB for a noncompressible 100 GiB file, before filesystem overhead. Do not extrapolate fixture success to that scale, use sparse/compressible data as a substitute, or bypass the clone limit. A larger-scale runner and a measured storage budget are required first.
+Capacity must include source, primary repository, standalone kit, clone checkpoints, repack overlap and restored outputs. Even the primary and kit copies alone exceed 200 GB for a noncompressible 100 GiB file, before filesystem overhead. Do not extrapolate fixture success to that scale, use sparse/compressible data as a substitute, or bypass the clone limit. A storage-efficient 100 GiB runner and a measured capacity budget are required first.
 
 Native stream semantics are described in [restic backup](https://restic.readthedocs.io/en/stable/040_backup.html#reading-data-from-a-command) and [restic dump](https://restic.readthedocs.io/en/stable/050_restore.html#printing-files-to-stdout).

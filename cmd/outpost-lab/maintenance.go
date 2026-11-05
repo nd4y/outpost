@@ -118,6 +118,7 @@ func cloneFixture(from, to string) error {
 		return err
 	}
 	var copied int64
+	limit := activeFixture.corpus + (96 << 20)
 	return filepath.WalkDir(from, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -145,7 +146,7 @@ func cloneFixture(from, to string) error {
 		if err != nil {
 			return err
 		}
-		n, copyErr := io.Copy(out, io.LimitReader(in, (128<<20)-copied+1))
+		n, copyErr := io.Copy(out, io.LimitReader(in, limit-copied+1))
 		copied += n
 		closeErr := out.Close()
 		if copyErr != nil {
@@ -154,8 +155,8 @@ func cloneFixture(from, to string) error {
 		if closeErr != nil {
 			return closeErr
 		}
-		if copied > 128<<20 {
-			return errors.New("fixture copy exceeds 128MiB")
+		if copied > limit {
+			return errors.New("fixture copy exceeds profile limit")
 		}
 		return nil
 	})

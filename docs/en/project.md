@@ -18,7 +18,7 @@ Policies use trusted nodes, untrusted nodes and external storage. Category, expl
 
 ## Platforms and contracts
 
-Planned workers: Linux amd64/arm64 containers. Planned operator surfaces: browser UI and recovery/management CLI. Exact OS/browser/runtime versions belong to a release compatibility matrix and are currently unverified. Restic 0.19.1 is a candidate, not a frozen engine decision. Sources use verified filesystem/application providers. External storage profiles cover S3, WebDAV, Mail.ru and separately delayed archives.
+Planned workers: Linux amd64/arm64 containers. Planned operator surfaces: browser UI and recovery/management CLI. Exact OS/browser/runtime versions belong to a release compatibility matrix and are currently unverified. Restic 0.19.1 is a candidate, not a frozen engine decision. Sources use verified filesystem/application providers. External storage profiles cover S3-compatible APIs, WebDAV and separately delayed-access archive classes.
 
 Published development tooling requires Git, Node.js 22+, npm, tar and a POSIX hook shell. No Go package, product binary or container is implied by that tooling bootstrap.
 

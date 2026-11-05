@@ -18,7 +18,6 @@ import (
 	"time"
 )
 
-const corpusBytes int64 = 32 << 20
 const descriptorTag = "outpost-lab-descriptor"
 
 var snapshotID = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -188,7 +187,7 @@ func prepare(ctx context.Context, binary, work string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.CopyN(f, rand.Reader, corpusBytes)
+	_, err = io.CopyN(f, rand.Reader, activeFixture.corpus)
 	closeErr := f.Close()
 	if err != nil {
 		return nil, err
@@ -208,9 +207,9 @@ func prepare(ctx context.Context, binary, work string) (any, error) {
 			if e != nil {
 				return nil, e
 			}
-			patch := make([]byte, 32<<10)
+			patch := make([]byte, activeFixture.patch)
 			if _, e = rand.Read(patch); e == nil {
-				_, e = f.WriteAt(patch, corpusBytes/2)
+				_, e = f.WriteAt(patch, activeFixture.corpus/2)
 			}
 			ce := f.Close()
 			if e != nil {
@@ -240,7 +239,7 @@ func prepare(ctx context.Context, binary, work string) (any, error) {
 		if e != nil {
 			return nil, e
 		}
-		d := descriptor{Version: fmt.Sprintf("v%d", i), Path: "fixture/confidential-name.bin", Payload: payloadID, Bytes: corpusBytes, SHA256: hash, Mode: 0600, Mtime: mtime.Unix()}
+		d := descriptor{Version: fmt.Sprintf("v%d", i), Path: "fixture/confidential-name.bin", Payload: payloadID, Bytes: activeFixture.corpus, SHA256: hash, Mode: 0600, Mtime: mtime.Unix()}
 		data, e := json.Marshal(d)
 		if e != nil {
 			return nil, e
@@ -288,7 +287,7 @@ func prepare(ctx context.Context, binary, work string) (any, error) {
 	if err = writeJSON(filepath.Join(recovery, "expected.json"), descriptors); err != nil {
 		return nil, err
 	}
-	result := map[string]any{"phase": "prepare", "fixtureBytes": corpusBytes, "versions": 2, "patchBytes": 32 << 10, "kitBytesAfterV1": kitSizes[0], "kitBytesAddedV2": kitSizes[1] - kitSizes[0], "fullPlaintextReadPerVersion": corpusBytes, "producerFailureRejected": true, "G1": "NOT_ACCEPTED", "next": "verify in a separate container with only kit and recovery inputs"}
+	result := map[string]any{"phase": "prepare", "fixtureBytes": activeFixture.corpus, "versions": 2, "patchBytes": activeFixture.patch, "kitBytesAfterV1": kitSizes[0], "kitBytesAddedV2": kitSizes[1] - kitSizes[0], "fullPlaintextReadPerVersion": activeFixture.corpus, "producerFailureRejected": true, "G1": "NOT_ACCEPTED", "next": "verify in a separate container with only kit and recovery inputs"}
 	if err = writeJSON(filepath.Join(root, "prepare.json"), result); err != nil {
 		return nil, err
 	}
@@ -296,7 +295,7 @@ func prepare(ctx context.Context, binary, work string) (any, error) {
 }
 
 func validDescriptor(d descriptor) error {
-	if (d.Version != "v1" && d.Version != "v2") || d.Path != "fixture/confidential-name.bin" || !snapshotID.MatchString(d.Payload) || !snapshotID.MatchString(d.SHA256) || d.Bytes != corpusBytes || d.Mode != 0600 || d.Mtime < 1 {
+	if (d.Version != "v1" && d.Version != "v2") || d.Path != "fixture/confidential-name.bin" || !snapshotID.MatchString(d.Payload) || !snapshotID.MatchString(d.SHA256) || d.Bytes != activeFixture.corpus || d.Mode != 0600 || d.Mtime < 1 {
 		return errors.New("invalid synthetic descriptor")
 	}
 	return nil
