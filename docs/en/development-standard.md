@@ -26,7 +26,7 @@ node scripts/check-format.mjs
 node scripts/check-standard-adoption.mjs
 ```
 
-Tools: Node.js 22+ locally, CI Node.js 24.18.0, Prettier 3.9.10 and checksum-verified Gitleaks 8.30.1. Git, npm, tar and a POSIX hook shell are required. There is no product build command until implementation begins.
+Tools: Node.js 22+ locally, CI Node.js 24.18.0, Prettier 3.9.10 and checksum-verified Gitleaks 8.30.1. Git, npm, tar and a POSIX hook shell are required. The M0 prototype uses Go 1.27.3: native gofmt, go test and go vet run in the prototype workflow. Its synthetic integration fixture runs without network or private credentials; see the [G1 commands and limits](g1-prototype.md). The production worker is not implemented.
 
 Format with `node scripts/check-format.mjs --write`, review the diff and stage only intended files. The pre-commit hook runs `node .standards/check.mjs staged` on index content; it preserves partial staging and chains any prior hook. Do not edit vendored toolkit files to reformat the project.
 

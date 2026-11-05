@@ -6,7 +6,7 @@
 
 Autonomous encrypted backups with complete assigned replicas, granular placement and recovery after long disconnections.
 
-**Stage: specification and repository bootstrap.** There is no runnable backup engine or production release yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
+**Stage: M0 feasibility prototypes.** The [standalone file-kit experiment](docs/en/g1-prototype.md) is executable on synthetic data. There is no production backup service or accepted format yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
 ## Planned workflows
 
@@ -42,11 +42,11 @@ These commands validate documentation and the standard toolkit. They do not star
 - [Milestones and open acceptance](docs/en/roadmap.md)
 - [Development standard and commands](docs/en/development-standard.md)
 - [Audit against all 45 rules](docs/en/standard-review.md)
+- [G1 executable experiment and limits](docs/en/g1-prototype.md)
+- [Infrastructure profile contract](docs/en/infrastructure-profile.md)
 - [Machine-readable requirement trace](docs/requirements.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.
-
-- [Infrastructure profile contract](docs/en/infrastructure-profile.md)
 
 ## Support and licensing
 

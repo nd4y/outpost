@@ -1,0 +1,40 @@
+name: Prototype checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go-prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Native formatting, unit checks and build
+        env:
+          GOMAXPROCS: 2
+        run: |
+          test -z "$(gofmt -l cmd)"
+          go test -count=1 ./...
+          go vet ./...
+          mkdir -p out
+          CGO_ENABLED=0 go build -trimpath -o out/outpost-lab ./cmd/outpost-lab
+      - name: Checksum-pinned experimental restic
+        run: |
+          curl -fL --retry 2 -o out/restic.bz2 https://github.com/restic/restic/releases/download/v0.19.1/restic_0.19.1_linux_amd64.bz2
+          echo 'f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c  out/restic.bz2' | sha256sum -c -
+          bzip2 -dk out/restic.bz2
+          chmod 755 out/restic
+      - name: Isolated synthetic G1 fixture
+        run: timeout 300 sh experiments/g1/run.sh "$RUNNER_TEMP/outpost-g1" "$PWD/out/outpost-lab" "$PWD/out/restic"
