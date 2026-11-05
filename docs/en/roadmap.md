@@ -2,7 +2,7 @@
 
 [Русский](../ru/roadmap.md)
 
-Current deliverable: specification 1.2, bilingual documentation, a pinned toolkit and the first [executable G1 fixture](g1-prototype.md). It checks a streaming standalone kit on synthetic data; full G1-G3, production releases, target installation/upgrade/restore and operational SLOs remain NOT VERIFIED.
+Current deliverable: specification 1.3, bilingual documentation, a pinned toolkit and the first [executable G1 fixture](g1-prototype.md). It checks a streaming standalone kit on synthetic data; full G1-G3, production releases, target installation/upgrade/restore and operational SLOs remain NOT VERIFIED.
 
 | Stage | Goal                                                                   | Required evidence                                                                    |
 | ----- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |

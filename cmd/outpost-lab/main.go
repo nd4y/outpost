@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 )
 
 func main() {
@@ -18,18 +17,24 @@ func main() {
 	out := flag.String("output", "", "new restore directory (verify)")
 	expected := flag.String("expected", "", "synthetic test oracle; not a restore dependency")
 	versions := flag.String("versions", "v1,v2", "exact expected fixture versions: v1,v2 or v2")
+	fixtureMiB := flag.Int("fixture-mib", 32, "bounded synthetic fixture: 32 or 4096 MiB")
 	restic := flag.String("restic", "restic", "restic 0.19.1 executable")
 	flag.Parse()
+	var err error
+	activeFixture, err = selectFixture(*fixtureMiB)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "outpost-lab:", err)
+		os.Exit(2)
+	}
 	// Fixed fault injection for the native producer-status experiment: emit a
 	// nonempty prefix, then fail. No repository or real source is accessed.
 	if *phase == "failed-producer" {
 		_, _ = os.Stdout.Write(make([]byte, 64<<10))
 		os.Exit(3)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), activeFixture.timeout)
 	defer cancel()
 	var result any
-	var err error
 	switch *phase {
 	case "prepare":
 		result, err = prepare(ctx, *restic, *work)

@@ -18,7 +18,7 @@ func TestRejectExistingDirectory(t *testing.T) {
 }
 
 func TestDescriptorRejectsUnsafeOrAmbiguousInputs(t *testing.T) {
-	d := descriptor{"v1", "fixture/confidential-name.bin", strings.Repeat("a", 64), corpusBytes, strings.Repeat("b", 64), 0600, 1700000001}
+	d := descriptor{"v1", "fixture/confidential-name.bin", strings.Repeat("a", 64), activeFixture.corpus, strings.Repeat("b", 64), 0600, 1700000001}
 	if err := validDescriptor(d); err != nil {
 		t.Fatal(err)
 	}
