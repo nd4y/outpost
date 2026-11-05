@@ -38,7 +38,7 @@ node scripts/check-format.mjs
 ## Документация
 
 - [Паспорт и сценарии](docs/ru/project.md)
-- [Техническое задание 1.1](docs/ru/specification.md)
+- [Техническое задание 1.2](docs/ru/specification.md)
 - [Этапы и незакрытая приёмка](docs/ru/roadmap.md)
 - [Стандарт разработки и команды](docs/ru/development-standard.md)
 - [Аудит по всем 45 правилам](docs/ru/standard-review.md)
@@ -51,3 +51,5 @@ node scripts/check-format.mjs
 Замечания к проекту и ограниченные предложения принимаются в [Issues](https://github.com/nd4y/outpost/issues). Для чувствительных сообщений используйте [SECURITY.md](SECURITY.md). На этой стадии нет обещаний совместимости runtime и SLA ответа. [CONTRIBUTING.md](CONTRIBUTING.md) описывает двуязычные PR и merge владельцем.
 
 Исходные материалы проекта распространяются по [MIT](LICENSE). В пакете стандарта сохранена его [лицензия MIT](.standards/LICENSE). Restic и будущие runtime-зависимости имеют собственные лицензии; здесь они не поставляются как готовый продукт.
+
+- [Контракт инфраструктурного профиля](docs/ru/infrastructure-profile.md)

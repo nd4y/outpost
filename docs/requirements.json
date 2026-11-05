@@ -173,7 +173,7 @@
       "stage": "release",
       "milestones": ["M1", "M2"],
       "level": "MUST",
-      "acceptance": ["AT-02", "AT-23"],
+      "acceptance": ["AT-02", "AT-23", "AT-30"],
       "id": "REQ-02"
     },
     {
@@ -309,7 +309,7 @@
       "stage": "release",
       "milestones": ["M2"],
       "level": "MUST",
-      "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20"],
+      "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
       "id": "REQ-19"
     },
     {
@@ -469,7 +469,7 @@
       "stage": "release",
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-22", "AT-25", "AT-26"],
+      "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
       "id": "REQ-39"
     },
     {
@@ -477,7 +477,7 @@
       "stage": "release",
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26"],
+      "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
       "id": "REQ-40"
     },
     {
@@ -509,7 +509,7 @@
       "stage": "release",
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-02", "AT-03", "AT-23"],
+      "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
       "id": "REQ-44"
     },
     {
@@ -540,7 +540,7 @@
     {
       "milestones": ["M2", "M4"],
       "level": "MUST",
-      "acceptance": ["AT-32", "AT-21", "AT-22"],
+      "acceptance": ["AT-21", "AT-22", "AT-32"],
       "id": "REQ-48",
       "scope": "untrusted-input-and-overload",
       "stage": "release"
@@ -556,7 +556,7 @@
     {
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-33", "AT-24", "AT-25"],
+      "acceptance": ["AT-24", "AT-25", "AT-33"],
       "id": "REQ-50",
       "scope": "compatibility-and-migrations",
       "stage": "release"
@@ -572,7 +572,7 @@
     {
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-35", "AT-26"],
+      "acceptance": ["AT-26", "AT-35"],
       "id": "REQ-52",
       "scope": "operations-and-alerting",
       "stage": "operations"
@@ -580,13 +580,13 @@
     {
       "milestones": ["M0", "M4"],
       "level": "MUST",
-      "acceptance": ["AT-02", "AT-14", "AT-22", "AT-30"],
+      "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],
       "id": "REQ-53",
       "scope": "capacity-and-cost",
       "stage": "release"
     }
   ],
-  "specVersion": "1.1",
+  "specVersion": "1.2",
   "schemaVersion": 1,
   "normativeSources": {
     "ru": "docs/ru/specification.md",

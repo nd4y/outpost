@@ -2,7 +2,7 @@
 
 [Русский](../ru/roadmap.md)
 
-Current deliverable: specification 1.1, bilingual project documentation and a pinned development-standard toolkit. Product implementation, builds, releases, clean installation, upgrade, restore and operational SLOs remain NOT VERIFIED.
+Current deliverable: specification 1.2, bilingual project documentation and a pinned development-standard toolkit. Product implementation, builds, releases, clean installation, upgrade, restore and operational SLOs remain NOT VERIFIED.
 
 | Stage | Goal                                                                   | Required evidence                                                                    |
 | ----- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |

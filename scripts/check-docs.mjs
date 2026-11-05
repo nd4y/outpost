@@ -31,8 +31,21 @@ for (const id of testIds)
     catalog.requirements.some((item) => item.acceptance.includes(id)),
     `Unmapped ${id}`,
   );
+// These failure-mode links are part of the reviewed specification contract.
+// Existence of a test elsewhere does not establish a scoped requirement's coverage.
+for (const [id, required] of Object.entries({
+  "REQ-19": ["AT-22"],
+  "REQ-39": ["AT-22", "AT-25", "AT-30"],
+  "REQ-44": ["AT-22", "AT-29", "AT-30"],
+  "REQ-53": ["AT-22", "AT-25", "AT-29", "AT-30"],
+})) {
+  const requirement = catalog.requirements.find((item) => item.id === id);
+  for (const test of required)
+    assert(requirement?.acceptance.includes(test), `Missing failure-mode link ${id} -> ${test}`);
+}
 const ruleIds = ids(read(".standards/rules.en.md"), /^## ([A-Z]+-\d{3}) /gm);
 const audit = JSON.parse(read("docs/standard-review.json"));
+assert.equal(audit.specVersion, catalog.specVersion, "Audit/catalog version differs");
 for (const lang of languages) {
   const digest = createHash("sha256")
     .update(read(`docs/${lang}/specification.md`))
