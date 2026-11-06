@@ -3,7 +3,10 @@
     "G3": {
       "milestone": "M0",
       "requirements": ["REQ-13", "REQ-19", "REQ-22", "REQ-23", "REQ-25", "REQ-27"],
-      "status": "NOT_VERIFIED"
+      "status": "NOT_VERIFIED",
+      "implementation": "internal/peer",
+      "evidencePlan": "docs/en/peer-transfer.md",
+      "trace": "docs/g3-trace.json"
     },
     "G2": {
       "milestone": "M0",

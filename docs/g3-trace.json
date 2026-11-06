@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "gate": "G3",
+  "scope": "Bounded HTTPS peer candidate only; full G3 and external distributed upload remain NOT_VERIFIED",
+  "requirements": [
+    {
+      "id": "REQ-13",
+      "acceptanceSubset": ["AT-05"],
+      "scope": "Immutable authenticated object delivery, length/hash/durability checks and bounded bodies",
+      "remaining": "Actual external target capability/visibility contract and repair of corrupt existing objects",
+      "tests": [
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestPrematurePublicationAndInvalidObject"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestPartialVisibilityAndCorruptionPreservePreviousComplete"
+        }
+      ]
+    },
+    {
+      "id": "REQ-19",
+      "acceptanceSubset": ["AT-15", "AT-22"],
+      "scope": "Stable bound operations, persistent retries, restart/duplicate safety and request cancellation",
+      "remaining": "Autonomous scheduler, distributed executor leases, abandoned job/pin retention and full overload acceptance",
+      "tests": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestLostReplyRestartAndDuplicateTransfer"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestRetryBudgetAndCancellation"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestJournalBoundsAndInterruptedSave"
+        }
+      ]
+    },
+    {
+      "id": "REQ-22",
+      "acceptanceSubset": ["AT-09", "AT-11"],
+      "scope": "Atomic target publication only after complete closure; prior complete retained on transfer failure",
+      "remaining": "Multi-process power loss, cloud targets and source application consistency",
+      "tests": [
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestPrematurePublicationAndInvalidObject"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestLostReplyRestartAndDuplicateTransfer"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestPartialVisibilityAndCorruptionPreservePreviousComplete"
+        }
+      ]
+    },
+    {
+      "id": "REQ-23",
+      "acceptanceSubset": ["AT-01", "AT-24"],
+      "scope": "Target receipts distinguished from independent full readback and local publication; standalone restored bytes",
+      "remaining": "Replica minimum/freshness coordination and proof beyond current byte availability",
+      "tests": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestFalseAcknowledgementCannotCompleteSenderJob"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAsynchronousBridgeOnlyTransferAndRestore"
+        }
+      ]
+    },
+    {
+      "id": "REQ-25",
+      "acceptanceSubset": ["AT-07", "AT-08"],
+      "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss",
+      "remaining": "Global graph validation, real host egress enforcement and long partitions",
+      "tests": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAsynchronousBridgeOnlyTransferAndRestore"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAuthorizationTLSScopesAndNoRedirect"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestTLSClientCertificateAndOperationGrants"
+        }
+      ]
+    },
+    {
+      "id": "REQ-27",
+      "acceptanceSubset": ["AT-15"],
+      "scope": "Prerequisites only: bounded concurrent object requests and safe duplicate delivery",
+      "remaining": "Three independent workers, distributed assignment/failover, actual S3-compatible/WebDAV uploads and measured scaling",
+      "tests": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestParallelObjectTransferIsBounded"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestLostReplyRestartAndDuplicateTransfer"
+        }
+      ]
+    }
+  ],
+  "supportingRequirements": [
+    {
+      "id": "REQ-40",
+      "acceptanceSubset": ["AT-07", "AT-22"],
+      "scope": "CA/hostname/SPKI authenticated HTTPS, explicit peer operations, expiry and no implicit fallback",
+      "remaining": "Installation, provisioning, signed policy delivery/reload and real egress/rotation acceptance",
+      "tests": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAuthorizationTLSScopesAndNoRedirect"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestTLSClientCertificateAndOperationGrants"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestRetryBudgetAndCancellation"
+        }
+      ]
+    }
+  ]
+}
