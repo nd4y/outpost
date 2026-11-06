@@ -15,6 +15,8 @@ Current deliverable: bilingual specification, a pinned toolkit and the [independ
 
 ## Feasibility gates
 
+The [G2 local-replica candidate](generation-replicas.md) now has bounded evidence for signed closures, durable reception, maintenance authority, pins and actual process interruption. It uses a 2 MiB integration source and a direct sequence 1-to-181 catch-up. This does not accept large-history costs, long-lived multi-node operation, epoch transitions or the deferred full-scale gates.
+
 G1 must recover a pre-created file kit with no repository index, other-file payload or source access. G2 must preserve actual pinned dependencies and kits across sealing, prune/repack and long absence. G3 must never publish incomplete data after interrupted transfers, duplicate work or uncertain receipts.
 
 An ordinary restic selective restore is not proof of G1. A signature is not proof that GC may remove a referenced object. A successful upload is not proof of target completeness. Preserve these requirements if the adapter or engine changes.

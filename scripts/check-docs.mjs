@@ -60,6 +60,29 @@ for (const item of g1Trace.requirements) {
   for (const phase of item.fixturePhases)
     assert(fixtureSource.includes(JSON.stringify(phase)), `Missing G1 fixture phase: ${phase}`);
 }
+const generationTrace = JSON.parse(read("docs/g2-trace.json"));
+assert.equal(generationTrace.gate, "G2");
+assert.deepEqual(
+  generationTrace.requirements.map((item) => item.id).sort(),
+  [...catalog.gates.G2.requirements].sort(),
+);
+for (const item of generationTrace.requirements) {
+  const requirement = catalog.requirements.find((entry) => entry.id === item.id);
+  assert(
+    item.scope && item.remaining && item.tests.length,
+    `Missing scoped G2 evidence: ${item.id}`,
+  );
+  for (const id of item.acceptanceSubset)
+    assert(requirement.acceptance.includes(id), `Invalid G2 subset ${item.id} -> ${id}`);
+  for (const test of item.tests) {
+    assert(/^internal\/(?:generation|filekit)\/[a-z_]+_test\.go$/.test(test.path));
+    assert(/^Test[A-Za-z0-9]+$/.test(test.name));
+    assert(
+      read(test.path).includes(`func ${test.name}(t *testing.T)`),
+      `Missing G2 check: ${test.name}`,
+    );
+  }
+}
 // These failure-mode links are part of the reviewed specification contract.
 // Existence of a test elsewhere does not establish a scoped requirement's coverage.
 for (const [id, required] of Object.entries({

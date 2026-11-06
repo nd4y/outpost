@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add the G2 signed generation/replica candidate with atomic completeness, restart-safe reception, persistent pins and separate revision-bound maintenance authority.
+- Verify small-file restore after source repack/loss, direct checkpoint catch-up and five real replica SIGKILL boundaries; defer heavy acceptance and retain all production holds.
+
 - Add the G1 independent file-kit candidate, local CLI, encrypted multipart descriptors, chunk reuse and standalone restoration.
 - Add real SIGKILL, concurrent reader/maintenance and tamper rejection checks plus measured 128 MiB/100 GiB acceptance runners.
 - Record specification 1.4's engine/format decision, resource bounds and bilingual requirement-to-check trace; retain G2/G3 and production holds.
@@ -17,6 +20,9 @@ The repository contains development file-kit code and a native restic comparison
 # Изменения
 
 ## Не выпущено
+
+- Добавлен кандидат поколений и реплик G2: атомарная полнота, продолжение приёма после перезапуска, постоянные закрепления и отдельные полномочия обслуживания с привязкой к ревизии.
+- Проверены восстановление малого файла после перепаковки и потери источника, переход к контрольной точке и пять реальных границ SIGKILL реплики; тяжёлая приёмка отложена, эксплуатационные ограничения сохранены.
 
 - Добавлены кандидат независимого комплекта G1, локальный CLI, зашифрованные части описания, повторное использование блоков и самостоятельное восстановление.
 - Добавлены реальные проверки SIGKILL, совместной работы читателя и обслуживания, повреждений и измеряемые сценарии 128 МиБ/100 ГиБ.

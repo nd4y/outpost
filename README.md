@@ -12,6 +12,8 @@ The [G1 acceptance plan](docs/en/g1-acceptance.md) covers encrypted names, old/n
 
 The local CLI accepts regular source and owner-key files. It rejects symbolic links and named pipes without waiting for a pipe writer; recovery keys must have private filesystem permissions. Restored names must fit Linux byte limits (255 per component, 4095 per relative path), so unsupported names fail before capture.
 
+The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signed complete catalogs, keyless reception, restart-safe progress, persistent pins and separately authorized cleanup. Small HDD tests cover checkpoint catch-up, source repack, actual process termination and independent old/new restoration. Heavy scale/endurance tests remain deferred; this is not full G2 acceptance or a network service.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.
@@ -52,6 +54,8 @@ These commands validate documentation and the standard toolkit. They do not star
 - [Infrastructure profile contract](docs/en/infrastructure-profile.md)
 - [Machine-readable requirement trace](docs/requirements.json)
 - [G1 requirements linked to executable checks](docs/g1-trace.json)
+- [G2 generation and replica contracts](docs/en/generation-replicas.md)
+- [G2 scoped requirement-to-check trace](docs/g2-trace.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.
 
