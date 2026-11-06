@@ -14,7 +14,7 @@ The local CLI accepts regular source and owner-key files. It rejects symbolic li
 
 The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signed complete catalogs, keyless reception, restart-safe progress, persistent pins and separately authorized cleanup. Small HDD tests cover checkpoint catch-up, source repack, actual process termination and independent old/new restoration. Heavy scale/endurance tests remain deferred; this is not full G2 acceptance or a network service.
 
-The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push currently audits the entire target generation by reading it back. Distributed external upload and heavy G3 acceptance remain open.
+The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push currently audits the entire target generation by reading it back. The [external-upload candidate](docs/en/external-upload.md) adds S3-compatible/WebDAV adapters, three independent workers, cached signed plans, failover and independently recoverable target generations. Real endpoint admission, full traffic accounting and heavy G3 acceptance remain open.
 
 ## Planned workflows
 
@@ -59,6 +59,7 @@ These commands validate documentation and the standard toolkit. They do not star
 - [G2 generation and replica contracts](docs/en/generation-replicas.md)
 - [G2 scoped requirement-to-check trace](docs/g2-trace.json)
 - [G3 peer protocol, evidence and limits](docs/en/peer-transfer.md)
+- [Distributed external upload, recovery and limits](docs/en/external-upload.md)
 - [G3 scoped requirement-to-check trace](docs/g3-trace.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.

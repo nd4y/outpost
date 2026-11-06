@@ -103,7 +103,7 @@ for (const item of [...peerTrace.requirements, ...peerTrace.supportingRequiremen
   for (const id of item.acceptanceSubset)
     assert(requirement.acceptance.includes(id), `Invalid G3 subset ${item.id} -> ${id}`);
   for (const test of item.tests) {
-    assert(/^internal\/peer\/[a-z_]+_test\.go$/.test(test.path));
+    assert(/^internal\/(peer|storage|upload)\/[a-z_]+_test\.go$/.test(test.path));
     assert(/^Test[A-Za-z0-9]+$/.test(test.name));
     assert(
       read(test.path).includes(`func ${test.name}(t *testing.T)`),

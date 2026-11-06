@@ -2,8 +2,12 @@
 
 ## Unreleased
 
+- Add S3-compatible/WebDAV immutable multipart storage and signed cached upload plans with durable worker journals.
+- Verify three independent upload processes, takeover after actual SIGKILL and old/new independent recovery after source loss. Reject false completeness, expired authority, policy violations and unsupported storage semantics.
+- Document per-target readback, resource/traffic limits and remaining actual-endpoint/heavy acceptance; no working services change.
+
 - Add the G3 mTLS peer library: explicit routes, durable push/pull operations, resumable immutable delivery and verified complete publication.
-- Verify asynchronous bridge recovery, lost replies/restart, false receipts, corrupt/truncated objects and authorization/retry bounds in small TLS fixtures. Retain full G3 and distributed external-upload holds; document full reverse-readback cost.
+- Verify asynchronous bridge recovery, lost replies/restart, false receipts, corrupt/truncated objects and authorization/retry bounds in small TLS fixtures. Retain full G3 and real external-target admission holds; document full reverse-readback cost.
 
 - Add the G2 signed generation/replica candidate with atomic completeness, restart-safe reception, persistent pins and separate revision-bound maintenance authority.
 - Verify small-file restore after source repack/loss, direct checkpoint catch-up and five real replica SIGKILL boundaries; defer heavy acceptance and retain all production holds.
@@ -24,8 +28,12 @@ The repository contains development file-kit code and a native restic comparison
 
 ## Не выпущено
 
+- Добавлены S3-совместимое/WebDAV-хранилище неизменяемых частей и сохранённые подписанные планы загрузки с постоянными журналами воркеров.
+- Проверены три независимых процесса, подхват после настоящего SIGKILL и самостоятельное восстановление старой/новой версий после потери источника. Ложная полнота, истёкшие полномочия, запреты размещения и неподдерживаемая семантика хранилища приводят к отказу.
+- Описаны обратное чтение отдельной цели, пределы ресурсов/трафика и оставшаяся приёмка реальных endpoint/тяжёлых сценариев; рабочие сервисы не меняются.
+
 - Добавлена библиотека G3 с mTLS: явные маршруты, постоянные операции push/pull, продолжение передачи неизменяемых объектов и проверенная публикация полного поколения.
-- В малых TLS-фикстурах проверены восстановление через асинхронную промежуточную ноду, потеря ответа/перезапуск, ложные квитанции, повреждённые/усечённые объекты и границы полномочий/повторов. Полный G3 и распределённая внешняя загрузка остаются открытыми; описана стоимость полного обратного чтения.
+- В малых TLS-фикстурах проверены восстановление через асинхронную промежуточную ноду, потеря ответа/перезапуск, ложные квитанции, повреждённые/усечённые объекты и границы полномочий/повторов. Полный G3 и допуск реальных внешних целей остаются открытыми; описана стоимость полного обратного чтения.
 
 - Добавлен кандидат поколений и реплик G2: атомарная полнота, продолжение приёма после перезапуска, постоянные закрепления и отдельные полномочия обслуживания с привязкой к ревизии.
 - Проверены восстановление малого файла после перепаковки и потери источника, переход к контрольной точке и пять реальных границ SIGKILL реплики; тяжёлая приёмка отложена, эксплуатационные ограничения сохранены.
