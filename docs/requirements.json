@@ -8,7 +8,10 @@
     "G2": {
       "milestone": "M0",
       "requirements": ["REQ-20", "REQ-21", "REQ-22", "REQ-31", "REQ-32", "REQ-33"],
-      "status": "NOT_VERIFIED"
+      "status": "NOT_VERIFIED",
+      "implementation": "internal/generation",
+      "evidencePlan": "docs/en/generation-replicas.md",
+      "trace": "docs/g2-trace.json"
     },
     "G1": {
       "milestone": "M0",

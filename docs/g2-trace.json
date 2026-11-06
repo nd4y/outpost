@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "gate": "G2",
+  "scope": "Bounded local generation/replica candidate only; full G2 and release scenarios remain NOT_VERIFIED",
+  "requirements": [
+    {
+      "id": "REQ-20",
+      "acceptanceSubset": ["AT-17", "AT-20"],
+      "scope": "Canonical signed complete closures and direct checkpoint catch-up",
+      "remaining": "Large catalog/history cost and independently provisioned checkpoints",
+      "tests": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestCatalogAuthenticationAndBounds"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestReceiveRestartConflictAndPendingPin"
+        }
+      ]
+    },
+    {
+      "id": "REQ-21",
+      "acceptanceSubset": ["AT-18", "AT-21"],
+      "scope": "Epoch/domain binding, highest sequence and conflicting author rejection",
+      "remaining": "Owner epoch transitions, revoked branch isolation and transport authority expiry",
+      "tests": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestCatalogAuthenticationAndBounds"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestReceiveRestartConflictAndPendingPin"
+        }
+      ]
+    },
+    {
+      "id": "REQ-22",
+      "acceptanceSubset": ["AT-09", "AT-11", "AT-12"],
+      "scope": "Locked consistent source closure and atomic complete local replica",
+      "remaining": "Real network/cloud publication and source application consistency",
+      "tests": [
+        {
+          "path": "internal/filekit/view_linux_test.go",
+          "name": "TestSealedViewExcludesMaintenance"
+        },
+        {
+          "path": "internal/generation/crash_linux_test.go",
+          "name": "TestReplicaSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        }
+      ]
+    },
+    {
+      "id": "REQ-31",
+      "acceptanceSubset": ["AT-09", "AT-10", "AT-12"],
+      "scope": "Latest-complete floor and durable explicit local pins",
+      "remaining": "Replica minimum coordination and configured retention scheduler",
+      "tests": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestMaintenanceAuthorityPinsAndReplay"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestReceiveRestartConflictAndPendingPin"
+        }
+      ]
+    },
+    {
+      "id": "REQ-32",
+      "acceptanceSubset": ["AT-10", "AT-20", "AT-21"],
+      "scope": "Separate maintenance signing authority and revision-bound replayable permit",
+      "remaining": "External append-only/immutable capability enforcement",
+      "tests": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestMaintenanceAuthorityPinsAndReplay"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestCatalogAuthenticationAndBounds"
+        }
+      ]
+    },
+    {
+      "id": "REQ-33",
+      "acceptanceSubset": ["AT-09", "AT-10", "AT-11", "AT-12"],
+      "scope": "Complete/pending/kit/restore protection, fail-closed inventory and physical garbage deletion",
+      "remaining": "Distributed and external-target pins, large history and hardware power loss",
+      "tests": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestMaintenanceAuthorityPinsAndReplay"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestIncompleteAndCorruptNeverPublishOrGC"
+        },
+        {
+          "path": "internal/generation/crash_linux_test.go",
+          "name": "TestReplicaSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        }
+      ]
+    }
+  ]
+}
