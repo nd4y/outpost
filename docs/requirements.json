@@ -6,7 +6,9 @@
       "status": "NOT_VERIFIED",
       "implementation": "internal/peer",
       "evidencePlan": "docs/en/peer-transfer.md",
-      "trace": "docs/g3-trace.json"
+      "trace": "docs/g3-trace.json",
+      "externalImplementation": ["internal/storage", "internal/upload"],
+      "externalEvidencePlan": "docs/en/external-upload.md"
     },
     "G2": {
       "milestone": "M0",

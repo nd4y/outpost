@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "gate": "G3",
-  "scope": "Bounded HTTPS peer candidate only; full G3 and external distributed upload remain NOT_VERIFIED",
+  "scope": "Bounded peer and distributed external-upload candidates; real target admission and full G3 remain NOT_VERIFIED",
   "requirements": [
     {
       "id": "REQ-13",
-      "acceptanceSubset": ["AT-05"],
-      "scope": "Immutable authenticated object delivery, length/hash/durability checks and bounded bodies",
-      "remaining": "Actual external target capability/visibility contract and repair of corrupt existing objects",
+      "acceptanceSubset": ["AT-05", "AT-16"],
+      "scope": "Authenticated immutable peer/physical-part delivery, conditional creation, hash/length/readback and capability bounds",
+      "remaining": "Actual endpoint durability/visibility contract and repair of corrupt immutable objects",
       "tests": [
         {
           "path": "internal/peer/guards_linux_test.go",
@@ -16,14 +16,26 @@
         {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestPartialVisibilityAndCorruptionPreservePreviousComplete"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolMultipartAndImmutableReadback"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolRetriesAndLostReply"
         }
       ]
     },
     {
       "id": "REQ-19",
       "acceptanceSubset": ["AT-15", "AT-22"],
-      "scope": "Stable bound operations, persistent retries, restart/duplicate safety and request cancellation",
-      "remaining": "Autonomous scheduler, distributed executor leases, abandoned job/pin retention and full overload acceptance",
+      "scope": "Stable bound operations, durable journals, cached signed assignment, actual process restart/takeover and bounded retries",
+      "remaining": "Automatic plan delivery/renewal, abandoned job/pin/claim retention, large-history and account-wide overload admission",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",
@@ -36,14 +48,26 @@
         {
           "path": "internal/peer/guards_linux_test.go",
           "name": "TestJournalBoundsAndInterruptedSave"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolLongThrottlePersistsAcrossCalls"
         }
       ]
     },
     {
       "id": "REQ-22",
       "acceptanceSubset": ["AT-09", "AT-11"],
-      "scope": "Atomic target publication only after complete closure; prior complete retained on transfer failure",
-      "remaining": "Multi-process power loss, cloud targets and source application consistency",
+      "scope": "Peer and external publication only after full closure; prior complete retained on missing parts or forged markers",
+      "remaining": "Hardware power loss, real cloud consistency/durability and application-consistent source capture",
       "tests": [
         {
           "path": "internal/peer/guards_linux_test.go",
@@ -56,14 +80,22 @@
         {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestPartialVisibilityAndCorruptionPreservePreviousComplete"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
         }
       ]
     },
     {
       "id": "REQ-23",
       "acceptanceSubset": ["AT-01", "AT-24"],
-      "scope": "Target receipts distinguished from independent full readback and local publication; standalone restored bytes",
-      "remaining": "Replica minimum/freshness coordination and proof beyond current byte availability",
+      "scope": "Separate per-target full-readback receipts and independent old/new byte/attribute recovery after source loss",
+      "remaining": "Replica minimum/freshness coordination and future durability beyond observed availability",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",
@@ -72,6 +104,14 @@
         {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestAsynchronousBridgeOnlyTransferAndRestore"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
         }
       ]
     },
@@ -97,9 +137,9 @@
     },
     {
       "id": "REQ-27",
-      "acceptanceSubset": ["AT-15"],
-      "scope": "Prerequisites only: bounded concurrent object requests and safe duplicate delivery",
-      "remaining": "Three independent workers, distributed assignment/failover, actual S3-compatible/WebDAV uploads and measured scaling",
+      "acceptanceSubset": ["AT-14", "AT-15"],
+      "scope": "Three actual worker processes divide physical parts using cached plans, rotate assignments after SIGKILL and measure controlled delayed-endpoint scaling",
+      "remaining": "Real infrastructure throughput/resource acceptance, adaptive bandwidth assignment, credential delivery and long partitions",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",
@@ -108,6 +148,18 @@
         {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestLostReplyRestartAndDuplicateTransfer"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
         }
       ]
     }
@@ -116,7 +168,7 @@
     {
       "id": "REQ-40",
       "acceptanceSubset": ["AT-07", "AT-22"],
-      "scope": "CA/hostname/SPKI authenticated HTTPS, explicit peer operations, expiry and no implicit fallback",
+      "scope": "Pinned mTLS peers plus TLS-verified explicit S3-compatible/WebDAV endpoints, signed worker plans, namespace/expiry guards and no redirects",
       "remaining": "Installation, provisioning, signed policy delivery/reload and real egress/rotation acceptance",
       "tests": [
         {
@@ -130,6 +182,94 @@
         {
           "path": "internal/peer/guards_linux_test.go",
           "name": "TestRetryBudgetAndCancellation"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        }
+      ]
+    },
+    {
+      "id": "REQ-28",
+      "acceptanceSubset": ["AT-16"],
+      "scope": "Size/capability probes, verified physical multipart resume, conditional writes, quota, delayed-read retries and throttling in synthetic protocols",
+      "remaining": "Actual S3-compatible/WebDAV endpoint matrix including listing/range/ACL/quota characteristics; unsupported capabilities are explicit",
+      "tests": [
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolMultipartAndImmutableReadback"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolRetriesAndLostReply"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolLongThrottlePersistsAcrossCalls"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        }
+      ]
+    },
+    {
+      "id": "REQ-29",
+      "acceptanceSubset": ["AT-14", "AT-15"],
+      "scope": "External denial/class/credential checks before tasks and a full independently recoverable closure for each selected target",
+      "remaining": "Upstream per-file policy compiler and multiple real target/category admission",
+      "tests": [
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        }
+      ]
+    },
+    {
+      "id": "REQ-48",
+      "acceptanceSubset": ["AT-22"],
+      "scope": "Bounded canonical signed plans, trusted identities, safe explicit HTTPS namespace, expired access and forbidden redirect rejection",
+      "remaining": "Full hostile-network campaign, actual egress confinement and supply-chain scenarios",
+      "tests": [
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
+        }
+      ]
+    },
+    {
+      "id": "REQ-53",
+      "acceptanceSubset": ["AT-14", "AT-22"],
+      "scope": "Controlled one-versus-three process timing, actual failover delay, local request/queue/backoff bounds and explicit accounting limitations",
+      "remaining": "Full wire/metadata/readback cost, real resource/capacity profiles, heavy delta and operational acceptance",
+      "tests": [
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolLongThrottlePersistsAcrossCalls"
         }
       ]
     }
