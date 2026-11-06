@@ -83,6 +83,34 @@ for (const item of generationTrace.requirements) {
     );
   }
 }
+const peerTrace = JSON.parse(read("docs/g3-trace.json"));
+assert.equal(peerTrace.schemaVersion, 1);
+assert.equal(peerTrace.gate, "G3");
+assert.deepEqual(
+  peerTrace.requirements.map((item) => item.id).sort(),
+  [...catalog.gates.G3.requirements].sort(),
+  "G3 trace must cover exactly its requirement set",
+);
+for (const item of [...peerTrace.requirements, ...peerTrace.supportingRequirements]) {
+  const requirement = catalog.requirements.find((entry) => entry.id === item.id);
+  assert(
+    requirement &&
+      item.scope &&
+      item.remaining &&
+      item.tests.length &&
+      item.acceptanceSubset.length,
+  );
+  for (const id of item.acceptanceSubset)
+    assert(requirement.acceptance.includes(id), `Invalid G3 subset ${item.id} -> ${id}`);
+  for (const test of item.tests) {
+    assert(/^internal\/peer\/[a-z_]+_test\.go$/.test(test.path));
+    assert(/^Test[A-Za-z0-9]+$/.test(test.name));
+    assert(
+      read(test.path).includes(`func ${test.name}(t *testing.T)`),
+      `Missing G3 check: ${test.name}`,
+    );
+  }
+}
 // These failure-mode links are part of the reviewed specification contract.
 // Existence of a test elsewhere does not establish a scoped requirement's coverage.
 for (const [id, required] of Object.entries({

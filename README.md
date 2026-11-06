@@ -6,13 +6,15 @@
 
 Autonomous encrypted backups with complete assigned replicas, granular placement and recovery after long disconnections.
 
-**Stage: M0, independent file-kit implementation.** The [G1 format candidate](docs/en/file-kit-format.md) streams files into encrypted objects and restores a selected version without a global repository index. There is no production backup service yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
+**Stage: M0, G1-G3 implementation candidates.** The [G1 format candidate](docs/en/file-kit-format.md) streams files into encrypted objects and restores a selected version without a global repository index. There is no production backup service yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
 The [G1 acceptance plan](docs/en/g1-acceptance.md) covers encrypted names, old/new versions, attributes, multipart descriptors, tamper rejection, actual SIGKILL boundaries and concurrent maintenance. Its 100 GiB/8 MiB profile records reads, added ciphertext/metadata, objects, memory and storage. Full-scale acceptance is pending the recorded run; G2/G3 and production deployment remain separate.
 
 The local CLI accepts regular source and owner-key files. It rejects symbolic links and named pipes without waiting for a pipe writer; recovery keys must have private filesystem permissions. Restored names must fit Linux byte limits (255 per component, 4095 per relative path), so unsupported names fail before capture.
 
 The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signed complete catalogs, keyless reception, restart-safe progress, persistent pins and separately authorized cleanup. Small HDD tests cover checkpoint catch-up, source repack, actual process termination and independent old/new restoration. Heavy scale/endurance tests remain deferred; this is not full G2 acceptance or a network service.
+
+The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push currently audits the entire target generation by reading it back. Distributed external upload and heavy G3 acceptance remain open.
 
 ## Planned workflows
 
@@ -56,6 +58,8 @@ These commands validate documentation and the standard toolkit. They do not star
 - [G1 requirements linked to executable checks](docs/g1-trace.json)
 - [G2 generation and replica contracts](docs/en/generation-replicas.md)
 - [G2 scoped requirement-to-check trace](docs/g2-trace.json)
+- [G3 peer protocol, evidence and limits](docs/en/peer-transfer.md)
+- [G3 scoped requirement-to-check trace](docs/g3-trace.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.
 
