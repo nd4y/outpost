@@ -378,6 +378,7 @@ func TestPartialVisibilityAndCorruptionPreservePreviousComplete(t *testing.T) {
 			must(t, e)
 			normal.Close()
 			var broken atomic.Bool
+			var injected atomic.Int64
 			broken.Store(true)
 			server := f.endpoint(t, f.a, f.policy(f.a, f.c), func(next http.Handler) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -390,11 +391,22 @@ func TestPartialVisibilityAndCorruptionPreservePreviousComplete(t *testing.T) {
 							}
 						}
 						data := rec.Body.Bytes()
-						if rec.Code != 200 || len(data) == 0 {
-							t.Error("bad fault fixture")
+						if rec.Code != 200 {
+							// The first invalid object cancels its concurrent siblings.
+							// Preserve that real response; corrupt only successful reads.
+							if rec.Code != http.StatusServiceUnavailable || r.Context().Err() == nil {
+								t.Errorf("unexpected fault fixture response: status=%d context=%v", rec.Code, r.Context().Err())
+							}
+							w.WriteHeader(rec.Code)
+							_, _ = w.Write(data)
+							return
+						}
+						if len(data) == 0 {
+							t.Error("empty successful object response")
 							w.WriteHeader(500)
 							return
 						}
+						injected.Add(1)
 						if fault == "truncated" {
 							_, _ = w.Write(data[:len(data)/2])
 						} else {
@@ -411,6 +423,9 @@ func TestPartialVisibilityAndCorruptionPreservePreviousComplete(t *testing.T) {
 			_, e = pull.Pull(testContext, op, second, f.c.replica)
 			if e == nil {
 				t.Fatal("invalid object accepted")
+			}
+			if injected.Load() == 0 {
+				t.Fatal("transfer failed without exercising the injected data fault")
 			}
 			status, e := f.c.replica.Status(testContext)
 			must(t, e)
