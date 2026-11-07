@@ -19,6 +19,7 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 	var input struct {
 		Bootstrap Bootstrap
 		Point     string
+		Schedule  bool
 	}
 	raw, e := os.ReadFile(file)
 	must(t, e)
@@ -34,21 +35,30 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 		}
 		return nil
 	}
-	must(t, a.Next(ctx))
-	must(t, a.Run(ctx))
+	if input.Schedule {
+		must(t, a.RunSchedule(ctx))
+	} else {
+		must(t, a.Next(ctx))
+		must(t, a.Run(ctx))
+	}
 	t.Fatal("kill point not reached")
 }
 
 func TestSourceAgentSIGKILLFencesAndFinalHead(t *testing.T) {
-	for _, point := range []string{"source-agent-intent-durable", "source-agent-before-head"} {
+	for _, point := range []string{"source-agent-intent-durable", "source-agent-before-head", "source-schedule-head-observed"} {
 		t.Run(point, func(t *testing.T) {
 			f := newFixture(t)
+			scheduled := point == "source-schedule-head-observed"
+			if scheduled {
+				must(t, f.a.ConfigureSchedule(context.Background(), testSchedule()))
+			}
 			must(t, f.a.Close())
 			f.a = nil
 			input := struct {
 				Bootstrap Bootstrap
 				Point     string
-			}{f.b, point}
+				Schedule  bool
+			}{f.b, point, scheduled}
 			raw, e := json.Marshal(input)
 			must(t, e)
 			file := filepath.Join(f.base, "child-input.json")
@@ -68,8 +78,17 @@ func TestSourceAgentSIGKILLFencesAndFinalHead(t *testing.T) {
 			}
 			f.a, e = Open(context.Background(), f.b, false)
 			must(t, e)
-			must(t, f.a.Next(context.Background()))
-			must(t, f.a.Run(context.Background()))
+			if scheduled {
+				must(t, f.a.scheduleStep(context.Background()))
+				s, e := f.a.ScheduleStatus(context.Background())
+				must(t, e)
+				if s.LastSequence != 1 || s.Attempts != 1 || s.Phase != "READY" {
+					t.Fatal("schedule lost accepted head", s)
+				}
+			} else {
+				must(t, f.a.Next(context.Background()))
+				must(t, f.a.Run(context.Background()))
+			}
 			s, e := f.a.Status(context.Background())
 			must(t, e)
 			if s.Phase != "COMPLETE" || s.Sequence != 1 {

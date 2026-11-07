@@ -16,6 +16,28 @@ import (
 
 var testLimits = Limits{Capacity: 16 << 20, Reserve: 8 << 20, Spool: 4 << 20, Telemetry: 1 << 20}
 
+func TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation(t *testing.T) {
+	b, root := newBudget(t)
+	finish, e := b.Reserve(context.Background(), "objects/inflight", 8192)
+	must(t, e)
+	defer func() { must(t, finish(false)) }()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	other, e := Open(ctx, root, testLimits, false)
+	must(t, e)
+	defer other.Close()
+	s, e := other.Status(ctx)
+	must(t, e)
+	if len(s.Pending) != 1 {
+		t.Fatal("opening changed inflight accounting", s.Pending)
+	}
+	blocked, stop := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer stop()
+	if e = other.Reconcile(blocked, testLimits); !errors.Is(e, context.DeadlineExceeded) {
+		t.Fatal("reconciliation bypassed reservation", e)
+	}
+}
+
 func TestReconciliationUsesOpenedTreeAfterPathReplacement(t *testing.T) {
 	b, root := newBudget(t)
 	ctx := context.Background()

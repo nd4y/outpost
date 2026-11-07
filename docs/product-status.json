@@ -19,7 +19,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-02",
@@ -41,7 +41,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-03",
@@ -91,7 +91,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-04",
@@ -107,6 +107,10 @@
         "internal/policy"
       ],
       "checks": [
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
+        },
         {
           "path": "internal/filekit/streaming_linux_test.go",
           "name": "TestStreamingCaptureKeepsOnlyMetadataAndRestoresBothDeltaVersions"
@@ -125,7 +129,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-05",
@@ -141,6 +145,10 @@
         "internal/policy"
       ],
       "checks": [
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
+        },
         {
           "path": "internal/generation/streaming_linux_test.go",
           "name": "TestBuildCatalogDoesNotFetchPayloadBackThroughSource"
@@ -167,7 +175,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-06",
@@ -184,7 +192,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-07",
@@ -224,7 +232,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-09",
@@ -380,7 +388,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-15",
@@ -429,7 +437,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-07", "AT-08", "AT-19", "AT-27"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-16",
@@ -494,7 +502,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-17",
@@ -519,7 +527,7 @@
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-18",
@@ -552,7 +560,7 @@
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-19",
@@ -606,6 +614,18 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueThrottleDeadlineSurvivesReopen"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceSchedulePauseAndStatusRemainResponsiveDuringNetworkRead"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleRejectsRevisionTamperingClockRollbackAndQuota"
         },
         {
           "path": "internal/ingress/crash_linux_test.go",
@@ -673,7 +693,7 @@
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-20",
@@ -794,6 +814,10 @@
           "name": "TestQueueActualSIGKILLAndRestart"
         },
         {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
+        },
+        {
           "path": "internal/source/scan_linux_test.go",
           "name": "TestScanRejectsRacesBeforeReadAndBeforePublication"
         },
@@ -842,6 +866,14 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueInstancesKeepIndependentPins"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleInitialPendingHeadKeepsOriginalCopyAge"
         },
         {
           "path": "internal/ingress/ack_linux_test.go",
@@ -998,7 +1030,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-25",
@@ -1035,7 +1067,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-26",
@@ -1060,7 +1092,7 @@
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-27",
@@ -1400,6 +1432,10 @@
       ],
       "checks": [
         {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
+        },
+        {
           "path": "internal/filekit/dataset_linux_test.go",
           "name": "TestIndependentDatasetRestoresDirectoryMetadataLastAndHardlinks"
         },
@@ -1452,7 +1488,12 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleInitialPendingHeadKeepsOriginalCopyAge"
+        }
+      ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
@@ -1491,6 +1532,14 @@
         {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestConcurrentReservationsShareQuotaAndKeepSeparateSpool"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceSchedulePauseAndStatusRemainResponsiveDuringNetworkRead"
+        },
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation"
         },
         {
           "path": "internal/diskbudget/remove_linux_test.go",
@@ -1559,7 +1608,7 @@
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Source scheduling, installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-41",
@@ -1594,6 +1643,10 @@
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
       "checks": [
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation"
+        },
         {
           "path": "internal/generation/index_migration_linux_test.go",
           "name": "TestExplicitIndexMigrationPreservesHistoryAndGuardsRollback"
@@ -1705,6 +1758,14 @@
           "name": "TestOwnerConfigurationRejectsExpansionAndAmbiguousIdentity"
         },
         {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceSchedulePauseAndStatusRemainResponsiveDuringNetworkRead"
+        },
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceScheduleRejectsRevisionTamperingClockRollbackAndQuota"
+        },
+        {
           "path": "internal/localfs/root_linux_test.go",
           "name": "TestRootedFileOpenRejectsFinalAndAncestorLinks"
         },
@@ -1806,6 +1867,10 @@
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
       "checks": [
+        {
+          "path": "internal/sourceagent/schedule_linux_test.go",
+          "name": "TestSourceSchedulePauseAndStatusRemainResponsiveDuringNetworkRead"
+        },
         {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLISourceProbeAndCapabilityErrors"

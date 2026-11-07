@@ -135,15 +135,21 @@ func OpenAt(parent *os.Root, ctx context.Context, dir string, limits Limits, ini
 		return nil, e
 	}
 	b := &Budget{root, s}
-	e = b.exclusive(ctx, func() error {
-		return s.WithLock(ctx, func() error {
-			_, err := b.load()
-			if errors.Is(err, os.ErrNotExist) && initialize {
-				return b.reconcile(ctx, limits)
-			}
-			return err
-		})
-	})
+	// Opening existing state only reads the atomic ledger. Shared admission
+	// permits control/status clients while another process owns a reservation.
+	unlock, e := b.lock(ctx, initialize)
+	if e == nil {
+		e = func() error {
+			return s.WithLock(ctx, func() error {
+				_, err := b.load()
+				if errors.Is(err, os.ErrNotExist) && initialize {
+					return b.reconcile(ctx, limits)
+				}
+				return err
+			})
+		}()
+		unlock()
+	}
 	if e != nil {
 		b.Close()
 		return nil, e

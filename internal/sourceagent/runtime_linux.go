@@ -105,6 +105,10 @@ type Agent struct {
 }
 
 func Open(ctx context.Context, b Bootstrap, initialize bool) (*Agent, error) {
+	return open(ctx, b, initialize, false)
+}
+
+func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Agent, error) {
 	if b.Format != Format || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
 		return nil, ErrInvalid
 	}
@@ -222,6 +226,21 @@ func Open(ctx context.Context, b Bootstrap, initialize bool) (*Agent, error) {
 		return fail(e)
 	}
 	a.store.Admit = a.admission("state")
+	if scheduleOnly {
+		// Atomic signed state can be inspected without the long capture lease.
+		// Reconciliation is reserved for the normal execution open path.
+		e = a.store.WithLock(ctx, func() error {
+			if e := a.guard(ctx); e != nil {
+				return e
+			}
+			_, e := a.load()
+			return e
+		})
+		if e != nil {
+			return fail(e)
+		}
+		return a, nil
+	}
 	e = a.lease.WithLock(ctx, func() error {
 		if initialize {
 			if _, e := a.store.Read("agent.json"); !errors.Is(e, os.ErrNotExist) {
@@ -375,33 +394,34 @@ func (a *Agent) Prepare(ctx context.Context, raw []byte) error {
 // Next signs a fresh operation from the durable head. Repeated requests while
 // one operation is pending resume it, rather than creating another generation.
 func (a *Agent) Next(ctx context.Context) error {
-	return a.lease.WithLock(ctx, func() error {
-		if e := a.guard(ctx); e != nil {
-			return e
-		}
-		s, e := a.load()
-		if e != nil {
-			return e
-		}
-		if s.Phase == "ACTIVE" || s.Phase == "PREPARING" {
-			return a.prepare(ctx, s.Intent)
-		}
-		if s.Sequence == ^uint64(0) {
-			return ErrInvalid
-		}
-		var nonce [32]byte
-		if _, e = rand.Read(nonce[:]); e != nil {
-			return e
-		}
-		now := time.Now().Unix()
-		g := a.grant
-		i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash(nonce[:]), Authority: storage.Hash(a.authority), Tenant: g.Tenant, Profile: g.Profile, Source: g.Source, Ingress: g.Ingress, Domain: g.Trust.Domain, Repository: g.Trust.Repository, Epoch: g.Trust.Epoch, Sequence: s.Sequence + 1, Parent: s.Generation, Policy: g.Revision, SnapshotUnix: now, NotBefore: now, ExpiresUnix: g.ExpiresUnix, MaxBytes: g.MaxBytes, MaxObjects: g.MaxObjects}
-		raw, e := ingress.SignIntent(i, a.authority, a.b.Local.Owner, a.writer, time.Now())
-		if e != nil {
-			return e
-		}
-		return a.prepare(ctx, raw)
-	})
+	return a.lease.WithLock(ctx, func() error { return a.next(ctx) })
+}
+func (a *Agent) next(ctx context.Context) error {
+	if e := a.guard(ctx); e != nil {
+		return e
+	}
+	s, e := a.load()
+	if e != nil {
+		return e
+	}
+	if s.Phase == "ACTIVE" || s.Phase == "PREPARING" {
+		return a.prepare(ctx, s.Intent)
+	}
+	if s.Sequence == ^uint64(0) {
+		return ErrInvalid
+	}
+	var nonce [32]byte
+	if _, e = rand.Read(nonce[:]); e != nil {
+		return e
+	}
+	now := time.Now().Unix()
+	g := a.grant
+	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash(nonce[:]), Authority: storage.Hash(a.authority), Tenant: g.Tenant, Profile: g.Profile, Source: g.Source, Ingress: g.Ingress, Domain: g.Trust.Domain, Repository: g.Trust.Repository, Epoch: g.Trust.Epoch, Sequence: s.Sequence + 1, Parent: s.Generation, Policy: g.Revision, SnapshotUnix: now, NotBefore: now, ExpiresUnix: g.ExpiresUnix, MaxBytes: g.MaxBytes, MaxObjects: g.MaxObjects}
+	raw, e := ingress.SignIntent(i, a.authority, a.b.Local.Owner, a.writer, time.Now())
+	if e != nil {
+		return e
+	}
+	return a.prepare(ctx, raw)
 }
 func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 	if e := a.guard(ctx); e != nil {
@@ -531,67 +551,68 @@ func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), err
 }
 
 func (a *Agent) Run(ctx context.Context) error {
-	return a.lease.WithLock(ctx, func() error {
-		if e := a.guard(ctx); e != nil {
-			return e
-		}
-		s, e := a.load()
-		if e != nil {
-			return e
-		}
-		if s.Phase == "IDLE" {
-			return ErrInvalid
-		}
-		if s.Phase == "COMPLETE" {
-			return nil
-		}
-		ctx, cancel := context.WithCancelCause(ctx)
-		joined := make(chan struct{})
-		go func() {
-			defer close(joined)
-			ticker := time.NewTicker(250 * time.Millisecond)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
+	return a.lease.WithLock(ctx, func() error { return a.run(ctx) })
+}
+func (a *Agent) run(ctx context.Context) error {
+	if e := a.guard(ctx); e != nil {
+		return e
+	}
+	s, e := a.load()
+	if e != nil {
+		return e
+	}
+	if s.Phase == "IDLE" {
+		return ErrInvalid
+	}
+	if s.Phase == "COMPLETE" {
+		return nil
+	}
+	ctx, cancel := context.WithCancelCause(ctx)
+	joined := make(chan struct{})
+	go func() {
+		defer close(joined)
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if e := a.guard(ctx); e != nil {
+					cancel(e)
 					return
-				case <-ticker.C:
-					if e := a.guard(ctx); e != nil {
-						cancel(e)
-						return
-					}
 				}
 			}
-		}()
-		defer func() { cancel(nil); <-joined }()
-		job, close, e := a.openJob(ctx, s)
-		if e != nil {
+		}
+	}()
+	defer func() { cancel(nil); <-joined }()
+	job, close, e := a.openJob(ctx, s)
+	if e != nil {
+		return e
+	}
+	defer close()
+	if s.Phase == "PREPARING" {
+		s.Phase = "ACTIVE"
+		if e = a.save(s); e != nil {
 			return e
 		}
-		defer close()
-		if s.Phase == "PREPARING" {
-			s.Phase = "ACTIVE"
-			if e = a.save(s); e != nil {
-				return e
-			}
-		}
-		if e = job.Run(ctx); e != nil {
-			return errors.Join(e, context.Cause(ctx))
-		}
-		checkpoint, heads, e := job.Export(ctx)
-		if e != nil {
-			return e
-		}
-		c, e := capture.VerifyCheckpoint(checkpoint, a.grant.Trust)
-		if e != nil {
-			return e
-		}
-		s.Phase, s.Sequence, s.Generation, s.Previous, s.Checkpoint = "COMPLETE", c.Sequence, c.Generation, heads, checkpoint
-		if e = a.point("source-agent-before-head"); e != nil {
-			return e
-		}
-		return a.save(s)
-	})
+	}
+	if e = job.Run(ctx); e != nil {
+		return errors.Join(e, context.Cause(ctx))
+	}
+	checkpoint, heads, e := job.Export(ctx)
+	if e != nil {
+		return e
+	}
+	c, e := capture.VerifyCheckpoint(checkpoint, a.grant.Trust)
+	if e != nil {
+		return e
+	}
+	s.Phase, s.Sequence, s.Generation, s.Previous, s.Checkpoint = "COMPLETE", c.Sequence, c.Generation, heads, checkpoint
+	if e = a.point("source-agent-before-head"); e != nil {
+		return e
+	}
+	return a.save(s)
 }
 
 func (a *Agent) Status(ctx context.Context) (Status, error) {
