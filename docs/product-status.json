@@ -465,6 +465,14 @@
           "name": "TestReceiverPolicyLagRetriesWithoutExpandingAuthority"
         },
         {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementEnrollmentDurableIntentIdentityScopeAndFences"
+        },
+        {
+          "path": "internal/management/config_linux_test.go",
+          "name": "TestManagementConfigurationPreviewExactApplyReplayAndTenantBoundary"
+        },
+        {
           "path": "internal/worker/ingress_linux_test.go",
           "name": "TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant"
         },
@@ -520,6 +528,10 @@
         {
           "path": "internal/control/control_linux_test.go",
           "name": "TestHTTPSRelayPreservesSignatureAndOfflineRecipientCache"
+        },
+        {
+          "path": "internal/management/relay_linux_test.go",
+          "name": "TestManagementConfigurationRelayRequiresRecipientAndScope"
         },
         {
           "path": "internal/worker/discovery_linux_test.go",
@@ -626,6 +638,10 @@
         {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleRejectsRevisionTamperingClockRollbackAndQuota"
+        },
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementSIGKILLRetainsEnrollmentAndReportCommitBoundaries"
         },
         {
           "path": "internal/ingress/crash_linux_test.go",
@@ -874,6 +890,10 @@
         {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleInitialPendingHeadKeepsOriginalCopyAge"
+        },
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementReportsKeepOriginalAgeBoundedSlotsAndLastGood"
         },
         {
           "path": "internal/ingress/ack_linux_test.go",
@@ -1487,11 +1507,28 @@
       "id": "REQ-37",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [
         {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleInitialPendingHeadKeepsOriginalCopyAge"
+        },
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementReportsKeepOriginalAgeBoundedSlotsAndLastGood"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementHTTPSConsumerEnrollmentPreviewReportsAndRoles"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementCursorBindingAndRevisionPreventMixedSnapshots"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -1501,8 +1538,29 @@
       "id": "REQ-38",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementEnrollmentDurableIntentIdentityScopeAndFences"
+        },
+        {
+          "path": "internal/management/config_linux_test.go",
+          "name": "TestManagementConfigurationPreviewExactApplyReplayAndTenantBoundary"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementHTTPSConsumerEnrollmentPreviewReportsAndRoles"
+        },
+        {
+          "path": "internal/management/relay_linux_test.go",
+          "name": "TestManagementConfigurationRelayRequiresRecipientAndScope"
+        },
         {
           "path": "internal/control/observations_test.go",
           "name": "TestObservationGrantCannotExpandPlacementOrReaderAuthority"
@@ -1519,7 +1577,12 @@
       "id": "REQ-39",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [
         {
           "path": "internal/worker/capacity_linux_test.go",
@@ -1540,6 +1603,10 @@
         {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation"
+        },
+        {
+          "path": "internal/management/config_linux_test.go",
+          "name": "TestManagementConfigurationInitialCacheIsQuotaAccounted"
         },
         {
           "path": "internal/diskbudget/remove_linux_test.go",
@@ -1591,6 +1658,18 @@
           "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
         },
         {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementHTTPSConsumerEnrollmentPreviewReportsAndRoles"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementHTTPSRejectsCSRFEncodedAliasesDuplicateFieldsAndOversize"
+        },
+        {
+          "path": "internal/management/relay_linux_test.go",
+          "name": "TestManagementConfigurationRelayRequiresRecipientAndScope"
+        },
+        {
           "path": "internal/peer/history_linux_test.go",
           "name": "TestHistoryHeaderCannotExpandReceiverAuthority"
         },
@@ -1614,7 +1693,12 @@
       "id": "REQ-41",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
@@ -1623,7 +1707,12 @@
       "id": "REQ-42",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
@@ -1632,8 +1721,26 @@
       "id": "REQ-43",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
-      "checks": [],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementEnrollmentDurableIntentIdentityScopeAndFences"
+        },
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementSIGKILLRetainsEnrollmentAndReportCommitBoundaries"
+        },
+        {
+          "path": "internal/management/config_linux_test.go",
+          "name": "TestManagementConfigurationPreviewExactApplyReplayAndTenantBoundary"
+        }
+      ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
@@ -1641,11 +1748,24 @@
       "id": "REQ-44",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [
         {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation"
+        },
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementReportsKeepOriginalAgeBoundedSlotsAndLastGood"
+        },
+        {
+          "path": "internal/management/config_linux_test.go",
+          "name": "TestManagementConfigurationInitialCacheIsQuotaAccounted"
         },
         {
           "path": "internal/generation/index_migration_linux_test.go",
@@ -1691,8 +1811,21 @@
       "id": "REQ-45",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [
+        {
+          "path": "internal/management/config_linux_test.go",
+          "name": "TestManagementConfigurationPreviewExactApplyReplayAndTenantBoundary"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementHTTPSConsumerEnrollmentPreviewReportsAndRoles"
+        },
         {
           "path": "internal/peer/window_linux_test.go",
           "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
@@ -1764,6 +1897,18 @@
         {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleRejectsRevisionTamperingClockRollbackAndQuota"
+        },
+        {
+          "path": "internal/management/registry_linux_test.go",
+          "name": "TestManagementEnrollmentDurableIntentIdentityScopeAndFences"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementHTTPSRejectsCSRFEncodedAliasesDuplicateFieldsAndOversize"
+        },
+        {
+          "path": "internal/management/http_linux_test.go",
+          "name": "TestManagementCursorBindingAndRevisionPreventMixedSnapshots"
         },
         {
           "path": "internal/localfs/root_linux_test.go",
@@ -1865,7 +2010,12 @@
       "id": "REQ-49",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [
         {
           "path": "internal/sourceagent/schedule_linux_test.go",
@@ -1883,7 +2033,12 @@
       "id": "REQ-50",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
@@ -1892,7 +2047,12 @@
       "id": "REQ-51",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-34"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
@@ -1901,7 +2061,12 @@
       "id": "REQ-52",
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "implementation": [
+        "internal/management",
+        "internal/worker",
+        "internal/diskbudget",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."

@@ -82,3 +82,5 @@ Track design defects and scoped proposals in [Issues](https://github.com/nd4y/ou
 Original project material is [MIT licensed](LICENSE). The vendored toolkit retains its [MIT notice](.standards/LICENSE). Restic and other future runtime dependencies retain their own licenses; none is bundled as a product release here.
 
 The private source agent supports a [durable interval schedule](docs/en/source-scheduling.md) with pause, restart and unchanged pending-operation recovery. Full product acceptance remains open.
+
+The [management API candidate](docs/en/management-api.md) supports authenticated enrollment, owner-signed configuration and original-age reports. Command execution, worker reporting and the operator UI are still in development.

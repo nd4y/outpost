@@ -31,6 +31,11 @@ func OpenCache(dir, node string, owner ed25519.PublicKey, initialize bool) (*Cac
 	return OpenCacheAt(nil, dir, node, owner, initialize)
 }
 func OpenCacheAt(parent *os.Root, dir, node string, owner ed25519.PublicKey, initialize bool) (*Cache, error) {
+	return OpenCacheAdmittedAt(parent, dir, node, owner, initialize, nil)
+}
+
+// OpenCacheAdmittedAt accounts the initial durable state as well as updates.
+func OpenCacheAdmittedAt(parent *os.Root, dir, node string, owner ed25519.PublicKey, initialize bool, admit statefile.Admission) (*Cache, error) {
 	if !storage.ID(node) || len(owner) != 32 {
 		return nil, ErrDenied
 	}
@@ -39,6 +44,7 @@ func OpenCacheAt(parent *os.Root, dir, node string, owner ed25519.PublicKey, ini
 		return nil, e
 	}
 	c := &Cache{s, append([]byte(nil), owner...), node}
+	s.Admit = admit
 	e = s.WithLock(context.Background(), func() error {
 		_, err := c.load()
 		if errors.Is(err, os.ErrNotExist) && initialize {
