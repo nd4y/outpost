@@ -101,7 +101,7 @@ func (s *Store) gcLocked(ctx context.Context) (int, error) {
 		if err = ctx.Err(); err != nil {
 			return 0, err
 		}
-		e, d, err := s.LoadVersion(id)
+		e, d, err := s.LoadVersionContext(ctx, id)
 		if err != nil {
 			return 0, err
 		}
@@ -155,6 +155,9 @@ func (s *Store) gcLocked(ctx context.Context) (int, error) {
 }
 
 func (s *Store) GC(ctx context.Context) (int, error) {
+	if s.backend != nil {
+		return 0, ErrRemoteMaintenance
+	}
 	unlock, err := s.lock(ctx, true)
 	if err != nil {
 		return 0, err
@@ -165,6 +168,9 @@ func (s *Store) GC(ctx context.Context) (int, error) {
 
 func (s *Store) Retire(ctx context.Context, ids []string) (MaintenanceStats, error) {
 	var result MaintenanceStats
+	if s.backend != nil {
+		return result, ErrRemoteMaintenance
+	}
 	unlock, err := s.lock(ctx, true)
 	if err != nil {
 		return result, err
@@ -181,7 +187,7 @@ func (s *Store) Retire(ctx context.Context, ids []string) (MaintenanceStats, err
 		return result, err
 	}
 	for _, id := range versions {
-		if _, _, err = s.LoadVersion(id); err != nil {
+		if _, _, err = s.LoadVersionContext(ctx, id); err != nil {
 			return result, err
 		}
 	}
@@ -190,7 +196,7 @@ func (s *Store) Retire(ctx context.Context, ids []string) (MaintenanceStats, err
 			return result, ErrInvalid
 		}
 		seen[id] = true
-		if _, _, err = s.LoadVersion(id); err != nil {
+		if _, _, err = s.LoadVersionContext(ctx, id); err != nil {
 			return result, err
 		}
 	}
@@ -216,6 +222,9 @@ func (s *Store) Retire(ctx context.Context, ids []string) (MaintenanceStats, err
 // identities. Old objects are collected only after all roots are durable.
 func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	var result MaintenanceStats
+	if s.backend != nil {
+		return result, ErrRemoteMaintenance
+	}
 	unlock, err := s.lock(ctx, true)
 	if err != nil {
 		return result, err
@@ -229,7 +238,7 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	byFile := map[string][]string{}
 	oldPayload := map[string]bool{}
 	for _, id := range versions {
-		_, d, e := s.LoadVersion(id)
+		_, d, e := s.LoadVersionContext(ctx, id)
 		if e != nil {
 			return result, e
 		}
@@ -251,7 +260,7 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	for _, file := range files {
 		unique := map[string]Block{}
 		for _, id := range byFile[file] {
-			_, d, e := s.LoadVersion(id)
+			_, d, e := s.LoadVersionContext(ctx, id)
 			if e != nil {
 				return result, e
 			}
@@ -280,7 +289,7 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 			if len(pack) == 0 {
 				return nil
 			}
-			ref, e := s.putObject(pack, false)
+			ref, e := s.putObjectContext(ctx, pack, false)
 			if e != nil {
 				return e
 			}
@@ -299,7 +308,7 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 			}
 			blocks := group[id]
 			sort.Slice(blocks, func(i, j int) bool { return blocks[i].Offset > blocks[j].Offset })
-			old, err := s.readObject(blocks[0].Object)
+			old, err := s.readObjectContext(ctx, blocks[0].Object)
 			if err != nil {
 				return result, err
 			}
@@ -322,14 +331,14 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 			return result, err
 		}
 		for _, id := range byFile[file] {
-			_, d, e := s.LoadVersion(id)
+			_, d, e := s.LoadVersionContext(ctx, id)
 			if e != nil {
 				return result, e
 			}
 			for i, b := range d.Blocks {
 				d.Blocks[i] = unique[b.Hash]
 			}
-			eNew, e := s.sealDescriptor(d)
+			eNew, e := s.sealDescriptorContext(ctx, d)
 			if e != nil {
 				return result, e
 			}
@@ -358,6 +367,9 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 // RemoveAbandoned removes only unpublished staging files under the private
 // transaction directory, never payload objects or committed descriptors.
 func (s *Store) RemoveAbandoned(ctx context.Context) error {
+	if s.backend != nil {
+		return ErrRemoteMaintenance
+	}
 	unlock, err := s.lock(ctx, true)
 	if err != nil {
 		return err

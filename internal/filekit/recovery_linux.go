@@ -60,7 +60,7 @@ func (s *Store) Export(ctx context.Context, version, dest string) error {
 	if err != nil || rel == "." || !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return ErrInvalid
 	}
-	e, d, err := s.LoadVersion(version)
+	e, d, err := s.LoadVersionContext(ctx, version)
 	if err != nil {
 		return err
 	}
@@ -80,11 +80,11 @@ func (s *Store) Export(ctx context.Context, version, dest string) error {
 		if err = ctx.Err(); err != nil {
 			return err
 		}
-		b, err := s.readObject(ref)
+		b, err := s.readObjectContext(ctx, ref)
 		if err != nil {
 			return err
 		}
-		if _, err = kit.putObject(b, refIsMetadata(e, ref.ID)); err != nil {
+		if _, err = kit.putObjectContext(ctx, b, refIsMetadata(e, ref.ID)); err != nil {
 			return err
 		}
 	}
@@ -120,7 +120,7 @@ func (s *Store) readTo(ctx context.Context, d Descriptor, w io.Writer) error {
 		}
 		if b.Object.ID != lastID {
 			var err error
-			pack, err = s.readObject(b.Object)
+			pack, err = s.readObjectContext(ctx, b.Object)
 			if err != nil {
 				return err
 			}
@@ -155,7 +155,7 @@ func (s *Store) readTo(ctx context.Context, d Descriptor, w io.Writer) error {
 // and hard-link aliases are verified. An error never publishes a partial file.
 // The caller supplies the expected opaque version from its trusted receipt.
 func (s *Store) Restore(ctx context.Context, version, dest string) (Descriptor, error) {
-	_, d, err := s.load("kit.json", version)
+	_, d, err := s.loadContext(ctx, "kit.json", version)
 	if err != nil {
 		return d, err
 	}
@@ -166,7 +166,7 @@ func (s *Store) Restore(ctx context.Context, version, dest string) (Descriptor, 
 // restored files or requiring permission to apply its recorded numeric IDs.
 // It proves readable content/metadata, not successful attribute restoration.
 func (s *Store) VerifyKit(ctx context.Context, version string) (Descriptor, error) {
-	_, d, e := s.load("kit.json", version)
+	_, d, e := s.loadContext(ctx, "kit.json", version)
 	if e != nil {
 		return d, e
 	}
@@ -178,7 +178,7 @@ func (s *Store) VerifyVersion(ctx context.Context, version string) (Descriptor, 
 		return Descriptor{}, e
 	}
 	defer unlock()
-	_, d, e := s.LoadVersion(version)
+	_, d, e := s.LoadVersionContext(ctx, version)
 	if e != nil {
 		return d, e
 	}
@@ -205,7 +205,7 @@ func (s *Store) RestoreVersion(ctx context.Context, version, dest string) (Descr
 		return Descriptor{}, err
 	}
 	defer unlock()
-	_, d, err := s.LoadVersion(version)
+	_, d, err := s.LoadVersionContext(ctx, version)
 	if err != nil {
 		return d, err
 	}

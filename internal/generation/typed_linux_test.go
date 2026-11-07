@@ -76,4 +76,24 @@ func TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss(t *testing.T) {
 			}
 		}
 	}
+	ok(t, receiver.Close())
+	ok(t, os.Remove(filepath.Join(base, "receiver/state.json")))
+	whole, e := RecoverMaterialized(ctx, filepath.Join(base, "receiver"), id, trust, owner, RecoverySelection{}, filepath.Join(base, "whole-dataset"))
+	ok(t, e)
+	if whole.Generation != id || !whole.CheckpointMatch || whole.Restored.Files != 1 || whole.Restored.Directories != 1 || whole.Restored.Symlinks != 1 {
+		t.Fatal("incomplete dataset receipt", whole)
+	}
+	body, e := os.ReadFile(filepath.Join(base, "whole-dataset/dataset/folder/file"))
+	ok(t, e)
+	if string(body) != "retained content" {
+		t.Fatal("dataset content changed")
+	}
+	selected, e := RecoverMaterialized(ctx, filepath.Join(base, "receiver"), id, trust, owner, RecoverySelection{Directory: "dataset/folder"}, filepath.Join(base, "selected-directory"))
+	ok(t, e)
+	if selected.Restored.Files != 1 || selected.Restored.Symlinks != 0 {
+		t.Fatal("directory scope widened", selected)
+	}
+	if _, e = RecoverMaterialized(ctx, filepath.Join(base, "receiver"), Hash([]byte("wrong checkpoint")), trust, owner, RecoverySelection{}, filepath.Join(base, "wrong")); e == nil {
+		t.Fatal("checkpoint replaced with latest")
+	}
 }

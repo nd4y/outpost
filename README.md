@@ -18,6 +18,8 @@ The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HT
 
 The [durable upload queue](docs/en/upload-queue.md) now admits signed plans, pins sources and runs independent targets with bounded concurrency, automatic delayed retries and process-crash recovery. Expired or permanently blocked jobs remain explicit and protected.
 
+The [source and recovery components](docs/en/product-development.md) now include bounded alias-aware scanning, a metadata-only streaming cache and whole-replica/directory recovery without the state index. `restore-replica` validates an explicit checkpoint and publishes a complete selected result atomically. Real source ingress, consistency-provider orchestration and the installable product remain in development.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.

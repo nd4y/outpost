@@ -56,7 +56,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "version" {
 		if len(args) != 1 {
@@ -74,10 +74,37 @@ func run(ctx context.Context, args []string) (any, error) {
 	version := flags.String("version", "", "expected opaque version")
 	operation := flags.String("operation", "", "operation ID")
 	domain := flags.String("domain", "", "opaque domain ID")
+	trustFile := flags.String("trust", "", "public generation trust JSON")
+	generationID := flags.String("generation", "", "expected generation checkpoint")
 	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 {
 		return nil, errUsage
 	}
 	switch args[0] {
+	case "restore-replica":
+		owner, e := filekit.ReadOwner(*key)
+		if e != nil {
+			return nil, e
+		}
+		owner.SigningKey = nil
+		raw, e := worker.ReadPrivate(*trustFile, 65536)
+		if e != nil {
+			return nil, e
+		}
+		var trust generation.Trust
+		if worker.DecodeInput(raw, &trust, 65536) != nil {
+			return nil, errUsage
+		}
+		var selection generation.RecoverySelection
+		if *input != "" {
+			raw, e = worker.ReadPrivate(*input, 1<<20)
+			if e != nil {
+				return nil, e
+			}
+			if worker.DecodeInput(raw, &selection, 1<<20) != nil {
+				return nil, errUsage
+			}
+		}
+		return generation.RecoverMaterialized(ctx, *store, *generationID, trust, owner, selection, *output)
 	case "config-sign":
 		private, e := worker.ReadPrivate(*key, 65536)
 		if e != nil {

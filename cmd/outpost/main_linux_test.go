@@ -13,11 +13,79 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/filekit"
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 	"github.com/nd4y/outpost/internal/worker"
 )
+
+func TestCLIRestoresMaterializedReplicaWithoutIndexOrSource(t *testing.T) {
+	root := teststore.Root(t)
+	ctx := context.Background()
+	must := func(e error) {
+		t.Helper()
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	owner, e := filekit.NewOwner()
+	must(e)
+	writer, key, e := ed25519.GenerateKey(rand.Reader)
+	must(e)
+	maintenance, _, e := ed25519.GenerateKey(rand.Reader)
+	must(e)
+	trust := generation.Trust{Domain: owner.Domain, Repository: storage.Hash([]byte("repository")), Epoch: 1, Writer: writer, Maintenance: maintenance}
+	sourceDir := filepath.Join(root, "source-cache")
+	s, e := filekit.OpenStore(sourceDir, owner, true)
+	must(e)
+	input := filepath.Join(root, "input")
+	must(os.WriteFile(input, []byte("independent whole replica"), 0600))
+	stats, e := s.Backup(ctx, input, filekit.BackupOptions{Names: []string{"private/данные", "outside-alias"}})
+	must(e)
+	replicaDir := filepath.Join(root, "replica")
+	must(os.Mkdir(replicaDir, 0700))
+	replica, e := generation.Open(replicaDir, trust, true)
+	must(e)
+	id, e := generation.Seal(ctx, s, []string{stats.Version}, replica, generation.Catalog{Format: generation.Format, Domain: trust.Domain, Repository: trust.Repository, Epoch: 1, Sequence: 1, SnapshotUnix: 1, Policy: 1}, key)
+	must(e)
+	must(s.Close())
+	must(replica.Close())
+	must(os.RemoveAll(sourceDir))
+	must(os.Remove(input))
+	must(os.Remove(filepath.Join(replicaDir, "state.json")))
+	owner.SigningKey = nil
+	ownerFile := filepath.Join(root, "recovery-owner.json")
+	must(filekit.WriteOwner(ownerFile, owner))
+	trustFile := filepath.Join(root, "public-trust.json")
+	raw, e := json.Marshal(trust)
+	must(e)
+	must(os.WriteFile(trustFile, raw, 0600))
+	selectionFile := filepath.Join(root, "selection.json")
+	raw, e = json.Marshal(generation.RecoverySelection{Directory: "private"})
+	must(e)
+	must(os.WriteFile(selectionFile, raw, 0600))
+	out := filepath.Join(root, "restore")
+	value, e := run(ctx, []string{"restore-replica", "--key", ownerFile, "--trust", trustFile, "--store", replicaDir, "--generation", id, "--input", selectionFile, "--output", out})
+	must(e)
+	receipt := value.(generation.RecoveryReceipt)
+	if receipt.Restored.Files != 1 || receipt.Restored.Aliases != 0 || receipt.Generation != id || !receipt.CheckpointMatch {
+		t.Fatal("incorrect receipt", receipt)
+	}
+	body, e := os.ReadFile(filepath.Join(out, "private/данные"))
+	must(e)
+	if string(body) != "independent whole replica" {
+		t.Fatal("wrong content")
+	}
+	if _, e = os.Lstat(filepath.Join(out, "outside-alias")); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("unselected alias restored")
+	}
+	raw, e = json.Marshal(value)
+	must(e)
+	if bytes.Contains(raw, []byte("private")) || bytes.Contains(raw, []byte("данные")) {
+		t.Fatal("private names in summary")
+	}
+}
 
 func TestCLIVerifiesFrozenIndependentV1Kit(t *testing.T) {
 	root := teststore.Root(t)

@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/restic/chunker"
+	"golang.org/x/sys/unix"
 )
 
 type countedReader struct {
@@ -72,7 +73,7 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	}
 	reuse := map[string]Block{}
 	if opt.Previous != "" {
-		_, prev, e := s.LoadVersion(opt.Previous)
+		_, prev, e := s.LoadVersionContext(ctx, opt.Previous)
 		if e != nil {
 			return s.Stats, e
 		}
@@ -89,6 +90,15 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	}
 	if !st.Mode().IsRegular() || st.Size() > MaxFileBytes {
 		return s.Stats, ErrInvalid
+	}
+	if opt.Expected != nil {
+		var observed unix.Stat_t
+		if err := unix.Fstat(int(f.Fd()), &observed); err != nil {
+			return s.Stats, err
+		}
+		if identity(observed) != *opt.Expected {
+			return s.Stats, ErrInvalid
+		}
 	}
 	if _, err = f.Seek(0, io.SeekStart); err != nil {
 		return s.Stats, err
@@ -110,7 +120,7 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 		if len(pack) == 0 {
 			return nil
 		}
-		ref, e := s.putObject(pack, false)
+		ref, e := s.putObjectContext(ctx, pack, false)
 		if e != nil {
 			return e
 		}
@@ -145,12 +155,8 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 				return s.Stats, ErrInvalid
 			}
 			if !existing[b.Object.ID] {
-				st, e := s.root.Stat(objectPath(b.Object.ID))
-				if e != nil {
+				if e := s.checkObjectContext(ctx, b.Object); e != nil {
 					return s.Stats, e
-				}
-				if !st.Mode().IsRegular() || st.Size() != int64(b.Object.Bytes) {
-					return s.Stats, ErrInvalid
 				}
 				existing[b.Object.ID] = true
 			}
@@ -200,12 +206,12 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	s.Stats.File = opt.File
 	s.Stats.Blocks = len(d.Blocks)
 	s.Stats.PeakBufferBytes = MaxChunk + MaxObject + 2*MaxDescriptor
-	if _, _, e := s.LoadVersion(version); e == nil {
+	if _, _, e := s.LoadVersionContext(ctx, version); e == nil {
 		return s.Stats, nil
 	} else if !errors.Is(e, os.ErrNotExist) {
 		return s.Stats, e
 	}
-	e, err := s.sealDescriptor(d)
+	e, err := s.sealDescriptorContext(ctx, d)
 	if err != nil {
 		return s.Stats, err
 	}

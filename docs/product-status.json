@@ -8,26 +8,38 @@
       "id": "REQ-01",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-02",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
       "checks": [],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-03",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
       "checks": [
+        {
+          "path": "internal/source/scan_linux_test.go",
+          "name": "TestScanCapturesCompleteAliasesDirectoriesAndLinksWithoutFollowing"
+        },
+        {
+          "path": "internal/source/scan_linux_test.go",
+          "name": "TestScanRefusesOutsideHardlinksAndSelectedSpecialFiles"
+        },
+        {
+          "path": "internal/source/scan_linux_test.go",
+          "name": "TestScanBoundsCancellationAndSymlinkAncestorReplacement"
+        },
         {
           "path": "internal/filekit/entries_linux_test.go",
           "name": "TestTypedIndependentDirectoryAndSymlinkRecovery"
@@ -42,34 +54,44 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-04",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
-      "checks": [],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "checks": [
+        {
+          "path": "internal/filekit/streaming_linux_test.go",
+          "name": "TestStreamingCaptureKeepsOnlyMetadataAndRestoresBothDeltaVersions"
+        }
+      ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-05",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
-      "checks": [],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "checks": [
+        {
+          "path": "internal/generation/streaming_linux_test.go",
+          "name": "TestBuildCatalogDoesNotFetchPayloadBackThroughSource"
+        }
+      ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-06",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-07",
@@ -84,10 +106,10 @@
       "id": "REQ-08",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
       "checks": [],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-09",
@@ -210,15 +232,19 @@
       "id": "REQ-14",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/policy"],
+      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
       "checks": [
         {
           "path": "internal/policy/rules_test.go",
           "name": "TestSelectAliases"
+        },
+        {
+          "path": "internal/source/scan_linux_test.go",
+          "name": "TestScanDeniedAliasNeverCapturesAllowedName"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
     },
     {
       "id": "REQ-15",
@@ -449,6 +475,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueActualSIGKILLAndRestart"
+        },
+        {
+          "path": "internal/source/scan_linux_test.go",
+          "name": "TestScanRejectsRacesBeforeReadAndBeforePublication"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -507,6 +537,10 @@
         {
           "path": "internal/worker/worker_linux_test.go",
           "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -699,28 +733,64 @@
       "id": "REQ-34",
       "workstream": "recovery",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "implementation": [
+        "internal/filekit",
+        "internal/generation",
+        "internal/storage",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-13"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
     },
     {
       "id": "REQ-35",
       "workstream": "recovery",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "implementation": [
+        "internal/filekit",
+        "internal/generation",
+        "internal/storage",
+        "cmd/outpost"
+      ],
       "checks": [],
       "acceptance": ["AT-13"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
     },
     {
       "id": "REQ-36",
       "workstream": "recovery",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
-      "checks": [],
+      "implementation": [
+        "internal/filekit",
+        "internal/generation",
+        "internal/storage",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/filekit/dataset_linux_test.go",
+          "name": "TestIndependentDatasetRestoresDirectoryMetadataLastAndHardlinks"
+        },
+        {
+          "path": "internal/filekit/dataset_linux_test.go",
+          "name": "TestDatasetRejectsAuthenticatedPathCollisionsBeforeOutput"
+        },
+        {
+          "path": "internal/filekit/dataset_linux_test.go",
+          "name": "TestDatasetRejectsMissingCorruptAndCancelledPayloadWithoutPublication"
+        },
+        {
+          "path": "internal/filekit/dataset_linux_test.go",
+          "name": "TestDatasetRequiresExplicitVersionAndBoundsAncestorExpansion"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        }
+      ],
       "acceptance": ["AT-24"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
     },
     {
       "id": "REQ-37",
@@ -844,7 +914,12 @@
       "id": "REQ-46",
       "workstream": "recovery",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "implementation": [
+        "internal/filekit",
+        "internal/generation",
+        "internal/storage",
+        "cmd/outpost"
+      ],
       "checks": [
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -856,7 +931,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
     },
     {
       "id": "REQ-47",

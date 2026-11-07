@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"github.com/nd4y/outpost/internal/statefile"
 	"io"
 	"os"
 )
@@ -93,6 +94,7 @@ type BackupOptions struct {
 	File     string
 	Previous string
 	Names    []string
+	Expected *SourceIdentity
 }
 
 // Fault is an optional test hook. A caller may inject a failure or stop its own
@@ -100,13 +102,27 @@ type BackupOptions struct {
 type Fault func(string) error
 
 type Store struct {
-	root  *os.Root
-	Owner Owner
-	Fault Fault
-	Stats Stats
+	root    *os.Root
+	Owner   Owner
+	Fault   Fault
+	Stats   Stats
+	backend ObjectBackend
+	Admit   statefile.Admission
+}
+
+// ObjectBackend receives ciphertext only. Write must reject conflicting bytes
+// and acknowledge verified durable acceptance; false means an identical object
+// was already accepted. Check proves presence/length, not a full content scrub.
+// Implementations must honor context cancellation and bound their requests.
+type ObjectBackend interface {
+	Read(context.Context, Object) ([]byte, error)
+	Write(context.Context, Object, []byte) (bool, error)
+	Check(context.Context, Object) error
 }
 
 var ErrInvalid = errors.New("invalid or unsupported file kit")
+
+var ErrRemoteMaintenance = errors.New("object maintenance is owned by the receiving replica")
 
 type contextReader struct {
 	ctx context.Context

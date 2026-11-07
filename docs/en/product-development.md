@@ -24,6 +24,22 @@ Capacity admission reserves space before replica, journal, configuration and que
 
 Bounded integration checks cover signed HTTPS relay, offline cache restart, policy cancellation, sender-to-intermediate-to-outbound-only-recipient recovery, both external protocols, process-kill quota reconciliation and retained-history recovery under capacity pressure. Source capture, automatic discovery and scheduling of new generations, maintenance, operator API/UI and packaging remain open deliverables. Local schema and configuration limits are implementation bounds, not measured production capacity. Full-scale tests and operational admission remain separate.
 
+## Source and independent dataset recovery
+
+The trusted source scanner inventories a bounded tree without following symbolic links or crossing mount boundaries, including bind mounts. It groups every discovered hardlink alias before selecting a domain. A denied alias excludes the inode; conflicting permitted domains, an undiscovered external alias, unsupported selected types or exceeded limits stop capture. The planner checks identities before and after each rooted read and rechecks the observed tree before publication. A live-tree scan remains best effort: metadata comparisons cannot detect every modification within a filesystem timestamp tick and do not establish application consistency. Snapshot/application-provider orchestration and actual source enrollment remain open.
+
+`OpenStreamingStore` keeps version envelopes in a local metadata cache with caller-supplied capacity admission while sending ciphertext to an `ObjectBackend`. Previous descriptors permit block reuse; unchanged payload is checked for presence and length without being downloaded through the source. The backend must acknowledge verified durable acceptance. `BuildCatalog` signs the descriptor closure without rereading payload through the source; it is not a durable replica receipt and cannot release a source snapshot. Receiver admission, authenticated network ingress, resumable source jobs and release thresholds still need their end-to-end integration. Maintenance through a streaming source cache is refused because the receiving replica owns those objects.
+
+`restore-replica` recovers a chosen checkpoint directly from immutable `catalogs` and `objects`, with public generation trust and the private recovery owner file. It does not need the replica state index, source, queue or control service. An optional private selection file chooses exact versions or a relative directory. Ambiguous versions of the same file are refused. Directory selection restores only the selected names, including hardlink aliases inside that scope. The supplied checkpoint identifies the intended generation; matching it does not prove that no newer checkpoint exists elsewhere.
+
+The reader validates names and ancestor types before creating output, preserves hardlinks and symbolic links, applies directory attributes after children and atomically publishes a new destination without overwrite. Missing or corrupt payload never produces a successful partial restore. A selection without its ancestor directory kits creates implicit directories with mode 0700 and reports their count. Current recovery bounds are 4096 kits, 64 MiB of aggregate authenticated metadata and 32768 names/directories. These are explicit admission limits, not production scale measurements. Recover from a retained materialized view; concurrent live GC can invalidate a read.
+
+```sh
+outpost restore-replica --key /private/recovery-owner.json \
+  --trust /private/generation-trust.json --store /recovery/replica \
+  --generation EXPECTED_CHECKPOINT --output /recovery/restored
+```
+
 ## Completion boundary
 
 Finish the applicable main profile through M4 with an installable artifact, standalone recovery, exact-source checks and measured limits. The delayed archive profile remains a separate M5 admission. Production deployment, endpoint credentials, real notifications and destructive infrastructure tests require their own authorized environment. Keep the [roadmap](roadmap.md), English/Russian documentation, requirement links and actual acceptance evidence consistent throughout development.

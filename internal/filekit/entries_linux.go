@@ -88,6 +88,9 @@ func (s *Store) BackupEntry(ctx context.Context, root *os.Root, relative string,
 	if e = unix.Fstatat(int(parent.Fd()), name, &initial, unix.AT_SYMLINK_NOFOLLOW); e != nil {
 		return Stats{}, e
 	}
+	if opt.Expected != nil && identity(initial) != *opt.Expected {
+		return Stats{}, ErrInvalid
+	}
 	if initial.Mode&unix.S_IFMT == unix.S_IFREG {
 		fd, e := unix.Openat(int(parent.Fd()), name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 		if e != nil {
@@ -131,7 +134,7 @@ func (s *Store) BackupEntry(ctx context.Context, root *os.Root, relative string,
 		return s.Stats, ErrInvalid
 	}
 	if opt.Previous != "" {
-		_, old, e := s.LoadVersion(opt.Previous)
+		_, old, e := s.LoadVersionContext(ctx, opt.Previous)
 		if e != nil {
 			return s.Stats, e
 		}
@@ -188,12 +191,12 @@ func (s *Store) BackupEntry(ctx context.Context, root *os.Root, relative string,
 	}
 	s.Stats.File = opt.File
 	s.Stats.Version = version
-	if _, _, e = s.LoadVersion(version); e == nil {
+	if _, _, e = s.LoadVersionContext(ctx, version); e == nil {
 		return s.Stats, nil
 	} else if !errors.Is(e, os.ErrNotExist) {
 		return s.Stats, e
 	}
-	envelope, e := s.sealDescriptor(d)
+	envelope, e := s.sealDescriptorContext(ctx, d)
 	if e != nil {
 		return s.Stats, e
 	}

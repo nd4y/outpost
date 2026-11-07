@@ -36,7 +36,7 @@ func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume f
 			return ErrInvalid
 		}
 		seen[version] = true
-		e, d, err := s.LoadVersion(version)
+		e, d, err := s.LoadVersionContext(ctx, version)
 		if err != nil {
 			return err
 		}
@@ -59,6 +59,6 @@ func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume f
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		return s.readObject(ref)
+		return s.readObjectContext(ctx, ref)
 	})
 }

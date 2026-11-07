@@ -51,7 +51,7 @@ for (const item of product.requirements) {
     assert(fs.existsSync(path.join(root, file)), `Missing implementation: ${item.id} ${file}`);
   }
   for (const check of item.checks) {
-    assert(/^internal\/[a-z_]+\/[a-z_]+_test\.go$/.test(check.path));
+    assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z_]+_test\.go$/.test(check.path));
     assert(/^Test[A-Za-z0-9]+$/.test(check.name));
     assert(
       read(check.path).includes(`func ${check.name}(t *testing.T)`),
