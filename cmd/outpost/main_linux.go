@@ -23,6 +23,7 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/sourceagent"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -66,7 +67,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "version" {
 		if len(args) != 1 {
@@ -210,7 +211,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			}
 		}
 		return generation.RecoverMaterialized(ctx, *store, *generationID, trust, owner, selection, *output)
-	case "config-sign", "source-authority-sign":
+	case "config-sign", "source-authority-sign", "observation-grant-sign":
 		private, e := worker.ReadPrivate(*key, 65536)
 		if e != nil {
 			return nil, e
@@ -228,6 +229,20 @@ func run(ctx context.Context, args []string) (any, error) {
 		raw, e := worker.ReadPrivate(*input, limit)
 		if e != nil {
 			return nil, e
+		}
+		if args[0] == "observation-grant-sign" {
+			var grant observation.Grant
+			if worker.DecodeInput(raw, &grant, observation.MaxDocument) != nil {
+				return nil, errUsage
+			}
+			signed, e := observation.SignGrant(grant, signer.PrivateKey)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, signed); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": observation.GrantFormat, "signed": true}, nil
 		}
 		if args[0] == "source-authority-sign" {
 			var grant ingress.Authority
@@ -274,7 +289,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"version": *version, "file": d.File, "bytes": d.Size, "aliases": len(d.Names), "fileKitFormat": d.Format, "kind": d.Kind}, nil
-	case "worker-init", "worker-run", "worker-status", "worker-retry", "config-apply", "replica-migrate", "replica-rollback":
+	case "worker-init", "worker-run", "worker-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "replica-migrate", "replica-rollback":
 		b, e := worker.LoadBootstrap(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -289,6 +304,10 @@ func run(ctx context.Context, args []string) (any, error) {
 			return map[string]any{"node": b.Node, "initialized": true}, nil
 		case "worker-status":
 			return w.Status(ctx)
+		case "worker-discovery-status":
+			return w.DiscoveryStatus(ctx)
+		case "worker-observation-status":
+			return w.ObservationStatus(ctx)
 		case "worker-retry":
 			e = w.Retry(ctx, *operation)
 			return map[string]any{"operation": *operation, "retryRequested": e == nil}, e
@@ -359,9 +378,9 @@ func failure(e error) (string, int) {
 		return "MIGRATION_REQUIRED", 5
 	case errors.Is(e, sourceagent.ErrUnsupported):
 		return "CAPABILITY_UNAVAILABLE", 5
-	case errors.Is(e, capture.ErrCopies):
+	case errors.Is(e, capture.ErrCopies), errors.Is(e, observation.ErrPending):
 		return "COPY_THRESHOLD_PENDING", 5
-	case errors.Is(e, worker.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ingress.ErrDenied):
+	case errors.Is(e, worker.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ingress.ErrDenied), errors.Is(e, observation.ErrDenied):
 		return "DENIED", 3
 	case errors.Is(e, generation.ErrIncomplete), errors.Is(e, filekit.ErrInvalid), errors.Is(e, storage.ErrIntegrity), errors.Is(e, capture.ErrInvalid), errors.Is(e, sourceagent.ErrInvalid):
 		return "INCOMPLETE_OR_CORRUPT", 4

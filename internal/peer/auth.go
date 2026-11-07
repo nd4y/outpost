@@ -28,6 +28,7 @@ type Grant struct {
 	Class       string `json:"class"`
 	Push        bool   `json:"push"`
 	Pull        bool   `json:"pull"`
+	History     bool   `json:"history,omitempty"`
 	ExpiresUnix int64  `json:"expiresUnix"`
 }
 

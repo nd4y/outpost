@@ -128,6 +128,11 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 			}
 		}
 		if !replay {
+			// Persist the signed authority before removing its catalogs. A crash
+			// can retain extra data, but cannot lose the retirement tombstone.
+			if e = r.recordRetirement(s, raw); e != nil {
+				return e
+			}
 			for id := range retiring {
 				delete(s.Generations, id)
 			}

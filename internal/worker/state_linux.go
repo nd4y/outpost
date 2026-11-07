@@ -12,6 +12,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -127,6 +128,15 @@ func (w *Worker) admit(ctx context.Context, c control.Config) error {
 			s.Jobs[j.Operation] = old
 		}
 		for op, j := range s.Jobs {
+			if c.Autonomous(j.Job) && j.Binding == binding(j.Job) {
+				current[op] = true
+				if j.Phase == "RUNNING" || j.Phase == "WITHDRAWN" {
+					j.Phase = "QUEUED"
+					j.NextMillis = 0
+					j.ErrorCode = ""
+					s.Jobs[op] = j
+				}
+			}
 			if !current[op] && j.Phase != "COMPLETE" {
 				j.Phase = "WITHDRAWN"
 				j.ErrorCode = "POLICY_WITHDRAWN"
@@ -167,7 +177,16 @@ func (w *Worker) Retry(ctx context.Context, operation string) error {
 		}
 	}
 	if admitted == nil {
-		return ErrDenied
+		s, e := w.Status(ctx)
+		if e != nil {
+			return e
+		}
+		old, ok := s.Jobs[operation]
+		if !ok || !c.Autonomous(old.Job) {
+			return ErrDenied
+		}
+		copy := old.Job
+		admitted = &copy
 	}
 	return w.update(ctx, func(s *Status) error {
 		j, ok := s.Jobs[operation]
@@ -212,7 +231,7 @@ func errorCode(e error) string {
 		return "CAPACITY_BLOCKED"
 	case errors.Is(e, control.ErrInactive):
 		return "POLICY_EXPIRED"
-	case errors.Is(e, peer.ErrDenied), errors.Is(e, upload.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ErrDenied):
+	case errors.Is(e, peer.ErrDenied), errors.Is(e, upload.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ErrDenied), errors.Is(e, observation.ErrDenied):
 		return "POLICY_BLOCKED"
 	case errors.Is(e, peer.ErrConflict), errors.Is(e, upload.ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, generation.ErrRollback):
 		return "CONFLICT"

@@ -76,7 +76,7 @@ func fail(w http.ResponseWriter, e error) {
 		status = http.StatusForbidden
 	case errors.Is(e, ErrCapacity):
 		status = http.StatusInsufficientStorage
-	case errors.Is(e, ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, generation.ErrRollback):
+	case errors.Is(e, ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, generation.ErrRollback), errors.Is(e, generation.ErrProtected):
 		status = http.StatusConflict
 	case errors.Is(e, generation.ErrIncomplete):
 		status = http.StatusPreconditionFailed
@@ -118,6 +118,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, resource := parts[4], parts[5]
+	history := r.Header.Get("Outpost-History")
+	if history != "" && (history != "1" || !push || r.Method != http.MethodPut || resource != "catalog" || !h.policy.Peers[peer].History) {
+		fail(w, ErrDenied)
+		return
+	}
 	if (resource == "objects" && len(parts) != 7) || (resource != "objects" && len(parts) != 6) {
 		fail(w, ErrProtocol)
 		return
@@ -165,7 +170,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if _, e = h.replica.Begin(ctx, raw); e != nil {
+		_, e = h.replica.Begin(ctx, raw)
+		if errors.Is(e, generation.ErrRollback) && history == "1" {
+			_, e = h.replica.BeginHistorical(ctx, raw)
+		}
+		if e != nil {
 			fail(w, e)
 			return
 		}

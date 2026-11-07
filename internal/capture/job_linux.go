@@ -58,10 +58,11 @@ type Profile struct {
 // CopyReceipt is an observation from a locally installed authenticated verifier.
 // A caller must not construct it from an unverified shared JSON job or callback.
 type CopyReceipt struct {
-	Target       string `json:"target"`
-	Generation   string `json:"generation"`
-	Verification string `json:"verification"`
-	ObservedUnix int64  `json:"observedUnix"`
+	Target            string `json:"target"`
+	Generation        string `json:"generation"`
+	Verification      string `json:"verification"`
+	ObservedUnix      int64  `json:"observedUnix"`
+	SignedObservation string `json:"signedObservation,omitempty"`
 }
 type Options struct {
 	Parent            *os.Root
@@ -618,7 +619,7 @@ func (j *Job) verifyCopies(copies []CopyReceipt, generationID string) ([]CopyRec
 	}
 	unique := map[string]CopyReceipt{}
 	for _, r := range copies {
-		if !allowed[r.Target] || r.Generation != generationID || r.Verification != "ciphertext-readback" || r.ObservedUnix < j.intent.SnapshotUnix || r.ObservedUnix > time.Now().Unix() {
+		if !allowed[r.Target] || r.Generation != generationID || r.Verification != "ciphertext-readback" || r.ObservedUnix < j.intent.SnapshotUnix || r.ObservedUnix > time.Now().Unix() || len(r.SignedObservation) > 16<<10 {
 			return nil, ErrInvalid
 		}
 		if old, ok := unique[r.Target]; ok && old != r {

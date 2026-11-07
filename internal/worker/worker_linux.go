@@ -54,6 +54,7 @@ type view struct {
 	done     chan struct{}
 	err      error
 	requests sync.WaitGroup
+	metadata chan struct{}
 	domains  map[string]*domainState
 }
 type Worker struct {
@@ -260,7 +261,7 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 	if !inbound {
 		p.RequiredRevision = job.PeerRevision
 		n, _ := c.NodeByID(job.Peer)
-		p.Peers[job.Peer] = peer.Grant{Class: n.Class, Push: job.Kind == "push", Pull: true, ExpiresUnix: c.ExpiresUnix}
+		p.Peers[job.Peer] = peer.Grant{Class: n.Class, Push: job.Kind == "push", Pull: true, History: c.Autonomous(job), ExpiresUnix: c.ExpiresUnix}
 		return p
 	}
 	for _, j := range c.Jobs {
@@ -281,10 +282,25 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 		}
 		p.Peers[j.Executor] = g
 	}
+	for _, rule := range c.Replication {
+		if rule.Domain != d.Trust.Domain || rule.Peer() != self {
+			continue
+		}
+		n, _ := c.NodeByID(rule.Executor())
+		g := p.Peers[rule.Executor()]
+		g.Class = n.Class
+		g.ExpiresUnix = c.ExpiresUnix
+		g.History = true
+		g.Pull = true
+		if rule.Mode == "push" {
+			g.Push = true
+		}
+		p.Peers[rule.Executor()] = g
+	}
 	return p
 }
 func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
-	v := &view{cfg: c, done: make(chan struct{}), domains: map[string]*domainState{}}
+	v := &view{cfg: c, done: make(chan struct{}), metadata: make(chan struct{}, c.Limits.Parallel), domains: map[string]*domainState{}}
 	v.ctx, v.cancel = context.WithDeadline(ctx, time.Unix(c.ExpiresUnix, 0))
 	fail := func(e error) (*view, error) {
 		v.cancel()
@@ -391,10 +407,22 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	if e := w.admit(ctx, c); e != nil {
 		return fail(e)
 	}
+	if e := w.resetDiscovery(ctx, v); e != nil {
+		return fail(e)
+	}
 	w.mu.Lock()
 	w.active = v
 	w.mu.Unlock()
-	go func() { v.err = w.jobs(v); close(v.done) }()
+	go func() {
+		discovery := make(chan error, 1)
+		go func() { discovery <- w.discover(v) }()
+		observations := make(chan error, 1)
+		go func() { observations <- w.observe(v) }()
+		v.err = w.jobs(v)
+		v.cancel()
+		v.err = errors.Join(v.err, <-discovery, <-observations)
+		close(v.done)
+	}()
 	return v, nil
 }
 func (w *Worker) stop(v *view) error {
@@ -534,6 +562,14 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) >= 4 && parts[1] == "v1" && parts[3] == "observations" {
+		w.serveObservations(out, r, parts)
+		return
+	}
+	if len(parts) == 4 && parts[1] == "v1" && parts[3] == "inventory" {
+		w.serveInventory(out, r, parts[2])
+		return
+	}
 	if len(parts) >= 8 && parts[1] == "v1" && parts[2] == "tenants" && parts[4] == "domains" && parts[6] == "captures" {
 		w.serveIngress(out, r, parts[5])
 		return
@@ -566,6 +602,21 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	if !allowed {
+		domain, ok := v.cfg.DomainByID(parts[2])
+		if ok {
+			for _, rule := range v.cfg.Replication {
+				if rule.Domain != parts[2] || rule.Peer() != w.node || rule.Executor() != remote || rule.Mode != r.Header.Get("Outpost-Mode") {
+					continue
+				}
+				j := rule.Job(domain.Trust, parts[4])
+				if storage.ID(parts[4]) && j.Operation == r.Header.Get("Outpost-Operation") {
+					allowed = true
+					break
+				}
+			}
+		}
+	}
 	if !allowed || d == nil || d.handler == nil {
 		w.mu.Unlock()
 		http.Error(out, "denied", 403)
@@ -574,10 +625,12 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 	v.requests.Add(1)
 	w.mu.Unlock()
 	defer v.requests.Done()
-	ctx, cancel := context.WithCancel(r.Context())
-	stop := context.AfterFunc(v.ctx, cancel)
-	defer stop()
-	defer cancel()
+	ctx, cleanup, e := w.requestContext(out, r, v)
+	if e != nil {
+		http.Error(out, "unavailable", 503)
+		return
+	}
+	defer cleanup()
 	d.handler.ServeHTTP(out, r.WithContext(ctx))
 }
 func (w *Worker) HTTPServer() (*http.Server, error) {

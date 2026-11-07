@@ -72,7 +72,17 @@ func (w *Worker) jobs(v *view) error {
 			}
 			return errors.Join(e, joined)
 		}
-		for _, j := range v.cfg.Jobs {
+		desired := append([]control.Job(nil), v.cfg.Jobs...)
+		known := map[string]bool{}
+		for _, j := range desired {
+			known[j.Operation] = true
+		}
+		for _, old := range s.Jobs {
+			if !known[old.Job.Operation] && v.cfg.Autonomous(old.Job) {
+				desired = append(desired, old.Job)
+			}
+		}
+		for _, j := range desired {
 			if j.Executor != w.node || s.Rejected[j.Operation] != "" || running[j.Operation] || len(running) >= v.cfg.Limits.Parallel {
 				continue
 			}

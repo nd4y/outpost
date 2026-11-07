@@ -11,6 +11,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
+	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
@@ -64,18 +65,20 @@ type Job struct {
 	Plan         json.RawMessage `json:"plan,omitempty"`
 }
 type Config struct {
-	Format      string            `json:"format"`
-	Node        string            `json:"node"`
-	Revision    uint64            `json:"revision"`
-	NotBefore   int64             `json:"notBefore"`
-	ExpiresUnix int64             `json:"expiresUnix"`
-	Limits      Limits            `json:"limits"`
-	Nodes       []policy.Node     `json:"nodes"`
-	Targets     []Target          `json:"targets"`
-	Domains     []Domain          `json:"domains"`
-	Jobs        []Job             `json:"jobs"`
-	Ingress     []json.RawMessage `json:"ingress,omitempty"`
-	Signature   []byte            `json:"signature,omitempty"`
+	Format       string            `json:"format"`
+	Node         string            `json:"node"`
+	Revision     uint64            `json:"revision"`
+	NotBefore    int64             `json:"notBefore"`
+	ExpiresUnix  int64             `json:"expiresUnix"`
+	Limits       Limits            `json:"limits"`
+	Nodes        []policy.Node     `json:"nodes"`
+	Targets      []Target          `json:"targets"`
+	Domains      []Domain          `json:"domains"`
+	Jobs         []Job             `json:"jobs"`
+	Ingress      []json.RawMessage `json:"ingress,omitempty"`
+	Replication  []Replication     `json:"replication,omitempty"`
+	Observations []json.RawMessage `json:"observations,omitempty"`
+	Signature    []byte            `json:"signature,omitempty"`
 }
 
 func (c Config) NodeByID(id string) (policy.Node, bool) {
@@ -109,7 +112,7 @@ func (c Config) Active(now time.Time) error {
 	return nil
 }
 func (c Config) validate(owner ed25519.PublicKey) error {
-	if c.Format != Format || !storage.ID(c.Node) || c.Revision == 0 || c.NotBefore <= 0 || c.ExpiresUnix <= c.NotBefore || c.ExpiresUnix > 1<<40 || c.Limits.Validate() != nil || len(c.Nodes) < 1 || len(c.Nodes) > 128 || len(c.Targets) > 128 || len(c.Domains) > 128 || len(c.Jobs) > 64 || len(c.Ingress) > 128 {
+	if c.Format != Format || !storage.ID(c.Node) || c.Revision == 0 || c.NotBefore <= 0 || c.ExpiresUnix <= c.NotBefore || c.ExpiresUnix > 1<<40 || c.Limits.Validate() != nil || len(c.Nodes) < 1 || len(c.Nodes) > 128 || len(c.Targets) > 128 || len(c.Domains) > 128 || len(c.Jobs) > 64 || len(c.Ingress) > 128 || len(c.Replication) > 128 {
 		return ErrDenied
 	}
 	nodes := map[string]policy.Node{}
@@ -152,6 +155,46 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		}
 	}
 	operations := map[string]bool{}
+	if len(c.Observations) > 64 {
+		return ErrDenied
+	}
+	observations := map[string]bool{}
+	for _, raw := range c.Observations {
+		g, e := observation.VerifyGrant(raw, owner)
+		d, ok := domains[g.Trust.Domain]
+		if e != nil || !ok || !observation.SameTrust(g.Trust, d.Trust) || g.NotBefore > c.NotBefore || g.ExpiresUnix < c.ExpiresUnix || (g.Collector != c.Node && !g.Target(c.Node)) || observations[storage.Hash(raw)] {
+			return ErrDenied
+		}
+		reader, rok := nodes[g.Reader]
+		collector, cok := nodes[g.Collector]
+		if !rok || reader.Class != "trusted" || !cok || collector.Endpoint == "" || !d.Placement.PermitsNode(g.Collector) {
+			return ErrDenied
+		}
+		for _, target := range g.Targets {
+			holder := false
+			for _, id := range d.Placement.Holders {
+				if id == target {
+					holder = true
+				}
+			}
+			if !holder {
+				return ErrDenied
+			}
+		}
+		observations[storage.Hash(raw)] = true
+	}
+	routes := map[string]bool{}
+	for _, r := range c.Replication {
+		d, ok := domains[r.Domain]
+		if !ok || r.Epoch == 0 || r.PeerRevision == 0 || (c.Node != r.From && c.Node != r.To) || !d.Placement.HasEdge(r.From, r.To, r.Mode) || r.Peer() == c.Node && r.PeerRevision > c.Revision {
+			return ErrDenied
+		}
+		id := r.Domain + "/" + r.From + "/" + r.To + "/" + r.Mode
+		if routes[id] {
+			return ErrDenied
+		}
+		routes[id] = true
+	}
 	grants := map[string]bool{}
 	for _, raw := range c.Ingress {
 		a, e := ingress.VerifyAuthorityDocument(raw, owner)

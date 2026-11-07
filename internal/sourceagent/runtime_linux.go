@@ -23,6 +23,7 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -38,15 +39,16 @@ var ErrUnsupported = errors.New("source profile requires an unavailable capabili
 // Bootstrap is private local configuration. Shared control documents cannot
 // select source paths, keys or installed provider implementations.
 type Bootstrap struct {
-	Format        string              `json:"format"`
-	Local         worker.Bootstrap    `json:"local"`
-	Profile       capture.Profile     `json:"profile"`
-	Tree          capture.TreeBinding `json:"tree"`
-	DataKeyFile   string              `json:"dataKeyFile"`
-	WriterKeyFile string              `json:"writerKeyFile"`
-	AuthorityFile string              `json:"authorityFile"`
-	Endpoint      string              `json:"endpoint"`
-	Limits        diskbudget.Limits   `json:"limits"`
+	Format          string              `json:"format"`
+	Local           worker.Bootstrap    `json:"local"`
+	Profile         capture.Profile     `json:"profile"`
+	Tree            capture.TreeBinding `json:"tree"`
+	DataKeyFile     string              `json:"dataKeyFile"`
+	WriterKeyFile   string              `json:"writerKeyFile"`
+	AuthorityFile   string              `json:"authorityFile"`
+	ObservationFile string              `json:"observationFile,omitempty"`
+	Endpoint        string              `json:"endpoint"`
+	Limits          diskbudget.Limits   `json:"limits"`
 }
 
 func Load(path string) (Bootstrap, error) {
@@ -92,6 +94,7 @@ type Agent struct {
 	owner        filekit.Owner
 	writer       ed25519.PrivateKey
 	authority    []byte
+	observation  []byte
 	grant        ingress.Authority
 	cert         tls.Certificate
 	roots        *x509.CertPool
@@ -105,8 +108,8 @@ func Open(ctx context.Context, b Bootstrap, initialize bool) (*Agent, error) {
 	if b.Format != Format || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
 		return nil, ErrInvalid
 	}
-	// Never downgrade a requested snapshot or two-copy policy to this provider.
-	if b.Profile.Consistency != "best-effort" || b.Profile.MinimumCopies != 1 {
+	// Never downgrade requested consistency or an unconfigured copy policy.
+	if b.Profile.Consistency != "best-effort" || b.Profile.MinimumCopies < 1 || b.Profile.MinimumCopies > 2 || b.Profile.MinimumCopies == 2 && b.ObservationFile == "" {
 		return nil, ErrUnsupported
 	}
 	a := &Agent{b: b}
@@ -121,6 +124,30 @@ func Open(ctx context.Context, b Bootstrap, initialize bool) (*Agent, error) {
 	}
 	if a.grant.Source != b.Local.Node || a.grant.Profile != b.Profile.ID {
 		return nil, ErrInvalid
+	}
+	if b.ObservationFile != "" {
+		if b.Profile.MinimumCopies != 2 {
+			return nil, ErrInvalid
+		}
+		a.observation, e = worker.ReadPrivate(b.ObservationFile, observation.MaxDocument)
+		if e != nil {
+			return nil, e
+		}
+		g, e := observation.VerifyGrant(a.observation, b.Local.Owner)
+		if e != nil || g.Reader != b.Local.Node || g.Collector != a.grant.Ingress || !observation.SameTrust(g.Trust, a.grant.Trust) || g.Target(g.Collector) {
+			return nil, ErrInvalid
+		}
+		for _, target := range g.Targets {
+			found := false
+			for _, id := range b.Profile.CopyTargets {
+				if id == target {
+					found = true
+				}
+			}
+			if !found {
+				return nil, ErrInvalid
+			}
+		}
 	}
 	a.owner, e = filekit.ReadOwner(b.DataKeyFile)
 	if e != nil {
@@ -149,10 +176,11 @@ func Open(ctx context.Context, b Bootstrap, initialize bool) (*Agent, error) {
 		return nil, ErrInvalid
 	}
 	identity, _ := json.Marshal(struct {
-		Bootstrap Bootstrap
-		Authority []byte
-		Data      filekit.Owner
-	}{b, a.authority, a.owner})
+		Bootstrap   Bootstrap
+		Authority   []byte
+		Observation []byte `json:",omitempty"`
+		Data        filekit.Owner
+	}{b, a.authority, a.observation, a.owner})
 	a.binding = storage.Hash(identity)
 	if initialize {
 		// The parent must already exist. Checking it by held identities rejects
@@ -487,7 +515,11 @@ func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), err
 		client.Close()
 		return nil, nil, e
 	}
-	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, Profile: p, Authority: a.authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: client, Cache: cache, Previous: previous, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
+	var copies func(context.Context, string) ([]capture.CopyReceipt, error)
+	if len(a.observation) > 0 {
+		copies = a.copies
+	}
+	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, Profile: p, Authority: a.authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: client, Cache: cache, Previous: previous, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
 	if e != nil {
 		cache.Close()
 		provider.Close()

@@ -14,11 +14,12 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-02",
@@ -30,11 +31,17 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
+        }
+      ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-03",
@@ -46,6 +53,7 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
       "checks": [
@@ -83,7 +91,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-04",
@@ -95,6 +103,7 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
       "checks": [
@@ -116,7 +125,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-05",
@@ -128,6 +137,7 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
       "checks": [
@@ -150,10 +160,14 @@
         {
           "path": "internal/sourceagent/runtime_linux_test.go",
           "name": "TestExecutableSourceRuntimeResumesAndPreservesIndependentHistory"
+        },
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-06",
@@ -165,18 +179,24 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-07",
       "workstream": "crypto",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/observation/authority_test.go",
+          "name": "TestObservationCannotChangeIdentityGenerationGrantOrOriginalAge"
+        }
+      ],
       "acceptance": ["AT-01", "AT-06", "AT-20", "AT-21", "AT-27"],
       "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
     },
@@ -190,11 +210,17 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
+        }
+      ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-09",
@@ -323,6 +349,7 @@
         "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
+        "internal/observation",
         "internal/policy"
       ],
       "checks": [
@@ -336,7 +363,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-15",
@@ -347,6 +374,7 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
@@ -357,10 +385,22 @@
         {
           "path": "internal/control/ingress_linux_test.go",
           "name": "TestIngressCapabilityRequiresCurrentPlacementAndIndependentSource"
+        },
+        {
+          "path": "internal/peer/history_linux_test.go",
+          "name": "TestHistoryHeaderCannotExpandReceiverAuthority"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestInventoryRequiresCurrentPullRuleAndRejectsReverseMetadataRoute"
+        },
+        {
+          "path": "internal/control/observations_test.go",
+          "name": "TestObservationGrantCannotExpandPlacementOrReaderAuthority"
         }
       ],
       "acceptance": ["AT-06", "AT-07", "AT-08", "AT-19", "AT-27"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-16",
@@ -371,6 +411,7 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
@@ -389,10 +430,22 @@
         {
           "path": "internal/worker/ingress_linux_test.go",
           "name": "TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestInventoryRequiresCurrentPullRuleAndRejectsReverseMetadataRoute"
+        },
+        {
+          "path": "internal/worker/deadline_linux_test.go",
+          "name": "TestWithdrawnRouteInterruptsAuthorizedIncompleteBody"
+        },
+        {
+          "path": "internal/worker/observations_linux_test.go",
+          "name": "TestObservationOverloadIsBoundedAndRevocationJoinsBlockedBodies"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-17",
@@ -403,16 +456,21 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
         {
           "path": "internal/control/control_linux_test.go",
           "name": "TestHTTPSRelayPreservesSignatureAndOfflineRecipientCache"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestDiscoveryRetriesPolicyLagWithoutExpandingAuthority"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-18",
@@ -423,16 +481,25 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
         {
           "path": "internal/control/control_linux_test.go",
           "name": "TestCachedPolicySurvivesRestartWithoutRollbackOrExpiredFallback"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        },
+        {
+          "path": "internal/worker/observations_linux_test.go",
+          "name": "TestOutboundOnlyNodePublishesOriginalObservationThroughCollector"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-19",
@@ -443,6 +510,7 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
@@ -493,10 +561,18 @@
         {
           "path": "internal/sourceagent/crash_linux_test.go",
           "name": "TestSourceAgentSIGKILLFencesAndFinalHead"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestRetirementAuthorityCrashKeepsDataAndFencesReacquisition"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestDiscoveryRetriesPolicyLagWithoutExpandingAuthority"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-20",
@@ -515,6 +591,18 @@
         {
           "path": "internal/generation/index_migration_linux_test.go",
           "name": "TestCompactIndexSupportsHistoryBeyondFormerEmbeddedLimit"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestHistoricalAdmissionKeepsHeadAndRejectsRetiredOrConflictingCatalog"
+        },
+        {
+          "path": "internal/peer/history_linux_test.go",
+          "name": "TestHTTPSRetainedHistoryRequiresGrantAndPreservesNewerHead"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
@@ -545,6 +633,10 @@
         {
           "path": "internal/ingress/registry_linux_test.go",
           "name": "TestRegistryRejectsClockRollbackAcrossSlotReplacement"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestHistoricalAdmissionKeepsHeadAndRejectsRetiredOrConflictingCatalog"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
@@ -599,6 +691,10 @@
         {
           "path": "internal/sourceagent/runtime_linux_test.go",
           "name": "TestSourceRuntimeRejectsProfileDowngradeStateTamperAndVolumeLoss"
+        },
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -645,6 +741,18 @@
         {
           "path": "internal/ingress/cleanup_linux_test.go",
           "name": "TestExpiredIntentCleanupOverHTTPSAfterRegistryRestart"
+        },
+        {
+          "path": "internal/observation/authority_test.go",
+          "name": "TestObservationCannotChangeIdentityGenerationGrantOrOriginalAge"
+        },
+        {
+          "path": "internal/worker/observations_linux_test.go",
+          "name": "TestOutboundOnlyNodePublishesOriginalObservationThroughCollector"
+        },
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -659,6 +767,7 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
@@ -669,10 +778,22 @@
         {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "internal/peer/history_linux_test.go",
+          "name": "TestHTTPSRetainedHistoryRequiresGrantAndPreservesNewerHead"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        },
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-25",
@@ -683,6 +804,7 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
@@ -697,10 +819,18 @@
         {
           "path": "internal/peer/guards_linux_test.go",
           "name": "TestTLSClientCertificateAndOperationGrants"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        },
+        {
+          "path": "internal/worker/observations_linux_test.go",
+          "name": "TestOutboundOnlyNodePublishesOriginalObservationThroughCollector"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-26",
@@ -711,11 +841,21 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/peer/history_linux_test.go",
+          "name": "TestHTTPSRetainedHistoryRequiresGrantAndPreservesNewerHead"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        }
+      ],
       "acceptance": ["AT-09", "AT-11", "AT-18"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-27",
@@ -808,6 +948,14 @@
         {
           "path": "internal/generation/index_migration_linux_test.go",
           "name": "TestCatalogCacheCannotHideTamperingFromCompletionOrMaintenance"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestHistoricalAdmissionKeepsHeadAndRejectsRetiredOrConflictingCatalog"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestRetirementAuthorityCrashKeepsDataAndFencesReacquisition"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
@@ -826,6 +974,10 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestCatalogAuthenticationAndBounds"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestMissingRetentionEvidenceBlocksHistoryUntilSignedReconstruction"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
@@ -852,6 +1004,14 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestMissingRetentionEvidenceBlocksHistoryUntilSignedReconstruction"
+        },
+        {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestRetirementAuthorityCrashKeepsDataAndFencesReacquisition"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
@@ -919,6 +1079,10 @@
         {
           "path": "internal/sourceagent/runtime_linux_test.go",
           "name": "TestExecutableSourceRuntimeResumesAndPreservesIndependentHistory"
+        },
+        {
+          "path": "internal/sourceagent/observations_linux_test.go",
+          "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         }
       ],
       "acceptance": ["AT-24"],
@@ -938,7 +1102,12 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/control/observations_test.go",
+          "name": "TestObservationGrantCannotExpandPlacementOrReaderAuthority"
+        }
+      ],
       "acceptance": ["AT-27"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
@@ -1001,16 +1170,29 @@
         "internal/control",
         "internal/worker",
         "internal/peer",
+        "internal/observation",
         "cmd/outpost"
       ],
       "checks": [
         {
           "path": "internal/worker/worker_linux_test.go",
           "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
+        },
+        {
+          "path": "internal/peer/history_linux_test.go",
+          "name": "TestHistoryHeaderCannotExpandReceiverAuthority"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestInventoryRequiresCurrentPullRuleAndRejectsReverseMetadataRoute"
+        },
+        {
+          "path": "internal/control/observations_test.go",
+          "name": "TestObservationGrantCannotExpandPlacementOrReaderAuthority"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+      "remaining": "Autonomous external planning, source scheduling, installation, long-outage and complete process-level acceptance."
     },
     {
       "id": "REQ-41",
@@ -1137,6 +1319,18 @@
         {
           "path": "internal/filekit/progress_linux_test.go",
           "name": "TestCaptureProgressRejectsTamperingRebindingAndLocalGCMode"
+        },
+        {
+          "path": "internal/worker/deadline_linux_test.go",
+          "name": "TestWithdrawnRouteInterruptsAuthorizedIncompleteBody"
+        },
+        {
+          "path": "internal/observation/authority_test.go",
+          "name": "TestObservationCannotChangeIdentityGenerationGrantOrOriginalAge"
+        },
+        {
+          "path": "internal/worker/observations_linux_test.go",
+          "name": "TestObservationOverloadIsBoundedAndRevocationJoinsBlockedBodies"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

@@ -42,14 +42,17 @@ func must(t *testing.T, e error) {
 }
 
 type fixture struct {
-	base, tree, replicaPath string
-	b                       Bootstrap
-	a                       *Agent
-	owner                   filekit.Owner
-	grant                   ingress.Authority
-	authority               []byte
-	writer                  ed25519.PrivateKey
-	intercept               func(http.ResponseWriter, *http.Request) bool
+	base, tree, replicaPath         string
+	b                               Bootstrap
+	a                               *Agent
+	owner                           filekit.Owner
+	grant                           ingress.Authority
+	authority                       []byte
+	writer                          ed25519.PrivateKey
+	ownerSigner                     ed25519.PrivateKey
+	destination, replicaCertificate tls.Certificate
+	roots                           *x509.CertPool
+	intercept                       func(http.ResponseWriter, *http.Request) bool
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -86,6 +89,9 @@ func newFixture(t *testing.T) *fixture {
 	}
 	src, cp, kp := newCert(2)
 	dst, _, _ := newCert(3)
+	f.destination = dst
+	f.replicaCertificate, _, _ = newCert(4)
+	f.roots = roots
 	id := func(c tls.Certificate) string {
 		leaf, e := x509.ParseCertificate(c.Certificate[0])
 		must(t, e)
@@ -93,6 +99,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	ownerPub, ownerKey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
+	f.ownerSigner = ownerKey
 	writer, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	f.writer = key

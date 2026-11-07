@@ -101,6 +101,9 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			req.Header.Set("Outpost-Required-Revision", strconv.FormatUint(c.policy.RequiredRevision, 10))
 		}
 		req.Header.Set("Outpost-Mode", mode)
+		if mode == "push" && method == http.MethodPut && resource == "catalog" && c.policy.Peers[c.peer].History {
+			req.Header.Set("Outpost-History", "1")
+		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Accept-Encoding", "identity")
 		if submitted != nil {
@@ -281,7 +284,11 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if _, err = generation.VerifyCatalog(raw, c.trust); err != nil {
 			return result, err
 		}
-		if _, err = local.Begin(ctx, raw); err != nil {
+		_, err = local.Begin(ctx, raw)
+		if errors.Is(err, generation.ErrRollback) && c.policy.Peers[c.peer].History {
+			_, err = local.BeginHistorical(ctx, raw)
+		}
+		if err != nil {
 			return result, err
 		}
 	}

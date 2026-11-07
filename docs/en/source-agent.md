@@ -8,7 +8,9 @@ The private `outpost-source-agent-1` bootstrap contains `local` (bootstrap2 node
 
 Key/configuration files must be private regular files; ancestor and final symlinks are refused. The source and runtime parent must already exist. Initialization checks overlap before creating runtime state and refuses an existing destination. An interrupted initial installation needs operator inspection, not automatic reset. Missing sentinels, substituted directories, changed bootstrap/key bindings and clock rollback stop admission.
 
-The current executable accepts one-copy best-effort profiles. A requested two-copy, filesystem-snapshot or application-consistent profile returns `CAPABILITY_UNAVAILABLE` without lowering the policy. The capture library already enforces two distinct verified copies; its authenticated network verifier is still integration work.
+The executable accepts best-effort profiles requiring one or two copies. A two-copy bootstrap adds a private `observationFile` containing the [owner-signed observation grant](copy-observations.md). Its reader is this source, collector is the ingress, and targets are distinct approved replica nodes in `profile.copyTargets`. The ingress itself is excluded from that grant because its original receipt already counts once. Missing configuration, filesystem-snapshot or application-consistent profiles return `CAPABILITY_UNAVAILABLE` without lowering the policy.
+
+The source authenticates relayed node signatures, generation and original verification age. Its signed checkpoint retains the exact second-copy observation. No observation leaves the job in `WAITING_COPIES`; retry `source-run` after the required replica becomes available. A short integration check restarts the waiting source, admits an outbound-only replica, completes the threshold and restores that replica independently after source loss.
 
 ```sh
 outpost source-probe --store /source/tree --node ORIGIN_ID --output /private/tree.json

@@ -53,7 +53,7 @@ func TestReplicaCrashChild(t *testing.T) {
 }
 
 func TestReplicaSIGKILLBoundaries(t *testing.T) {
-	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}} {
+	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "retirement-authority-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}} {
 		t.Run(tc.action+"/"+tc.point, func(t *testing.T) {
 			base := temp(t)
 			trust, key, maintenance := trust(t)
@@ -109,6 +109,9 @@ func TestReplicaSIGKILLBoundaries(t *testing.T) {
 			if tc.action == "maintain" {
 				_, e = r.Maintain(ctx, input.Permit)
 				ok(t, e)
+				if _, e = r.BeginHistorical(ctx, a); !errors.Is(e, ErrProtected) {
+					t.Fatal("retirement authority lost across SIGKILL", e)
+				}
 			}
 			c, refs, e := getForTest(r, id)
 			ok(t, e)
