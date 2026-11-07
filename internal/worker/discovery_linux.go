@@ -108,7 +108,7 @@ func (w *Worker) serveInventory(out http.ResponseWriter, r *http.Request, domain
 			break
 		}
 	}
-	if !ok || !allowed || local == nil {
+	if !ok || !allowed || local == nil || v.paused(domain, "") {
 		w.mu.Unlock()
 		http.Error(out, "denied", 403)
 		return
@@ -362,7 +362,7 @@ func (w *Worker) admitDerived(ctx context.Context, v *view, jobs []control.Job) 
 func (w *Worker) discover(v *view) error {
 	rules := []control.Replication{}
 	for _, r := range v.cfg.Replication {
-		if r.Executor() == w.node {
+		if r.Executor() == w.node && !v.paused(r.Domain, "") {
 			rules = append(rules, r)
 		}
 	}

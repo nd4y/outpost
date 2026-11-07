@@ -1491,7 +1491,8 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 256
+              "maximum": 32,
+              "default": 32
             }
           }
         ],
@@ -1706,7 +1707,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SignedReport"
+                "$ref": "#/components/schemas/SignedCommandReceipt"
               }
             }
           }
@@ -2644,12 +2645,11 @@
           "reason": {
             "type": "string",
             "enum": [
-              "OPERATOR_RETRY",
-              "OPERATOR_PAUSE",
-              "OPERATOR_RESUME",
-              "VERIFY",
-              "RECOVER",
-              "MAINTAIN"
+              "OPERATOR_REQUEST",
+              "INCIDENT_RESPONSE",
+              "RECOVERY_DRILL",
+              "POLICY_CHANGE",
+              "OWNER_MAINTENANCE"
             ]
           },
           "tenant": {
@@ -2681,15 +2681,37 @@
           "authority": {
             "type": "string",
             "contentEncoding": "base64",
-            "maxLength": 1398104
+            "maxLength": 87384,
+            "description": "Canonical owner-signed outpost-command-authority-1 grant for this service, node, tenant/domain/repository/writer epoch and command kind."
           },
           "expiresUnix": {
             "type": "integer",
             "minimum": 0,
             "maximum": 1099511627776
+          },
+          "expectedConfigurationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Exact owner-policy revision observed by the operator; stale commands cannot silently apply to a replacement policy."
+          },
+          "maintenancePermit": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 1398104,
+            "description": "Separate domain maintenance permit; required only for maintenance and verified independently by the worker."
           }
         },
-        "required": ["operationId", "reason", "tenant", "domain", "kind", "expiresUnix"]
+        "required": [
+          "operationId",
+          "reason",
+          "tenant",
+          "domain",
+          "kind",
+          "expiresUnix",
+          "expectedConfigurationRevision",
+          "authority"
+        ]
       },
       "CommandPage": {
         "type": "object",
@@ -2713,7 +2735,7 @@
                 "document": {
                   "type": "string",
                   "contentEncoding": "base64",
-                  "maxLength": 2796204
+                  "maxLength": 4194304
                 },
                 "sequence": {
                   "type": "integer",
@@ -2813,6 +2835,18 @@
           }
         },
         "required": ["format", "revision", "items"]
+      },
+      "SignedCommandReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 87384
+          }
+        },
+        "required": ["document"]
       }
     }
   }

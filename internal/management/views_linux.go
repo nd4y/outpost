@@ -263,6 +263,13 @@ func (r *Registry) Operation(ctx context.Context, p Principal, tenant, operation
 			out = o.Receipt
 			return nil
 		}
+		if o, ok := s.CommandOperations[operation]; ok {
+			if o.Audit.Tenant != tenant || !p.Allows(tenant, o.Audit.Domain) {
+				return ErrUnavailable
+			}
+			out = o.Receipt
+			return nil
+		}
 		return ErrUnavailable
 	})
 	return out, e

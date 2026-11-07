@@ -112,7 +112,7 @@ func (w *Worker) serveObservations(out http.ResponseWriter, r *http.Request, par
 	} else {
 		allowed = allowed && g.Target(remote) && parts[6] == remote
 	}
-	if !allowed {
+	if !allowed || v.paused(domain, "") {
 		w.mu.Unlock()
 		http.Error(out, "denied", 403)
 		return
@@ -338,7 +338,7 @@ func (w *Worker) observe(v *view) error {
 				v.cancel()
 				return e
 			}
-			if !g.Target(w.node) {
+			if !g.Target(w.node) || v.paused(g.Trust.Domain, "") {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)

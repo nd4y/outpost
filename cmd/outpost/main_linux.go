@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/capture"
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
@@ -69,7 +70,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "version" {
 		if len(args) != 1 {
@@ -240,7 +241,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			}
 		}
 		return generation.RecoverMaterialized(ctx, *store, *generationID, trust, owner, selection, *output)
-	case "config-sign", "management-enrollment-sign", "source-authority-sign", "observation-grant-sign", "upload-delegation-sign":
+	case "config-sign", "command-authority-sign", "management-enrollment-sign", "source-authority-sign", "observation-grant-sign", "upload-delegation-sign":
 		private, e := worker.ReadPrivate(*key, 65536)
 		if e != nil {
 			return nil, e
@@ -252,6 +253,9 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, errUsage
 		}
 		limit := control.MaxConfig
+		if args[0] == "command-authority-sign" {
+			limit = command.MaxAuthority
+		}
 		if args[0] == "management-enrollment-sign" {
 			limit = management.MaxEnrollment
 		}
@@ -275,6 +279,20 @@ func run(ctx context.Context, args []string) (any, error) {
 				return nil, e
 			}
 			return map[string]any{"format": management.EnrollmentFormat, "node": grant.Node, "revision": grant.Revision, "digest": storage.Hash(signed)}, nil
+		}
+		if args[0] == "command-authority-sign" {
+			var grant command.Authority
+			if worker.DecodeInput(raw, &grant, command.MaxAuthority) != nil {
+				return nil, errUsage
+			}
+			signed, e := command.SignAuthority(grant, signer.PrivateKey)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, signed); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": command.AuthorityFormat, "node": grant.Node, "digest": storage.Hash(signed)}, nil
 		}
 		if args[0] == "observation-grant-sign" {
 			var grant observation.Grant
@@ -351,7 +369,9 @@ func run(ctx context.Context, args []string) (any, error) {
 		return map[string]any{"version": *version, "file": d.File, "bytes": d.Size, "aliases": len(d.Names), "fileKitFormat": d.Format, "kind": d.Kind}, nil
 	case "worker-report-init", "worker-report-set", "worker-report-renew", "worker-report-status", "worker-report-loop":
 		return runReporting(ctx, args[0], *bootstrap, *input)
-	case "worker-init", "worker-run", "worker-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "replica-migrate", "replica-rollback":
+	case "worker-command-once", "worker-command-loop":
+		return runCommands(ctx, args[0], *bootstrap, *input)
+	case "worker-init", "worker-run", "worker-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "replica-migrate", "replica-rollback", "worker-controls-migrate", "worker-controls-rollback", "worker-command-apply":
 		b, e := worker.LoadBootstrap(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -366,6 +386,19 @@ func run(ctx context.Context, args []string) (any, error) {
 			return map[string]any{"node": b.Node, "initialized": true}, nil
 		case "worker-status":
 			return w.Status(ctx)
+		case "worker-controls-migrate", "worker-controls-rollback":
+			e = w.MigrateControls(ctx, args[0] == "worker-controls-rollback")
+			return map[string]any{"node": b.Node, "action": args[0], "completed": e == nil}, e
+		case "worker-command-apply":
+			raw, e := worker.ReadPrivate(*input, command.MaxEnvelope)
+			if e != nil {
+				return nil, e
+			}
+			ack, e := w.ExecuteCommand(ctx, raw)
+			if e != nil {
+				return nil, e
+			}
+			return json.RawMessage(ack), nil
 		case "worker-discovery-status":
 			return w.DiscoveryStatus(ctx)
 		case "worker-observation-status":

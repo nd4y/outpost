@@ -63,12 +63,13 @@ type registryState struct {
 	ObservedUnix int64             `json:"observedUnix"`
 	Enrollments  map[string][]byte `json:"enrollments"`
 	// Removed domains retain tenant/repository/epoch fences.
-	Domains          map[string]domainFence         `json:"domains"`
-	Operations       map[string]enrollmentOperation `json:"operations"`
-	Reports          map[string]reportPointer       `json:"reports"`
-	Configurations   map[string]configPointer       `json:"configurations"`
-	ConfigOperations map[string]configOperation     `json:"configOperations"`
-	Signature        []byte                         `json:"signature,omitempty"`
+	Domains           map[string]domainFence         `json:"domains"`
+	Operations        map[string]enrollmentOperation `json:"operations"`
+	Reports           map[string]reportPointer       `json:"reports"`
+	Configurations    map[string]configPointer       `json:"configurations"`
+	ConfigOperations  map[string]configOperation     `json:"configOperations"`
+	CommandOperations map[string]commandOperation    `json:"commandOperations,omitempty"`
+	Signature         []byte                         `json:"signature,omitempty"`
 }
 type domainFence struct {
 	Tenant     string `json:"tenant"`
@@ -221,10 +222,13 @@ func (r *Registry) load() (registryState, error) {
 			return s, ErrInvalid
 		}
 	}
-	if s.Configurations == nil || s.ConfigOperations == nil || len(s.Configurations) > 128 || len(s.Operations)+len(s.ConfigOperations) > maxOperations {
+	if s.Configurations == nil || s.ConfigOperations == nil || len(s.Configurations) > 128 || len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) > maxOperations {
 		return s, ErrInvalid
 	}
 	if e := r.validateConfigState(s); e != nil {
+		return s, e
+	}
+	if e := r.validateCommandState(s); e != nil {
 		return s, e
 	}
 	return s, nil
@@ -331,6 +335,9 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 		if _, used := s.ConfigOperations[operation]; used {
 			return ErrConflict
 		}
+		if _, used := s.CommandOperations[operation]; used {
+			return ErrConflict
+		}
 		if exists {
 			if op.Receipt.RequestDigest != digest {
 				return ErrConflict
@@ -343,7 +350,7 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 				return nil
 			}
 		} else {
-			if len(s.Operations)+len(s.ConfigOperations) >= maxOperations {
+			if len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) >= maxOperations {
 				return ErrCapacity
 			}
 			// Do not let a later enrollment overtake an uncertain earlier effect.
@@ -483,6 +490,11 @@ func (r *Registry) Audit(ctx context.Context, p Principal, tenant string, after 
 			}
 			if visible {
 				out = append(out, a)
+			}
+		}
+		for _, o := range s.CommandOperations {
+			if o.Audit.Tenant == tenant && o.Audit.Sequence > after && p.Allows(tenant, o.Audit.Domain) {
+				out = append(out, o.Audit)
 			}
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Sequence < out[j].Sequence })

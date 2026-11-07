@@ -19,7 +19,8 @@ import (
 	"github.com/nd4y/outpost/internal/upload"
 )
 
-const Format = "outpost-worker-1"
+const LegacyFormat = "outpost-worker-1"
+const Format = "outpost-worker-2"
 const MaxJobs = 4096
 
 var ErrDenied = errors.New("worker operation denied")
@@ -43,6 +44,7 @@ type Status struct {
 	UpdatedUnix int64               `json:"updatedUnix"`
 	Jobs        map[string]JobState `json:"jobs"`
 	Rejected    map[string]string   `json:"rejectedJobs,omitempty"`
+	Controls    *Controls           `json:"controls,omitempty"`
 }
 
 func binding(j control.Job) string        { b, _ := json.Marshal(j); return storage.Hash(b) }
@@ -53,7 +55,10 @@ func (w *Worker) load() (Status, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, 32<<20) != nil || s.Format != Format || s.Node != w.node || s.Jobs == nil || len(s.Jobs) > MaxJobs {
+	if storage.Decode(raw, &s, 32<<20) != nil || (s.Format != Format && s.Format != LegacyFormat) || s.Node != w.node || s.Jobs == nil || len(s.Jobs) > MaxJobs {
+		return s, ErrDenied
+	}
+	if s.Format == LegacyFormat && s.Controls != nil || s.Format == Format && w.validateControls(s.Controls) != nil {
 		return s, ErrDenied
 	}
 	if len(s.Rejected) > 64 {
@@ -77,6 +82,11 @@ func (w *Worker) load() (Status, error) {
 	return s, nil
 }
 func (w *Worker) save(s Status) error {
+	if s.Format == Format {
+		if e := w.signControls(s.Controls); e != nil {
+			return e
+		}
+	}
 	b, e := json.Marshal(s)
 	if e != nil {
 		return e
@@ -250,13 +260,19 @@ func errorCode(e error) string {
 func blocked(code string) bool {
 	return code == "CAPACITY_BLOCKED" || code == "POLICY_BLOCKED" || code == "CONFLICT" || code == "TARGET_BLOCKED" || code == "DATA_INCOMPLETE"
 }
-func initState(s *statefile.Store, node string, initialize bool) error {
-	return s.WithLock(context.Background(), func() error {
-		_, e := s.Read("worker.json")
+func (w *Worker) initState(initialize bool) error {
+	return w.state.WithLock(context.Background(), func() error {
+		_, e := w.state.Read("worker.json")
 		if !errors.Is(e, os.ErrNotExist) || !initialize {
 			return e
 		}
-		b, _ := json.Marshal(Status{Format: Format, Node: node, Phase: "NO_CONFIGURATION", Jobs: map[string]JobState{}})
-		return s.Write("worker.json", b)
+		commands, e := statefile.OpenAt(w.root, "commands/poll", 4096, true)
+		if e != nil {
+			return e
+		}
+		if e = commands.Close(); e != nil {
+			return e
+		}
+		return w.save(Status{Format: Format, Node: w.node, Phase: "NO_CONFIGURATION", Jobs: map[string]JobState{}, Controls: newControls(w.node)})
 	})
 }

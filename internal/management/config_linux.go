@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/storage"
@@ -177,6 +178,12 @@ func (r *Registry) allowConfiguration(s registryState, p Principal, tenant strin
 			return ErrDenied
 		}
 	}
+	for _, raw := range c.Commands {
+		grant, err := command.VerifyAuthority(raw, r.owner)
+		if err != nil || grant.Tenant != tenant {
+			return ErrDenied
+		}
+	}
 	return nil
 }
 func configDigest(value any) string { raw, _ := json.Marshal(value); return storage.Hash(raw) }
@@ -249,7 +256,8 @@ func previewChanges(before, after control.Config) Preview {
 			Replication  any
 			Observations any
 			Uploads      any
-		}{old, before.Nodes, before.Targets, before.Limits, before.Ingress, before.Jobs, before.Replication, before.Observations, before.Uploads})
+			Commands     any
+		}{old, before.Nodes, before.Targets, before.Limits, before.Ingress, before.Jobs, before.Replication, before.Observations, before.Uploads, before.Commands})
 		b := configDigest(struct {
 			Domain       control.Domain
 			Nodes        any
@@ -260,7 +268,8 @@ func previewChanges(before, after control.Config) Preview {
 			Replication  any
 			Observations any
 			Uploads      any
-		}{next, after.Nodes, after.Targets, after.Limits, after.Ingress, after.Jobs, after.Replication, after.Observations, after.Uploads})
+			Commands     any
+		}{next, after.Nodes, after.Targets, after.Limits, after.Ingress, after.Jobs, after.Replication, after.Observations, after.Uploads, after.Commands})
 		add("AUTHORITY", []string{a}, []string{b})
 		if len(p.Changes) > start {
 			p.ChangedDomains = append(p.ChangedDomains, id)
@@ -338,6 +347,9 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 		if _, exists := s.Operations[input.Operation]; exists {
 			return ErrConflict
 		}
+		if _, exists := s.CommandOperations[input.Operation]; exists {
+			return ErrConflict
+		}
 		op, exists := s.ConfigOperations[input.Operation]
 		if exists {
 			if op.Receipt.RequestDigest != requestDigest {
@@ -348,7 +360,7 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 				return nil
 			}
 		} else {
-			if len(s.Operations)+len(s.ConfigOperations) >= maxOperations {
+			if len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) >= maxOperations {
 				return ErrCapacity
 			}
 			for _, o := range s.ConfigOperations {

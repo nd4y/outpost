@@ -83,7 +83,7 @@ func (w *Worker) jobs(v *view) error {
 			}
 		}
 		for _, j := range desired {
-			if j.Executor != w.node || s.Rejected[j.Operation] != "" || running[j.Operation] || len(running) >= v.cfg.Limits.Parallel {
+			if j.Executor != w.node || s.Rejected[j.Operation] != "" || running[j.Operation] || len(running) >= v.cfg.Limits.Parallel || v.paused(j.Domain, j.Operation) || s.Controls.paused(j.Domain, j.Operation) {
 				continue
 			}
 			old := s.Jobs[j.Operation]
@@ -91,6 +91,10 @@ func (w *Worker) jobs(v *view) error {
 				continue
 			}
 			e = w.update(v.ctx, func(s *Status) error {
+				if controlRevision(s.Controls) != controlRevision(v.controls) {
+					v.cancel()
+					return context.Canceled
+				}
 				state := s.Jobs[j.Operation]
 				state.Phase = "RUNNING"
 				state.Attempts++

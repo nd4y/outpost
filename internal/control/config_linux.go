@@ -83,6 +83,7 @@ type Config struct {
 	Replication  []Replication     `json:"replication,omitempty"`
 	Observations []json.RawMessage `json:"observations,omitempty"`
 	Uploads      []json.RawMessage `json:"uploads,omitempty"`
+	Commands     []json.RawMessage `json:"commands,omitempty"`
 	Signature    []byte            `json:"signature,omitempty"`
 }
 
@@ -285,7 +286,7 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 			return ErrDenied
 		}
 	}
-	return nil
+	return c.validateCommands(owner)
 }
 func Sign(c Config, key ed25519.PrivateKey) ([]byte, error) {
 	if len(key) != ed25519.PrivateKeySize {

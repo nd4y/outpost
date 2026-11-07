@@ -147,4 +147,5 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 	if !bytes.Contains(encoded, []byte("worker-report-loop")) || !bytes.Contains(encoded, []byte("management-enrollment-sign")) {
 		t.Fatal("report commands absent from help")
 	}
+	checkCLICommands(t, base, bootstrap, ownerFile, cfg, ownerKey)
 }

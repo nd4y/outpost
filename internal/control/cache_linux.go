@@ -147,9 +147,16 @@ func (c *Cache) Accept(ctx context.Context, raw []byte, now time.Time) error {
 // Current never falls back to an older policy. Expiry or clock rollback denies
 // new work without deleting replicas, journals, pins or recovery material.
 func (c *Cache) Current(ctx context.Context, now time.Time) (Config, error) {
+	var out Config
+	e := c.WithCurrent(ctx, now, func(cfg Config, _ []byte) error { out = cfg; return nil })
+	return out, e
+}
+
+// WithCurrent serializes a short local admission with policy replacement.
+// The callback must not re-enter this cache or perform network/long-running I/O.
+func (c *Cache) WithCurrent(ctx context.Context, now time.Time, fn func(Config, []byte) error) error {
 	var cfg Config
-	var inactive error
-	e := c.store.WithLock(ctx, func() error {
+	return c.store.WithLock(ctx, func() error {
 		s, e := c.load()
 		if e != nil {
 			return e
@@ -164,20 +171,18 @@ func (c *Cache) Current(ctx context.Context, now time.Time) (Config, error) {
 		if e != nil {
 			return e
 		}
-		inactive = cfg.Active(now)
+		inactive := cfg.Active(now)
 		if now.Unix() > s.ObservedUnix {
 			s.ObservedUnix = now.Unix()
-			return c.save(s)
+			if e = c.save(s); e != nil {
+				return e
+			}
 		}
-		return nil
+		if inactive != nil {
+			return inactive
+		}
+		return fn(cfg, append([]byte(nil), s.Current...))
 	})
-	if e != nil {
-		return Config{}, e
-	}
-	if inactive != nil {
-		return Config{}, inactive
-	}
-	return cfg, nil
 }
 
 // Raw preserves the owner's bytes for an authorized relay; it never re-signs.

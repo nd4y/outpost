@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/tls"
@@ -57,6 +58,7 @@ type view struct {
 	requests sync.WaitGroup
 	metadata chan struct{}
 	domains  map[string]*domainState
+	controls *Controls
 }
 type Worker struct {
 	// Fault is a local test hook, never accepted from shared configuration.
@@ -85,7 +87,9 @@ func Open(o Options) (*Worker, error) {
 	if e != nil || peer.Identity(leaf) != o.Node {
 		return nil, ErrDenied
 	}
-	if _, ok := o.Certificate.PrivateKey.(ed25519.PrivateKey); !ok {
+	private, ok := o.Certificate.PrivateKey.(ed25519.PrivateKey)
+	public, publicOK := leaf.PublicKey.(ed25519.PublicKey)
+	if !ok || !publicOK || len(private) != ed25519.PrivateKeySize || !bytes.Equal(public, private.Public().(ed25519.PublicKey)) {
 		return nil, ErrDenied
 	}
 	w := &Worker{guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
@@ -112,11 +116,21 @@ func Open(o Options) (*Worker, error) {
 		return nil, e
 	}
 	fail := func(e error) (*Worker, error) { w.Close(); return nil, e }
-	if e = initState(w.state, w.node, o.Initialize); e != nil {
+	if e = w.initState(o.Initialize); e != nil {
 		return fail(e)
 	}
-	if _, e = w.Status(context.Background()); e != nil {
+	status, e := w.Status(context.Background())
+	if e != nil {
 		return fail(e)
+	}
+	if status.Controls != nil {
+		commands, err := statefile.OpenAt(w.root, "commands/poll", 4096, false)
+		if err != nil {
+			return fail(err)
+		}
+		if err = commands.Close(); err != nil {
+			return fail(err)
+		}
 	}
 	w.lease, e = statefile.OpenAt(w.root, "lease", 4096, o.Initialize)
 	if e != nil {
@@ -304,7 +318,14 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 	return p
 }
 func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
-	v := &view{cfg: c, done: make(chan struct{}), metadata: make(chan struct{}, c.Limits.Parallel), domains: map[string]*domainState{}}
+	status, e := w.Status(ctx)
+	if e != nil {
+		return nil, e
+	}
+	if status.Controls == nil && len(c.Commands) > 0 {
+		return nil, ErrDenied
+	}
+	v := &view{cfg: c, done: make(chan struct{}), metadata: make(chan struct{}, c.Limits.Parallel), domains: map[string]*domainState{}, controls: status.Controls}
 	var compileError error
 	v.autonomy, compileError = c.CompileAutonomy()
 	if compileError != nil {
@@ -463,12 +484,20 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 		return e
 	}
 	parent := ctx
+	initial, e := w.Status(ctx)
+	if e != nil {
+		return e
+	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	monitorDone := make(chan struct{})
+	controlChanged := make(chan struct{}, 1)
+	var fetchMu sync.Mutex
+	var cancelFetch context.CancelFunc
 	go func() {
 		defer close(monitorDone)
-		tick := time.NewTicker(time.Second)
+		tick := time.NewTicker(100 * time.Millisecond)
 		defer tick.Stop()
+		observed := controlRevision(initial.Controls)
 		for {
 			select {
 			case <-ctx.Done():
@@ -477,6 +506,33 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 				if e := w.check(ctx); e != nil {
 					cancel(e)
 					return
+				}
+				s, e := w.Status(ctx)
+				if e != nil {
+					if ctx.Err() == nil {
+						cancel(e)
+					}
+					return
+				}
+				revision := controlRevision(s.Controls)
+				w.mu.Lock()
+				active := w.active
+				stale := active != nil && controlRevision(active.controls) != revision
+				if stale {
+					active.cancel()
+				}
+				w.mu.Unlock()
+				if revision != observed || stale {
+					observed = revision
+					select {
+					case controlChanged <- struct{}{}:
+					default:
+					}
+					fetchMu.Lock()
+					if cancelFetch != nil {
+						cancelFetch()
+					}
+					fetchMu.Unlock()
 				}
 			}
 		}
@@ -490,7 +546,23 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 		}
 	}()
 
-	e := w.lease.WithLock(ctx, func() (runErr error) {
+	e = w.lease.WithLock(ctx, func() (runErr error) {
+		// A reopened process must install existing quota admission before its
+		// first control reconciliation, including the deferred quiescence write.
+		// Reconciliation belongs to this exclusive execution owner, never a
+		// concurrent reporting or command process.
+		cached, err := w.cache.Raw(ctx)
+		if err == nil {
+			known, err := w.cache.Verify(cached)
+			if err != nil {
+				return err
+			}
+			if _, err = w.budgetFor(ctx, known, false); err != nil {
+				return err
+			}
+		} else if !errors.Is(err, control.ErrInactive) {
+			return err
+		}
 		var active *view
 		defer func() {
 			if ctx.Err() != nil && (runErr == context.Canceled || runErr == context.DeadlineExceeded) {
@@ -499,20 +571,53 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 			if stopErr := w.stop(active); stopErr != nil {
 				runErr = errors.Join(runErr, stopErr)
 			}
+			// Only successful joining proves that no old operation is running.
+			if runErr == nil {
+				bounded, done := context.WithTimeout(context.Background(), 5*time.Second)
+				runErr = w.markControlsApplied(bounded)
+				done()
+			}
 		}()
 		poll := time.Second
 		stop := func() error { old := active; active = nil; return w.stop(old) }
+		reconcileControls := func() error {
+			s, e := w.Status(ctx)
+			if e != nil {
+				return e
+			}
+			if active != nil && controlRevision(active.controls) != controlRevision(s.Controls) {
+				if e = stop(); e != nil {
+					return e
+				}
+			}
+			if active == nil {
+				return w.markControlsApplied(ctx)
+			}
+			return nil
+		}
 		for {
 			if ctx.Err() != nil {
 				return nil
 			}
+			if e := reconcileControls(); e != nil {
+				return e
+			}
 			if w.fetcher != nil {
-				fetchCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				fetchCtx, doneFetch := context.WithTimeout(ctx, 5*time.Second)
+				fetchMu.Lock()
+				cancelFetch = doneFetch
+				fetchMu.Unlock()
 				raw, e := w.fetcher.Fetch(fetchCtx)
-				cancel()
+				fetchMu.Lock()
+				cancelFetch = nil
+				fetchMu.Unlock()
+				doneFetch()
 				if e == nil {
 					_ = w.Accept(ctx, raw)
 				}
+			}
+			if e := reconcileControls(); e != nil {
+				return e
 			}
 			c, e := w.cache.Current(ctx, time.Now())
 			if e != nil {
@@ -549,6 +654,8 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 				if err := stop(); err != nil {
 					return err
 				}
+			case <-controlChanged:
+				timer.Stop()
 			case <-timer.C:
 			}
 		}
@@ -626,7 +733,7 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if !allowed || d == nil || d.handler == nil {
+	if !allowed || d == nil || d.handler == nil || v.paused(parts[2], r.Header.Get("Outpost-Operation")) {
 		w.mu.Unlock()
 		http.Error(out, "denied", 403)
 		return

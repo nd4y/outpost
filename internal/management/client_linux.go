@@ -49,6 +49,9 @@ func NewReportClient(endpoint, target, node string, cert tls.Certificate, roots 
 	return &ReportClient{client: &http.Client{Transport: tr, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, endpoint: strings.TrimSuffix(u.String(), "/"), target: target, node: node}, nil
 }
 func (c *ReportClient) Close() { c.client.CloseIdleConnections() }
+func (c *ReportClient) Matches(target, node string) bool {
+	return c != nil && c.target == target && c.node == node
+}
 
 func (c *ReportClient) Publish(ctx context.Context, enrollment Enrollment, raw []byte) (Receipt, error) {
 	var out Receipt

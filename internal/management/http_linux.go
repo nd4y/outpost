@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -270,7 +271,7 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/v1/config/") || strings.Contains(r.URL.Path, "/configuration") || strings.Contains(r.URL.Path, "/domains/") || strings.HasSuffix(r.URL.Path, "/reports") {
 		slots = h.large
 	}
-	if strings.HasSuffix(r.URL.Path, "/commands") && r.Method == http.MethodPost {
+	if strings.Contains(r.URL.Path, "/commands") {
 		slots = h.controls
 	}
 	select {
@@ -484,7 +485,66 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if action == "commands" {
-		writeHTTP(w, 503, httpFailure{"outpost-management-error-1", "UNSUPPORTED"})
+		if len(parts) == 7 && r.Method == http.MethodPost && r.URL.RawQuery == "" {
+			if !oneOfRole(p, "owner", "operator", "recovery") {
+				failHTTP(w, ErrDenied)
+				return
+			}
+			var input command.Request
+			if e := readHTTP(w, r, &input, command.MaxRequest); e != nil {
+				failHTTP(w, e)
+				return
+			}
+			out, e := h.registry.AdmitCommand(ctx, p, tenant, node, input)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			status := http.StatusAccepted
+			if out.State != "ADMITTED" {
+				status = http.StatusOK
+			}
+			writeHTTP(w, status, out)
+			return
+		}
+		if len(parts) == 7 && r.Method == http.MethodGet {
+			limit, token, e := pageQuery(r)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			if !r.URL.Query().Has("limit") {
+				limit = 32
+			}
+			out, e := h.registry.CommandPage(ctx, p, tenant, node, limit, token, r.URL.Path)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+		if len(parts) == 9 && storage.ID(parts[7]) && parts[8] == "receipt" && r.Method == http.MethodPut && r.URL.RawQuery == "" {
+			if !p.Role("node") || p.Actor != node {
+				failHTTP(w, ErrDenied)
+				return
+			}
+			var input struct {
+				Document []byte `json:"document"`
+			}
+			if e := readHTTP(w, r, &input, command.MaxAck*4/3+4096); e != nil {
+				failHTTP(w, e)
+				return
+			}
+			out, e := h.registry.AcknowledgeCommand(ctx, p, tenant, node, parts[7], input.Document)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+		failHTTP(w, ErrUnavailable)
 		return
 	}
 	failHTTP(w, ErrUnavailable)

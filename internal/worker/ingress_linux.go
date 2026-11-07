@@ -17,7 +17,7 @@ func (w *Worker) serveIngress(out http.ResponseWriter, r *http.Request, domain s
 		return
 	}
 	d := v.domains[domain]
-	if d == nil || d.ingress == nil {
+	if d == nil || d.ingress == nil || v.paused(domain, "") {
 		w.mu.Unlock()
 		http.Error(out, "denied", 403)
 		return

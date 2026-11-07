@@ -396,6 +396,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -445,6 +446,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -483,6 +485,10 @@
         {
           "path": "internal/management/dispatch_linux_test.go",
           "name": "TestReporterDispatchRevocationCancelsBlockedHTTP"
+        },
+        {
+          "path": "internal/management/commands_config_linux_test.go",
+          "name": "TestManagementCommandGrantPreviewAndTenantFence"
         },
         {
           "path": "internal/worker/ingress_linux_test.go",
@@ -530,6 +536,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -563,6 +570,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -596,6 +604,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -674,6 +683,38 @@
         {
           "path": "internal/management/dispatch_linux_test.go",
           "name": "TestReporterDispatchPauseCancelsBlockedHTTPAndPreservesPending"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandAdmissionExecutionAckReplayAndAudit"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandIntentBlocksLaterDeliveryAndQuota"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandSIGKILLCommitBoundaries"
+        },
+        {
+          "path": "internal/worker/commands_linux_test.go",
+          "name": "TestWorkerCommandPauseSurvivesRestartAndPolicyThenResumeAndReplay"
+        },
+        {
+          "path": "internal/worker/command_crash_linux_test.go",
+          "name": "TestWorkerCommandPauseCancelsTransferWhileConfigurationFetchIsBlocked"
+        },
+        {
+          "path": "internal/worker/command_crash_linux_test.go",
+          "name": "TestWorkerCommandSIGKILLKeepsFormatIntentHoldAndAckBoundaries"
+        },
+        {
+          "path": "internal/worker/command_poll_linux_test.go",
+          "name": "TestWorkerCommandRealManagementLostAckAndPersistedPollDeadline"
+        },
+        {
+          "path": "internal/worker/controls_capacity_linux_test.go",
+          "name": "TestWorkerCommandStartupAccountsPendingControlBeforeAck"
         },
         {
           "path": "internal/ingress/crash_linux_test.go",
@@ -1041,6 +1082,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -1094,6 +1136,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -1131,6 +1174,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -1634,6 +1678,18 @@
           "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
         },
         {
+          "path": "internal/management/commands_config_linux_test.go",
+          "name": "TestManagementCommandGrantPreviewAndTenantFence"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandAdmissionExecutionAckReplayAndAudit"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandRejectsPrivilegeScopeStalePolicyAndForgedAck"
+        },
+        {
           "path": "internal/control/observations_test.go",
           "name": "TestObservationGrantCannotExpandPlacementOrReaderAuthority"
         },
@@ -1730,6 +1786,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/policy",
+        "internal/command",
         "internal/control",
         "internal/worker",
         "internal/peer",
@@ -1776,6 +1833,30 @@
         {
           "path": "cmd/outpost/reporting_linux_test.go",
           "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandAdmissionExecutionAckReplayAndAudit"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandRejectsPrivilegeScopeStalePolicyAndForgedAck"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandHTTPSAdmissionPagingAckAndReservedLane"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandClientRejectsSubstitutedEnvelopeAndFalseReceipt"
+        },
+        {
+          "path": "internal/worker/commands_linux_test.go",
+          "name": "TestWorkerCommandRejectsUnknownJobAndRemovedGrantWithoutChangingHolds"
+        },
+        {
+          "path": "internal/worker/command_poll_linux_test.go",
+          "name": "TestWorkerCommandRealManagementLostAckAndPersistedPollDeadline"
         },
         {
           "path": "internal/peer/history_linux_test.go",
@@ -1851,6 +1932,14 @@
         {
           "path": "internal/management/reporter_linux_test.go",
           "name": "TestReporterSIGKILLKeepsPendingRemoteAckAndLocalAck"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandAdmissionExecutionAckReplayAndAudit"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandSIGKILLCommitBoundaries"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -1898,6 +1987,18 @@
         {
           "path": "internal/worker/reporting_linux_test.go",
           "name": "TestWorkerReportingSeparateHandleDoesNotReconcileActiveBackupReservation"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandIntentBlocksLaterDeliveryAndQuota"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandPageBoundsAggregatePayload"
+        },
+        {
+          "path": "internal/worker/controls_capacity_linux_test.go",
+          "name": "TestWorkerCommandStartupAccountsPendingControlBeforeAck"
         },
         {
           "path": "internal/generation/index_migration_linux_test.go",
@@ -1965,6 +2066,30 @@
         {
           "path": "cmd/outpost/reporting_linux_test.go",
           "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
+        {
+          "path": "internal/management/commands_config_linux_test.go",
+          "name": "TestManagementCommandGrantPreviewAndTenantFence"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandHTTPSAdmissionPagingAckAndReservedLane"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandPageBoundsAggregatePayload"
+        },
+        {
+          "path": "internal/worker/commands_linux_test.go",
+          "name": "TestWorkerCommandPauseSurvivesRestartAndPolicyThenResumeAndReplay"
+        },
+        {
+          "path": "internal/worker/commands_linux_test.go",
+          "name": "TestWorkerControlsMigrationBackupRollbackAndCorruption"
+        },
+        {
+          "path": "internal/worker/command_crash_linux_test.go",
+          "name": "TestWorkerCommandSIGKILLKeepsFormatIntentHoldAndAckBoundaries"
         },
         {
           "path": "internal/peer/window_linux_test.go",
@@ -2069,6 +2194,42 @@
         {
           "path": "internal/management/dispatch_linux_test.go",
           "name": "TestReporterDispatchRevocationCancelsBlockedHTTP"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandRejectsPrivilegeScopeStalePolicyAndForgedAck"
+        },
+        {
+          "path": "internal/management/commands_linux_test.go",
+          "name": "TestManagementCommandIntentBlocksLaterDeliveryAndQuota"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandHTTPSAdmissionPagingAckAndReservedLane"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandClientRejectsSubstitutedEnvelopeAndFalseReceipt"
+        },
+        {
+          "path": "internal/management/command_http_linux_test.go",
+          "name": "TestManagementCommandPageBoundsAggregatePayload"
+        },
+        {
+          "path": "internal/worker/commands_linux_test.go",
+          "name": "TestWorkerCommandRejectsUnknownJobAndRemovedGrantWithoutChangingHolds"
+        },
+        {
+          "path": "internal/worker/commands_linux_test.go",
+          "name": "TestWorkerControlsMigrationBackupRollbackAndCorruption"
+        },
+        {
+          "path": "internal/worker/command_crash_linux_test.go",
+          "name": "TestWorkerCommandPauseCancelsTransferWhileConfigurationFetchIsBlocked"
+        },
+        {
+          "path": "internal/worker/controls_capacity_linux_test.go",
+          "name": "TestWorkerCommandStartupAccountsPendingControlBeforeAck"
         },
         {
           "path": "internal/localfs/root_linux_test.go",

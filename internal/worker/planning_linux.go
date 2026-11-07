@@ -80,6 +80,9 @@ func (w *Worker) discoverUploads(v *view) error {
 			v.cancel()
 			return ErrDenied
 		}
+		if v.paused(g.Trust.Domain, "") {
+			continue
+		}
 		ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
 		local := v.domains[g.Trust.Domain]
 		var entries []generation.InventoryEntry
