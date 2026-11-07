@@ -56,13 +56,13 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID"}}, nil
 	}
 	if args[0] == "version" {
 		if len(args) != 1 {
 			return nil, errUsage
 		}
-		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format}, nil
+		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -103,7 +103,7 @@ func run(ctx context.Context, args []string) (any, error) {
 		}
 		e = writeNew(*output, signed)
 		return map[string]any{"node": config.Node, "revision": config.Revision, "digest": storage.Hash(signed)}, e
-	case "restore-kit":
+	case "restore-kit", "verify-kit":
 		owner, e := filekit.ReadOwner(*key)
 		if e != nil {
 			return nil, e
@@ -114,11 +114,16 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		defer s.Close()
-		d, e := s.Restore(ctx, *version, *output)
+		var d filekit.Descriptor
+		if args[0] == "verify-kit" {
+			d, e = s.VerifyKit(ctx, *version)
+		} else {
+			d, e = s.Restore(ctx, *version, *output)
+		}
 		if e != nil {
 			return nil, e
 		}
-		return map[string]any{"version": *version, "file": d.File, "bytes": d.Size, "aliases": len(d.Names)}, nil
+		return map[string]any{"version": *version, "file": d.File, "bytes": d.Size, "aliases": len(d.Names), "fileKitFormat": d.Format, "kind": d.Kind}, nil
 	case "worker-init", "worker-run", "worker-status", "worker-retry", "config-apply", "replica-migrate", "replica-rollback":
 		b, e := worker.LoadBootstrap(*bootstrap)
 		if e != nil {

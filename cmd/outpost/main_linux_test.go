@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -11,11 +12,52 @@ import (
 	"testing"
 
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 	"github.com/nd4y/outpost/internal/worker"
 )
+
+func TestCLIVerifiesFrozenIndependentV1Kit(t *testing.T) {
+	root := teststore.Root(t)
+	base, e := filepath.Abs("../../internal/filekit/testdata/v1")
+	if e != nil {
+		t.Fatal(e)
+	}
+	raw := teststore.PublicV1Owner()
+	key := filepath.Join(root, "recovery.json")
+	if e = os.WriteFile(key, raw, 0600); e != nil {
+		t.Fatal(e)
+	}
+	raw, e = os.ReadFile(filepath.Join(base, "manifest.fixture"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	var fixture struct{ Version string }
+	if e = json.Unmarshal(raw, &fixture); e != nil {
+		t.Fatal(e)
+	}
+	kit := filepath.Join(root, "kit")
+	if e = os.CopyFS(kit, os.DirFS(filepath.Join(base, "kit"))); e != nil {
+		t.Fatal(e)
+	}
+	if e = os.Rename(filepath.Join(kit, "root.fixture"), filepath.Join(kit, "kit.json")); e != nil {
+		t.Fatal(e)
+	}
+	value, e := run(context.Background(), []string{"verify-kit", "--key", key, "--store", kit, "--version", fixture.Version})
+	if e != nil {
+		t.Fatal(e)
+	}
+	result := value.(map[string]any)
+	if result["version"] != fixture.Version || result["fileKitFormat"] != filekit.Format || result["aliases"] != 2 {
+		t.Fatal("wrong reference result", result)
+	}
+	encoded, _ := json.Marshal(value)
+	if bytes.Contains(encoded, []byte("старый файл")) {
+		t.Fatal("plaintext path in shared result")
+	}
+}
 
 func TestCLIConfigSigningAndNoOverwriteWithUnicodePaths(t *testing.T) {
 	root := teststore.Root(t)

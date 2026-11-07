@@ -306,7 +306,7 @@ func (s *Store) sealDescriptor(d Descriptor) (Envelope, error) {
 	if err != nil {
 		return Envelope{}, err
 	}
-	e := Envelope{Format: Format, Domain: d.Domain, File: d.File, Version: v}
+	e := Envelope{Format: d.Format, Domain: d.Domain, File: d.File, Version: v}
 	b, err := json.Marshal(d)
 	if err != nil {
 		return e, err
@@ -368,7 +368,7 @@ func (s *Store) load(name, version string) (Envelope, Descriptor, error) {
 	if err = decode(b, &d); err != nil {
 		return e, d, err
 	}
-	if d.Domain != e.Domain || d.File != e.File {
+	if d.Domain != e.Domain || d.File != e.File || d.Format != e.Format {
 		return e, d, ErrInvalid
 	}
 	canonical, err = json.Marshal(d)

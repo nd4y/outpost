@@ -162,6 +162,41 @@ func (s *Store) Restore(ctx context.Context, version, dest string) (Descriptor, 
 	return s.restoreDescriptor(ctx, d, dest)
 }
 
+// VerifyKit authenticates and decrypts an independent kit without publishing
+// restored files or requiring permission to apply its recorded numeric IDs.
+// It proves readable content/metadata, not successful attribute restoration.
+func (s *Store) VerifyKit(ctx context.Context, version string) (Descriptor, error) {
+	_, d, e := s.load("kit.json", version)
+	if e != nil {
+		return d, e
+	}
+	return d, s.verifyDescriptor(ctx, d)
+}
+func (s *Store) VerifyVersion(ctx context.Context, version string) (Descriptor, error) {
+	unlock, e := s.lock(ctx, false)
+	if e != nil {
+		return Descriptor{}, e
+	}
+	defer unlock()
+	_, d, e := s.LoadVersion(version)
+	if e != nil {
+		return d, e
+	}
+	return d, s.verifyDescriptor(ctx, d)
+}
+func (s *Store) verifyDescriptor(ctx context.Context, d Descriptor) error {
+	if e := ctx.Err(); e != nil {
+		return e
+	}
+	if e := validateDescriptor(d); e != nil {
+		return e
+	}
+	if d.Kind != "" {
+		return nil
+	}
+	return s.readTo(ctx, d, io.Discard)
+}
+
 // RestoreVersion is a convenience for a healthy store, not the independent
 // recovery proof. A shared process lock protects it from maintenance/GC.
 func (s *Store) RestoreVersion(ctx context.Context, version, dest string) (Descriptor, error) {
@@ -216,25 +251,13 @@ func (s *Store) restoreDescriptor(ctx context.Context, d Descriptor, dest string
 			return d, err
 		}
 	}
-	f, err := out.OpenFile(d.Names[0], os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	if d.Kind != "" {
+		err = restoreSpecial(out, d)
+	} else {
+		err = s.restoreRegular(ctx, out, d)
+	}
 	if err != nil {
 		return d, err
-	}
-	err = s.readTo(ctx, d, f)
-	if err == nil {
-		err = applyMetadata(f, d.Metadata)
-	}
-	ce := f.Close()
-	if err != nil {
-		return d, err
-	}
-	if ce != nil {
-		return d, ce
-	}
-	for _, n := range d.Names[1:] {
-		if err = out.Link(d.Names[0], n); err != nil {
-			return d, err
-		}
 	}
 	// Persist all created directory entries from leaves to the staging root.
 	for _, n := range d.Names {
@@ -275,4 +298,27 @@ func (s *Store) restoreDescriptor(ctx context.Context, d Descriptor, dest string
 		return d, err
 	}
 	return d, nil
+}
+func (s *Store) restoreRegular(ctx context.Context, out *os.Root, d Descriptor) error {
+	f, err := out.OpenFile(d.Names[0], os.O_CREATE|os.O_EXCL|os.O_RDWR|unix.O_NOFOLLOW, 0600)
+	if err != nil {
+		return err
+	}
+	err = s.readTo(ctx, d, f)
+	if err == nil {
+		err = applyMetadata(f, d.Metadata)
+	}
+	ce := f.Close()
+	if err != nil {
+		return err
+	}
+	if ce != nil {
+		return ce
+	}
+	for _, n := range d.Names[1:] {
+		if err = out.Link(d.Names[0], n); err != nil {
+			return err
+		}
+	}
+	return nil
 }

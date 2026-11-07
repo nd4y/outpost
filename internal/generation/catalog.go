@@ -16,6 +16,7 @@ const (
 	Format         = "outpost-generation-1"
 	StateFormat    = "outpost-replica-state-2"
 	KitFormat      = "outpost-filekit-1"
+	TypedKitFormat = "outpost-filekit-2"
 	MaxObject      = 8 << 20
 	MaxCatalog     = 8 << 20
 	MaxObjects     = 32768
@@ -92,7 +93,7 @@ func canonical(raw []byte, v any, maximum int) error {
 	return nil
 }
 func closure(c Catalog) (map[string]Object, error) {
-	if c.Format != Format || c.KitFormat != KitFormat || !validID(c.Domain) || !validID(c.Repository) || c.Epoch == 0 || c.Sequence == 0 || c.SnapshotUnix <= 0 || c.Policy == 0 || (c.Parent != "" && !validID(c.Parent)) || (c.Sequence == 1 && c.Parent != "") || (c.Sequence > 1 && c.Parent == "") || len(c.Kits) == 0 || len(c.Kits) > MaxKits {
+	if c.Format != Format || (c.KitFormat != KitFormat && c.KitFormat != TypedKitFormat) || !validID(c.Domain) || !validID(c.Repository) || c.Epoch == 0 || c.Sequence == 0 || c.SnapshotUnix <= 0 || c.Policy == 0 || (c.Parent != "" && !validID(c.Parent)) || (c.Sequence == 1 && c.Parent != "") || (c.Sequence > 1 && c.Parent == "") || len(c.Kits) == 0 || len(c.Kits) > MaxKits {
 		return nil, ErrInvalid
 	}
 	refs := map[string]Object{}

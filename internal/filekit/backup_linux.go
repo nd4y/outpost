@@ -28,6 +28,22 @@ func (r countedReader) Read(p []byte) (int, error) {
 // store. No plaintext temporary file or second source repository is created.
 // Previous is an authenticated per-file descriptor, never a global index.
 func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (Stats, error) {
+	fd, err := syscall.Open(source, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		return Stats{}, err
+	}
+	f := os.NewFile(uintptr(fd), source)
+	defer f.Close()
+	return s.BackupFile(ctx, f, opt)
+}
+
+// BackupFile reads a caller-owned regular file descriptor from offset zero.
+// Source scanners must open it through a root-confined, no-symlink path and
+// establish complete hardlink aliases before passing the approved names.
+func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (Stats, error) {
+	if f == nil {
+		return Stats{}, ErrInvalid
+	}
 	unlock, err := s.lock(ctx, true)
 	if err != nil {
 		return Stats{}, err
@@ -67,18 +83,15 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 			reuse[b.Hash] = b
 		}
 	}
-	fd, err := syscall.Open(source, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
-	if err != nil {
-		return s.Stats, err
-	}
-	f := os.NewFile(uintptr(fd), source)
-	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
 		return s.Stats, err
 	}
 	if !st.Mode().IsRegular() || st.Size() > MaxFileBytes {
 		return s.Stats, ErrInvalid
+	}
+	if _, err = f.Seek(0, io.SeekStart); err != nil {
+		return s.Stats, err
 	}
 	meta, err := captureMetadata(f)
 	if err != nil {
@@ -176,7 +189,7 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	if err != nil {
 		return s.Stats, err
 	}
-	if after.Size() != st.Size() || after.Size() != d.Size || !sameMetadata(meta, afterMeta) {
+	if !sameInodeSnapshot(st, after) || after.Size() != d.Size || !sameMetadata(meta, afterMeta) {
 		return s.Stats, errors.New("source changed during capture")
 	}
 	version, err := s.Owner.version(d)

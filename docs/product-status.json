@@ -27,7 +27,20 @@
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/filekit", "internal/policy"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/filekit/entries_linux_test.go",
+          "name": "TestTypedIndependentDirectoryAndSymlinkRecovery"
+        },
+        {
+          "path": "internal/filekit/entries_linux_test.go",
+          "name": "TestRootedEntryRefusesSymlinkAncestorsAndSpecialFiles"
+        },
+        {
+          "path": "internal/filekit/entries_linux_test.go",
+          "name": "TestBackupDetectsChangedCTimeWithRestoredSizeAndMTime"
+        }
+      ],
       "acceptance": ["AT-02", "AT-23"],
       "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
     },
@@ -832,7 +845,16 @@
       "workstream": "recovery",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/filekit/reference_linux_test.go",
+          "name": "TestFrozenV1KitCreatedByPreviousImplementation"
+        },
+        {
+          "path": "internal/generation/typed_linux_test.go",
+          "name": "TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss"
+        }
+      ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
       "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
     },

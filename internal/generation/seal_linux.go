@@ -20,7 +20,11 @@ func Seal(ctx context.Context, source *filekit.Store, versions []string, target 
 	err := source.WithSealedKits(ctx, versions, func(kits []filekit.SealedKit, read func(filekit.Object) ([]byte, error)) error {
 		roots := map[string][]byte{}
 		c.Kits = nil
+		c.KitFormat = KitFormat
 		for _, kit := range kits {
+			if kit.Format == filekit.TypedFormat {
+				c.KitFormat = TypedKitFormat
+			}
 			ref := Object{Hash(kit.Root), len(kit.Root)}
 			roots[ref.ID] = kit.Root
 			k := Kit{File: kit.File, Version: kit.Version, Root: ref}

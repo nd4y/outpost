@@ -10,6 +10,7 @@ import (
 // The callback must finish reading objects before WithSealedKits returns.
 type SealedKit struct {
 	File, Version string
+	Format        string
 	Root          []byte
 	Objects       []Object
 }
@@ -47,7 +48,7 @@ func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume f
 		if err != nil {
 			return err
 		}
-		kit := SealedKit{File: e.File, Version: version, Root: root}
+		kit := SealedKit{File: e.File, Version: version, Format: e.Format, Root: root}
 		for _, ref := range refs {
 			kit.Objects = append(kit.Objects, ref)
 		}

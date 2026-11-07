@@ -6,7 +6,7 @@
 
 Autonomous encrypted backups with complete assigned replicas, granular placement and recovery after long disconnections.
 
-**Stage: M0, G1-G3 implementation candidates.** The [G1 format candidate](docs/en/file-kit-format.md) streams files into encrypted objects and restores a selected version without a global repository index. There is no production backup service yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
+**Stage: M0, G1-G3 implementation candidates.** The [G1 format candidate](docs/en/file-kit-format.md) streams files into encrypted objects and restores a selected version without a global repository index. Typed kits also preserve directory attributes and symbolic links without following their targets; regular files retain the original format. There is no production backup service yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
 The [G1 acceptance plan](docs/en/g1-acceptance.md) covers encrypted names, old/new versions, attributes, multipart descriptors, tamper rejection, actual SIGKILL boundaries and concurrent maintenance. Its 100 GiB/8 MiB profile records reads, added ciphertext/metadata, objects, memory and storage. Full-scale acceptance is pending the recorded run; G2/G3 and production deployment remain separate.
 

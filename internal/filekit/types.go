@@ -12,6 +12,7 @@ import (
 
 const (
 	Format               = "outpost-filekit-1"
+	TypedFormat          = "outpost-filekit-2"
 	MaxFileBytes   int64 = 128 << 30
 	MaxChunk             = 4 << 20
 	MaxObject            = 8 << 20
@@ -53,14 +54,16 @@ type Block struct {
 }
 
 type Descriptor struct {
-	Format   string   `json:"format"`
-	Domain   string   `json:"domain"`
-	File     string   `json:"file"`
-	Names    []string `json:"names"`
-	Size     int64    `json:"size"`
-	SHA256   string   `json:"sha256"`
-	Metadata Metadata `json:"metadata"`
-	Blocks   []Block  `json:"blocks"`
+	Format     string   `json:"format"`
+	Domain     string   `json:"domain"`
+	File       string   `json:"file"`
+	Names      []string `json:"names"`
+	Size       int64    `json:"size"`
+	SHA256     string   `json:"sha256"`
+	Metadata   Metadata `json:"metadata"`
+	Blocks     []Block  `json:"blocks"`
+	Kind       string   `json:"kind,omitempty"`
+	LinkTarget string   `json:"linkTarget,omitempty"`
 }
 
 // Envelope is signed and contains every descriptor part. It reveals opaque
