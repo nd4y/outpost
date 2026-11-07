@@ -147,7 +147,7 @@ func (r *Registry) DomainPolicy(ctx context.Context, p Principal, tenant, node, 
 		// advertise grants that the existing mutation path cannot currently use.
 		pending := false
 		for _, op := range s.Operations {
-			if op.Receipt.State == "ADMITTED" {
+			if op.Receipt.State == "ADMITTED" && !resolved(s, op.Receipt.Operation) {
 				next, e := VerifyEnrollment(op.Document, r.owner)
 				if e != nil {
 					return e

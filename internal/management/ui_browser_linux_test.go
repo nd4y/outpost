@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 )
 
@@ -31,6 +32,12 @@ func TestManagementBrowserFixture(t *testing.T) {
 	h := newHTTPFixture(t)
 	f := h.f
 	cfg := domainPolicyFixture(t, h)
+	pending := command.Request{Operation: id("browser-unpublished"), Reason: "OPERATOR_REQUEST", Tenant: f.e.Tenant, Domain: id("domain"), Kind: "pause", ExpectedRevision: cfg.Revision, Authority: cfg.Commands[0], ExpiresUnix: time.Now().Unix() + 600}
+	f.r.Fault = interruptAt("management-command-intent-durable")
+	if _, e := f.r.AdmitCommand(context.Background(), f.p, f.e.Tenant, f.e.Node, pending); e == nil {
+		t.Fatal("missing pending fixture interruption")
+	}
+	f.r.Fault = nil
 	h.handler.(*httpService).origin = h.server.URL
 	h.handler.(*httpService).timeout = 5 * time.Second
 	view, e := VerifyReport(f.report(t, 1, time.Now().Unix()-20), f.e, time.Now())
@@ -65,7 +72,7 @@ func TestManagementBrowserFixture(t *testing.T) {
 		must(t, os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}), 0600))
 		clients[name] = map[string]string{"certPath": certPath, "keyPath": keyPath}
 	}
-	meta := map[string]any{"url": h.server.URL, "clients": clients, "tenant": f.e.Tenant, "node": f.e.Node, "domain": id("domain"), "otherDomain": id("second-domain"), "generation": id("generation"), "preset": id("browser-recovery-preset"), "config": config, "futureConfig": future, "observedUnix": view.ObservedUnix}
+	meta := map[string]any{"url": h.server.URL, "clients": clients, "tenant": f.e.Tenant, "node": f.e.Node, "domain": id("domain"), "otherDomain": id("second-domain"), "generation": id("generation"), "preset": id("browser-recovery-preset"), "config": config, "futureConfig": future, "observedUnix": view.ObservedUnix, "pendingCommand": pending}
 	raw, e = json.Marshal(meta)
 	must(t, e)
 	must(t, os.WriteFile(filepath.Join(dir, "ready.json"), raw, 0600))

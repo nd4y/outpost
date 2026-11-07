@@ -50,6 +50,17 @@ const words = {
       "Keep the operation identifier. A lost reply does not mean failure. Read the receipt or retry the same request; do not create a replacement operation.",
     operationId: "Operation identifier",
     readReceipt: "Read receipt",
+    resolutionTitle: "Abandon an unpublished request",
+    resolutionHelp:
+      "Only requests with no published effect are eligible. The original request and audit remain retained. This does not cancel work already published to a node.",
+    reviewResolution: "Review abandonment",
+    confirmResolution: "Confirm abandonment",
+    resolutionReady:
+      "Review the original request and the new resolution identifier before confirming.",
+    resolutionUnavailable:
+      "This request cannot be abandoned: publication is already recorded, the result is terminal, or its effect is unknown. Read its receipt and worker result.",
+    resolutionDone:
+      "The service confirmed abandonment before publication. The original request and audit remain retained.",
     audit: "Audit",
     loadAudit: "Load audit",
     more: "Next page",
@@ -239,6 +250,16 @@ const words = {
       "Сохраните идентификатор операции. Потеря ответа не означает отказ. Прочитайте квитанцию или повторите тот же запрос; не создавайте замену с новым идентификатором.",
     operationId: "Идентификатор операции",
     readReceipt: "Прочитать квитанцию",
+    resolutionTitle: "Отказ от неопубликованного запроса",
+    resolutionHelp:
+      "Допустимы только запросы без опубликованного эффекта. Исходный запрос и аудит сохраняются. Работа, уже опубликованная ноде, этим действием не отменяется.",
+    reviewResolution: "Проверить возможность отказа",
+    confirmResolution: "Подтвердить отказ",
+    resolutionReady:
+      "Перед подтверждением проверьте исходный запрос и новый идентификатор решения.",
+    resolutionUnavailable:
+      "Отказ недоступен: публикация уже зафиксирована, результат завершён или эффект неизвестен. Прочитайте квитанцию и результат воркера.",
+    resolutionDone: "Сервис подтвердил отказ до публикации. Исходный запрос и аудит сохранены.",
     audit: "Аудит",
     loadAudit: "Загрузить аудит",
     more: "Следующая страница",
@@ -392,6 +413,7 @@ const stateNames = {
     UNAVAILABLE: "Недоступно",
     OBSERVED: "Наблюдалось",
     COMPLETE: "Завершено",
+    ABANDONED: "Отказ до публикации",
     INCOMPLETE: "Не завершено",
     CORRUPT: "Повреждено",
     NONE: "Нет проверки",
@@ -419,6 +441,7 @@ const stateNames = {
     maintenance: "Обслуживание",
   },
   en: {
+    ABANDONED: "Abandoned before publication",
     FRESH: "Fresh when retrieved",
     CURRENT: "Current when retrieved",
     pause: "Pause",
@@ -737,6 +760,8 @@ function resetView() {
   state.retrieved = 0;
   state.command = null;
   state.config = null;
+  state.resolution = null;
+  $("resolution-review").hidden = true;
   state.audit = null;
   state.auditCursor = "";
   $("command-review").hidden = true;
@@ -865,6 +890,8 @@ async function loadDomain() {
   state.abort = new AbortController();
   state.command = null;
   state.config = null;
+  state.resolution = null;
+  $("resolution-review").hidden = true;
   $("command-review").hidden = true;
   $("config-preview").hidden = true;
   $("command-fields").disabled = true;
@@ -1396,6 +1423,93 @@ async function readReceipt(record) {
   $("receipt-result").textContent = JSON.stringify(confirmed, null, 2);
   notice("admitted");
 }
+function resolutionPath(record) {
+  if (!ID.test(record.tenant) || !ID.test(record.operation)) throw new Error("INVALID");
+  return `/api/v1/tenants/${record.tenant}/operations/${record.operation}/resolution`;
+}
+async function reviewResolution(record) {
+  if (state.busy || !state.session?.roles.includes("owner")) throw new Error("DENIED");
+  const epoch = state.epoch;
+  await currentAuthority(record);
+  if (!state.session.roles.includes("owner")) throw new Error("DENIED");
+  const preview = await api(resolutionPath(record));
+  if (epoch !== state.epoch) return;
+  if (
+    preview.format !== "outpost-management-resolution-preview-1" ||
+    preview.operationId !== record.operation ||
+    preview.node !== record.node ||
+    !ID.test(preview.targetRequestDigest) ||
+    !Array.isArray(preview.domains) ||
+    !preview.domains.every((d) => ID.test(d))
+  )
+    throw new Error("INVALID");
+  const retained = journalSnapshot().records.find((r) => r.operation === record.operation);
+  if (!retained) throw new Error("CONFLICT");
+  const body = retained.resolution?.body || {
+    operationId: newID(),
+    targetRequestDigest: preview.targetRequestDigest,
+    reason: "ABANDON_UNPUBLISHED",
+  };
+  const retry = preview.reason === "ALREADY_ABANDONED" && retained.resolution;
+  state.resolution = {
+    record: retained,
+    body,
+    preview,
+    allowed: preview.canAbandon || Boolean(retry),
+  };
+  $("resolution-summary").textContent = JSON.stringify(
+    { ...preview, resolutionOperationId: body.operationId },
+    null,
+    2,
+  );
+  $("resolution-review").hidden = false;
+  $("confirm-resolution").disabled = !state.resolution.allowed;
+  notice(
+    state.resolution.allowed ? "resolutionReady" : "resolutionUnavailable",
+    state.resolution.allowed ? "info" : "error",
+  );
+  (state.resolution.allowed ? $("confirm-resolution") : $("cancel-resolution")).focus();
+}
+async function submitResolution() {
+  const review = state.resolution;
+  if (!review?.allowed || state.busy) return;
+  state.busy = true;
+  $("confirm-resolution").disabled = true;
+  try {
+    await journal.dispatch(async () => {
+      await currentAuthority(review.record);
+      if (!state.session.roles.includes("owner")) throw new Error("DENIED");
+      const body = await journal.prepareResolution(review.record.operation, review.body);
+      $("resolution-summary").textContent = JSON.stringify(
+        { ...review.preview, resolutionOperationId: body.operationId },
+        null,
+        2,
+      );
+      let result;
+      try {
+        result = await api(resolutionPath(review.record), { method: "POST", body });
+      } catch (e) {
+        if (["OFFLINE", "UNAVAILABLE"].includes(e.message)) notice("uncertain", "error");
+        else showError(e);
+        return;
+      }
+      if (result.operationId !== body.operationId || result.state !== "COMPLETE")
+        throw new Error("INVALID");
+      try {
+        await journal.resolved(review.record.operation, result);
+      } catch {
+        throw new Error("STORAGE_AFTER");
+      }
+      await readReceipt(review.record);
+      $("resolution-review").hidden = true;
+      state.resolution = null;
+      notice("resolutionDone");
+    });
+  } finally {
+    state.busy = false;
+    $("confirm-resolution").disabled = !state.resolution?.allowed;
+  }
+}
 function renderOperations() {
   const records = state.journal.filter((r) => r.tenant === $("tenant").value && recordAllowed(r));
   table(
@@ -1409,6 +1523,8 @@ function renderOperations() {
       () => {
         const box = el("div", undefined, "actions");
         box.append(button("refreshReceipt", () => readReceipt(r)));
+        if (!terminal(r) && state.session?.roles.includes("owner"))
+          box.append(button("reviewResolution", () => reviewResolution(r)));
         if (!terminal(r))
           box.append(
             button("retry", () =>
@@ -1521,6 +1637,11 @@ on("config-form", "submit", previewConfig);
 on("apply-config", "click", () =>
   state.config ? submit(state.config.record, state.config.body) : null,
 );
+on("confirm-resolution", "click", submitResolution);
+on("cancel-resolution", "click", () => {
+  state.resolution = null;
+  $("resolution-review").hidden = true;
+});
 on("receipt-form", "submit", () =>
   readReceipt({ tenant: $("tenant").value, operation: $("operation-id").value }),
 );

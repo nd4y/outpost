@@ -180,6 +180,20 @@
           retry the same request; do not create a replacement operation.
         </p>
         <div id="operations"></div>
+        <div id="resolution-review" hidden>
+          <h3 data-i18n="resolutionTitle">Abandon an unpublished request</h3>
+          <p data-i18n="resolutionHelp">
+            Only requests with no published effect are eligible. The original request and audit
+            remain retained. This does not cancel work already published to a node.
+          </p>
+          <pre id="resolution-summary"></pre>
+          <button id="confirm-resolution" type="button" data-i18n="confirmResolution">
+            Confirm abandonment
+          </button>
+          <button id="cancel-resolution" type="button" data-i18n="cancelReview">
+            Return to editing
+          </button>
+        </div>
         <form id="receipt-form">
           <label for="operation-id"
             ><span data-i18n="operationId">Operation identifier</span

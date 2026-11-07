@@ -92,3 +92,5 @@ The [management API candidate](docs/en/management-api.md) supports signed config
 [Catalog repair](docs/en/integrity-repair.md#unreadable-catalogs) isolates damaged metadata without hiding healthy generations, preserves the original in quarantine and restores it through explicitly authorized peers.
 
 [Management service commands](docs/en/management-service.md) provide private initialization, runtime status, profile revision, bounded reconciliation and TLS serving. Stop/join, volume-loss and real process-kill checks run on isolated fixtures; no live installation is implied.
+
+Owners can now review and abandon an admitted request only while its effect remains unpublished. An independent resolution receipt and audit preserve the original request; replay cannot execute it. Published commands and durable configuration effects are refused. [The lifecycle contract](docs/en/management-service.md#resolving-unpublished-intents) describes the format fence, retained checkpoint and remaining recovery work.

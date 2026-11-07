@@ -66,17 +66,17 @@ func (r *Registry) Reconcile(ctx context.Context, principals []Principal, after 
 			}
 		}
 		for _, v := range s.Operations {
-			if v.Receipt.State == "ADMITTED" {
+			if v.Receipt.State == "ADMITTED" && !resolved(s, v.Receipt.Operation) {
 				add(v.Audit)
 			}
 		}
 		for _, v := range s.ConfigOperations {
-			if v.Receipt.State == "ADMITTED" {
+			if v.Receipt.State == "ADMITTED" && !resolved(s, v.Receipt.Operation) {
 				add(v.Audit)
 			}
 		}
 		for _, v := range s.CommandOperations {
-			if v.Receipt.State == "ADMITTED" && v.Envelope == "" {
+			if v.Receipt.State == "ADMITTED" && !resolved(s, v.Receipt.Operation) && v.Envelope == "" {
 				add(v.Audit)
 			}
 		}
@@ -142,6 +142,10 @@ func (r *Registry) reconcileOne(ctx context.Context, acl map[string]Principal, i
 		s, e := r.load()
 		if e != nil {
 			return e
+		}
+		if resolved(s, item.Operation) {
+			historical = "ABANDONED"
+			return nil
 		}
 		switch item.Action {
 		case "ENROLL", "REVOKE":

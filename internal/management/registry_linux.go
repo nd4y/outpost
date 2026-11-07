@@ -69,6 +69,8 @@ type registryState struct {
 	Configurations    map[string]configPointer       `json:"configurations"`
 	ConfigOperations  map[string]configOperation     `json:"configOperations"`
 	CommandOperations map[string]commandOperation    `json:"commandOperations,omitempty"`
+	Resolutions       map[string]intentResolution    `json:"resolutions,omitempty"`
+	LegacyCheckpoint  string                         `json:"legacyCheckpoint,omitempty"`
 	Signature         []byte                         `json:"signature,omitempty"`
 }
 type domainFence struct {
@@ -179,14 +181,14 @@ func (r *Registry) load() (registryState, error) {
 	if e != nil {
 		return s, e
 	}
-	if canonical(raw, &s, maxRegistry) != nil || s.Format != registryFormat || !bytes.Equal(s.Owner, r.owner) || !bytes.Equal(s.Signer, r.signer.Public().(ed25519.PublicKey)) || !safe(s.Revision) || !validTime(s.ObservedUnix) || s.ObservedUnix > time.Now().Unix() || s.Enrollments == nil || len(s.Enrollments) > 128 || s.Domains == nil || len(s.Domains) > 128 || s.Operations == nil || len(s.Operations) > maxOperations || s.Reports == nil || len(s.Reports) > 16384 {
+	if canonical(raw, &s, maxRegistry) != nil || (s.Format != registryFormat && s.Format != resolutionFormat) || !bytes.Equal(s.Owner, r.owner) || !bytes.Equal(s.Signer, r.signer.Public().(ed25519.PublicKey)) || !safe(s.Revision) || !validTime(s.ObservedUnix) || s.ObservedUnix > time.Now().Unix() || s.Enrollments == nil || len(s.Enrollments) > 128 || s.Domains == nil || len(s.Domains) > 128 || s.Operations == nil || len(s.Operations) > maxOperations || s.Reports == nil || len(s.Reports) > 16384 {
 		return s, ErrInvalid
 	}
 	sig := s.Signature
 	s.Signature = nil
 	raw, _ = json.Marshal(s)
 	s.Signature = sig
-	if !ed25519.Verify(s.Signer, append([]byte(registryFormat+"\x00"), raw...), sig) {
+	if !ed25519.Verify(s.Signer, append([]byte(s.Format+"\x00"), raw...), sig) {
 		return s, ErrInvalid
 	}
 	for node, raw := range s.Enrollments {
@@ -231,6 +233,9 @@ func (r *Registry) load() (registryState, error) {
 	if e := r.validateCommandState(s); e != nil {
 		return s, e
 	}
+	if e := r.validateResolutions(s); e != nil {
+		return s, e
+	}
 	return s, nil
 }
 func (r *Registry) save(s registryState) error {
@@ -245,7 +250,7 @@ func (r *Registry) save(s registryState) error {
 	s.ObservedUnix = now
 	s.Signature = nil
 	raw, _ := json.Marshal(s)
-	s.Signature = ed25519.Sign(r.signer, append([]byte(registryFormat+"\x00"), raw...))
+	s.Signature = ed25519.Sign(r.signer, append([]byte(s.Format+"\x00"), raw...))
 	raw, e := json.Marshal(s)
 	if e != nil {
 		return e
@@ -331,6 +336,9 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 		if e != nil {
 			return e
 		}
+		if resolutionID(s, operation) {
+			return ErrConflict
+		}
 		op, exists := s.Operations[operation]
 		if _, used := s.ConfigOperations[operation]; used {
 			return ErrConflict
@@ -345,6 +353,13 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 			if !scopeEnrollment(p, next) {
 				return ErrDenied
 			}
+			if v, ok := s.Resolutions[operation]; ok {
+				if !allowsDomains(p, next.Tenant, v.Domains) {
+					return ErrDenied
+				}
+				out = resolutionReceipt(s, op.Receipt)
+				return nil
+			}
 			if op.Receipt.State == "COMPLETE" {
 				out = op.Receipt
 				return nil
@@ -355,7 +370,7 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 			}
 			// Do not let a later enrollment overtake an uncertain earlier effect.
 			for _, pending := range s.Operations {
-				if pending.Receipt.State == "ADMITTED" {
+				if pending.Receipt.State == "ADMITTED" && !resolved(s, pending.Receipt.Operation) {
 					return ErrConflict
 				}
 			}
@@ -495,6 +510,11 @@ func (r *Registry) Audit(ctx context.Context, p Principal, tenant string, after 
 		for _, o := range s.CommandOperations {
 			if o.Audit.Tenant == tenant && o.Audit.Sequence > after && p.Allows(tenant, o.Audit.Domain) {
 				out = append(out, o.Audit)
+			}
+		}
+		for _, v := range s.Resolutions {
+			if v.Audit.Tenant == tenant && v.Audit.Sequence > after && allowsDomains(p, tenant, v.Domains) {
+				out = append(out, v.Audit)
 			}
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Sequence < out[j].Sequence })

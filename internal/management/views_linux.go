@@ -235,6 +235,18 @@ func (r *Registry) Operation(ctx context.Context, p Principal, tenant, operation
 		if e != nil {
 			return e
 		}
+		if v, ok := s.Resolutions[operation]; ok && !allowsDomains(p, tenant, v.Domains) {
+			return ErrUnavailable
+		}
+		for _, v := range s.Resolutions {
+			if v.Receipt.Operation == operation {
+				if v.Audit.Tenant != tenant || !allowsDomains(p, tenant, v.Domains) {
+					return ErrUnavailable
+				}
+				out = v.Receipt
+				return nil
+			}
+		}
 		if o, ok := s.Operations[operation]; ok {
 			if o.Audit.Tenant != tenant {
 				return ErrUnavailable
@@ -248,7 +260,7 @@ func (r *Registry) Operation(ctx context.Context, p Principal, tenant, operation
 					return ErrUnavailable
 				}
 			}
-			out = o.Receipt
+			out = resolutionReceipt(s, o.Receipt)
 			return nil
 		}
 		if o, ok := s.ConfigOperations[operation]; ok {
@@ -260,14 +272,14 @@ func (r *Registry) Operation(ctx context.Context, p Principal, tenant, operation
 					return ErrUnavailable
 				}
 			}
-			out = o.Receipt
+			out = resolutionReceipt(s, o.Receipt)
 			return nil
 		}
 		if o, ok := s.CommandOperations[operation]; ok {
 			if o.Audit.Tenant != tenant || !p.Allows(tenant, o.Audit.Domain) {
 				return ErrUnavailable
 			}
-			out = o.Receipt
+			out = resolutionReceipt(s, o.Receipt)
 			return nil
 		}
 		return ErrUnavailable

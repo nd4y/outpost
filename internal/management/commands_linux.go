@@ -122,7 +122,7 @@ func (r *Registry) admitCommandPolicy(ctx context.Context, s registryState, p Pr
 		return enrollment, "", ErrDenied
 	}
 	for _, pending := range s.Operations {
-		if pending.Receipt.State == "ADMITTED" {
+		if pending.Receipt.State == "ADMITTED" && !resolved(s, pending.Receipt.Operation) {
 			next, e := VerifyEnrollment(pending.Document, r.owner)
 			if e != nil {
 				return enrollment, "", e
@@ -162,6 +162,9 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 		if e != nil {
 			return e
 		}
+		if resolutionID(s, input.Operation) {
+			return ErrConflict
+		}
 		if _, used := s.Operations[input.Operation]; used {
 			return ErrConflict
 		}
@@ -175,6 +178,10 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 		if exists {
 			if o.Node != node || o.Receipt.RequestDigest != digest {
 				return ErrConflict
+			}
+			if resolved(s, input.Operation) {
+				out = resolutionReceipt(s, o.Receipt)
+				return nil
 			}
 			if _, _, e := r.commandRequest(o); e != nil {
 				return e
@@ -317,7 +324,7 @@ func (r *Registry) Commands(ctx context.Context, p Principal, tenant, node strin
 			return command.Position(o.Audit.Sequence, strings.ToLower(strings.TrimPrefix(o.Audit.Action, "COMMAND_")))
 		}
 		for _, o := range s.CommandOperations {
-			if o.Node == node && o.Audit.Tenant == tenant && p.Allows(tenant, o.Audit.Domain) && o.Receipt.State == "ADMITTED" && position(o) > after {
+			if o.Node == node && o.Audit.Tenant == tenant && p.Allows(tenant, o.Audit.Domain) && o.Receipt.State == "ADMITTED" && !resolved(s, o.Receipt.Operation) && position(o) > after {
 				if d, ok := enrollment.Domain(o.Audit.Domain); ok {
 					f := s.Domains[d.Domain]
 					if f.Tenant != tenant || f.Repository != d.Repository || f.Epoch != d.Epoch {

@@ -368,6 +368,33 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeHTTP(w, 200, out)
 		return
 	}
+	if len(parts) == 7 && parts[4] == "operations" && storage.ID(parts[5]) && parts[6] == "resolution" && r.URL.RawQuery == "" {
+		if r.Method == http.MethodGet {
+			out, e := h.registry.ResolutionPreview(ctx, p, tenant, parts[5])
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+		if r.Method == http.MethodPost {
+			var input ResolveRequest
+			if e := readHTTP(w, r, &input, 4096); e != nil {
+				failHTTP(w, e)
+				return
+			}
+			out, e := h.registry.ResolveUnpublished(ctx, p, tenant, parts[5], input)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+		failHTTP(w, ErrInvalid)
+		return
+	}
 	if len(parts) == 6 && parts[4] == "operations" && storage.ID(parts[5]) && r.Method == http.MethodGet && r.URL.RawQuery == "" {
 		out, e := h.registry.Operation(ctx, p, tenant, parts[5])
 		if e != nil {

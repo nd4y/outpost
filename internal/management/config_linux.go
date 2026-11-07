@@ -139,7 +139,7 @@ func (r *Registry) allowConfiguration(s registryState, p Principal, tenant strin
 		return ErrInvalid
 	}
 	for _, pending := range s.Operations {
-		if pending.Receipt.State == "ADMITTED" {
+		if pending.Receipt.State == "ADMITTED" && !resolved(s, pending.Receipt.Operation) {
 			admission, e := VerifyEnrollment(pending.Document, r.owner)
 			if e != nil {
 				return e
@@ -360,6 +360,23 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 		if e != nil {
 			return e
 		}
+		if resolutionID(s, input.Operation) {
+			return ErrConflict
+		}
+		if v, ok := s.Resolutions[input.Operation]; ok {
+			if v.TargetDigest != requestDigest {
+				return ErrConflict
+			}
+			if !allowsDomains(p, tenant, v.Domains) {
+				return ErrDenied
+			}
+			original, ok := s.ConfigOperations[input.Operation]
+			if !ok {
+				return ErrConflict
+			}
+			out = resolutionReceipt(s, original.Receipt)
+			return nil
+		}
 		if e := r.allowConfiguration(s, p, tenant, next); e != nil {
 			return e
 		}
@@ -383,7 +400,7 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 				return ErrCapacity
 			}
 			for _, o := range s.ConfigOperations {
-				if o.Receipt.State == "ADMITTED" && o.Node == node {
+				if o.Receipt.State == "ADMITTED" && !resolved(s, o.Receipt.Operation) && o.Node == node {
 					return ErrConflict
 				}
 			}
@@ -515,7 +532,7 @@ func (r *Registry) Configuration(ctx context.Context, p Principal, tenant, node 
 			}
 		}
 		for _, pending := range s.Operations {
-			if pending.Receipt.State == "ADMITTED" {
+			if pending.Receipt.State == "ADMITTED" && !resolved(s, pending.Receipt.Operation) {
 				next, e := VerifyEnrollment(pending.Document, r.owner)
 				if e != nil {
 					return e

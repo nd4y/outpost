@@ -319,6 +319,107 @@ try {
     );
     assert.equal((await current.json()).digest, digest);
   });
+  await test("owner cannot abandon an already published command", async () => {
+    const row = page.locator("#operations tbody tr").filter({ hasText: commandBody.operationId });
+    await row.getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(page, "#resolution-summary", "COMMAND_PUBLISHED");
+    assert.equal(await page.locator("#confirm-resolution").isDisabled(), true);
+    await contains(page, "#notice", "cannot be abandoned");
+    await page.locator("#cancel-resolution").click();
+  });
+  await test("owner abandonment at full journal survives lost reply with exact resolution replay", async () => {
+    const session = await (await owner.request.get(`${meta.url}/api/v1/session`)).json();
+    const original = await (
+      await owner.request.get(
+        `${meta.url}/api/v1/tenants/${meta.tenant}/operations/${meta.pendingCommand.operationId}`,
+      )
+    ).json();
+    assert.equal(original.state, "ADMITTED");
+    const record = {
+      tenant: meta.tenant,
+      node: meta.node,
+      domain: meta.domain,
+      type: "command",
+      operation: meta.pendingCommand.operationId,
+      fingerprint: meta.pendingCommand.operationId,
+      body: meta.pendingCommand,
+      receipt: original,
+      saved: true,
+    };
+    const records = [record];
+    while (records.length < 16) {
+      const copy = structuredClone(record);
+      copy.operation = (records.length + 200).toString(16).padStart(64, "0");
+      copy.fingerprint = copy.operation;
+      copy.body.operationId = copy.operation;
+      copy.receipt.operationId = copy.operation;
+      records.push(copy);
+    }
+    const resolving = await context("owner");
+    await resolving.addInitScript(
+      ({ actor, records }) => {
+        const key = `outpost-operations-2-${actor}`;
+        if (!localStorage.getItem(key))
+          localStorage.setItem(
+            key,
+            JSON.stringify({ format: "outpost-browser-journal-2", revision: 1, records }),
+          );
+      },
+      { actor: session.actor, records },
+    );
+    let view = await resolving.newPage();
+    const bodies = [];
+    await resolving.route("**/operations/*/resolution", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      bodies.push(route.request().postData());
+      const response = await route.fetch();
+      assert.equal(response.status(), 200);
+      if (bodies.length === 1) await route.abort("failed");
+      else await route.fulfill({ response });
+    });
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    const row = () => view.locator("#operations tbody tr").filter({ hasText: record.operation });
+    await row().getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#resolution-summary", original.requestDigest);
+    assert.equal(await view.locator("#confirm-resolution").isDisabled(), false);
+    await view.locator("#confirm-resolution").click();
+    await contains(view, "#notice", "Reply unavailable");
+    assert.equal(await view.locator("#operations tbody tr").count(), 16);
+    await view.close();
+    view = await resolving.newPage();
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    await row().getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#resolution-summary", "ALREADY_ABANDONED");
+    await view.locator("#confirm-resolution").click();
+    await contains(view, "#notice", "confirmed abandonment before publication");
+    assert.equal(bodies.length, 2);
+    assert.equal(bodies[0], bodies[1]);
+    assert.equal(JSON.parse(bodies[0]).targetRequestDigest, original.requestDigest);
+    await contains(view, "#operations", "Abandoned before publication");
+    assert.equal(
+      await row().getByRole("button", { name: "Retry same request", exact: true }).count(),
+      0,
+    );
+    await row().getByRole("button", { name: "Remove completed local record", exact: true }).click();
+    await view.waitForFunction(
+      () => document.querySelectorAll("#operations tbody tr").length === 15,
+    );
+    const receipt = await (
+      await resolving.request.get(
+        `${meta.url}/api/v1/tenants/${meta.tenant}/operations/${record.operation}`,
+      )
+    ).json();
+    assert.equal(receipt.state, "ABANDONED");
+    const resolved = await (
+      await resolving.request.get(
+        `${meta.url}/api/v1/tenants/${meta.tenant}/operations/${JSON.parse(bodies[0]).operationId}`,
+      )
+    ).json();
+    assert.equal(resolved.state, "COMPLETE");
+    await resolving.close();
+  });
   await test("viewer has no mutation controls or cross-scope API access", async () => {
     const viewer = await context("viewer"),
       view = await viewer.newPage();

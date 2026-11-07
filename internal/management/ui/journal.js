@@ -2,7 +2,8 @@ const ID = /^[a-f0-9]{64}$/;
 const FORMAT = "outpost-browser-journal-2";
 const MAX = 3 * 1024 * 1024;
 const oversized = (raw) => raw.length > MAX || new TextEncoder().encode(raw).byteLength > MAX;
-export const terminal = (record) => ["COMPLETE", "FAILED"].includes(record.receipt?.state);
+export const terminal = (record) =>
+  ["COMPLETE", "FAILED", "ABANDONED"].includes(record.receipt?.state);
 const copy = (value) => structuredClone(value);
 function recordsValid(records) {
   return (
@@ -18,6 +19,13 @@ function recordsValid(records) {
             r.accessDomains.length <= 128 &&
             r.accessDomains.every((d) => ID.test(d)))) &&
         (!r.receipt || r.receipt.operationId === r.operation) &&
+        (!r.resolution ||
+          (ID.test(r.resolution.body?.operationId) &&
+            r.resolution.body.operationId !== r.operation &&
+            ID.test(r.resolution.body.targetRequestDigest) &&
+            r.resolution.body.reason === "ABANDON_UNPUBLISHED" &&
+            (!r.resolution.receipt ||
+              r.resolution.receipt.operationId === r.resolution.body.operationId))) &&
         (r.type === "command"
           ? r.body &&
             r.body.operationId === r.operation &&
@@ -195,6 +203,38 @@ export class OperationJournal {
       if (!old) throw new Error("CONFLICT");
       if (old.accessDomains) return {};
       old.accessDomains = accessDomains;
+      return { write: true };
+    });
+  }
+  async prepareResolution(operation, body) {
+    return this.locked((value) => {
+      const old = value.records.find((r) => r.operation === operation);
+      if (!old) throw new Error("CONFLICT");
+      if (old.resolution) {
+        if (old.resolution.body.targetRequestDigest !== body.targetRequestDigest)
+          throw new Error("CONFLICT");
+        return { value: old.resolution.body };
+      }
+      if (terminal(old)) throw new Error("CONFLICT");
+      if (
+        value.records.some(
+          (r) =>
+            r.operation === body.operationId || r.resolution?.body.operationId === body.operationId,
+        )
+      )
+        throw new Error("CONFLICT");
+      old.resolution = { body };
+      return { write: true, value: body };
+    });
+  }
+  async resolved(operation, receipt) {
+    return this.locked((value) => {
+      const old = value.records.find((r) => r.operation === operation);
+      if (!old) return {};
+      if (old.resolution?.body.operationId !== receipt.operationId || receipt.state !== "COMPLETE")
+        throw new Error("INVALID");
+      if (old.resolution.receipt) return {};
+      old.resolution.receipt = receipt;
       return { write: true };
     });
   }
