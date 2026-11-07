@@ -362,7 +362,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-14",
@@ -525,6 +525,14 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetryRechecksPolicyAndPreservesHolds"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -779,6 +787,54 @@
         {
           "path": "internal/upload/evidence_epoch_linux_test.go",
           "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
+        },
+        {
+          "path": "internal/upload/queue_retry_linux_test.go",
+          "name": "TestQueueCommandRetrySurvivesLostResultAndNeverRepeatsEffect"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetrySIGKILLBetweenQueueAndWorkerReceipt"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetryRechecksPolicyAndPreservesHolds"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat"
+        },
+        {
+          "path": "internal/management/command_ordering_linux_test.go",
+          "name": "TestManagementCommandControlPriorityPaginatesWithoutSkippingOlderWork"
+        },
+        {
+          "path": "internal/worker/command_ordering_linux_test.go",
+          "name": "TestWorkerCommandPauseOvertakesPendingRetryWithoutDroppingWorkFence"
+        },
+        {
+          "path": "internal/worker/action_reconcile_linux_test.go",
+          "name": "TestWorkerCommandExpiredQueuedActionReconcilesWithoutActivePolicy"
+        },
+        {
+          "path": "internal/worker/action_reconcile_linux_test.go",
+          "name": "TestWorkerCommandExpiredActionPollingWithoutExecutionOwner"
+        },
+        {
+          "path": "internal/worker/actions_linux_test.go",
+          "name": "TestWorkerCommandPauseJoinsScrubThenResumeKeepsOriginalReadAge"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceMissingOrTamperedFrozenPlanCannotRecalculate"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceAdmissionRevokedBetweenRemovals"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSIGKILLAfterReplicaResultDoesNotDeleteLaterData"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -817,10 +873,14 @@
         {
           "path": "internal/generation/window_linux_test.go",
           "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-21",
@@ -855,10 +915,26 @@
         {
           "path": "internal/generation/window_linux_test.go",
           "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceMissingOrTamperedFrozenPlanCannotRecalculate"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-22",
@@ -917,10 +993,14 @@
         {
           "path": "internal/sourceagent/observations_linux_test.go",
           "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-23",
@@ -1071,10 +1151,38 @@
         {
           "path": "internal/upload/evidence_epoch_linux_test.go",
           "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
+        },
+        {
+          "path": "internal/upload/queue_retry_linux_test.go",
+          "name": "TestQueueCommandRetrySurvivesLostResultAndNeverRepeatsEffect"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetrySIGKILLBetweenQueueAndWorkerReceipt"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat"
+        },
+        {
+          "path": "internal/worker/actions_linux_test.go",
+          "name": "TestWorkerCommandScrubReadsFreshBytesAndKeepsHistoricalReceipt"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSIGKILLAfterReplicaResultDoesNotDeleteLaterData"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-24",
@@ -1291,6 +1399,18 @@
         {
           "path": "internal/upload/evidence_epoch_linux_test.go",
           "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
+        },
+        {
+          "path": "internal/upload/queue_retry_linux_test.go",
+          "name": "TestQueueCommandRetrySurvivesLostResultAndNeverRepeatsEffect"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetrySIGKILLBetweenQueueAndWorkerReceipt"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -1422,10 +1542,38 @@
         {
           "path": "internal/generation/window_linux_test.go",
           "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceMissingOrTamperedFrozenPlanCannotRecalculate"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceAdmissionRevokedBetweenRemovals"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSIGKILLAfterReplicaResultDoesNotDeleteLaterData"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-32",
@@ -1444,10 +1592,18 @@
         {
           "path": "internal/generation/history_linux_test.go",
           "name": "TestMissingRetentionEvidenceBlocksHistoryUntilSignedReconstruction"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-33",
@@ -1478,10 +1634,18 @@
         {
           "path": "internal/generation/history_linux_test.go",
           "name": "TestRetirementAuthorityCrashKeepsDataAndFencesReacquisition"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
     },
     {
       "id": "REQ-34",
@@ -1501,10 +1665,18 @@
         {
           "path": "internal/worker/observation_window_linux_test.go",
           "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
+        },
+        {
+          "path": "internal/worker/actions_linux_test.go",
+          "name": "TestWorkerCommandScrubReadsFreshBytesAndKeepsHistoricalReceipt"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
         }
       ],
       "acceptance": ["AT-13"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
     },
     {
       "id": "REQ-35",
@@ -1518,7 +1690,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-13"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
     },
     {
       "id": "REQ-36",
@@ -1581,7 +1753,7 @@
         }
       ],
       "acceptance": ["AT-24"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
     },
     {
       "id": "REQ-37",
@@ -1641,6 +1813,18 @@
         {
           "path": "cmd/outpost/reporting_linux_test.go",
           "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -1696,6 +1880,10 @@
         {
           "path": "internal/readback/cache_linux_test.go",
           "name": "TestReadbackEvidenceRetainsAgeAcrossRestartAndIsolatesScopes"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
         }
       ],
       "acceptance": ["AT-27"],
@@ -1775,6 +1963,10 @@
         {
           "path": "internal/sourceagent/runtime_linux_test.go",
           "name": "TestSourceVolumeLossCancelsInflightHTTPSAndJoins"
+        },
+        {
+          "path": "internal/worker/command_cache_capacity_linux_test.go",
+          "name": "TestWorkerCommandCacheWriteRespectsForeignReservationAndSpoolQuota"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -1873,6 +2065,38 @@
         {
           "path": "internal/worker/readback_linux_test.go",
           "name": "TestOwnerReadbackPolicyEnablesReuseAndRestoresFreshOnlyAudits"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetryRechecksPolicyAndPreservesHolds"
+        },
+        {
+          "path": "internal/management/command_ordering_linux_test.go",
+          "name": "TestManagementCommandControlPriorityPaginatesWithoutSkippingOlderWork"
+        },
+        {
+          "path": "internal/worker/command_ordering_linux_test.go",
+          "name": "TestWorkerCommandPauseOvertakesPendingRetryWithoutDroppingWorkFence"
+        },
+        {
+          "path": "internal/worker/action_reconcile_linux_test.go",
+          "name": "TestWorkerCommandExpiredQueuedActionReconcilesWithoutActivePolicy"
+        },
+        {
+          "path": "internal/worker/action_reconcile_linux_test.go",
+          "name": "TestWorkerCommandExpiredActionPollingWithoutExecutionOwner"
+        },
+        {
+          "path": "internal/worker/actions_linux_test.go",
+          "name": "TestWorkerCommandPauseJoinsScrubThenResumeKeepsOriginalReadAge"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceAdmissionRevokedBetweenRemovals"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -1888,7 +2112,20 @@
         "internal/diskbudget",
         "cmd/outpost"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/upload/queue_retry_linux_test.go",
+          "name": "TestQueueCommandRetrySurvivesLostResultAndNeverRepeatsEffect"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceMissingOrTamperedFrozenPlanCannotRecalculate"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"
+        }
+      ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
@@ -1940,6 +2177,26 @@
         {
           "path": "internal/management/commands_linux_test.go",
           "name": "TestManagementCommandSIGKILLCommitBoundaries"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetrySIGKILLBetweenQueueAndWorkerReceipt"
+        },
+        {
+          "path": "internal/worker/actions_linux_test.go",
+          "name": "TestWorkerCommandScrubReadsFreshBytesAndKeepsHistoricalReceipt"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSIGKILLAfterReplicaResultDoesNotDeleteLaterData"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -2035,6 +2292,22 @@
         {
           "path": "internal/worker/observation_window_linux_test.go",
           "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
+        },
+        {
+          "path": "internal/worker/command_cache_capacity_linux_test.go",
+          "name": "TestWorkerCommandCacheWriteRespectsForeignReservationAndSpoolQuota"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
+        },
+        {
+          "path": "internal/worker/command_reporting_linux_test.go",
+          "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -2098,6 +2371,30 @@
         {
           "path": "internal/peer/window_linux_test.go",
           "name": "TestPeerVerificationWindowAcceptsLegacyServerAndRejectsFalseProgress"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetrySIGKILLBetweenQueueAndWorkerReceipt"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat"
+        },
+        {
+          "path": "internal/management/command_ordering_linux_test.go",
+          "name": "TestManagementCommandControlPriorityPaginatesWithoutSkippingOlderWork"
+        },
+        {
+          "path": "internal/worker/command_ordering_linux_test.go",
+          "name": "TestWorkerCommandPauseOvertakesPendingRetryWithoutDroppingWorkFence"
+        },
+        {
+          "path": "internal/worker/actions_linux_test.go",
+          "name": "TestWorkerCommandPauseJoinsScrubThenResumeKeepsOriginalReadAge"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -2124,7 +2421,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
     },
     {
       "id": "REQ-47",
@@ -2322,6 +2619,50 @@
         {
           "path": "internal/upload/evidence_epoch_linux_test.go",
           "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
+        },
+        {
+          "path": "internal/upload/queue_retry_linux_test.go",
+          "name": "TestQueueCommandRetrySurvivesLostResultAndNeverRepeatsEffect"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerCommandRetryRechecksPolicyAndPreservesHolds"
+        },
+        {
+          "path": "internal/management/command_ordering_linux_test.go",
+          "name": "TestManagementCommandControlPriorityPaginatesWithoutSkippingOlderWork"
+        },
+        {
+          "path": "internal/worker/command_ordering_linux_test.go",
+          "name": "TestWorkerCommandPauseOvertakesPendingRetryWithoutDroppingWorkFence"
+        },
+        {
+          "path": "internal/worker/action_reconcile_linux_test.go",
+          "name": "TestWorkerCommandExpiredQueuedActionReconcilesWithoutActivePolicy"
+        },
+        {
+          "path": "internal/worker/action_reconcile_linux_test.go",
+          "name": "TestWorkerCommandExpiredActionPollingWithoutExecutionOwner"
+        },
+        {
+          "path": "internal/worker/command_cache_capacity_linux_test.go",
+          "name": "TestWorkerCommandCacheWriteRespectsForeignReservationAndSpoolQuota"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceMissingOrTamperedFrozenPlanCannotRecalculate"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -2360,7 +2701,12 @@
         "internal/diskbudget",
         "cmd/outpost"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"
+        }
+      ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },

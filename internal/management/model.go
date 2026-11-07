@@ -15,6 +15,7 @@ import (
 
 const EnrollmentFormat = "outpost-management-enrollment-1"
 const ReportFormat = "outpost-management-report-1"
+const CommandReportFormat = "outpost-management-report-2"
 const CommandFormat = "outpost-management-command-1"
 const MaxEnrollment = 65536
 const MaxReport = 8 << 20
@@ -225,19 +226,20 @@ type Job struct {
 	ErrorCode      string `json:"errorCode,omitempty"`
 }
 type Report struct {
-	Format                string       `json:"format"`
-	Node                  string       `json:"node"`
-	Tenant                string       `json:"tenant"`
-	Domain                string       `json:"domain"`
-	EnrollmentRevision    uint64       `json:"enrollmentRevision"`
-	Sequence              uint64       `json:"sequence"`
-	ConfigurationRevision uint64       `json:"configurationRevision"`
-	ObservedUnix          int64        `json:"observedUnix"`
-	InventoryState        string       `json:"inventoryState,omitempty"`
-	Generations           []Generation `json:"generations"`
-	Jobs                  []Job        `json:"jobs"`
-	Space                 Space        `json:"space"`
-	Signature             []byte       `json:"signature,omitempty"`
+	Format                string               `json:"format"`
+	Node                  string               `json:"node"`
+	Tenant                string               `json:"tenant"`
+	Domain                string               `json:"domain"`
+	EnrollmentRevision    uint64               `json:"enrollmentRevision"`
+	Sequence              uint64               `json:"sequence"`
+	ConfigurationRevision uint64               `json:"configurationRevision"`
+	ObservedUnix          int64                `json:"observedUnix"`
+	InventoryState        string               `json:"inventoryState,omitempty"`
+	Generations           []Generation         `json:"generations"`
+	Jobs                  []Job                `json:"jobs"`
+	Commands              []CommandObservation `json:"commands,omitempty"`
+	Space                 Space                `json:"space"`
+	Signature             []byte               `json:"signature,omitempty"`
 }
 
 func stableCode(code string) bool {
@@ -252,13 +254,23 @@ func stableCode(code string) bool {
 	return true
 }
 func (r Report) Validate(e Enrollment, now time.Time) error {
-	if e.Validate() != nil || r.Format != ReportFormat || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
+	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
 		return ErrInvalid
 	}
 	if _, ok := e.Domain(r.Domain); !ok {
 		return ErrDenied
 	}
 	seen := map[string]bool{}
+	if len(r.Commands) > 2048 || r.Format == ReportFormat && len(r.Commands) > 0 {
+		return ErrInvalid
+	}
+	for _, c := range r.Commands {
+		if seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
+			return ErrInvalid
+		}
+		seen[c.Operation] = true
+	}
+	seen = map[string]bool{}
 	for _, g := range r.Generations {
 		k := g.Generation + g.Target
 		if !storage.ID(g.Generation) || !storage.ID(g.Target) || g.Sequence == 0 || !safe(g.Sequence) || g.LogicalBytes != nil && (*g.LogicalBytes < 0 || *g.LogicalBytes > MaxSafeInteger) || !safe(g.Objects) || !validTime(g.CreatedUnix) || g.CreatedUnix > r.ObservedUnix || !oneOf(g.Status, "INCOMPLETE", "COMPLETE", "CORRUPT", "UNAVAILABLE") || !oneOf(g.Verification, "NONE", "CIPHERTEXT", "DECRYPTED") || g.VerifiedUnix < 0 || g.VerifiedUnix > r.ObservedUnix || g.RestoreVerifiedUnix < 0 || g.RestoreVerifiedUnix > r.ObservedUnix || seen[k] {
@@ -287,7 +299,7 @@ func SignReport(r Report, e Enrollment, key ed25519.PrivateKey, now time.Time) (
 	}
 	r.Signature = nil
 	raw, _ := json.Marshal(r)
-	r.Signature = ed25519.Sign(key, append([]byte(ReportFormat+"\x00"), raw...))
+	r.Signature = ed25519.Sign(key, append([]byte(r.Format+"\x00"), raw...))
 	raw, err := json.Marshal(r)
 	if len(raw) > MaxReport {
 		return nil, ErrCapacity
@@ -303,7 +315,7 @@ func VerifyReport(raw []byte, e Enrollment, now time.Time) (Report, error) {
 	r.Signature = nil
 	payload, _ := json.Marshal(r)
 	r.Signature = sig
-	if !ed25519.Verify(e.PublicKey, append([]byte(ReportFormat+"\x00"), payload...), sig) {
+	if !ed25519.Verify(e.PublicKey, append([]byte(r.Format+"\x00"), payload...), sig) {
 		return r, ErrDenied
 	}
 	return r, nil

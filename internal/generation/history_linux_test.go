@@ -95,8 +95,8 @@ func TestMissingRetentionEvidenceBlocksHistoryUntilSignedReconstruction(t *testi
 	if s.LatestComplete != head || s.HighestSequence != 5 {
 		t.Fatal("head changed", s)
 	}
-	// A legacy reader can still open replica-state2; extra sidecar metadata
-	// does not replace the immutable catalog or independent recovery material.
+	// Maintenance upgrades local state; immutable catalog and independent
+	// recovery material retain their original format.
 	ok(t, r.VerifyComplete(ctx, head))
 }
 

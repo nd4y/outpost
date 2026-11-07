@@ -480,10 +480,15 @@ func (w *Worker) stop(v *view) error {
 // Run keeps using the cached unexpired policy while the controller is absent.
 // A new revision cancels and joins all old attempts before starting new work.
 func (w *Worker) Run(ctx context.Context) (result error) {
+	parent := ctx
+	defer func() {
+		if parent.Err() != nil && cancellationOnly(result) {
+			result = nil
+		}
+	}()
 	if e := w.check(ctx); e != nil {
 		return e
 	}
-	parent := ctx
 	initial, e := w.Status(ctx)
 	if e != nil {
 		return e
@@ -591,6 +596,9 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 				}
 			}
 			if active == nil {
+				if e = w.reconcileActions(ctx); e != nil {
+					return e
+				}
 				return w.markControlsApplied(ctx)
 			}
 			return nil
@@ -664,6 +672,30 @@ func (w *Worker) Run(ctx context.Context) (result error) {
 		return nil
 	}
 	return e
+}
+
+// A wrapped/joined parent cancellation is an orderly stop. A mixed error tree
+// still reports its independent failure (for example a failed durable write).
+func cancellationOnly(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		children := joined.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !cancellationOnly(child) {
+				return false
+			}
+		}
+		return true
+	}
+	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+		return cancellationOnly(wrapped.Unwrap())
+	}
+	return err == context.Canceled || err == context.DeadlineExceeded
 }
 
 // ServeHTTP delegates only exact signed inbound jobs. It cannot be used as a

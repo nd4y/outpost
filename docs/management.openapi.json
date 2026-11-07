@@ -1936,6 +1936,138 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/command-status": {
+      "get": {
+        "operationId": "commandStatus",
+        "summary": "List original-age observations of long worker commands",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2302,7 +2434,7 @@
             "type": "string",
             "contentEncoding": "base64",
             "maxLength": 11184812,
-            "description": "outpost-management-report-1 signed by the enrolled node key; sequence, original observation time and exact tenant/domain scope required."
+            "description": "outpost-management-report-1 or report-2 signed by the enrolled node key; v2 carries bounded command observations. Sequence, original observation time and exact tenant/domain scope are required."
           }
         },
         "required": ["document"]
@@ -2312,7 +2444,8 @@
         "additionalProperties": false,
         "properties": {
           "format": {
-            "const": "outpost-management-report-view-1"
+            "type": "string",
+            "enum": ["outpost-management-report-view-1", "outpost-management-report-view-2"]
           },
           "node": {
             "$ref": "#/components/schemas/ID"
@@ -2366,6 +2499,13 @@
             "type": "string",
             "enum": ["UNKNOWN", "OBSERVED", "UNAVAILABLE"],
             "description": "Missing in an older report means unknown, never an empty healthy inventory."
+          },
+          "commands": {
+            "type": "array",
+            "maxItems": 2048,
+            "items": {
+              "$ref": "#/components/schemas/CommandObservation"
+            }
           }
         },
         "required": [
@@ -2381,6 +2521,22 @@
           "generations",
           "jobs",
           "space"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-1"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": ["commands"]
+              }
+            }
+          }
         ]
       },
       "Space": {
@@ -2718,7 +2874,7 @@
         "additionalProperties": false,
         "properties": {
           "format": {
-            "const": "outpost-management-commands-1"
+            "const": "outpost-management-commands-2"
           },
           "revision": {
             "type": "integer",
@@ -2847,6 +3003,232 @@
           }
         },
         "required": ["document"]
+      },
+      "CommandObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Historical node observation, separate from backup jobs and audit acknowledgement. Verification and completion times retain their original age; counts and kind-specific outcomes are validated by the signed-report reader.",
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "envelopeDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "resultDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["scrub", "maintenance"]
+          },
+          "phase": {
+            "type": "string",
+            "enum": ["QUEUED", "RUNNING", "RETRY_WAIT", "COMPLETE", "FAILED"]
+          },
+          "verification": {
+            "const": "CIPHERTEXT"
+          },
+          "errorCode": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[A-Z0-9_]*$"
+          },
+          "maintenance": {
+            "$ref": "#/components/schemas/MaintenanceOutcome"
+          },
+          "startedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "finishedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "verifiedObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "nextAttemptMillis": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1125899906842624
+          }
+        },
+        "required": [
+          "operationId",
+          "envelopeDigest",
+          "kind",
+          "phase",
+          "startedUnix",
+          "finishedUnix",
+          "attempts",
+          "nextAttemptMillis",
+          "verifiedObjects",
+          "totalObjects",
+          "verifiedUnix"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "phase": {
+                  "const": "COMPLETE"
+                }
+              }
+            },
+            "then": {
+              "required": ["resultDigest"]
+            },
+            "else": {
+              "not": {
+                "required": ["resultDigest"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "scrub"
+                }
+              }
+            },
+            "then": {
+              "required": ["generation"],
+              "not": {
+                "required": ["maintenance"]
+              }
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["generation"]
+                  },
+                  {
+                    "required": ["verification"]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "MaintenanceOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Original frozen GC outcome. Absent plus protected equals the candidate count. Absence is not physical erasure; a completed replay performs no new deletion.",
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "permit": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "candidateObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 131072
+          },
+          "absentObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 131072
+          },
+          "protectedObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 131072
+          },
+          "candidateCatalogs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "absentCatalogs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "protectedCatalogs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "completedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          }
+        },
+        "required": [
+          "operation",
+          "permit",
+          "candidateObjects",
+          "absentObjects",
+          "protectedObjects",
+          "candidateCatalogs",
+          "absentCatalogs",
+          "protectedCatalogs",
+          "completedUnix"
+        ]
+      },
+      "CommandStatusPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-command-status-1"
+          },
+          "reportSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommandObservation"
+            },
+            "maxItems": 256
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
+          }
+        },
+        "required": ["format", "reportSequence", "observedUnix", "items", "state"]
       }
     }
   }

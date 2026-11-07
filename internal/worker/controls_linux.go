@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/command"
+	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
@@ -16,15 +17,28 @@ const controlsFormat = "outpost-worker-controls-1"
 const maxCommands = 2048
 
 type CommandRecord struct {
-	Envelope    string `json:"envelope"`
-	Service     string `json:"service"`
-	Sequence    uint64 `json:"sequence"`
-	Domain      string `json:"domain"`
-	Kind        string `json:"kind"`
-	Job         string `json:"job,omitempty"`
-	StartedUnix int64  `json:"startedUnix"`
-	Revision    uint64 `json:"revision"`
-	Ack         []byte `json:"ack,omitempty"`
+	Tenant      string       `json:"tenant,omitempty"`
+	Envelope    string       `json:"envelope"`
+	Service     string       `json:"service"`
+	Sequence    uint64       `json:"sequence"`
+	Domain      string       `json:"domain"`
+	Kind        string       `json:"kind"`
+	Job         string       `json:"job,omitempty"`
+	JobBinding  string       `json:"jobBinding,omitempty"`
+	Generation  string       `json:"generation,omitempty"`
+	Work        *CommandWork `json:"work,omitempty"`
+	Result      []byte       `json:"result,omitempty"`
+	StartedUnix int64        `json:"startedUnix"`
+	Revision    uint64       `json:"revision"`
+	Ack         []byte       `json:"ack,omitempty"`
+}
+type CommandWork struct {
+	Phase           string `json:"phase"`
+	Attempts        uint64 `json:"attempts"`
+	NextMillis      int64  `json:"nextMillis"`
+	VerifiedObjects int    `json:"verifiedObjects"`
+	TotalObjects    int    `json:"totalObjects"`
+	ErrorCode       string `json:"errorCode,omitempty"`
 }
 type Controls struct {
 	Format     string                   `json:"format"`
@@ -65,7 +79,7 @@ func (w *Worker) signControls(c *Controls) error {
 	return nil
 }
 func (w *Worker) validateControls(c *Controls) error {
-	if c == nil || c.Format != controlsFormat || c.Node != w.node || c.Revision == 0 || c.Revision > command.MaxSafeInteger || c.Applied > c.Revision || c.Domains == nil || len(c.Domains) > 128 || c.Jobs == nil || len(c.Jobs) > MaxJobs || c.Sequences == nil || len(c.Sequences) > 128 || c.Operations == nil || len(c.Operations) > maxCommands {
+	if c == nil || c.Format != controlsFormat || c.Node != w.node || c.Revision == 0 || c.Revision > command.MaxSafeInteger || c.Applied > c.Revision || c.Domains == nil || len(c.Domains) > 128 || c.Jobs == nil || len(c.Jobs) > MaxJobs || c.Sequences == nil || len(c.Sequences) > 256 || c.Operations == nil || len(c.Operations) > maxCommands {
 		return ErrDenied
 	}
 	for id, pause := range c.Domains {
@@ -83,16 +97,52 @@ func (w *Worker) validateControls(c *Controls) error {
 			return ErrDenied
 		}
 	}
-	pending := 0
+	pendingControl, pendingWork := 0, 0
 	for id, op := range c.Operations {
-		if !storage.ID(id) || !storage.ID(op.Envelope) || !storage.ID(op.Service) || op.Sequence == 0 || op.Sequence > c.Sequences[op.Service] || !storage.ID(op.Domain) || !command.Kind(op.Kind) || op.Job != "" && !storage.ID(op.Job) || op.StartedUnix < 0 || op.StartedUnix > time.Now().Unix() || op.Revision > c.Revision || len(op.Ack) > command.MaxAck {
+		if !storage.ID(id) || !storage.ID(op.Envelope) || !storage.ID(op.Service) || op.Sequence == 0 || op.Sequence > c.Sequences[command.SequenceScope(op.Service, op.Kind)] || !storage.ID(op.Domain) || !command.Kind(op.Kind) || op.Job != "" && !storage.ID(op.Job) || op.StartedUnix < 0 || op.StartedUnix > time.Now().Unix() || op.Revision > c.Revision || len(op.Ack) > command.MaxAck {
 			return ErrDenied
 		}
+		if op.JobBinding != "" && (op.Kind != "retry" || !storage.ID(op.JobBinding)) || op.Kind == "retry" && op.StartedUnix > 0 && op.JobBinding == "" {
+			return ErrDenied
+		}
+		if len(op.Result) > 16<<10 || op.Generation != "" && !storage.ID(op.Generation) {
+			return ErrDenied
+		}
+		if op.Kind == "scrub" && op.StartedUnix > 0 && (op.Generation == "" || op.Work == nil) {
+			return ErrDenied
+		}
+		if op.Kind == "maintenance" && (op.Generation != "" || op.StartedUnix > 0 && op.Work == nil) {
+			return ErrDenied
+		}
+		if op.Work != nil {
+			if !storage.ID(op.Tenant) {
+				return ErrDenied
+			}
+			if (op.Kind != "scrub" && op.Kind != "maintenance") || op.Work.Attempts > command.MaxSafeInteger || op.Work.NextMillis < 0 || op.Work.VerifiedObjects < 0 || op.Work.TotalObjects < op.Work.VerifiedObjects {
+				return ErrDenied
+			}
+			switch op.Work.Phase {
+			case "QUEUED", "RUNNING", "RETRY_WAIT":
+				if len(op.Ack) > 0 {
+					return ErrDenied
+				}
+			case "COMPLETE", "FAILED":
+				if len(op.Ack) == 0 {
+					return ErrDenied
+				}
+			default:
+				return ErrDenied
+			}
+		}
 		if len(op.Ack) == 0 {
-			pending++
+			if command.Control(op.Kind) {
+				pendingControl++
+			} else {
+				pendingWork++
+			}
 		}
 	}
-	if pending > 1 {
+	if pendingControl > 1 || pendingWork > 32 {
 		return ErrDenied
 	}
 	if c.Delivery != nil && c.Delivery.validate() != nil {
@@ -230,8 +280,15 @@ func (w *Worker) commandSession(ctx context.Context) (*Worker, *statefile.Store,
 	}
 	state.Admit = guardAdmission("state")
 	commands.Admit = guardAdmission("commands")
-	shadow := &Worker{state: state, node: w.node, cert: w.cert, owner: w.owner}
-	return shadow, commands, func() { commands.Close(); state.Close(); cleanup() }, nil
+	cache, e := control.OpenCacheAdmittedAt(w.root, "control", w.node, w.owner, false, guardAdmission("control"))
+	if e != nil {
+		commands.Close()
+		state.Close()
+		cleanup()
+		return nil, nil, nil, e
+	}
+	shadow := &Worker{state: state, cache: cache, node: w.node, cert: w.cert, owner: w.owner, root: w.root, dir: w.dir, budget: budget, guard: w.guard}
+	return shadow, commands, func() { cache.Close(); commands.Close(); state.Close(); cleanup() }, nil
 }
 
 // The caller holds the execution lease and has joined the previous view.

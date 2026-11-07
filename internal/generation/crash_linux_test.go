@@ -55,7 +55,7 @@ func TestReplicaCrashChild(t *testing.T) {
 }
 
 func TestReplicaSIGKILLBoundaries(t *testing.T) {
-	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "retirement-authority-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}, {"window", "verification-batch-durable"}, {"window", "before-complete"}, {"window", "state-durable"}} {
+	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "gc-plan-durable"}, {"maintain", "retirement-authority-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}, {"maintain", "gc-result-durable"}, {"window", "verification-batch-durable"}, {"window", "before-complete"}, {"window", "state-durable"}} {
 		t.Run(tc.action+"/"+tc.point, func(t *testing.T) {
 			base := temp(t)
 			trust, key, maintenance := trust(t)

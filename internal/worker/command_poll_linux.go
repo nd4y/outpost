@@ -60,7 +60,7 @@ func (d CommandDelivery) validate() error {
 		return ErrDenied
 	}
 	switch d.Phase {
-	case "RUNNING", "IDLE", "ACKNOWLEDGED":
+	case "RUNNING", "IDLE", "ACKNOWLEDGED", "EXECUTING":
 		if d.ErrorCode != "" {
 			return ErrDenied
 		}
@@ -88,32 +88,42 @@ func (w *Worker) CommandOnce(ctx context.Context, client *management.ReportClien
 	if e != nil || grant.Node != w.node || !grant.Active(time.Now()) {
 		return out, ErrDenied
 	}
-	page, e := client.Commands(ctx, grant, w.owner, 1, "")
+	page, e := client.Commands(ctx, grant, w.owner, 32, "")
 	if e != nil {
 		return out, e
 	}
 	if len(page.Commands) == 0 {
 		return out, nil
 	}
-	raw := page.Commands[0].Document
-	// The execution path independently rechecks the current local owner policy.
-	envelope, _, e := command.VerifyEnvelope(raw, w.owner)
-	if e != nil {
-		return out, e
+	var pending *CommandResult
+	for _, queued := range page.Commands {
+		raw := queued.Document
+		envelope, _, e := command.VerifyEnvelope(raw, w.owner)
+		if e != nil {
+			return out, e
+		}
+		out = CommandResult{Operation: envelope.Request.Operation, State: "EXECUTING"}
+		ack, e := w.ExecuteCommand(ctx, raw)
+		if e != nil {
+			return out, e
+		}
+		if len(ack) == 0 {
+			if pending == nil {
+				copy := out
+				pending = &copy
+			}
+			continue
+		}
+		receipt, e := client.AcknowledgeCommand(ctx, grant, w.owner, raw, ack)
+		if e != nil {
+			out.State = "ACK_PENDING"
+			return out, e
+		}
+		out.State, out.ErrorCode = receipt.State, receipt.ErrorCode
 	}
-	out.Operation = envelope.Request.Operation
-	out.State = "EXECUTING"
-	ack, e := w.ExecuteCommand(ctx, raw)
-	if e != nil {
-		return out, e
+	if pending != nil {
+		return *pending, nil
 	}
-	receipt, e := client.AcknowledgeCommand(ctx, grant, w.owner, raw, ack)
-	if e != nil {
-		out.State = "ACK_PENDING"
-		return out, e
-	}
-	out.State = receipt.State
-	out.ErrorCode = receipt.ErrorCode
 	return out, nil
 }
 
@@ -194,8 +204,8 @@ func (w *Worker) RunCommands(ctx context.Context, profile CommandProfile, enroll
 				d.NextUnix = d.ObservedUnix + profile.RetrySeconds
 			} else {
 				d.Phase = "ACKNOWLEDGED"
-				if result.State == "IDLE" {
-					d.Phase = "IDLE"
+				if result.State == "IDLE" || result.State == "EXECUTING" {
+					d.Phase = result.State
 				}
 				d.NextUnix = d.ObservedUnix + profile.PollSeconds
 			}

@@ -73,17 +73,18 @@ func (c *ReportClient) Commands(ctx context.Context, enrollment Enrollment, owne
 	if e := c.commandTransport(ctx, http.MethodGet, path, nil, &out, MaxCommandPage); e != nil {
 		return CommandPage{}, e
 	}
-	if out.Format != "outpost-management-commands-1" || !safe(out.Revision) || len(out.Commands) > limit || out.Commands == nil || len(out.NextCursor) > 512 {
+	if out.Format != "outpost-management-commands-2" || !safe(out.Revision) || len(out.Commands) > limit || out.Commands == nil || len(out.NextCursor) > 512 {
 		return CommandPage{}, ErrInvalid
 	}
 	var previous uint64
 	for _, queued := range out.Commands {
 		envelope, a, e := command.VerifyEnvelope(queued.Document, owner)
 		d, ok := enrollment.Domain(a.Domain)
-		if e != nil || !ok || a.Node != c.node || a.Tenant != enrollment.Tenant || a.Repository != d.Repository || a.WriterEpoch > d.Epoch || envelope.Service != c.target || envelope.AdmittedUnix > time.Now().Unix() || envelope.Sequence != queued.Sequence || queued.Sequence <= previous || queued.Sequence > out.Revision {
+		position := command.Position(queued.Sequence, envelope.Request.Kind)
+		if e != nil || !ok || a.Node != c.node || a.Tenant != enrollment.Tenant || a.Repository != d.Repository || a.WriterEpoch > d.Epoch || envelope.Service != c.target || envelope.AdmittedUnix > time.Now().Unix() || envelope.Sequence != queued.Sequence || position <= previous || queued.Sequence > out.Revision {
 			return CommandPage{}, ErrDenied
 		}
-		previous = queued.Sequence
+		previous = position
 	}
 	return out, nil
 }

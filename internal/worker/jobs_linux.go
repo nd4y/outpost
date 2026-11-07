@@ -13,15 +13,20 @@ type result struct {
 	job     control.Job
 	receipt json.RawMessage
 	err     error
+	action  *actionResult
 }
 
 func (w *Worker) jobs(v *view) error {
 	results := make(chan result, v.cfg.Limits.Parallel)
 	running := map[string]bool{}
 	finish := func(r result) error {
-		delete(running, r.job.Operation)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		if r.action != nil {
+			delete(running, "command/"+r.action.envelope.Request.Operation)
+			return w.finishAction(ctx, v, r.action)
+		}
+		delete(running, r.job.Operation)
 		return w.update(ctx, func(s *Status) error {
 			j, ok := s.Jobs[r.job.Operation]
 			if !ok || j.Binding != binding(r.job) {
@@ -73,6 +78,14 @@ func (w *Worker) jobs(v *view) error {
 			return errors.Join(e, joined)
 		}
 		desired := append([]control.Job(nil), v.cfg.Jobs...)
+		if e = w.scheduleActions(v, s, running, results); e != nil {
+			v.cancel()
+			joined := drain()
+			if errors.Is(e, context.Canceled) || errors.Is(e, context.DeadlineExceeded) {
+				return joined
+			}
+			return errors.Join(e, joined)
+		}
 		known := map[string]bool{}
 		for _, j := range desired {
 			known[j.Operation] = true
@@ -115,7 +128,7 @@ func (w *Worker) jobs(v *view) error {
 				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
 				defer cancel()
 				receipt, e := w.attempt(ctx, v, job)
-				results <- result{job, receipt, e}
+				results <- result{job: job, receipt: receipt, err: e}
 			}(j)
 		}
 		select {

@@ -51,7 +51,9 @@ func TestChangedOperationIsRejectedWithoutStoppingIndependentJob(t *testing.T) {
 func TestUnchangedJobRestartsAfterPolicyCancellationWithoutBackoff(t *testing.T) {
 	f := newFixture(t)
 	begun := make(chan struct{}, 1)
+	restarted := make(chan int64, 1)
 	var writes atomic.Int64
+	push, _ := f.jobs()
 	f.endpoint(t, func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPut && writes.Add(1) == 1 {
@@ -63,10 +65,18 @@ func TestUnchangedJobRestartsAfterPolicyCancellationWithoutBackoff(t *testing.T)
 				}
 				return
 			}
+			if r.Method == http.MethodPut {
+				state, e := f.nodes[0].Status(r.Context())
+				if e == nil {
+					select {
+					case restarted <- state.Jobs[push.Operation].NextMillis:
+					default:
+					}
+				}
+			}
 			next.ServeHTTP(w, r)
 		})
 	})
-	push, _ := f.jobs()
 	cfg := f.config(t, 0, []control.Job{push})
 	f.config(t, 1, []control.Job{push})
 	start(t, f.nodes[1])
@@ -79,12 +89,16 @@ func TestUnchangedJobRestartsAfterPolicyCancellationWithoutBackoff(t *testing.T)
 	cfg.Revision++
 	raw, e := control.Sign(cfg, f.owner)
 	must(t, e)
-	startTime := time.Now()
 	must(t, f.nodes[0].Accept(context.Background(), raw))
-	wait(t, func() bool { return complete(f.nodes[0], push.Operation) })
-	if time.Since(startTime) > 2500*time.Millisecond {
-		t.Fatal("policy cancellation imposed network failure backoff")
+	select {
+	case next := <-restarted:
+		if next != 0 {
+			t.Fatal("policy cancellation imposed network failure backoff", next)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("unchanged job did not restart")
 	}
+	wait(t, func() bool { return complete(f.nodes[0], push.Operation) })
 }
 func TestRunDeadlineIsAnOrderlyStop(t *testing.T) {
 	f := newFixture(t)

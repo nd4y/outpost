@@ -25,6 +25,7 @@ type Snapshot struct {
 	InventoryState        string
 	Generations           []Generation
 	Jobs                  []Job
+	Commands              []CommandObservation
 	Space                 Space
 }
 type ReporterOptions struct {
@@ -233,7 +234,10 @@ func (r *Reporter) Enqueue(ctx context.Context, in Snapshot) ([]byte, error) {
 		if in.ObservedUnix < s.ObservedUnix {
 			return ErrConflict
 		}
-		report := Report{Format: ReportFormat, Node: r.node, Tenant: grant.Tenant, Domain: r.domain, EnrollmentRevision: grant.Revision, Sequence: s.Sequence + 1, ConfigurationRevision: in.ConfigurationRevision, ObservedUnix: in.ObservedUnix, InventoryState: in.InventoryState, Generations: in.Generations, Jobs: in.Jobs, Space: in.Space}
+		report := Report{Format: ReportFormat, Node: r.node, Tenant: grant.Tenant, Domain: r.domain, EnrollmentRevision: grant.Revision, Sequence: s.Sequence + 1, ConfigurationRevision: in.ConfigurationRevision, ObservedUnix: in.ObservedUnix, InventoryState: in.InventoryState, Generations: in.Generations, Jobs: in.Jobs, Commands: in.Commands, Space: in.Space}
+		if len(in.Commands) > 0 {
+			report.Format = CommandReportFormat
+		}
 		raw, e := SignReport(report, grant, r.signer, time.Now())
 		if e != nil {
 			return e

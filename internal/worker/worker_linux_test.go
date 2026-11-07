@@ -74,6 +74,7 @@ type fixture struct {
 	owner               ed25519.PrivateKey
 	dataOwner           filekit.Owner
 	writer              ed25519.PrivateKey
+	maintenance         ed25519.PrivateKey
 	domain              control.Domain
 	nodes               []*Worker
 	cfg                 control.Config
@@ -87,7 +88,8 @@ func newFixture(t *testing.T) *fixture {
 	_, f.owner = key(t)
 	writer, wk := key(t)
 	f.writer = wk
-	maint, _ := key(t)
+	maint, mk := key(t)
+	f.maintenance = mk
 	planner, _ := key(t)
 	var e error
 	f.dataOwner, e = filekit.NewOwner()

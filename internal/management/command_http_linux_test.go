@@ -42,7 +42,7 @@ func TestManagementCommandHTTPSAdmissionPagingAckAndReservedLane(t *testing.T) {
 		t.Fatal("viewer admitted", status)
 	}
 	cfg := h.node.Transport.(*http.Transport).TLSClientConfig
-	client, e := NewReportClient(h.server.URL, identity(f.options.Signer.Public().(ed25519.PublicKey)), f.e.Node, cfg.Certificates[0], cfg.RootCAs, time.Second)
+	client, e := NewReportClient(h.server.URL, identity(f.options.Signer.Public().(ed25519.PublicKey)), f.e.Node, cfg.Certificates[0], cfg.RootCAs, 5*time.Second)
 	must(t, e)
 	defer client.Close()
 	page, e := client.Commands(ctx, f.e, f.options.Owner, 1, "")

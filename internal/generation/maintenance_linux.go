@@ -3,10 +3,9 @@ package generation
 import (
 	"context"
 	"errors"
-	"github.com/nd4y/outpost/internal/localfs"
-	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -16,6 +15,25 @@ import (
 // Retire and GC are replayable: a crash may leave extra bytes, never a dangling
 // protected root. Revision zero is valid only for the initial empty replica.
 func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
+	return r.MaintainAdmitted(ctx, raw, nil)
+}
+
+// MaintainAdmitted rechecks short caller admission before retirement and each
+// destructive step. The caller must cancel and join it before acknowledging a
+// hold or policy replacement. Admission must not re-enter this replica.
+func (r *Replica) MaintainAdmitted(ctx context.Context, raw []byte, admit func() error) (int, error) {
+	check := func() error {
+		if e := ctx.Err(); e != nil {
+			return e
+		}
+		if admit != nil {
+			return admit()
+		}
+		return nil
+	}
+	if e := check(); e != nil {
+		return 0, e
+	}
 	p, e := verifyPermit(raw, r.trust)
 	if e != nil {
 		return 0, e
@@ -26,6 +44,15 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 		previous, replay := s.Receipts[p.Operation]
 		if replay && previous != operation {
 			return ErrConflict
+		}
+		record, frozen := s.GC[p.Operation]
+		if replay && !frozen {
+			// A legacy receipt has no durable candidate set. It cannot authorize
+			// a new scan; a newly signed revision-bound permit is required.
+			return ErrMigrationRequired
+		}
+		if replay && record.Result != nil {
+			return nil
 		}
 		if !replay && p.Revision != s.Revision {
 			return ErrRollback
@@ -78,58 +105,16 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 				}
 			}
 		}
-		f, e := r.root.Open("objects")
+		plan, digest, e := r.gcPlan(ctx, p, operation, record.Plan, keep, retiring, s)
 		if e != nil {
 			return e
-		}
-		entries, e := f.ReadDir(MaxObjects*4 + 1)
-		f.Close()
-		if (e != nil && !errors.Is(e, io.EOF)) || len(entries) > MaxObjects*4 {
-			return ErrInvalid
-		}
-		var garbage []string
-		for _, item := range entries {
-			if !item.Type().IsRegular() || !validID(item.Name()) {
-				return ErrInvalid
-			}
-			info, e := localfs.Stat(r.root, "objects/"+item.Name())
-			if e != nil {
-				return e
-			}
-			if info.Size() < 1 || info.Size() > MaxObject {
-				return ErrInvalid
-			}
-			if ref, ok := keep[item.Name()]; ok {
-				if int64(ref.Bytes) != info.Size() {
-					return ErrIncomplete
-				}
-			} else {
-				garbage = append(garbage, item.Name())
-			}
-		}
-		// Unknown files never become deletion candidates. Catalog GC uses the
-		// same permit and commit-before-delete boundary as object GC.
-		catalogDir, e := r.root.Open("catalogs")
-		if e != nil {
-			return e
-		}
-		catalogEntries, e := catalogDir.ReadDir(MaxGenerations*4 + 1)
-		catalogDir.Close()
-		if (e != nil && !errors.Is(e, io.EOF)) || len(catalogEntries) > MaxGenerations*4 {
-			return ErrInvalid
-		}
-		var catalogGarbage []string
-		for _, item := range catalogEntries {
-			if !item.Type().IsRegular() || !validID(item.Name()) {
-				return ErrInvalid
-			}
-			if _, exists := s.Generations[item.Name()]; !exists || retiring[item.Name()] {
-				catalogGarbage = append(catalogGarbage, item.Name())
-			}
 		}
 		if !replay {
 			// Persist the signed authority before removing its catalogs. A crash
 			// can retain extra data, but cannot lose the retirement tombstone.
+			if e = check(); e != nil {
+				return e
+			}
 			if e = r.recordRetirement(s, raw); e != nil {
 				return e
 			}
@@ -137,6 +122,11 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 				delete(s.Generations, id)
 			}
 			s.Receipts[p.Operation] = operation
+			if s.GC == nil {
+				s.GC = map[string]gcRecord{}
+			}
+			s.GC[p.Operation] = gcRecord{Plan: digest}
+			s.Format = MaintenanceStateFormat
 			s.Revision++
 			if e = r.save(*s); e != nil {
 				return e
@@ -145,13 +135,26 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 		if e = r.point("retirement-durable"); e != nil {
 			return e
 		}
-		for _, id := range garbage {
-			if e = ctx.Err(); e != nil {
+		result := MaintenanceReceipt{Operation: p.Operation, Permit: operation, CandidateObjects: len(plan.Objects), CandidateCatalogs: len(plan.Catalogs)}
+		for _, ref := range plan.Objects {
+			if e = check(); e != nil {
 				return e
 			}
-			if e = r.root.Remove("objects/" + id); e != nil {
+			if _, protected := keep[ref.ID]; protected {
+				result.ProtectedObjects++
+				continue
+			}
+			// Do not erase replacement/corrupt bytes under an old object name.
+			if _, e = r.object(ref); errors.Is(e, os.ErrNotExist) {
+				result.AbsentObjects++
+				continue
+			} else if e != nil {
 				return e
 			}
+			if e = r.root.Remove("objects/" + ref.ID); e != nil {
+				return e
+			}
+			result.AbsentObjects++
 			removed++
 			if e = r.point("gc-object-removed"); e != nil {
 				return e
@@ -160,15 +163,45 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 		if e = syncDir(r.root, "objects"); e != nil {
 			return e
 		}
-		for _, id := range catalogGarbage {
-			if e = ctx.Err(); e != nil {
+		for _, id := range plan.Catalogs {
+			if e = check(); e != nil {
+				return e
+			}
+			if _, protected := s.Generations[id]; protected {
+				result.ProtectedCatalogs++
+				continue
+			}
+			raw, e := read(r.root, "catalogs/"+id, MaxCatalog)
+			if errors.Is(e, os.ErrNotExist) {
+				result.AbsentCatalogs++
+				continue
+			}
+			if e != nil {
+				return e
+			}
+			if Hash(raw) != id {
+				return ErrIncomplete
+			}
+			if _, e = VerifyCatalog(raw, r.trust); e != nil {
 				return e
 			}
 			if e = r.root.Remove("catalogs/" + id); e != nil {
 				return e
 			}
+			result.AbsentCatalogs++
 		}
-		return syncDir(r.root, "catalogs")
+		if e = syncDir(r.root, "catalogs"); e != nil {
+			return e
+		}
+		result.CompletedUnix = time.Now().Unix()
+		record = s.GC[p.Operation]
+		record.Result = &result
+		s.GC[p.Operation] = record
+		s.Revision++
+		if e = r.save(*s); e != nil {
+			return e
+		}
+		return r.point("gc-result-durable")
 	})
 	return removed, e
 }

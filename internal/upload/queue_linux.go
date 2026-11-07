@@ -20,6 +20,10 @@ import (
 )
 
 const QueueFormat = "outpost-upload-queue-1"
+
+// Command retries add a durable effect ledger. Older binaries must reject it;
+// source pin identities deliberately retain the original QueueFormat namespace.
+const CommandQueueFormat = "outpost-upload-queue-2"
 const maxQueueBytes = 32 << 20
 
 var ErrBlocked = errors.New("upload queue contains blocked or expired jobs")
@@ -46,11 +50,16 @@ type QueueJob struct {
 	CleanupPending bool            `json:"cleanupPending"`
 }
 type QueueState struct {
-	Format   string              `json:"format"`
-	Identity string              `json:"identity"`
-	Instance string              `json:"instance"`
-	Revision uint64              `json:"revision"`
-	Jobs     map[string]QueueJob `json:"jobs"`
+	Format   string                `json:"format"`
+	Identity string                `json:"identity"`
+	Instance string                `json:"instance"`
+	Revision uint64                `json:"revision"`
+	Jobs     map[string]QueueJob   `json:"jobs"`
+	Retries  map[string]QueueRetry `json:"commandRetries,omitempty"`
+}
+type QueueRetry struct {
+	Operation string `json:"operation"`
+	Plan      string `json:"plan"`
 }
 type Queue struct {
 	root             *os.Root
@@ -133,8 +142,17 @@ func (q *Queue) load() (QueueState, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, maxQueueBytes) != nil || s.Format != QueueFormat || s.Identity != q.identity || !storage.ID(s.Instance) || q.instance != "" && s.Instance != q.instance || s.Jobs == nil || len(s.Jobs) > q.limits.MaxJobs {
+	if storage.Decode(raw, &s, maxQueueBytes) != nil || (s.Format != QueueFormat && s.Format != CommandQueueFormat) || s.Identity != q.identity || !storage.ID(s.Instance) || q.instance != "" && s.Instance != q.instance || s.Jobs == nil || len(s.Jobs) > q.limits.MaxJobs {
 		return s, ErrConflict
+	}
+	if len(s.Retries) > 2048 || (s.Format == CommandQueueFormat) != (len(s.Retries) > 0) {
+		return s, ErrConflict
+	}
+	for token, retry := range s.Retries {
+		j, ok := s.Jobs[retry.Operation]
+		if !storage.ID(token) || !ok || retry.Plan != storage.Hash(j.Plan) {
+			return s, ErrConflict
+		}
 	}
 	for op, j := range s.Jobs {
 		p, e := Verify(j.Plan, q.authority)
@@ -312,7 +330,27 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 // Retry is an explicit local operator action after correcting a blocked cause.
 // It cannot revive expired authority, replace a plan, or release a source pin.
 func (q *Queue) Retry(ctx context.Context, op string) error {
-	return q.edit(ctx, func(s *QueueState) error {
+	return q.retry(ctx, op, "")
+}
+
+// RetryCommand atomically records a one-time retry token with the queued effect.
+// An exact replay only observes the previous effect, even if the job has since
+// run, blocked again, completed or its plan expired. It never requeues that job.
+func (q *Queue) RetryCommand(ctx context.Context, op, token string) error {
+	if !storage.ID(token) {
+		return ErrDenied
+	}
+	return q.retry(ctx, op, token)
+}
+func (q *Queue) retry(ctx context.Context, op, token string) error {
+	replayed := errors.New("retry already recorded")
+	e := q.edit(ctx, func(s *QueueState) error {
+		if old, ok := s.Retries[token]; token != "" && ok {
+			if old.Operation != op {
+				return ErrConflict
+			}
+			return replayed
+		}
 		j, ok := s.Jobs[op]
 		if !ok || j.Phase != "BLOCKED" {
 			return ErrDenied
@@ -325,8 +363,25 @@ func (q *Queue) Retry(ctx context.Context, op string) error {
 		j.NextMillis = max(time.Now().UnixMilli(), p.StartMillis)
 		j.ErrorCode = ""
 		s.Jobs[op] = j
+		if token != "" {
+			if len(s.Retries) >= 2048 {
+				return storage.ErrCapacity
+			}
+			if s.Retries == nil {
+				s.Retries = map[string]QueueRetry{}
+			}
+			s.Retries[token] = QueueRetry{Operation: op, Plan: storage.Hash(j.Plan)}
+			s.Format = CommandQueueFormat
+		}
 		return nil
 	})
+	if errors.Is(e, replayed) {
+		return nil
+	}
+	if e == nil && token != "" {
+		return q.checkpoint("command-retry-durable")
+	}
+	return e
 }
 func (q *Queue) backoff(op string, attempt uint64) time.Duration {
 	delay := int64(q.limits.RetryBaseMillis)

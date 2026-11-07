@@ -108,6 +108,7 @@ type commandChild struct {
 	planningChild
 	Envelope  []byte
 	Migration bool
+	Run       bool
 }
 
 func TestWorkerCommandSIGKILLChild(t *testing.T) {
@@ -137,6 +138,9 @@ func TestWorkerCommandSIGKILLChild(t *testing.T) {
 		e = w.MigrateControls(context.Background(), false)
 	} else {
 		_, e = w.ExecuteCommand(context.Background(), in.Envelope)
+		if e == nil && in.Run {
+			e = w.Run(context.Background())
+		}
 	}
 	must(t, e)
 	t.Fatal("kill point absent")

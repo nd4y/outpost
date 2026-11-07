@@ -212,6 +212,10 @@ func SignPermit(p Permit, key ed25519.PrivateKey) ([]byte, error) {
 	p.Signature = ed25519.Sign(key, append([]byte(Format+"\x00maintenance\x00"), b...))
 	return json.Marshal(p)
 }
+
+// VerifyPermit checks the separate maintenance authority. Execution additionally
+// binds revision, operation, current references, pins and any command admission.
+func VerifyPermit(raw []byte, t Trust) (Permit, error) { return verifyPermit(raw, t) }
 func verifyPermit(raw []byte, t Trust) (Permit, error) {
 	var p Permit
 	if !t.valid() {

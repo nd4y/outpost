@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/generation"
@@ -142,6 +144,10 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	}
 	out.ConfigurationRevision = status.Revision
 	out.EnrollmentRevision = grant.Revision
+	out.Commands, e = commandObservations(status, grant.Tenant, domain)
+	if e != nil {
+		return out, e
+	}
 	for _, j := range status.Jobs {
 		if j.Job.Domain != domain {
 			continue
@@ -239,5 +245,67 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	}
 	out.ObservedUnix = time.Now().Unix()
 	out.Space = management.Space{State: "OBSERVED", Scope: "VOLUME", PhysicalBytes: &used, FreeBytes: &free, AccountedBytes: accounted, ReservedBytes: reserved, ObservedUnix: out.ObservedUnix}
+	return out, nil
+}
+
+func commandObservations(status Status, tenant, domain string) ([]management.CommandObservation, error) {
+	out := []management.CommandObservation{}
+	if status.Controls == nil {
+		return out, nil
+	}
+	for id, op := range status.Controls.Operations {
+		if op.Work == nil || op.Tenant != tenant || op.Domain != domain {
+			continue
+		}
+		work := op.Work
+		c := management.CommandObservation{Operation: id, EnvelopeDigest: op.Envelope, Kind: op.Kind, Phase: work.Phase, Generation: op.Generation, StartedUnix: op.StartedUnix, Attempts: work.Attempts, NextAttemptMillis: work.NextMillis, VerifiedObjects: uint64(work.VerifiedObjects), TotalObjects: uint64(work.TotalObjects), ErrorCode: work.ErrorCode}
+		if len(op.Ack) > 0 {
+			var ack command.Ack
+			if e := json.Unmarshal(op.Ack, &ack); e != nil {
+				return nil, e
+			}
+			if ack.Operation != id || ack.EnvelopeDigest != op.Envelope || ack.State != work.Phase || ack.ErrorCode != work.ErrorCode {
+				return nil, management.ErrInvalid
+			}
+			c.FinishedUnix = ack.ObservedUnix
+			c.ResultDigest = ack.ResultDigest
+			if ack.State == "COMPLETE" {
+				if storage.Hash(op.Result) != ack.ResultDigest {
+					return nil, management.ErrInvalid
+				}
+				switch op.Kind {
+				case "scrub":
+					var result ScrubReceipt
+					if e := storage.Decode(op.Result, &result, 16<<10); e != nil {
+						return nil, e
+					}
+					if result.Kind != "scrub" || result.Generation != op.Generation || result.Verification != "sha256-ciphertext" || result.VerifiedObjects != work.VerifiedObjects {
+						return nil, management.ErrInvalid
+					}
+					c.Verification = "CIPHERTEXT"
+					c.VerifiedUnix = result.VerifiedAt
+				case "maintenance":
+					var result MaintenanceReceipt
+					if e := storage.Decode(op.Result, &result, 16<<10); e != nil {
+						return nil, e
+					}
+					if result.Kind != "maintenance" {
+						return nil, management.ErrInvalid
+					}
+					c.Maintenance = &result.Result
+				default:
+					return nil, management.ErrInvalid
+				}
+			}
+		}
+		if e := c.Validate(time.Now().Unix()); e != nil {
+			return nil, e
+		}
+		out = append(out, c)
+	}
+	if len(out) > 2048 {
+		return nil, management.ErrCapacity
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Operation < out[j].Operation })
 	return out, nil
 }

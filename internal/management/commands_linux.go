@@ -248,6 +248,7 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 type QueuedCommand struct {
 	Document []byte `json:"document"`
 	Sequence uint64 `json:"sequence"`
+	position uint64
 }
 
 const MaxCommandPage = 8 << 20
@@ -264,7 +265,7 @@ func (r *Registry) CommandPage(ctx context.Context, p Principal, tenant, node st
 	if limit < 1 || limit > 32 {
 		return out, ErrInvalid
 	}
-	binding := cursorBinding(p, path)
+	binding := cursorBinding(p, path+"/command-order-2")
 	cur, e := r.readCursor(token, binding)
 	if e != nil {
 		return out, e
@@ -272,7 +273,7 @@ func (r *Registry) CommandPage(ctx context.Context, p Principal, tenant, node st
 	after := uint64(0)
 	if token != "" {
 		after, e = strconv.ParseUint(cur.Position, 10, 64)
-		if e != nil || !safe(after) {
+		if e != nil || !command.ValidPosition(after) {
 			return out, ErrConflict
 		}
 	}
@@ -283,17 +284,17 @@ func (r *Registry) CommandPage(ctx context.Context, p Principal, tenant, node st
 	if token != "" && cur.Revision != revision {
 		return out, ErrConflict
 	}
-	out = CommandPage{Format: "outpost-management-commands-1", Revision: revision, Commands: commands}
+	out = CommandPage{Format: "outpost-management-commands-2", Revision: revision, Commands: commands}
 	// A nonempty page supplies a cursor even when the following page is empty.
 	// Consumers restart at the first page after any ACK or registry revision.
 	if len(commands) > 0 {
-		out.NextCursor = r.writeCursor(revision, strconv.FormatUint(commands[len(commands)-1].Sequence, 10), binding)
+		out.NextCursor = r.writeCursor(revision, strconv.FormatUint(commands[len(commands)-1].position, 10), binding)
 	}
 	return out, nil
 }
 
 func (r *Registry) Commands(ctx context.Context, p Principal, tenant, node string, after uint64, limit int) ([]QueuedCommand, uint64, error) {
-	if p.Validate() != nil || !p.Role("node") || p.Actor != node || !p.Allows(tenant, "") || limit < 1 || limit > 32 || !safe(after) {
+	if p.Validate() != nil || !p.Role("node") || p.Actor != node || !p.Allows(tenant, "") || limit < 1 || limit > 32 || !command.ValidPosition(after) {
 		return nil, 0, ErrDenied
 	}
 	out := []QueuedCommand{}
@@ -312,8 +313,11 @@ func (r *Registry) Commands(ctx context.Context, p Principal, tenant, node strin
 			return ErrDenied
 		}
 		candidates := []commandOperation{}
+		position := func(o commandOperation) uint64 {
+			return command.Position(o.Audit.Sequence, strings.ToLower(strings.TrimPrefix(o.Audit.Action, "COMMAND_")))
+		}
 		for _, o := range s.CommandOperations {
-			if o.Node == node && o.Audit.Tenant == tenant && p.Allows(tenant, o.Audit.Domain) && o.Receipt.State == "ADMITTED" && o.Audit.Sequence > after {
+			if o.Node == node && o.Audit.Tenant == tenant && p.Allows(tenant, o.Audit.Domain) && o.Receipt.State == "ADMITTED" && position(o) > after {
 				if d, ok := enrollment.Domain(o.Audit.Domain); ok {
 					f := s.Domains[d.Domain]
 					if f.Tenant != tenant || f.Repository != d.Repository || f.Epoch != d.Epoch {
@@ -323,7 +327,7 @@ func (r *Registry) Commands(ctx context.Context, p Principal, tenant, node strin
 				}
 			}
 		}
-		sort.Slice(candidates, func(i, j int) bool { return candidates[i].Audit.Sequence < candidates[j].Audit.Sequence })
+		sort.Slice(candidates, func(i, j int) bool { return position(candidates[i]) < position(candidates[j]) })
 		bytes := 0
 		for _, o := range candidates {
 			if o.Envelope == "" {
@@ -337,7 +341,7 @@ func (r *Registry) Commands(ctx context.Context, p Principal, tenant, node strin
 				break
 			}
 			bytes += len(raw)
-			out = append(out, QueuedCommand{raw, o.Audit.Sequence})
+			out = append(out, QueuedCommand{raw, o.Audit.Sequence, position(o)})
 			if len(out) == limit {
 				break
 			}

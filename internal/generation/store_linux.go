@@ -28,15 +28,16 @@ type Pin struct {
 	Kind       string `json:"kind"`
 }
 type state struct {
-	Format          string            `json:"format"`
-	Trust           Trust             `json:"trust"`
-	Revision        uint64            `json:"revision"`
-	HighestSequence uint64            `json:"highestSequence"`
-	HighestID       string            `json:"highestId"`
-	Latest          string            `json:"latestComplete"`
-	Generations     map[string]entry  `json:"generations"`
-	Pins            map[string]Pin    `json:"pins"`
-	Receipts        map[string]string `json:"maintenanceReceipts"`
+	Format          string              `json:"format"`
+	Trust           Trust               `json:"trust"`
+	Revision        uint64              `json:"revision"`
+	HighestSequence uint64              `json:"highestSequence"`
+	HighestID       string              `json:"highestId"`
+	Latest          string              `json:"latestComplete"`
+	Generations     map[string]entry    `json:"generations"`
+	Pins            map[string]Pin      `json:"pins"`
+	Receipts        map[string]string   `json:"maintenanceReceipts"`
+	GC              map[string]gcRecord `json:"gc,omitempty"`
 }
 type Status struct {
 	Revision        uint64         `json:"revision"`
@@ -213,8 +214,16 @@ func (r *Replica) load() (state, error) {
 func (r *Replica) validateState(s state) (state, error) {
 	t, _ := json.Marshal(r.trust)
 	u, _ := json.Marshal(s.Trust)
-	if s.Format != StateFormat || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
+	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
 		return s, ErrInvalid
+	}
+	if s.Format == StateFormat && s.GC != nil || s.Format == MaintenanceStateFormat && len(s.GC) == 0 || len(s.GC) > len(s.Receipts) {
+		return s, ErrInvalid
+	}
+	for op, record := range s.GC {
+		if !validID(record.Plan) || !validID(s.Receipts[op]) || record.Result != nil && !record.Result.valid(op, s.Receipts[op]) {
+			return s, ErrInvalid
+		}
 	}
 	for id, digest := range s.Receipts {
 		if !validID(id) || !validID(digest) {

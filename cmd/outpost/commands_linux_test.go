@@ -80,10 +80,37 @@ func checkCLICommands(t *testing.T, base, bootstrap, ownerFile string, cfg contr
 	if _, e = run(ctx, []string{"worker-command-once", "--bootstrap", bootstrap, "--input", input}); !errors.Is(e, management.ErrUnavailable) {
 		t.Fatal("unavailable controller hidden", e)
 	}
-	bounded, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	_, e = run(bounded, []string{"worker-command-loop", "--bootstrap", bootstrap, "--input", input})
-	must(e)
+	done := make(chan error, 1)
+	go func() {
+		_, e := run(bounded, []string{"worker-command-loop", "--bootstrap", bootstrap, "--input", input})
+		done <- e
+	}()
+	// Observe the durable retry before cancelling. A fixed startup sleep races
+	// volume admission and journal fsync on a throttled HDD race-detector run.
+	deadline := time.Now().Add(3 * time.Second)
+	observed := false
+	for time.Now().Before(deadline) {
+		value, err := run(ctx, []string{"worker-status", "--bootstrap", bootstrap})
+		must(err)
+		state := value.(worker.Status)
+		if state.Controls.Delivery != nil && state.Controls.Delivery.Phase == "RETRY_WAIT" {
+			observed = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		must(err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("command loop did not join")
+	}
+	if !observed {
+		t.Fatal("command loop never persisted retry")
+	}
 	result, e = run(ctx, []string{"worker-status", "--bootstrap", bootstrap})
 	must(e)
 	s := result.(worker.Status)

@@ -22,7 +22,7 @@ func workerCommandFixture(t *testing.T, f *fixture, index int, jobs []control.Jo
 	c.Node = w.node
 	c.Domains = []control.Domain{f.domain}
 	c.Jobs = jobs
-	grant, e := command.SignAuthority(command.Authority{Format: command.AuthorityFormat, Service: service, Node: w.node, Tenant: storage.Hash([]byte("tenant")), Domain: f.domain.Trust.Domain, Repository: f.domain.Trust.Repository, WriterEpoch: 1, AuthorityEpoch: 1, Kinds: []string{"pause", "resume"}, NotBefore: c.NotBefore, ExpiresUnix: c.ExpiresUnix}, f.owner)
+	grant, e := command.SignAuthority(command.Authority{Format: command.AuthorityFormat, Service: service, Node: w.node, Tenant: storage.Hash([]byte("tenant")), Domain: f.domain.Trust.Domain, Repository: f.domain.Trust.Repository, WriterEpoch: 1, AuthorityEpoch: 1, Kinds: []string{"pause", "resume", "retry", "scrub"}, NotBefore: c.NotBefore, ExpiresUnix: c.ExpiresUnix}, f.owner)
 	must(t, e)
 	c.Commands = []json.RawMessage{grant}
 	raw, e := control.Sign(c, f.owner)
@@ -30,7 +30,11 @@ func workerCommandFixture(t *testing.T, f *fixture, index int, jobs []control.Jo
 	must(t, w.Accept(context.Background(), raw))
 	return c, func(kind, job string, seq uint64) []byte {
 		now := time.Now().Unix()
-		env := command.Envelope{Format: command.EnvelopeFormat, Actor: storage.Hash([]byte("operator")), Service: command.Identity(service), Node: w.node, Sequence: seq, ConfigurationDigest: storage.Hash(raw), AdmittedUnix: now, Request: command.Request{Operation: storage.Hash([]byte(kind + "/" + job + "/" + string(rune(seq)))), Reason: "OPERATOR_REQUEST", Tenant: storage.Hash([]byte("tenant")), Domain: f.domain.Trust.Domain, Kind: kind, Job: job, ExpectedRevision: c.Revision, Authority: grant, ExpiresUnix: now + 120}}
+		env := command.Envelope{Format: command.EnvelopeFormat, Actor: storage.Hash([]byte("operator")), Service: command.Identity(service), Node: w.node, Sequence: seq, ConfigurationDigest: storage.Hash(raw), AdmittedUnix: now, Request: command.Request{Operation: storage.Hash([]byte(kind + "/" + job + "/" + string(rune(seq)))), Reason: "OPERATOR_REQUEST", Tenant: storage.Hash([]byte("tenant")), Domain: f.domain.Trust.Domain, Kind: kind, Job: job, ExpectedRevision: c.Revision, Authority: grant, ExpiresUnix: min(now+120, c.ExpiresUnix)}}
+		if kind == "scrub" {
+			env.Request.Job = ""
+			env.Request.Generation = job
+		}
 		out, e := command.SignEnvelope(env, f.owner.Public().(ed25519.PublicKey), signer)
 		must(t, e)
 		return out

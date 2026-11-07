@@ -317,7 +317,7 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.RawQuery != "" {
-		paged := r.Method == http.MethodGet && (len(parts) == 5 && (parts[4] == "nodes" || parts[4] == "audit") || len(parts) == 9 && (parts[8] == "generations" || parts[8] == "jobs") || len(parts) == 7 && parts[6] == "commands")
+		paged := r.Method == http.MethodGet && (len(parts) == 5 && (parts[4] == "nodes" || parts[4] == "audit") || len(parts) == 9 && (parts[8] == "generations" || parts[8] == "jobs" || parts[8] == "command-status") || len(parts) == 7 && parts[6] == "commands")
 		if !paged {
 			failHTTP(w, ErrInvalid)
 			return
@@ -459,7 +459,7 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(parts) == 9 && action == "domains" && storage.ID(parts[7]) && r.Method == http.MethodGet {
 		domain, kind := parts[7], parts[8]
-		if kind != "report" && kind != "generations" && kind != "jobs" {
+		if kind != "report" && kind != "generations" && kind != "jobs" && kind != "command-status" {
 			failHTTP(w, ErrUnavailable)
 			return
 		}
@@ -571,6 +571,9 @@ func (h *httpService) reportPage(p Principal, r *http.Request, view ReportView, 
 	if kind == "jobs" {
 		total = len(view.Jobs)
 	}
+	if kind == "command-status" {
+		total = len(view.Commands)
+	}
 	if offset > total {
 		return nil, ErrConflict
 	}
@@ -589,6 +592,20 @@ func (h *httpService) reportPage(p Principal, r *http.Request, view ReportView, 
 			Items          []Generation `json:"items"`
 			NextCursor     string       `json:"nextCursor,omitempty"`
 		}{"outpost-management-generations-1", view.Sequence, view.ObservedUnix, view.State, inventoryState(view.InventoryState), view.Generations[offset:end], next}, nil
+	}
+	if kind == "command-status" {
+		items := view.Commands[offset:end]
+		if items == nil {
+			items = []CommandObservation{}
+		}
+		return struct {
+			Format         string               `json:"format"`
+			ReportSequence uint64               `json:"reportSequence"`
+			ObservedUnix   int64                `json:"observedUnix"`
+			State          string               `json:"state"`
+			Items          []CommandObservation `json:"items"`
+			NextCursor     string               `json:"nextCursor,omitempty"`
+		}{"outpost-management-command-status-1", view.Sequence, view.ObservedUnix, view.State, items, next}, nil
 	}
 	return struct {
 		Format         string `json:"format"`

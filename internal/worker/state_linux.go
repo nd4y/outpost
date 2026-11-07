@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
@@ -163,76 +162,6 @@ func (w *Worker) admit(ctx context.Context, c control.Config) error {
 	})
 }
 
-// Retry cannot create work or renew authority. The job must still belong to the
-// currently active owner policy. Durable data and upload pins are retained.
-func (w *Worker) Retry(ctx context.Context, operation string) error {
-	raw, e := w.cache.Raw(ctx)
-	if e != nil {
-		return e
-	}
-	known, e := w.cache.Verify(raw)
-	if e != nil {
-		return e
-	}
-	_, e = w.budgetFor(ctx, known, false)
-	if e != nil {
-		return e
-	}
-	c, e := w.cache.Current(ctx, time.Now())
-	if e != nil {
-		return e
-	}
-	var admitted *control.Job
-	for _, j := range c.Jobs {
-		if j.Executor == w.node && j.Operation == operation {
-			copy := j
-			admitted = &copy
-			break
-		}
-	}
-	if admitted == nil {
-		s, e := w.Status(ctx)
-		if e != nil {
-			return e
-		}
-		old, ok := s.Jobs[operation]
-		if !ok || !c.Autonomous(old.Job) {
-			return ErrDenied
-		}
-		copy := old.Job
-		admitted = &copy
-	}
-	return w.update(ctx, func(s *Status) error {
-		j, ok := s.Jobs[operation]
-		if !ok || s.Rejected[operation] != "" || j.Binding != binding(*admitted) || j.Phase != "BLOCKED" {
-			return ErrDenied
-		}
-		if j.Job.Kind == "upload" {
-			d, ok := c.DomainByID(j.Job.Domain)
-			if !ok {
-				return ErrDenied
-			}
-			dir := filepath.Join(DomainDirectory(w.dir, d.Trust), "uploads", operation)
-			relative, e := filepath.Rel(w.dir, dir)
-			if e != nil {
-				return e
-			}
-			q, e := upload.OpenQueueAt(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, false, w.admission(filepath.ToSlash(relative)))
-			if e != nil {
-				return e
-			}
-			defer q.Close()
-			if e = q.Retry(ctx, operation); e != nil {
-				return e
-			}
-		}
-		j.Phase = "QUEUED"
-		j.NextMillis = 0
-		j.ErrorCode = ""
-		s.Jobs[operation] = j
-		return nil
-	})
-}
 func errorCode(e error) string {
 	switch {
 	case e == nil:

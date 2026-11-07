@@ -20,6 +20,11 @@ func (w *Worker) commandPolicy(ctx context.Context, cfg control.Config, raw []by
 	if _, e := cfg.CommandAuthority(env.Request.Authority, w.owner, time.Now()); e != nil {
 		return e
 	}
+	if env.Request.Kind == "maintenance" {
+		if _, e := cfg.MaintenancePermit(env.Request); e != nil {
+			return e
+		}
+	}
 	if env.Request.Job != "" {
 		for _, job := range cfg.Jobs {
 			if job.Operation == env.Request.Job && job.Domain == env.Request.Domain && (job.Executor == w.node || job.Peer == w.node) {
@@ -46,7 +51,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 	if e != nil || env.Node != w.node {
 		return nil, ErrDenied
 	}
-	if env.Request.Kind != "pause" && env.Request.Kind != "resume" {
+	if env.Request.Kind != "pause" && env.Request.Kind != "resume" && env.Request.Kind != "retry" && env.Request.Kind != "scrub" && env.Request.Kind != "maintenance" {
 		return nil, ErrDenied
 	}
 	if e = w.check(ctx); e != nil {
@@ -66,6 +71,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 		if s.Format != Format || s.Controls == nil {
 			return ErrDenied
 		}
+		scope := command.SequenceScope(env.Service, env.Request.Kind)
 		op, exists := s.Controls.Operations[env.Request.Operation]
 		digest := storage.Hash(raw)
 		name := "command-" + digest + ".json"
@@ -91,16 +97,23 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 			if len(s.Controls.Operations) >= maxCommands {
 				return ErrCapacity
 			}
-			if env.Sequence <= s.Controls.Sequences[env.Service] {
+			if env.Sequence <= s.Controls.Sequences[scope] {
 				return ErrDenied
 			}
-			if _, ok := s.Controls.Sequences[env.Service]; !ok && len(s.Controls.Sequences) >= 128 {
+			if _, ok := s.Controls.Sequences[scope]; !ok && len(s.Controls.Sequences) >= 256 {
 				return ErrCapacity
 			}
+			pending := 0
 			for _, old := range s.Controls.Operations {
-				if len(old.Ack) == 0 {
-					return ErrDenied
+				if len(old.Ack) == 0 && command.Control(old.Kind) == command.Control(env.Request.Kind) {
+					pending++
 				}
+			}
+			if command.Control(env.Request.Kind) && pending > 0 {
+				return ErrDenied
+			}
+			if !command.Control(env.Request.Kind) && pending >= 32 {
+				return ErrCapacity
 			}
 			previous, e := journal.Read(name)
 			if e == nil && !bytes.Equal(previous, raw) {
@@ -117,16 +130,35 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 			if e = w.point("worker-command-envelope-durable"); e != nil {
 				return e
 			}
-			op = CommandRecord{Envelope: digest, Service: env.Service, Sequence: env.Sequence, Domain: env.Request.Domain, Kind: env.Request.Kind, Job: env.Request.Job}
+			op = CommandRecord{Tenant: env.Request.Tenant, Envelope: digest, Service: env.Service, Sequence: env.Sequence, Domain: env.Request.Domain, Kind: env.Request.Kind, Job: env.Request.Job}
 			// Lock order is cache, then worker state. Policy cannot be replaced between
 			// checking the owner grant and committing its short local desired-state change.
-			e = w.cache.WithCurrent(ctx, time.Now(), func(cfg control.Config, policy []byte) error {
+			e = state.cache.WithCurrent(ctx, time.Now(), func(cfg control.Config, policy []byte) error {
 				if e = w.commandPolicy(ctx, cfg, policy, env); e != nil {
 					return e
 				}
 				return state.update(ctx, func(s *Status) error {
 					if s.Controls == nil || s.Controls.Revision >= command.MaxSafeInteger || cfg.Active(time.Now()) != nil || env.Active(time.Now()) != nil {
 						return ErrDenied
+					}
+					if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" {
+						op.Generation = env.Request.Generation
+						op.Work = &CommandWork{Phase: "QUEUED"}
+						op.StartedUnix = time.Now().Unix()
+						s.Controls.Operations[env.Request.Operation] = op
+						s.Controls.Sequences[scope] = env.Sequence
+						return nil
+					}
+					if env.Request.Kind == "retry" {
+						job, e := w.retryJob(cfg, s, env.Request.Job)
+						if e != nil {
+							return e
+						}
+						op.JobBinding = job.Binding
+						op.StartedUnix = time.Now().Unix()
+						s.Controls.Operations[env.Request.Operation] = op
+						s.Controls.Sequences[scope] = env.Sequence
+						return nil
 					}
 					if env.Request.Job == "" {
 						if env.Request.Kind == "pause" {
@@ -148,7 +180,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 					op.Revision = s.Controls.Revision
 					op.StartedUnix = time.Now().Unix()
 					s.Controls.Operations[env.Request.Operation] = op
-					s.Controls.Sequences[env.Service] = env.Sequence
+					s.Controls.Sequences[scope] = env.Sequence
 					return nil
 				})
 			})
@@ -172,7 +204,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 				op.Ack = ack
 				if e = state.update(ctx, func(s *Status) error {
 					s.Controls.Operations[env.Request.Operation] = op
-					s.Controls.Sequences[env.Service] = env.Sequence
+					s.Controls.Sequences[scope] = env.Sequence
 					return nil
 				}); e != nil {
 					return e
@@ -183,6 +215,26 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 			if e = w.point("worker-command-intent-durable"); e != nil {
 				return e
 			}
+		}
+		if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" {
+			if exists {
+				acquire, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
+				err := w.lease.WithLock(acquire, func() error { return state.reconcileActions(ctx) })
+				cancel()
+				if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+					return err
+				}
+				current, err := state.Status(ctx)
+				if err != nil {
+					return err
+				}
+				out = current.Controls.Operations[env.Request.Operation].Ack
+			}
+			return nil
+		}
+		if env.Request.Kind == "retry" {
+			out, e = w.finishRetryCommand(ctx, state, raw, env, op)
+			return e
 		}
 		wait, done := context.WithDeadline(ctx, time.Unix(env.Request.ExpiresUnix, 0))
 		defer done()
@@ -231,6 +283,9 @@ func (w *Worker) commandResult(raw []byte, env command.Envelope, op CommandRecor
 	ack := command.Ack{Format: command.AckFormat, Node: w.node, Operation: env.Request.Operation, EnvelopeDigest: storage.Hash(raw), State: status, StartedUnix: op.StartedUnix, ObservedUnix: now.Unix(), ControlRevision: op.Revision, ErrorCode: code}
 	if status == "COMPLETE" {
 		ack.ResultDigest = storage.Hash([]byte(op.Envelope + "/applied"))
+		if len(op.Result) > 0 {
+			ack.ResultDigest = storage.Hash(op.Result)
+		}
 	}
 	return command.SignAck(ack, raw, w.owner, w.cert.PrivateKey.(ed25519.PrivateKey), now)
 }

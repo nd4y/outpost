@@ -398,6 +398,9 @@ func run(ctx context.Context, args []string) (any, error) {
 			if e != nil {
 				return nil, e
 			}
+			if len(ack) == 0 {
+				return map[string]any{"state": "QUEUED", "completed": false}, nil
+			}
 			return json.RawMessage(ack), nil
 		case "worker-discovery-status":
 			return w.DiscoveryStatus(ctx)

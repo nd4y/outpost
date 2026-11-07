@@ -89,7 +89,10 @@ func waitQueue(t *testing.T, q *Queue, predicate func(QueueState) bool) {
 func TestQueueTargetIsolationAndAutomaticRetry(t *testing.T) {
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
-			f := newFixture(t)
+			// Exercise isolation/retry with several physical parts within the same
+			// bounded deadlines under the race detector on one CPU. The independent
+			// throughput/reassignment fixtures retain their larger payloads.
+			f := fixtureBytes(t, 256<<10)
 			var unavailable atomic.Bool
 			unavailable.Store(true)
 			slow := f.server(t, kind, 0, func(w http.ResponseWriter, r *http.Request, actor, key string, body []byte) bool {
