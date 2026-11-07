@@ -91,7 +91,17 @@ func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit 
 		if audit != nil {
 			e = audit.verify(ctx, blob.Object.ID, false)
 		} else {
-			_, e = b.ReadBlob(ctx, blob.Object)
+			var actual storage.Blob
+			actual, e = b.Descriptor(ctx, blob.Object)
+			if e == nil {
+				expectedRaw, _ := json.Marshal(blob)
+				actualRaw, _ := json.Marshal(actual)
+				if !bytes.Equal(expectedRaw, actualRaw) {
+					e = storage.ErrConflict
+				} else {
+					_, e = b.ReadDescribed(ctx, actual)
+				}
+			}
 		}
 		if e != nil {
 			return e
@@ -190,7 +200,18 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 					return result, e
 				}
 			}
-			if e = j.edit(ctx, func(s *State) error { s.Phase = "COMPLETE"; s.Receipt = &receipt; return nil }); e != nil {
+			if e = j.edit(ctx, func(s *State) error {
+				// A PUT/readback may succeed just as its slot expires before the
+				// local acknowledgment is saved. Exact-map whole-target evidence
+				// resolves those attempts without inventing submitted byte counts.
+				for id, p := range s.Parts {
+					p.Complete = true
+					s.Parts[id] = p
+				}
+				s.Phase = "COMPLETE"
+				s.Receipt = &receipt
+				return nil
+			}); e != nil {
 				return result, e
 			}
 			result.Receipt = receipt

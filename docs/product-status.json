@@ -636,6 +636,10 @@
           "name": "TestUploadPlanningSIGKILLKeepsProtectionAcrossQueueHandoff"
         },
         {
+          "path": "internal/upload/descriptor_linux_test.go",
+          "name": "TestCompleteTargetCannotCertifyDifferentPlannedParts"
+        },
+        {
           "path": "internal/upload/planning_cache_linux_test.go",
           "name": "TestMultipartPlanningResumesAfterDurableObjectWithoutRereadingIt"
         },
@@ -844,6 +848,10 @@
           "name": "TestReadbackEvidenceRetainsAgeAcrossRestartAndIsolatesScopes"
         },
         {
+          "path": "internal/upload/descriptor_linux_test.go",
+          "name": "TestCompleteTargetCannotCertifyDifferentPlannedParts"
+        },
+        {
           "path": "internal/upload/planning_io_linux_test.go",
           "name": "TestTargetReadbackDoesNotRequireUnneededSourcePayload"
         },
@@ -1023,6 +1031,10 @@
         {
           "path": "internal/upload/delegation_linux_test.go",
           "name": "TestDelegatedPlansAreIdenticalAcrossReplicasAndRecoverBothProtocols"
+        },
+        {
+          "path": "internal/upload/descriptor_linux_test.go",
+          "name": "TestCompleteTargetCannotCertifyDifferentPlannedParts"
         },
         {
           "path": "internal/upload/planning_io_linux_test.go",
@@ -1593,6 +1605,10 @@
         {
           "path": "internal/readback/cache_linux_test.go",
           "name": "TestReadbackEvidenceRetainsAgeAcrossRestartAndIsolatesScopes"
+        },
+        {
+          "path": "internal/upload/descriptor_linux_test.go",
+          "name": "TestCompleteTargetCannotCertifyDifferentPlannedParts"
         },
         {
           "path": "internal/upload/planning_cache_linux_test.go",

@@ -81,10 +81,23 @@ func TestTargetReadbackDoesNotRequireUnneededSourcePayload(t *testing.T) {
 		j, e := Open(dir, raw, f.workers[0].ID, f.authority, true)
 		must(t, e)
 		defer j.Close()
+		if name == "independent-target-audit" {
+			tasks, e := j.plan.Tasks()
+			must(t, e)
+			// Simulate a lost local acknowledgment after the target accepted bytes.
+			must(t, j.beginPart(ctx, tasks[0].Part.ID, 0))
+		}
 		b := f.backend(t, target, 0)
 		defer b.Close()
 		result, e := j.Run(ctx, source, b, f.keys[0])
 		must(t, e)
+		state, e := j.Status(ctx)
+		must(t, e)
+		for _, part := range state.Parts {
+			if !part.Complete {
+				t.Fatal("full readback left an acknowledged target part pending")
+			}
+		}
 		return result.Receipt
 	}
 	run("initial-target", f.replicas[1])
