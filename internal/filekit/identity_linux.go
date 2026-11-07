@@ -46,3 +46,36 @@ func InspectEntry(root *os.Root, relative string) (SourceIdentity, error) {
 	e = unix.Fstatat(int(p.Fd()), n, &st, unix.AT_SYMLINK_NOFOLLOW)
 	return identity(st), e
 }
+
+// Birth distinguishes inode reuse when the source filesystem exposes birthtime.
+// Absence is explicit; callers must choose a new file identity, not infer one
+// from inode numbers alone. It does not certify a snapshot provider's origin.
+func Birth(root *os.Root, relative string, expected SourceIdentity) (int64, uint32, bool, error) {
+	p, n, e := rootedParent(root, relative)
+	if e != nil {
+		return 0, 0, false, e
+	}
+	defer p.Close()
+	var before, after unix.Stat_t
+	if e = unix.Fstatat(int(p.Fd()), n, &before, unix.AT_SYMLINK_NOFOLLOW); e != nil {
+		return 0, 0, false, e
+	}
+	if identity(before) != expected {
+		return 0, 0, false, ErrInvalid
+	}
+	var st unix.Statx_t
+	e = unix.Statx(int(p.Fd()), n, unix.AT_SYMLINK_NOFOLLOW|unix.AT_NO_AUTOMOUNT, unix.STATX_BTIME, &st)
+	if e != nil {
+		return 0, 0, false, e
+	}
+	if e = unix.Fstatat(int(p.Fd()), n, &after, unix.AT_SYMLINK_NOFOLLOW); e != nil {
+		return 0, 0, false, e
+	}
+	if identity(after) != expected {
+		return 0, 0, false, ErrInvalid
+	}
+	if st.Mask&unix.STATX_BTIME == 0 || st.Btime.Sec <= 0 || st.Btime.Nsec >= 1000000000 {
+		return 0, 0, false, nil
+	}
+	return st.Btime.Sec, st.Btime.Nsec, true, nil
+}

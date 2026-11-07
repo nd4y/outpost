@@ -2,6 +2,7 @@ package ingress
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -17,10 +18,12 @@ import (
 
 type registryFixture struct {
 	*fixture
-	registry *Registry
-	options  RegistryOptions
-	server   *httptest.Server
-	client   *Client
+	registry   *Registry
+	options    RegistryOptions
+	server     *httptest.Server
+	client     *Client
+	sourceCert tls.Certificate
+	ca         *testCA
 }
 
 func registryNetwork(t *testing.T) *registryFixture {
@@ -35,7 +38,7 @@ func registryNetwork(t *testing.T) *registryFixture {
 	o := RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: f.options.Authority, Owner: f.options.Owner, Replica: f.options.Replica, Certificate: target, Roots: ca.roots, Limits: httpLimits, Initialize: true}
 	g, e := OpenRegistry(context.Background(), o)
 	must(t, e)
-	x := &registryFixture{fixture: f, registry: g, options: o}
+	x := &registryFixture{fixture: f, registry: g, options: o, sourceCert: source, ca: ca}
 	t.Cleanup(func() {
 		if x.registry != nil {
 			x.registry.Close()

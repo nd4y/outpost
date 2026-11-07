@@ -432,9 +432,36 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, ErrDenied)
 		return
 	}
-	if _, e := g.begin(ctx, g.state.Intent); e != nil {
-		fail(w, e)
-		return
+	if len(parts) == 2 && parts[1] == "ack" && r.Method == http.MethodPut {
+		// Cleanup cannot initialize or replace the fenced slot. Current owner
+		// authority and TLS were checked above; the receipt is checked by Session.
+		if g.poisoned || now.Unix() < g.state.ObservedUnix {
+			fail(w, ErrConflict)
+			return
+		}
+		if g.session == nil {
+			o := g.sessionOptions(g.state.Intent)
+			o.Initialize = false
+			var e error
+			g.session, e = openSession(ctx, o, true)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+		}
+		if g.handler == nil {
+			s, e := NewServer(g.session, g.options.Certificate, g.options.Roots, g.options.Limits)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			g.handler = s.Handler
+		}
+	} else {
+		if _, e := g.begin(ctx, g.state.Intent); e != nil {
+			fail(w, e)
+			return
+		}
 	}
 	g.handler.ServeHTTP(w, r.WithContext(ctx))
 }

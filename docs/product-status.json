@@ -10,13 +10,15 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-02",
@@ -24,13 +26,15 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-03",
@@ -38,6 +42,8 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
@@ -56,6 +62,14 @@
           "name": "TestScanBoundsCancellationAndSymlinkAncestorReplacement"
         },
         {
+          "path": "internal/capture/tree_linux_test.go",
+          "name": "TestTreeProviderRejectsOverlapsAliasAndReplacedSource"
+        },
+        {
+          "path": "internal/sourceagent/runtime_linux_test.go",
+          "name": "TestSourceInitRejectsOverlapBeforeCreatingRuntime"
+        },
+        {
           "path": "internal/filekit/entries_linux_test.go",
           "name": "TestTypedIndependentDirectoryAndSymlinkRecovery"
         },
@@ -69,7 +83,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-04",
@@ -77,6 +91,8 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
@@ -93,10 +109,14 @@
         {
           "path": "internal/filekit/progress_linux_test.go",
           "name": "TestEncryptedCaptureProgressResumesAcceptedPacksAndTornTail"
+        },
+        {
+          "path": "internal/sourceagent/runtime_linux_test.go",
+          "name": "TestExecutableSourceRuntimeResumesAndPreservesIndependentHistory"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-05",
@@ -104,6 +124,8 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
@@ -124,10 +146,14 @@
         {
           "path": "internal/filekit/progress_linux_test.go",
           "name": "TestCaptureProgressSIGKILLReusesDurablyAcceptedPack"
+        },
+        {
+          "path": "internal/sourceagent/runtime_linux_test.go",
+          "name": "TestExecutableSourceRuntimeResumesAndPreservesIndependentHistory"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-06",
@@ -135,13 +161,15 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-07",
@@ -158,13 +186,15 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-09",
@@ -289,6 +319,8 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/source",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/filekit",
         "internal/ingress",
         "internal/policy"
@@ -304,7 +336,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
+      "remaining": "Native consistency providers, authenticated second-copy discovery, scheduled capture, grant renewal, initial-install recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-15",
@@ -457,6 +489,10 @@
         {
           "path": "internal/ingress/crash_linux_test.go",
           "name": "TestIngressSIGKILLDurabilityAndPublicationBoundaries"
+        },
+        {
+          "path": "internal/sourceagent/crash_linux_test.go",
+          "name": "TestSourceAgentSIGKILLFencesAndFinalHead"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -559,6 +595,10 @@
         {
           "path": "internal/source/scan_linux_test.go",
           "name": "TestScanRejectsRacesBeforeReadAndBeforePublication"
+        },
+        {
+          "path": "internal/sourceagent/runtime_linux_test.go",
+          "name": "TestSourceRuntimeRejectsProfileDowngradeStateTamperAndVolumeLoss"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -601,6 +641,10 @@
         {
           "path": "internal/ingress/ack_linux_test.go",
           "name": "TestHTTPSAcknowledgementIsIdempotentAfterLostReply"
+        },
+        {
+          "path": "internal/ingress/cleanup_linux_test.go",
+          "name": "TestExpiredIntentCleanupOverHTTPSAfterRegistryRestart"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -871,6 +915,10 @@
         {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "internal/sourceagent/runtime_linux_test.go",
+          "name": "TestExecutableSourceRuntimeResumesAndPreservesIndependentHistory"
         }
       ],
       "acceptance": ["AT-24"],
@@ -935,6 +983,10 @@
         {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLIVolumeProbeAndEnrollmentBindExactEmptyTarget"
+        },
+        {
+          "path": "internal/sourceagent/runtime_linux_test.go",
+          "name": "TestSourceVolumeLossCancelsInflightHTTPSAndJoins"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -1095,7 +1147,12 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLISourceProbeAndCapabilityErrors"
+        }
+      ],
       "acceptance": ["AT-31"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },

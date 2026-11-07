@@ -80,6 +80,26 @@ func Probe(ctx context.Context, path string) (Observation, error) {
 	}
 	return o, ctx.Err()
 }
+
+// InspectRoot observes the held descriptor, avoiding a path check-to-use gap.
+func InspectRoot(ctx context.Context, root *os.Root) (Observation, error) {
+	if e := ctx.Err(); e != nil {
+		return Observation{}, e
+	}
+	if root == nil {
+		return Observation{}, ErrUnavailable
+	}
+	f, e := root.Open(".")
+	if e != nil {
+		return Observation{}, e
+	}
+	defer f.Close()
+	result, e := observe(f)
+	if e != nil {
+		return result, e
+	}
+	return result, ctx.Err()
+}
 func sentinel(root *os.Root) ([]byte, error) {
 	f, e := localfs.OpenFile(root, Sentinel, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if e != nil {

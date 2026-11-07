@@ -17,9 +17,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/ingress"
+	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/sourceagent"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/volume"
@@ -33,7 +37,12 @@ func writeNew(path string, b []byte) error {
 	if !filepath.IsAbs(path) {
 		return errUsage
 	}
-	f, e := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	root, e := localfs.OpenRoot(filepath.Dir(path))
+	if e != nil {
+		return e
+	}
+	defer root.Close()
+	f, e := localfs.OpenFile(root, filepath.Base(path), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
 		return e
 	}
@@ -48,7 +57,7 @@ func writeNew(path string, b []byte) error {
 	if e != nil {
 		return e
 	}
-	dir, e := os.Open(filepath.Dir(path))
+	dir, e := root.Open(".")
 	if e != nil {
 		return e
 	}
@@ -57,7 +66,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "version" {
 		if len(args) != 1 {
@@ -83,6 +92,56 @@ func run(ctx context.Context, args []string) (any, error) {
 		return nil, errUsage
 	}
 	switch args[0] {
+	case "source-probe":
+		binding, e := capture.ProbeTree(ctx, *store, *nodeID)
+		if e != nil {
+			return nil, e
+		}
+		raw, e := json.Marshal(binding)
+		if e != nil {
+			return nil, e
+		}
+		if e = writeNew(*output, raw); e != nil {
+			return nil, e
+		}
+		return map[string]any{"format": capture.TreeFormat, "probed": true}, nil
+	case "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint":
+		b, e := sourceagent.Load(*bootstrap)
+		if e != nil {
+			return nil, e
+		}
+		a, e := sourceagent.Open(ctx, b, args[0] == "source-init")
+		if e != nil {
+			return nil, e
+		}
+		defer a.Close()
+		switch args[0] {
+		case "source-next":
+			if e = a.Next(ctx); e != nil {
+				return nil, e
+			}
+		case "source-prepare":
+			raw, e := worker.ReadPrivate(*input, ingress.MaxDocument)
+			if e != nil {
+				return nil, e
+			}
+			if e = a.Prepare(ctx, raw); e != nil {
+				return nil, e
+			}
+		case "source-run":
+			if e = a.Run(ctx); e != nil {
+				return nil, e
+			}
+		case "source-checkpoint":
+			raw, e := a.Checkpoint(ctx)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, raw); e != nil {
+				return nil, e
+			}
+		}
+		return a.Status(ctx)
 	case "volume-probe":
 		if !filepath.IsAbs(*output) {
 			return nil, errUsage
@@ -151,7 +210,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			}
 		}
 		return generation.RecoverMaterialized(ctx, *store, *generationID, trust, owner, selection, *output)
-	case "config-sign":
+	case "config-sign", "source-authority-sign":
 		private, e := worker.ReadPrivate(*key, 65536)
 		if e != nil {
 			return nil, e
@@ -162,9 +221,27 @@ func run(ctx context.Context, args []string) (any, error) {
 		if worker.DecodeInput(private, &signer, 65536) != nil {
 			return nil, errUsage
 		}
-		raw, e := worker.ReadPrivate(*input, control.MaxConfig)
+		limit := control.MaxConfig
+		if args[0] == "source-authority-sign" {
+			limit = ingress.MaxDocument
+		}
+		raw, e := worker.ReadPrivate(*input, limit)
 		if e != nil {
 			return nil, e
+		}
+		if args[0] == "source-authority-sign" {
+			var grant ingress.Authority
+			if worker.DecodeInput(raw, &grant, ingress.MaxDocument) != nil {
+				return nil, errUsage
+			}
+			signed, e := ingress.SignAuthority(grant, signer.PrivateKey)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, signed); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": ingress.AuthorityFormat, "signed": true}, nil
 		}
 		var config control.Config
 		if worker.DecodeInput(raw, &config, control.MaxConfig) != nil {
@@ -280,11 +357,15 @@ func failure(e error) (string, int) {
 		return "INVALID_ARGUMENT", 2
 	case errors.Is(e, generation.ErrMigrationRequired):
 		return "MIGRATION_REQUIRED", 5
-	case errors.Is(e, worker.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied):
+	case errors.Is(e, sourceagent.ErrUnsupported):
+		return "CAPABILITY_UNAVAILABLE", 5
+	case errors.Is(e, capture.ErrCopies):
+		return "COPY_THRESHOLD_PENDING", 5
+	case errors.Is(e, worker.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ingress.ErrDenied):
 		return "DENIED", 3
-	case errors.Is(e, generation.ErrIncomplete), errors.Is(e, filekit.ErrInvalid), errors.Is(e, storage.ErrIntegrity):
+	case errors.Is(e, generation.ErrIncomplete), errors.Is(e, filekit.ErrInvalid), errors.Is(e, storage.ErrIntegrity), errors.Is(e, capture.ErrInvalid), errors.Is(e, sourceagent.ErrInvalid):
 		return "INCOMPLETE_OR_CORRUPT", 4
-	case errors.Is(e, control.ErrRollback), errors.Is(e, generation.ErrConflict), errors.Is(e, storage.ErrConflict), errors.Is(e, os.ErrExist):
+	case errors.Is(e, control.ErrRollback), errors.Is(e, generation.ErrConflict), errors.Is(e, storage.ErrConflict), errors.Is(e, ingress.ErrConflict), errors.Is(e, os.ErrExist):
 		return "CONFLICT", 5
 	case errors.Is(e, worker.ErrCapacity), errors.Is(e, storage.ErrCapacity), errors.Is(e, statefile.ErrCapacity):
 		return "CAPACITY_BLOCKED", 6

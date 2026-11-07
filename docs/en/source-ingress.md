@@ -33,4 +33,6 @@ A receipt identifies operation, ingress, tenant/domain, generation, new bytes/ob
 
 Before acknowledging, the source must durably save its verified receipt/checkpoint, satisfy its copy threshold and finish provider release. Acknowledgement persists first, then releases only its own pins and removes its accepted staged copies in bounded steps. Retry the identical acknowledgement after a lost response. Acknowledged operations cannot accept or expose payload; replica recovery remains available. Retirement needs separate signed maintenance authority.
 
+A completed operation can acknowledge its exact original receipt after its capture intent expires. The cleanup-only client cannot begin or access payload. Registry routing still requires current owner authority and current worker placement/TLS; expiry does not renew those grants. Reopening cleanup cannot initialize a slot. An incomplete operation cannot use this path.
+
 403 means denied authority; 404 absent scoped object; 409 operation/lineage conflict; 412 incomplete data; 429 request capacity; 503 temporary unavailability; 507 storage admission refused. None permits a broader route. Expiry/rollback preserve retained data. Unknown files are never removed; interrupted temporary files need explicit owned-file reconciliation.

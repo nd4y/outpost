@@ -252,6 +252,9 @@ func (p Plan) Recheck(ctx context.Context, root *os.Root) error {
 // CaptureEntry rechecks every hardlink alias around the rooted read. The caller
 // must preserve the plan and call Recheck before publishing the generation.
 func (p Plan) CaptureEntry(ctx context.Context, root *os.Root, entry Entry, s *filekit.Store, file, previous string) (filekit.Stats, error) {
+	return p.CaptureEntryProgress(ctx, root, entry, s, file, previous, "")
+}
+func (p Plan) CaptureEntryProgress(ctx context.Context, root *os.Root, entry Entry, s *filekit.Store, file, previous, operation string) (filekit.Stats, error) {
 	if s == nil || entry.Domain != s.Owner.Domain || len(entry.Names) == 0 {
 		return filekit.Stats{}, policy.ErrDenied
 	}
@@ -280,7 +283,7 @@ func (p Plan) CaptureEntry(ctx context.Context, root *os.Root, entry Entry, s *f
 	if e := check(); e != nil {
 		return filekit.Stats{}, e
 	}
-	stats, e := s.BackupEntry(ctx, root, entry.Names[0], filekit.BackupOptions{File: file, Previous: previous, Names: entry.Names, Expected: &entry.Identity})
+	stats, e := s.BackupEntry(ctx, root, entry.Names[0], filekit.BackupOptions{File: file, Previous: previous, Names: entry.Names, Expected: &entry.Identity, Progress: operation})
 	if e != nil {
 		return stats, e
 	}

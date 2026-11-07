@@ -123,7 +123,11 @@ func NewServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 			return
 		}
 		deadline := now.Add(limits.Timeout)
-		for _, expiry := range []time.Time{leaf.NotAfter, remote.NotAfter, time.Unix(s.intent.ExpiresUnix, 0)} {
+		expiries := []time.Time{leaf.NotAfter, remote.NotAfter}
+		if resource != "ack" || r.Method != http.MethodPut {
+			expiries = append(expiries, time.Unix(s.intent.ExpiresUnix, 0))
+		}
+		for _, expiry := range expiries {
 			if expiry.Before(deadline) {
 				deadline = expiry
 			}
@@ -246,6 +250,7 @@ type Client struct {
 	cert                         *x509.Certificate
 	authority, intentRaw         []byte
 	owner                        ed25519.PublicKey
+	cleanup                      bool
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
 type countedBody struct {
@@ -267,10 +272,22 @@ func (c *Client) peerCurrent(s *tls.ConnectionState) bool {
 	return peer.Identity(leaf) == c.intent.Ingress && !now.Before(leaf.NotBefore) && now.Before(leaf.NotAfter)
 }
 func NewClient(endpoint string, authority, intent []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*Client, error) {
+	return newClient(endpoint, authority, intent, owner, cert, roots, limits, false)
+}
+
+// NewCleanupClient admits only acknowledgement of an already verified receipt.
+// It cannot begin, read, upload or publish an operation, including before expiry.
+func NewCleanupClient(endpoint string, authority, intent []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*Client, error) {
+	return newClient(endpoint, authority, intent, owner, cert, roots, limits, true)
+}
+func newClient(endpoint string, authority, intent []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits, cleanup bool) (*Client, error) {
 	if !limitsOK(limits) {
 		return nil, ErrDenied
 	}
 	i, _, e := VerifyIntent(intent, authority, owner, time.Now())
+	if cleanup {
+		e = canonicalIntent(intent, authority, owner, &i)
+	}
 	if e != nil {
 		return nil, e
 	}
@@ -283,18 +300,27 @@ func NewClient(endpoint string, authority, intent []byte, owner ed25519.PublicKe
 		h.CloseIdleConnections()
 		return nil, e
 	}
-	return &Client{http: h, endpoint: u, intent: i, cert: leaf, authority: bytes.Clone(authority), intentRaw: bytes.Clone(intent), owner: bytes.Clone(owner)}, nil
+	return &Client{http: h, endpoint: u, intent: i, cert: leaf, authority: bytes.Clone(authority), intentRaw: bytes.Clone(intent), owner: bytes.Clone(owner), cleanup: cleanup}, nil
 }
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	now := time.Now()
-	if _, _, e := VerifyIntent(c.intentRaw, c.authority, c.owner, now); e != nil {
-		return 0, nil, nil, e
+	ack := resource == "ack" && method == http.MethodPut
+	if c.cleanup && !ack {
+		return 0, nil, nil, ErrDenied
+	}
+	if !ack {
+		if _, _, e := VerifyIntent(c.intentRaw, c.authority, c.owner, now); e != nil {
+			return 0, nil, nil, e
+		}
 	}
 	if now.Before(c.cert.NotBefore) || !now.Before(c.cert.NotAfter) {
 		return 0, nil, nil, ErrDenied
 	}
 	deadline := time.Unix(c.intent.ExpiresUnix, 0)
+	if ack {
+		deadline = c.cert.NotAfter
+	}
 	if c.cert.NotAfter.Before(deadline) {
 		deadline = c.cert.NotAfter
 	}

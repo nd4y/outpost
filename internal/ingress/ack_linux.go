@@ -31,11 +31,11 @@ func (s *Session) Acknowledge(ctx context.Context, receipt Receipt, maxObjects i
 	if maxObjects < 1 || maxObjects > 256 {
 		return result, ErrDenied
 	}
-	if e := s.guard(ctx); e != nil {
-		return result, e
-	}
 	if !s.state.Complete || s.state.Receipt == nil || receipt != *s.state.Receipt {
 		return result, ErrConflict
+	}
+	if e := s.guardMode(ctx, true); e != nil {
+		return result, e
 	}
 	if !s.state.Acknowledged {
 		old := s.state

@@ -92,6 +92,9 @@ func (s *Session) save() error {
 	return e
 }
 func (s *Session) guard(ctx context.Context) error {
+	return s.guardMode(ctx, false)
+}
+func (s *Session) guardMode(ctx context.Context, cleanup bool) error {
 	if s.poisoned {
 		return ErrConflict
 	}
@@ -102,7 +105,14 @@ func (s *Session) guard(ctx context.Context) error {
 	if now.Unix() < s.state.LastObserved {
 		return ErrDenied
 	}
-	if _, _, e := VerifyIntent(s.state.Intent, s.state.Authority, s.owner, now); e != nil {
+	checkTime := now
+	if cleanup {
+		if !s.state.Complete || s.state.Receipt == nil {
+			return ErrIncomplete
+		}
+		checkTime = time.Unix(s.intent.NotBefore, 0)
+	}
+	if _, _, e := VerifyIntent(s.state.Intent, s.state.Authority, s.owner, checkTime); e != nil {
 		return e
 	}
 	if now.Unix() > s.state.LastObserved {
@@ -127,8 +137,11 @@ func OpenSession(ctx context.Context, o SessionOptions) (*Session, error) {
 func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (*Session, error) {
 	checkTime := time.Now()
 	if acknowledgedOnly {
-		// Historical validation is only for local cleanup of a durably
-		// acknowledged slot. Every data operation still requires current authority.
+		// Historical validation opens only an existing COMPLETE slot for cleanup.
+		// Every data operation still requires current authority.
+		if o.Initialize {
+			return nil, ErrDenied
+		}
 		var old Intent
 		if canonical(o.Intent, &old) != nil {
 			return nil, ErrDenied
@@ -213,7 +226,7 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 		}
 	}
 	if acknowledgedOnly {
-		if !s.state.Acknowledged || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
+		if !s.state.Complete || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
 			return fail(ErrConflict)
 		}
 	} else {

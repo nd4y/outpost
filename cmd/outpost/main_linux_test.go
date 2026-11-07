@@ -11,15 +11,52 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/policy"
+	"github.com/nd4y/outpost/internal/sourceagent"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 	"github.com/nd4y/outpost/internal/volume"
 	"github.com/nd4y/outpost/internal/worker"
 )
+
+func TestCLISourceProbeAndCapabilityErrors(t *testing.T) {
+	ctx := context.Background()
+	base := teststore.Root(t)
+	source := filepath.Join(base, "источник с пробелами")
+	if e := os.Mkdir(source, 0700); e != nil {
+		t.Fatal(e)
+	}
+	out := filepath.Join(base, "source-binding.json")
+	args := []string{"source-probe", "--store", source, "--node", storage.Hash([]byte("origin")), "--output", out}
+	if _, e := run(ctx, args); e != nil {
+		t.Fatal(e)
+	}
+	raw, e := os.ReadFile(out)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var b capture.TreeBinding
+	if e = json.Unmarshal(raw, &b); e != nil || b.Path != source || b.Format != capture.TreeFormat {
+		t.Fatal("invalid source binding", e)
+	}
+	if _, e = run(ctx, args); !errors.Is(e, os.ErrExist) {
+		t.Fatal("probe overwritten", e)
+	}
+	names, e := os.ReadDir(source)
+	if e != nil || len(names) != 0 {
+		t.Fatal("probe modified source", e)
+	}
+	if code, exit := failure(sourceagent.ErrUnsupported); code != "CAPABILITY_UNAVAILABLE" || exit != 5 {
+		t.Fatal(code, exit)
+	}
+	if code, exit := failure(capture.ErrCopies); code != "COPY_THRESHOLD_PENDING" || exit != 5 {
+		t.Fatal(code, exit)
+	}
+}
 
 func TestCLIVolumeProbeAndEnrollmentBindExactEmptyTarget(t *testing.T) {
 	ctx := context.Background()

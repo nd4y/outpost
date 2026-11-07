@@ -2,6 +2,7 @@
 package localfs
 
 import (
+	"context"
 	"errors"
 	"golang.org/x/sys/unix"
 	"os"
@@ -272,4 +273,67 @@ func Stat(root *os.Root, name string) (os.FileInfo, error) {
 	}
 	defer f.Close()
 	return f.Stat()
+}
+
+// Disjoint rejects equal roots and ancestor relationships by held inode
+// identities, including aliases. It only reads parents and never creates paths.
+func Disjoint(ctx context.Context, a, b *os.Root) error {
+	for _, pair := range [][2]*os.Root{{a, b}, {b, a}} {
+		contains, e := Contains(ctx, pair[0], pair[1])
+		if e != nil {
+			return e
+		}
+		if contains {
+			return ErrBoundary
+		}
+	}
+	return nil
+}
+
+// Contains compares identities while walking candidate's parents. A true
+// result includes equality. No pathname is created or resolved through links.
+func Contains(ctx context.Context, ancestor, candidate *os.Root) (bool, error) {
+	if ancestor == nil || candidate == nil {
+		return false, ErrBoundary
+	}
+	target, e := ancestor.Stat(".")
+	if e != nil {
+		return false, e
+	}
+	f, e := candidate.Open(".")
+	if e != nil {
+		return false, e
+	}
+	for depth := 0; depth < 128; depth++ {
+		if e = ctx.Err(); e != nil {
+			f.Close()
+			return false, e
+		}
+		info, e := f.Stat()
+		if e != nil {
+			f.Close()
+			return false, e
+		}
+		if os.SameFile(info, target) {
+			f.Close()
+			return true, nil
+		}
+		fd, e := unix.Openat(int(f.Fd()), "..", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+		f.Close()
+		if e != nil {
+			return false, e
+		}
+		f = os.NewFile(uintptr(fd), "ancestor")
+		parent, e := f.Stat()
+		if e != nil {
+			f.Close()
+			return false, e
+		}
+		if os.SameFile(info, parent) {
+			f.Close()
+			return false, nil
+		}
+	}
+	f.Close()
+	return false, ErrBoundary
 }

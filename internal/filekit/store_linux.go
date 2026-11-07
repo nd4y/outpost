@@ -495,7 +495,12 @@ func (s *Store) LoadVersionContext(ctx context.Context, version string) (Envelop
 
 func ReadOwner(name string) (Owner, error) {
 	var o Owner
-	f, err := os.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	root, err := localfs.OpenRoot(filepath.Dir(name))
+	if err != nil {
+		return o, err
+	}
+	defer root.Close()
+	f, err := localfs.OpenFile(root, filepath.Base(name), os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return o, err
 	}
