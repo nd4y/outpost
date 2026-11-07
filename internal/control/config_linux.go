@@ -13,6 +13,7 @@ import (
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/policy"
+	"github.com/nd4y/outpost/internal/readback"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
 )
@@ -42,9 +43,10 @@ func (l Limits) Validate() error {
 }
 
 type Domain struct {
-	Trust     generation.Trust  `json:"trust"`
-	Planner   ed25519.PublicKey `json:"planner"`
-	Placement policy.Placement  `json:"placement"`
+	PeerReadbackMaxAgeSeconds int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
+	Trust                     generation.Trust  `json:"trust"`
+	Planner                   ed25519.PublicKey `json:"planner"`
+	Placement                 policy.Placement  `json:"placement"`
 }
 type Target struct {
 	ID      string          `json:"id"`
@@ -63,6 +65,7 @@ type Job struct {
 	Peer         string          `json:"peer,omitempty"`
 	Target       string          `json:"target,omitempty"`
 	Plan         json.RawMessage `json:"plan,omitempty"`
+	Delegation   string          `json:"delegation,omitempty"`
 }
 type Config struct {
 	Format       string            `json:"format"`
@@ -78,6 +81,7 @@ type Config struct {
 	Ingress      []json.RawMessage `json:"ingress,omitempty"`
 	Replication  []Replication     `json:"replication,omitempty"`
 	Observations []json.RawMessage `json:"observations,omitempty"`
+	Uploads      []json.RawMessage `json:"uploads,omitempty"`
 	Signature    []byte            `json:"signature,omitempty"`
 }
 
@@ -140,6 +144,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	domains := map[string]Domain{}
 	for _, d := range c.Domains {
+		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds {
+			return ErrDenied
+		}
 		t := d.Trust
 		if !storage.ID(t.Domain) || !storage.ID(t.Repository) || t.Epoch == 0 || len(t.Writer) != 32 || len(t.Maintenance) != 32 || len(d.Planner) != 32 || bytes.Equal(t.Writer, t.Maintenance) || bytes.Equal(t.Writer, d.Planner) || bytes.Equal(t.Maintenance, d.Planner) || bytes.Equal(owner, t.Writer) || bytes.Equal(owner, t.Maintenance) || bytes.Equal(owner, d.Planner) || d.Placement.Domain != t.Domain || d.Placement.Validate(nodes, targets) != nil {
 			return ErrDenied
@@ -155,6 +162,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		}
 	}
 	operations := map[string]bool{}
+	if e := c.validateUploads(); e != nil {
+		return e
+	}
 	if len(c.Observations) > 64 {
 		return ErrDenied
 	}
@@ -224,7 +234,7 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	for _, j := range c.Jobs {
 		d, ok := domains[j.Domain]
-		if !ok || !storage.ID(j.Operation) || !storage.ID(j.Generation) || operations[j.Operation] || !d.Placement.PermitsNode(c.Node) || !d.Placement.PermitsNode(j.Executor) {
+		if !ok || j.Delegation != "" || !storage.ID(j.Operation) || !storage.ID(j.Generation) || operations[j.Operation] || !d.Placement.PermitsNode(c.Node) || !d.Placement.PermitsNode(j.Executor) {
 			return ErrDenied
 		}
 		operations[j.Operation] = true

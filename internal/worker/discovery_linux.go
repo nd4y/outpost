@@ -219,7 +219,7 @@ func (w *Worker) discoveryState() (DiscoveryStatus, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, 1<<20) != nil || s.Format != discoveryFormat || s.Routes == nil || len(s.Routes) > 128 {
+	if storage.Decode(raw, &s, 1<<20) != nil || s.Format != discoveryFormat || s.Routes == nil || len(s.Routes) > 256 {
 		return s, ErrDenied
 	}
 	for id, r := range s.Routes {
@@ -232,29 +232,16 @@ func (w *Worker) discoveryState() (DiscoveryStatus, error) {
 func (w *Worker) recordDiscovery(ctx context.Context, v *view, rule control.Replication, count int, result error) error {
 	d, _ := v.cfg.DomainByID(rule.Domain)
 	id := rule.ID(d.Trust)
+	return w.recordDiscoveryID(ctx, v, id, count, result)
+}
+func (w *Worker) recordDiscoveryID(ctx context.Context, v *view, id string, count int, result error) error {
 	return w.state.WithLock(ctx, func() error {
 		s, e := w.discoveryState()
 		if e != nil {
 			return e
 		}
-		if s.Revision > v.cfg.Revision {
-			return ErrDenied
-		}
 		if s.Revision != v.cfg.Revision {
-			next := map[string]DiscoveryRoute{}
-			for _, r := range v.cfg.Replication {
-				if r.Executor() == w.node {
-					d, _ := v.cfg.DomainByID(r.Domain)
-					rid := r.ID(d.Trust)
-					prior, ok := s.Routes[rid]
-					if !ok {
-						prior.Phase = "PENDING"
-					}
-					next[rid] = prior
-				}
-			}
-			s.Routes = next
-			s.Revision = v.cfg.Revision
+			return ErrDenied
 		}
 		entry := DiscoveryRoute{Phase: "DISCOVERED", Generations: count, CheckedUnix: time.Now().Unix(), ErrorCode: errorCode(result)}
 		if result != nil {
@@ -286,6 +273,14 @@ func (w *Worker) resetDiscovery(ctx context.Context, v *view) error {
 			return ErrDenied
 		}
 		next := DiscoveryStatus{Format: discoveryFormat, Revision: v.cfg.Revision, Routes: map[string]DiscoveryRoute{}}
+		for _, raw := range v.cfg.Uploads {
+			id := storage.Hash(raw)
+			r, ok := s.Routes[id]
+			if !ok {
+				r.Phase = "PENDING"
+			}
+			next.Routes[id] = r
+		}
 		for _, rule := range v.cfg.Replication {
 			if rule.Executor() != w.node {
 				continue
@@ -314,13 +309,19 @@ func (w *Worker) admitDiscovered(ctx context.Context, v *view, rule control.Repl
 		return peer.ErrProtocol
 	}
 	d, _ := v.cfg.DomainByID(rule.Domain)
+	jobs := make([]control.Job, 0, len(entries))
+	for _, item := range entries {
+		jobs = append(jobs, rule.Job(d.Trust, item.Generation))
+	}
+	return w.admitDerived(ctx, v, jobs)
+}
+func (w *Worker) admitDerived(ctx context.Context, v *view, jobs []control.Job) error {
 	s, e := w.Status(ctx)
 	if e != nil {
 		return e
 	}
 	changed := false
-	for _, item := range entries {
-		j := rule.Job(d.Trust, item.Generation)
+	for _, j := range jobs {
 		old, ok := s.Jobs[j.Operation]
 		if !ok || old.Phase == "WITHDRAWN" || old.Binding != binding(j) {
 			changed = true
@@ -331,9 +332,8 @@ func (w *Worker) admitDiscovered(ctx context.Context, v *view, rule control.Repl
 		return nil
 	}
 	return w.update(ctx, func(s *Status) error {
-		for _, item := range entries {
-			j := rule.Job(d.Trust, item.Generation)
-			if !v.cfg.Autonomous(j) || j.Executor != w.node {
+		for _, j := range jobs {
+			if !v.autonomy.Permits(j) || j.Executor != w.node {
 				return ErrDenied
 			}
 			old, ok := s.Jobs[j.Operation]
@@ -366,7 +366,7 @@ func (w *Worker) discover(v *view) error {
 			rules = append(rules, r)
 		}
 	}
-	if len(rules) == 0 {
+	if len(rules) == 0 && len(v.cfg.Uploads) == 0 {
 		return nil
 	}
 	for v.ctx.Err() == nil {
@@ -405,6 +405,9 @@ func (w *Worker) discover(v *view) error {
 		group.Wait()
 		close(failures)
 		if e := <-failures; e != nil {
+			return e
+		}
+		if e := w.discoverUploads(v); e != nil {
 			return e
 		}
 		select {

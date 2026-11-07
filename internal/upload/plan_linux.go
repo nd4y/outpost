@@ -52,6 +52,7 @@ type Plan struct {
 	SlotMillis     int64           `json:"slotMillis"`
 	Catalog        json.RawMessage `json:"catalog"`
 	Blobs          []storage.Blob  `json:"blobs"`
+	Delegation     json.RawMessage `json:"delegation,omitempty"`
 	Signature      []byte          `json:"signature,omitempty"`
 }
 type Authority struct {
@@ -68,7 +69,7 @@ func (p Plan) policy() error {
 	if p.ExpiresUnix > (int64(^uint64(0)>>1)-300000)/1000 {
 		return ErrDenied
 	}
-	if p.Format != Format || !storage.ID(p.Operation) || !p.AllowExternal || p.Profile.Validate() != nil || len(p.Workers) < 1 || len(p.Workers) > 32 || len(p.AllowedClasses) < 1 || len(p.AllowedClasses) > 2 || p.StartMillis < 1 || p.ExpiresUnix <= p.StartMillis/1000 || p.SlotMillis < 500 || p.SlotMillis > 300000 {
+	if (p.Format != Format && p.Format != DerivedFormat) || p.Format == Format && len(p.Delegation) > 0 || p.Format == DerivedFormat && (len(p.Delegation) == 0 || len(p.Signature) > 0) || !storage.ID(p.Operation) || !p.AllowExternal || p.Profile.Validate() != nil || len(p.Workers) < 1 || len(p.Workers) > 32 || len(p.AllowedClasses) < 1 || len(p.AllowedClasses) > 2 || p.StartMillis < 1 || p.ExpiresUnix <= p.StartMillis/1000 || p.SlotMillis < 500 || p.SlotMillis > 300000 {
 		return ErrDenied
 	}
 	allowed := map[string]bool{}
@@ -133,7 +134,7 @@ func (p Plan) validate(a Authority) error {
 }
 func Build(ctx context.Context, source *generation.Replica, id string, p Plan, planner ed25519.PrivateKey) ([]byte, error) {
 	// Policy is checked before reading or describing source payloads.
-	if source == nil || p.policy() != nil || len(planner) != ed25519.PrivateKeySize {
+	if source == nil || p.Format != Format || p.policy() != nil || len(planner) != ed25519.PrivateKeySize {
 		return nil, ErrDenied
 	}
 	if p.Profile.Namespace != storage.Hash([]byte(source.Trust().Domain+"/"+source.Trust().Repository)) {
@@ -175,7 +176,13 @@ func Build(ctx context.Context, source *generation.Replica, id string, p Plan, p
 }
 func Verify(raw []byte, a Authority) (Plan, error) {
 	var p Plan
-	if storage.Decode(raw, &p, MaxPlan) != nil || len(a.Planner) != ed25519.PublicKeySize || len(p.Signature) != ed25519.SignatureSize {
+	if storage.Decode(raw, &p, MaxPlan) != nil || len(a.Planner) != ed25519.PublicKeySize {
+		return p, ErrDenied
+	}
+	if p.Format == DerivedFormat {
+		return p, verifyDerived(raw, p, a)
+	}
+	if len(p.Signature) != ed25519.SignatureSize {
 		return p, ErrDenied
 	}
 	signature := append([]byte(nil), p.Signature...)

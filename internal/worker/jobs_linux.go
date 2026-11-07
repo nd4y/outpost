@@ -78,7 +78,7 @@ func (w *Worker) jobs(v *view) error {
 			known[j.Operation] = true
 		}
 		for _, old := range s.Jobs {
-			if !known[old.Job.Operation] && v.cfg.Autonomous(old.Job) {
+			if !known[old.Job.Operation] && v.autonomy.Permits(old.Job) {
 				desired = append(desired, old.Job)
 			}
 		}

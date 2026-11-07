@@ -18,6 +18,7 @@ import (
 
 const maxJobs = 1024
 const maxJournal = 4 << 20
+const CachedReceiptFormat = "outpost-peer-readback-2"
 
 type Binding struct {
 	Operation  string `json:"operationId"`
@@ -335,5 +336,6 @@ func validReceipt(r Receipt, b Binding) bool {
 	if b.Kind == "receive" || b.Kind == "pull" {
 		target = b.Executor
 	}
-	return r.Format == Format && r.Target == target && r.Generation == b.Generation && r.CatalogDigest == b.Expected && r.Operation == b.Operation && r.ObservedUnix > 0 && (r.Verification == "target-full-read" || r.Verification == "client-full-readback" || r.Verification == "local-full-read")
+	level := r.Format == Format && (r.Verification == "target-full-read" || r.Verification == "client-full-readback" || r.Verification == "local-full-read") || r.Format == CachedReceiptFormat && r.Verification == "client-cached-readback" && b.Kind == "push"
+	return level && r.Target == target && r.Generation == b.Generation && r.CatalogDigest == b.Expected && r.Operation == b.Operation && r.ObservedUnix > 0
 }

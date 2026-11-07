@@ -102,6 +102,10 @@ func (w *Worker) Status(ctx context.Context) (Status, error) {
 	return s, e
 }
 func (w *Worker) admit(ctx context.Context, c control.Config) error {
+	autonomy, e := c.CompileAutonomy()
+	if e != nil {
+		return e
+	}
 	return w.update(ctx, func(s *Status) error {
 		s.Rejected = map[string]string{}
 		current := map[string]bool{}
@@ -128,7 +132,7 @@ func (w *Worker) admit(ctx context.Context, c control.Config) error {
 			s.Jobs[j.Operation] = old
 		}
 		for op, j := range s.Jobs {
-			if c.Autonomous(j.Job) && j.Binding == binding(j.Job) {
+			if autonomy.Permits(j.Job) && j.Binding == binding(j.Job) {
 				current[op] = true
 				if j.Phase == "RUNNING" || j.Phase == "WITHDRAWN" {
 					j.Phase = "QUEUED"

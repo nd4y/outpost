@@ -13,6 +13,13 @@ import (
 const BlobFormat = "outpost-external-blob-1"
 const CompleteFormat = "outpost-external-complete-1"
 
+// MissingPart identifies the exact immutable part absent during a content
+// read. Callers can retry that part without discarding unrelated progress.
+type MissingPart struct{ Part generation.Object }
+
+func (e *MissingPart) Error() string { return "external part absent" }
+func (e *MissingPart) Unwrap() error { return ErrNotFound }
+
 type Blob struct {
 	Format string              `json:"format"`
 	Object generation.Object   `json:"object"`
@@ -76,6 +83,9 @@ func (b *Backend) ReadPart(ctx context.Context, part generation.Object) ([]byte,
 		return nil, ErrIntegrity
 	}
 	raw, e := b.Get(ctx, "part-"+part.ID)
+	if errors.Is(e, ErrNotFound) {
+		return nil, &MissingPart{Part: part}
+	}
 	if e != nil {
 		return nil, e
 	}

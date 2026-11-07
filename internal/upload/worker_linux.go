@@ -179,7 +179,10 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		round, end := j.plan.round(time.Now())
 		for _, task := range tasks {
 			progress := state.Parts[task.Part.ID]
-			if progress.Complete && progress.Round == round || j.plan.owner(task.Part.ID, round) != j.worker {
+			// Completion belongs to immutable bytes, not to an assignment slot.
+			// Rechecking every completed prefix on slot rotation can starve the
+			// remaining parts on slow links. Publication detects vanished parts.
+			if progress.Complete || j.plan.owner(task.Part.ID, round) != j.worker {
 				continue
 			}
 			if e = ctx.Err(); e != nil {
@@ -237,11 +240,12 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			}
 			// If previously acknowledged parts disappeared, retrying their immutable
 			// uploads is safe. Never clear source pins or claim COMPLETE on this path.
-			if storage.Missing(e) {
+			var absent *storage.MissingPart
+			if errors.As(e, &absent) {
 				if e = j.edit(ctx, func(s *State) error {
-					for id, p := range s.Parts {
+					if p, ok := s.Parts[absent.Part.ID]; ok {
 						p.Complete = false
-						s.Parts[id] = p
+						s.Parts[absent.Part.ID] = p
 					}
 					return nil
 				}); e != nil {

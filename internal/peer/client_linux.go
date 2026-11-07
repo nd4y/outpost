@@ -29,6 +29,7 @@ type Client struct {
 	certificate *x509.Certificate
 }
 type Result struct {
+	CachedObjects  int      `json:"cachedObjects,omitempty"`
 	Receipt        Receipt  `json:"receipt"`
 	TargetReceipt  *Receipt `json:"targetReceipt,omitempty"`
 	Counters       Counters `json:"counters"`
@@ -363,17 +364,17 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			return result, ErrProtocol
 		}
 		readback.Add(int64(len(r.data)))
-		err = parallel(ctx, refs, c.limits.Concurrency, func(ctx context.Context, ref generation.Object) error {
-			b, e := c.getObject(ctx, operation, id, kind, ref)
-			if e == nil {
-				readback.Add(int64(len(b)))
-			}
-			return e
-		})
+		var oldest int64
+		result.CachedObjects, oldest, err = c.auditObjects(ctx, operation, id, refs, &readback)
 		if err != nil {
 			return result, err
 		}
 		result.Receipt = Receipt{Format, c.peer, id, id, operation, "client-full-readback", time.Now().Unix()}
+		if result.CachedObjects > 0 {
+			result.Receipt.Format = CachedReceiptFormat
+			result.Receipt.Verification = "client-cached-readback"
+			result.Receipt.ObservedUnix = oldest
+		}
 	} else {
 		missing, e := local.Missing(ctx, id)
 		if e != nil {

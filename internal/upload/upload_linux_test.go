@@ -47,6 +47,9 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
+	return fixtureBytes(t, 3<<20)
+}
+func fixtureBytes(t *testing.T, size int) *fixture {
 	f := &fixture{base: teststore.Root(t)}
 	var e error
 	f.owner, e = filekit.NewOwner()
@@ -64,7 +67,7 @@ func newFixture(t *testing.T) *fixture {
 	must(t, e)
 	t.Cleanup(func() { f.store.Close() })
 	f.input = filepath.Join(f.base, "input")
-	f.data = make([]byte, 3<<20)
+	f.data = make([]byte, size)
 	_, e = rand.Read(f.data)
 	must(t, e)
 	copy(f.data, []byte("private-source-marker-not-for-external-plaintext"))

@@ -1,0 +1,17 @@
+# Reusing immutable-object readback
+
+[Русский](../ru/readback-reuse.md)
+
+The peer client implements this contract through explicit owner policy with a maximum evidence age. Its default is disabled. It changes verification cost, not placement, writer trust, object identity, retention or deletion authority. Cloud publication still uses fresh full readback.
+
+A successful independent read of an immutable object may be retained in private local state, bound to the protocol, exact endpoint, target identity/profile, reader and generation trust. The record includes object digest, length and the original successful-read time. Reuse requires every binding and the age limit to match. Missing or expired evidence requires a fresh content read. Malformed evidence fails closed. Losing a cache causes additional reads, never loss of recovery data. Cache eviction removes only advisory evidence.
+
+An operation always reads and validates its selected signed catalog. New objects are independently read and hashed after transfer. The receiving peer still verifies its complete local closure before publication. With reuse, the sender reports a distinct cached-readback level and the oldest supporting read time; a new target claim cannot refresh that time. An old observation is not proof that an untrusted target still holds the object. Scheduled fresh verification and restore exercises remain necessary to detect subsequent loss or corruption.
+
+Set `peerReadbackMaxAgeSeconds` in the owner-signed domain configuration to enable reuse for outgoing peer pushes, between 1 and 31622400 seconds. Zero selects fresh-only reads and bypasses the cache. A reused receipt has format `outpost-peer-readback-2`, level `client-cached-readback` and the oldest supporting object-read time. `cachedObjects` is reported separately from transferred and readback payload bytes. The target's full-read claim remains separate.
+
+The private cache has 256 digest-prefix pages per scope, at most 4096 records and 1 MiB per page, under the same disk admission as the peer journal. A full page evicts its oldest advisory records; it never deletes payload or releases pins. Writes are atomic and network reads run outside the state lock. A successful batch of at most 16 objects is persisted before the next batch. Missing cache pages cause fresh reads; malformed pages block enabled reuse and are preserved. The oldest evidence must still satisfy the policy when the audit finishes.
+
+Fresh-only operation remains available for audits. Old binaries reject journals containing the new receipt format; do not claim binary rollback without a compatible journal reader. Immutable backup formats and independent recovery remain unchanged. Upgrade the affected readers before enabling the optional configuration field. Unknown formats must never trigger journal reinitialization.
+
+Acceptance compares initial transfer, an unchanged retry and a changed generation using actual test-endpoint request/response payload counts. It checks retained original age, expiry, corruption, restart and isolation between target scopes. Payload counters exclude TLS/HTTP overhead and cannot be reported as total wire bytes. Full local closure scans, long-attempt resume, cache metadata costs, scheduled fresh verification and the 100 GiB traffic target remain separate acceptance work. Cloud publication needs equivalent explicit evidence semantics before enabling reuse there.

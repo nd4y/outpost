@@ -77,7 +77,14 @@ func waitQueue(t *testing.T, q *Queue, predicate func(QueueState) bool) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	s, e := q.Status(context.Background())
-	t.Fatalf("queue condition not reached: %+v %v", s, e)
+	jobs := map[string]any{}
+	for op, j := range s.Jobs {
+		jobs[op] = struct {
+			Phase, Error string
+			Attempts     uint64
+		}{j.Phase, j.ErrorCode, j.Attempts}
+	}
+	t.Fatalf("queue condition not reached: revision=%d jobs=%+v error=%v", s.Revision, jobs, e)
 }
 func TestQueueTargetIsolationAndAutomaticRetry(t *testing.T) {
 	for _, kind := range []string{"s3", "webdav"} {

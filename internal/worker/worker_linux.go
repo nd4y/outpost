@@ -49,6 +49,7 @@ type domainState struct {
 }
 type view struct {
 	cfg      control.Config
+	autonomy *control.Autonomy
 	ctx      context.Context
 	cancel   context.CancelFunc
 	done     chan struct{}
@@ -58,6 +59,8 @@ type view struct {
 	domains  map[string]*domainState
 }
 type Worker struct {
+	// Fault is a local test hook, never accepted from shared configuration.
+	Fault        func(string) error
 	root         *os.Root
 	guard        func(context.Context) error
 	budgetMu     sync.Mutex
@@ -259,6 +262,7 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 		}
 	}
 	if !inbound {
+		p.ReadbackMaxAgeSeconds = d.PeerReadbackMaxAgeSeconds
 		p.RequiredRevision = job.PeerRevision
 		n, _ := c.NodeByID(job.Peer)
 		p.Peers[job.Peer] = peer.Grant{Class: n.Class, Push: job.Kind == "push", Pull: true, History: c.Autonomous(job), ExpiresUnix: c.ExpiresUnix}
@@ -301,6 +305,11 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 }
 func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	v := &view{cfg: c, done: make(chan struct{}), metadata: make(chan struct{}, c.Limits.Parallel), domains: map[string]*domainState{}}
+	var compileError error
+	v.autonomy, compileError = c.CompileAutonomy()
+	if compileError != nil {
+		return nil, compileError
+	}
 	v.ctx, v.cancel = context.WithDeadline(ctx, time.Unix(c.ExpiresUnix, 0))
 	fail := func(e error) (*view, error) {
 		v.cancel()
@@ -667,6 +676,14 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 	if j.Kind != "upload" || w.resolve == nil {
 		return nil, ErrDenied
 	}
+	automatic := j.Delegation != ""
+	if automatic {
+		raw, e := w.planUpload(ctx, v, j, local.replica)
+		if e != nil {
+			return nil, e
+		}
+		j.Plan = raw
+	}
 	dir := filepath.Join(DomainDirectory(w.dir, d.Trust), "uploads", j.Operation)
 	var queue *upload.Queue
 	e := w.createOrOpen(ctx, dir, func(init bool) error {
@@ -685,6 +702,17 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 	if e = queue.Enqueue(ctx, local.replica, j.Plan); e != nil {
 		return nil, e
 	}
+	if automatic {
+		if e = w.point("upload-queue-admitted"); e != nil {
+			return nil, e
+		}
+		if e = local.replica.ReleasePin(ctx, planningPin(j)); e != nil {
+			return nil, e
+		}
+		if e = w.point("upload-planning-pin-released"); e != nil {
+			return nil, e
+		}
+	}
 	e = queue.Run(ctx, local.replica, w.resolve, w.cert.PrivateKey.(ed25519.PrivateKey))
 	if e != nil {
 		return nil, e
@@ -698,4 +726,11 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		return nil, ErrDenied
 	}
 	return json.Marshal(job.Receipt)
+}
+
+func (w *Worker) point(name string) error {
+	if w.Fault != nil {
+		return w.Fault(name)
+	}
+	return nil
 }

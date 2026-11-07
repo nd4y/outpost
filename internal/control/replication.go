@@ -43,6 +43,9 @@ func (r Replication) Job(t generation.Trust, id string) Job {
 	return Job{PeerRevision: r.PeerRevision, Operation: storage.Hash([]byte(r.ID(t) + "/" + id)), Executor: r.Executor(), Kind: r.Mode, Domain: r.Domain, Generation: id, Peer: r.Peer()}
 }
 func (c Config) Autonomous(j Job) bool {
+	if j.Kind == "upload" {
+		return c.AutonomousUpload(j)
+	}
 	if !storage.ID(j.Generation) {
 		return false
 	}

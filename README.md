@@ -14,7 +14,7 @@ The local CLI accepts regular source and owner-key files. It rejects symbolic li
 
 The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signed complete catalogs, keyless reception, restart-safe progress, persistent pins and separately authorized cleanup. Its compact local history index has explicit migration and guarded rollback commands; wire catalogs and existing file kits remain compatible. Small HDD tests cover checkpoint catch-up, source repack, actual process termination and independent old/new restoration. Heavy scale/endurance tests remain deferred; this is not full G2 acceptance or a network service.
 
-The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push currently audits the entire target generation by reading it back. The [external-upload candidate](docs/en/external-upload.md) adds S3-compatible/WebDAV adapters, three independent workers, cached signed plans, failover and independently recoverable target generations. Real endpoint admission, full traffic accounting and heavy G3 acceptance remain open.
+The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push defaults to full target readback; an explicit [reuse policy](docs/en/readback-reuse.md) retains original evidence age while avoiding unchanged-object downloads. The [external-upload candidate](docs/en/external-upload.md) adds S3-compatible/WebDAV adapters, three independent workers, cached signed plans, failover and independently recoverable target generations. Real endpoint admission, full traffic accounting and heavy G3 acceptance remain open.
 
 The [durable upload queue](docs/en/upload-queue.md) now admits signed plans, pins sources and runs independent targets with bounded concurrency, automatic delayed retries and process-crash recovery. Expired or permanently blocked jobs remain explicit and protected.
 
@@ -67,6 +67,8 @@ These commands validate documentation and the standard toolkit. They do not star
 - [G2 scoped requirement-to-check trace](docs/g2-trace.json)
 - [G3 peer protocol, evidence and limits](docs/en/peer-transfer.md)
 - [Distributed external upload, recovery and limits](docs/en/external-upload.md)
+- [Autonomous external planning](docs/en/delegated-upload.md)
+- [Immutable-object readback reuse contract](docs/en/readback-reuse.md)
 - [G3 scoped requirement-to-check trace](docs/g3-trace.json)
 
 [Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.

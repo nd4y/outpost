@@ -37,6 +37,8 @@ Targets that cannot honor the conditional-create contract are rejected. Compatib
 
 ## Complete generations and recovery
 
+Completed immutable parts remain completed when assignment slots rotate. If a publication read discovers an absent part, only that part loses its local completion mark. Other verified progress survives. This prevents a slow executor from repeatedly restarting its completed prefix while preserving full publication checks. A delayed-slot test also physically removes an acknowledged fixture part and requires its independent reupload before recovery.
+
 Workers upload and verify physical parts first, then seal immutable logical-object descriptors. Publication verifies **all** dependencies against the signed generation catalog, uploads that catalog and finally creates the per-generation complete marker. Each external target has its own closure and readiness; success elsewhere does not make this target complete. A complete marker is a hint, never proof by itself. `Catalog` validates the marker/catalog binding, while `Recover` and worker completion also fetch and validate every dependency. A false acknowledgment, truncated object or forged marker cannot create a verified complete replica.
 
 Old generations and shared chunks remain immutable. A later version uploads missing ciphertext parts, while both versions remain recoverable. This is reuse of G1's chunked version format, not encryption of the whole original file as one object. No mutable `latest` pointer or listing is needed. Recovery needs a selected generation ID, public generation trust, target read credentials and the owner's file-kit key for final plaintext restoration. A retained recovery inventory must supply the IDs/keys; discovery and key escrow are separate work.
