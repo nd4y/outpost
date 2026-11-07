@@ -21,6 +21,7 @@ type ReportView struct {
 	Sequence              uint64       `json:"sequence"`
 	ConfigurationRevision uint64       `json:"configurationRevision"`
 	ObservedUnix          int64        `json:"observedUnix"`
+	InventoryState        string       `json:"inventoryState,omitempty"`
 	State                 string       `json:"state"`
 	DocumentDigest        string       `json:"documentDigest"`
 	Generations           []Generation `json:"generations"`
@@ -171,7 +172,7 @@ func (r *Registry) Report(ctx context.Context, p Principal, tenant, node, domain
 		if time.Now().Unix()-report.ObservedUnix > int64(maxAge/time.Second) || !enrollment.Active(time.Now()) || report.EnrollmentRevision != enrollment.Revision {
 			state = "STALE"
 		}
-		out = ReportView{Format: "outpost-management-report-view-1", Node: node, Tenant: tenant, Domain: domain, Sequence: report.Sequence, ConfigurationRevision: report.ConfigurationRevision, ObservedUnix: report.ObservedUnix, State: state, DocumentDigest: pointer.Digest, Generations: report.Generations, Jobs: report.Jobs, Space: report.Space}
+		out = ReportView{Format: "outpost-management-report-view-1", Node: node, Tenant: tenant, Domain: domain, Sequence: report.Sequence, ConfigurationRevision: report.ConfigurationRevision, ObservedUnix: report.ObservedUnix, InventoryState: report.InventoryState, State: state, DocumentDigest: pointer.Digest, Generations: report.Generations, Jobs: report.Jobs, Space: report.Space}
 		return nil
 	})
 	return out, e

@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"net"
@@ -26,6 +27,74 @@ type httpFixture struct {
 	server                       *httptest.Server
 	owner, node, viewer, unknown *http.Client
 	handler                      http.Handler
+}
+
+func TestTransportJSONIsNotTheSignedDocumentEncoding(t *testing.T) {
+	var value struct {
+		Document []byte `json:"document"`
+		Expected uint64 `json:"expectedRevision"`
+	}
+	if e := decodeHTTP([]byte("{\n  \"expectedRevision\": 1, \"document\": \"e30=\"\n}\n"), &value, 256); e != nil || value.Expected != 1 || string(value.Document) != "{}" {
+		t.Fatal("transport whitespace/order rejected", e)
+	}
+	for _, raw := range []string{`{"document":"e30=","document":"e30=","expectedRevision":1}`, `{"document":"e30=","extra":1}`, `{"document":"e30="} {}`} {
+		if decodeHTTP([]byte(raw), &value, 256) == nil {
+			t.Fatal("ambiguous transport accepted", raw)
+		}
+	}
+}
+
+func TestManagementReportPaginationCoversLargeWorkerQueueAndStaleState(t *testing.T) {
+	h := newHTTPFixture(t)
+	f := h.f
+	f.enroll(t)
+	now := time.Now().Unix() - 20
+	report, e := VerifyReport(f.report(t, 1, now), f.e, time.Now())
+	must(t, e)
+	for i := 0; i < 600; i++ {
+		report.Jobs = append(report.Jobs, Job{Operation: id(fmt.Sprint("job-", i)), Domain: report.Domain, Generation: id("generation"), Kind: "PEER", Phase: "QUEUED", UpdatedUnix: now})
+	}
+	raw, e := SignReport(report, f.e, f.node, time.Now())
+	must(t, e)
+	_, e = f.r.PublishReport(context.Background(), f.e.Node, f.e.Tenant, f.e.Node, raw)
+	must(t, e)
+	path := h.base() + "/domains/" + id("domain") + "/jobs?limit=256"
+	seen := map[string]bool{}
+	cursor := ""
+	for page := 0; page < 3; page++ {
+		url := path
+		if cursor != "" {
+			url += "&cursor=" + cursor
+		}
+		status, raw := h.request(t, h.viewer, "GET", url, nil)
+		if status != 200 {
+			t.Fatalf("page %d: %d %s", page, status, raw)
+		}
+		var out struct {
+			Items        []Job
+			NextCursor   string
+			State        string
+			ObservedUnix int64
+		}
+		must(t, json.Unmarshal(raw, &out))
+		if out.State != "STALE" || out.ObservedUnix != now || len(out.Items) == 0 {
+			t.Fatal("lost report age", out)
+		}
+		for _, j := range out.Items {
+			if seen[j.Operation] {
+				t.Fatal("duplicate job page")
+			}
+			seen[j.Operation] = true
+		}
+		cursor = out.NextCursor
+	}
+	if len(seen) != 600 || cursor != "" {
+		t.Fatal("truncated job queue", len(seen))
+	}
+	status, _ := h.request(t, h.viewer, "GET", h.base()+"/domains/"+id("domain")+"/jobs?limit=", nil)
+	if status != 400 {
+		t.Fatal("empty explicit limit accepted", status)
+	}
 }
 
 func newHTTPFixture(t *testing.T) *httpFixture {

@@ -83,4 +83,4 @@ Original project material is [MIT licensed](LICENSE). The vendored toolkit retai
 
 The private source agent supports a [durable interval schedule](docs/en/source-scheduling.md) with pause, restart and unchanged pending-operation recovery. Full product acceptance remains open.
 
-The [management API candidate](docs/en/management-api.md) supports authenticated enrollment, owner-signed configuration and original-age reports. Command execution, worker reporting and the operator UI are still in development.
+The [management API candidate](docs/en/management-api.md) supports authenticated enrollment, owner-signed configuration and original-age reports. A separate worker reporting process persists its queue, schedule and retries; pause or revocation cancels active delivery. Unknown verification age, logical size and transfer progress remain explicit. Command execution, management service bootstrap and the operator UI are still in development.

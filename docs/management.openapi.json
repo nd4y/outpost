@@ -2356,10 +2356,15 @@
             "items": {
               "$ref": "#/components/schemas/Job"
             },
-            "maxItems": 256
+            "maxItems": 4096
           },
           "space": {
             "$ref": "#/components/schemas/Space"
+          },
+          "inventoryState": {
+            "type": "string",
+            "enum": ["UNKNOWN", "OBSERVED", "UNAVAILABLE"],
+            "description": "Missing in an older report means unknown, never an empty healthy inventory."
           }
         },
         "required": [
@@ -2405,6 +2410,17 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 1099511627776
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["VOLUME"],
+            "description": "Physical/free bytes describe the entire admitted filesystem, which may contain other applications."
+          },
+          "accountedBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Conservative Outpost allocation ledger, separate from filesystem physical use."
           }
         },
         "required": [
@@ -2455,9 +2471,10 @@
             "maximum": 1099511627776
           },
           "logicalBytes": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "minimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Null means unknown; ciphertext bytes or missing progress must not be presented as a known value."
           },
           "objects": {
             "type": "integer",
@@ -2509,9 +2526,17 @@
           "nextCursor": {
             "type": "string",
             "maxLength": 512
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
+          },
+          "inventoryState": {
+            "type": "string",
+            "enum": ["UNKNOWN", "OBSERVED", "UNAVAILABLE"]
           }
         },
-        "required": ["format", "reportSequence", "observedUnix", "items"]
+        "required": ["format", "reportSequence", "observedUnix", "items", "state", "inventoryState"]
       },
       "Job": {
         "type": "object",
@@ -2549,9 +2574,10 @@
             "maximum": 1099511627776
           },
           "completedBytes": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "minimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Null means unknown; ciphertext bytes or missing progress must not be presented as a known value."
           },
           "totalBytes": {
             "type": ["integer", "null"],
@@ -2600,9 +2626,13 @@
           "nextCursor": {
             "type": "string",
             "maxLength": 512
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
           }
         },
-        "required": ["format", "reportSequence", "observedUnix", "items"]
+        "required": ["format", "reportSequence", "observedUnix", "items", "state"]
       },
       "Command": {
         "type": "object",

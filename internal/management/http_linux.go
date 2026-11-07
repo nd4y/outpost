@@ -169,6 +169,20 @@ func uniqueJSON(raw []byte) error {
 	}
 	return nil
 }
+
+// Transport JSON permits whitespace and field ordering. Signed documents
+// inside it still require their exact canonical bytes at signature validation.
+func decodeHTTP(raw []byte, out any, max int) error {
+	if len(raw) == 0 || len(raw) > max || uniqueJSON(raw) != nil {
+		return ErrInvalid
+	}
+	d := json.NewDecoder(strings.NewReader(string(raw)))
+	d.DisallowUnknownFields()
+	if d.Decode(out) != nil || d.Decode(new(any)) != io.EOF {
+		return ErrInvalid
+	}
+	return nil
+}
 func readHTTP(w http.ResponseWriter, r *http.Request, out any, max int) error {
 	media, _, e := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if e != nil || media != "application/json" || r.Header.Get("Content-Encoding") != "" {
@@ -185,7 +199,7 @@ func readHTTP(w http.ResponseWriter, r *http.Request, out any, max int) error {
 		}
 		return ErrInvalid
 	}
-	if uniqueJSON(raw) != nil || storage.Decode(raw, out, max) != nil {
+	if decodeHTTP(raw, out, max) != nil {
 		return ErrInvalid
 	}
 	return nil
@@ -217,7 +231,7 @@ func pageQuery(r *http.Request) (int, string, error) {
 		}
 	}
 	limit := 64
-	if v := query.Get("limit"); v != "" {
+	if v := query.Get("limit"); query.Has("limit") {
 		n, e := strconv.Atoi(v)
 		if e != nil || n < 1 || n > 256 {
 			return 0, "", ErrInvalid
@@ -488,7 +502,7 @@ func (h *httpService) reportPage(p Principal, r *http.Request, view ReportView, 
 	offset := 0
 	if token != "" {
 		n, e := strconv.Atoi(cur.Position)
-		if e != nil || n < 0 || n > 256 || cur.Revision != view.Sequence {
+		if e != nil || n < 0 || n > 4096 || cur.Revision != view.Sequence {
 			return nil, ErrConflict
 		}
 		offset = n
@@ -510,15 +524,25 @@ func (h *httpService) reportPage(p Principal, r *http.Request, view ReportView, 
 			Format         string       `json:"format"`
 			ReportSequence uint64       `json:"reportSequence"`
 			ObservedUnix   int64        `json:"observedUnix"`
+			State          string       `json:"state"`
+			InventoryState string       `json:"inventoryState"`
 			Items          []Generation `json:"items"`
 			NextCursor     string       `json:"nextCursor,omitempty"`
-		}{"outpost-management-generations-1", view.Sequence, view.ObservedUnix, view.Generations[offset:end], next}, nil
+		}{"outpost-management-generations-1", view.Sequence, view.ObservedUnix, view.State, inventoryState(view.InventoryState), view.Generations[offset:end], next}, nil
 	}
 	return struct {
 		Format         string `json:"format"`
 		ReportSequence uint64 `json:"reportSequence"`
 		ObservedUnix   int64  `json:"observedUnix"`
+		State          string `json:"state"`
 		Items          []Job  `json:"items"`
 		NextCursor     string `json:"nextCursor,omitempty"`
-	}{"outpost-management-jobs-1", view.Sequence, view.ObservedUnix, view.Jobs[offset:end], next}, nil
+	}{"outpost-management-jobs-1", view.Sequence, view.ObservedUnix, view.State, view.Jobs[offset:end], next}, nil
+}
+
+func inventoryState(value string) string {
+	if value == "" {
+		return "UNKNOWN"
+	}
+	return value
 }

@@ -72,7 +72,8 @@ func (f *fixture) reopen(t *testing.T) {
 	f.r = r
 }
 func (f *fixture) report(t *testing.T, sequence uint64, observed int64) []byte {
-	r := Report{Format: ReportFormat, Node: f.e.Node, Tenant: f.e.Tenant, Domain: id("domain"), EnrollmentRevision: f.e.Revision, Sequence: sequence, ConfigurationRevision: 1, ObservedUnix: observed, Generations: []Generation{{Generation: id("generation"), Sequence: 1, CreatedUnix: observed - 60, Status: "COMPLETE", Target: f.e.Node, Verification: "CIPHERTEXT", VerifiedUnix: observed - 30, LogicalBytes: 4096, Objects: 1, Pinned: true}}, Jobs: []Job{}, Space: Space{State: "UNKNOWN"}}
+	logical := int64(4096)
+	r := Report{Format: ReportFormat, Node: f.e.Node, Tenant: f.e.Tenant, Domain: id("domain"), EnrollmentRevision: f.e.Revision, Sequence: sequence, ConfigurationRevision: 1, ObservedUnix: observed, Generations: []Generation{{Generation: id("generation"), Sequence: 1, CreatedUnix: observed - 60, Status: "COMPLETE", Target: f.e.Node, Verification: "CIPHERTEXT", VerifiedUnix: observed - 30, LogicalBytes: &logical, Objects: 1, Pinned: true}}, Jobs: []Job{}, Space: Space{State: "UNKNOWN"}}
 	raw, e := SignReport(r, f.e, f.node, time.Now())
 	must(t, e)
 	return raw

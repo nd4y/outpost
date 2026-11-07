@@ -32,10 +32,51 @@ Acceptance includes tenant/role isolation, replay and conflicting IDs, stale pre
 
 ## Implemented core and remaining integration
 
-The current management candidate implements signed enrollment/revocation records, tenant/domain fences, owner-policy preview/apply, exact configuration retrieval, signed original-age reports and scoped node/job/generation/audit/operation views. The existing worker `control.Fetcher` uses `/v1/config/{node}` with the same mutual TLS and exact signed bytes. A relay needs an explicit recipient ACL and matching scopes. Command queue/execution, the worker report producer, service bootstrap and browser UI remain in development; command endpoints currently return `UNSUPPORTED`.
+The current management candidate implements signed enrollment/revocation records, tenant/domain fences, owner-policy preview/apply, exact configuration retrieval, signed original-age reports and scoped node/job/generation/audit/operation views. The existing worker `control.Fetcher` uses `/v1/config/{node}` with the same mutual TLS and exact signed bytes. A relay needs an explicit recipient ACL and matching scopes. Command queue/execution, management service bootstrap and browser UI remain in development; command endpoints currently return `UNSUPPORTED`.
 
 Enrollment and configuration changes retain an admitted audit intent before their effect. Configuration publication stages an immutable candidate, updates the existing monotonic authority cache and then commits the registry pointer/result. A cache/pointer mismatch is unavailable until the same operation reconciles it. Initial cache writes are quota-accounted. Node reports use two slots per node/domain; the signed pointer changes only after a slot is durable. Replays retain their original observation time. Revoked or changed enrollment makes a retained report stale, not empty or fresh.
 
 Seven actual process-kill boundaries cover enrollment intent/result, report slot/pointer and configuration intent/cache/result. Short race checks also cover stale previews, operation conflicts, quota, retained tenant/epoch fences, foreign report/config scopes, duplicate JSON/query fields, oversized/deep bodies, encoded path aliases, CSRF and mixed-revision cursors. A real HTTPS consumer and the existing worker fetcher exercise the published paths. These tests do not yet accept slow-client stop handling, command execution, automatic crash reconciliation, installed services, UI accessibility or large-scale metadata cost.
 
-Current admission bounds are 128 enrolled nodes, 128 retained domain fences, 2048 audited configuration/enrollment operations, 256 generations/jobs per scoped report and 8 MiB per signed report. Configuration keeps the existing 32 MiB limit. Large configuration/report requests have a separate single slot; metadata concurrency and request deadlines are explicit. Capacity remains unknown in preview without a matching volume estimate. Audit export/retention, larger inventories and journal-loss recovery need their own completed workflow before production capacity is claimed.
+Current admission bounds are 128 enrolled nodes, 128 retained domain fences, 2048 audited configuration/enrollment operations, 256 generations and 4096 jobs per scoped report and 8 MiB per signed report. Configuration keeps the existing 32 MiB limit. Large configuration/report requests have a separate single slot; metadata concurrency and request deadlines are explicit. Capacity remains unknown in preview without a matching volume estimate. Audit export/retention, larger inventories and journal-loss recovery need their own completed workflow before production capacity is claimed.
+
+## Durable worker reports
+
+The reporting client uses pinned mutual TLS, no proxy or redirects and bounded replies. It verifies the exact report digest and original observation time in the acknowledgement. A signed local journal retains one pending report per domain before sending; losing the reply or restarting sends exactly those bytes again. Three process-kill boundaries cover local enqueue, remote acknowledgement and durable local acknowledgement. Explicit owner-signed enrollment renewal preserves the counter and may supersede obsolete telemetry. Missing/corrupt state is not initialized automatically. Network I/O holds a separate delivery lease so local status and renewal remain available.
+
+Worker snapshots read the admitted held filesystem, authenticated generation catalogs and actual job state. `COMPLETE` records publication, while `verification: NONE` and zero verification time explicitly mean no known payload-read timestamp. Logical size and transfer progress are null when unavailable. `inventoryState: UNAVAILABLE` differs from an observed empty inventory. The worker refuses to claim a newly cached configuration is already applied. Physical/free bytes describe the whole volume; `accountedBytes` is the separate conservative Outpost ledger. No data-decryption key is used.
+
+Reporter files are charged to the worker telemetry allowance. A full queue/quota blocks reporting without mutating accepted backup jobs or spending backup spool allowance. The report retains up to all 4096 worker jobs; exceeding a bound never silently truncates it. Large reports can require more than the minimum telemetry allowance. Typed transport JSON accepts normal whitespace and field order while rejecting duplicates/unknown fields; embedded signed documents retain canonical byte validation. New unknown-value fields are a candidate format extension: old strict readers are not a supported downgrade until migration acceptance.
+
+## Reporting process and local profile
+
+After explicit worker initialization and owner-policy acceptance, provision an owner-signed management enrollment and a private report profile. The management registry must independently admit the same enrollment. The example uses placeholder opaque IDs; substitute the actual service SPKI and domain, and protect the profile/enrollment/key files with private permissions. The worker bootstrap supplies the existing volume binding, TLS identity and CA. No new listener or data-decryption permission is created.
+
+```json
+{
+  "format": "outpost-report-profile-1",
+  "endpoint": "https://control.example",
+  "identity": "1111111111111111111111111111111111111111111111111111111111111111",
+  "domain": "2222222222222222222222222222222222222222222222222222222222222222",
+  "enrollmentFile": "/run/secrets/report-enrollment.json",
+  "schedule": {
+    "format": "outpost-report-dispatch-1",
+    "revision": 1,
+    "enabled": true,
+    "intervalSeconds": 60,
+    "retrySeconds": 10,
+    "attemptSeconds": 5
+  }
+}
+```
+
+```sh
+outpost management-enrollment-sign --key /private/owner.json --input /private/enrollment.json --output /private/signed-enrollment.json
+outpost worker-report-init --bootstrap /private/worker.json --input /private/report.json
+outpost worker-report-status --bootstrap /private/worker.json --input /private/report.json
+outpost worker-report-loop --bootstrap /private/worker.json --input /private/report.json
+```
+
+`worker-report-loop` runs in the foreground as a separate supervised process from `worker-run`. Missing state is an error: only `worker-report-init` initializes the queue. Reporting failures do not stop the backup process. Status includes the original queued/acknowledged observation, enrollment activity and persisted dispatch phase/deadline/error code. Intervals/retries coalesce missed observations rather than reconstructing data that was never observed.
+
+To pause or resume, change `enabled`, increase the schedule revision and run `worker-report-set` with the same bootstrap/profile arguments. Pause cancels and joins active HTTPS while retaining the pending bytes. Retry deadlines are persisted before I/O and survive restart. Changing the profile file alone does not change the persisted schedule or grant. Apply a new owner-signed enrollment explicitly with `worker-report-renew`; snapshot revision fencing prevents observations made under the previous grant from being relabeled. Reporting uses an independent existing-budget handle and cannot reconcile another process's live reservations.

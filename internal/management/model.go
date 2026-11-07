@@ -175,22 +175,24 @@ func VerifyEnrollment(raw []byte, owner ed25519.PublicKey) (Enrollment, error) {
 }
 
 type Space struct {
-	State         string `json:"state"`
-	LogicalBytes  *int64 `json:"logicalBytes"`
-	PhysicalBytes *int64 `json:"physicalBytes"`
-	FreeBytes     *int64 `json:"freeBytes"`
-	ReservedBytes *int64 `json:"reservedBytes"`
-	ObservedUnix  int64  `json:"observedUnix"`
+	State          string `json:"state"`
+	Scope          string `json:"scope,omitempty"`
+	AccountedBytes *int64 `json:"accountedBytes,omitempty"`
+	LogicalBytes   *int64 `json:"logicalBytes"`
+	PhysicalBytes  *int64 `json:"physicalBytes"`
+	FreeBytes      *int64 `json:"freeBytes"`
+	ReservedBytes  *int64 `json:"reservedBytes"`
+	ObservedUnix   int64  `json:"observedUnix"`
 }
 
 func (s Space) valid(now int64) bool {
 	if s.State == "UNKNOWN" {
-		return s.LogicalBytes == nil && s.PhysicalBytes == nil && s.FreeBytes == nil && s.ReservedBytes == nil && s.ObservedUnix == 0
+		return s.LogicalBytes == nil && s.PhysicalBytes == nil && s.FreeBytes == nil && s.ReservedBytes == nil && s.AccountedBytes == nil && s.Scope == "" && s.ObservedUnix == 0
 	}
-	if s.State != "OBSERVED" || !validTime(s.ObservedUnix) || s.ObservedUnix > now {
+	if s.State != "OBSERVED" || !oneOf(s.Scope, "", "VOLUME") || !validTime(s.ObservedUnix) || s.ObservedUnix > now {
 		return false
 	}
-	for _, n := range []*int64{s.LogicalBytes, s.PhysicalBytes, s.FreeBytes, s.ReservedBytes} {
+	for _, n := range []*int64{s.LogicalBytes, s.PhysicalBytes, s.FreeBytes, s.ReservedBytes, s.AccountedBytes} {
 		if n != nil && (*n < 0 || *n > MaxSafeInteger) {
 			return false
 		}
@@ -207,7 +209,7 @@ type Generation struct {
 	Verification        string `json:"verification"`
 	VerifiedUnix        int64  `json:"verifiedUnix"`
 	RestoreVerifiedUnix int64  `json:"restoreVerifiedUnix"`
-	LogicalBytes        uint64 `json:"logicalBytes"`
+	LogicalBytes        *int64 `json:"logicalBytes"`
 	Objects             uint64 `json:"objects"`
 	Pinned              bool   `json:"pinned"`
 }
@@ -218,7 +220,7 @@ type Job struct {
 	Kind           string `json:"kind"`
 	Phase          string `json:"phase"`
 	UpdatedUnix    int64  `json:"updatedUnix"`
-	CompletedBytes uint64 `json:"completedBytes"`
+	CompletedBytes *int64 `json:"completedBytes"`
 	TotalBytes     *int64 `json:"totalBytes"`
 	ErrorCode      string `json:"errorCode,omitempty"`
 }
@@ -231,6 +233,7 @@ type Report struct {
 	Sequence              uint64       `json:"sequence"`
 	ConfigurationRevision uint64       `json:"configurationRevision"`
 	ObservedUnix          int64        `json:"observedUnix"`
+	InventoryState        string       `json:"inventoryState,omitempty"`
 	Generations           []Generation `json:"generations"`
 	Jobs                  []Job        `json:"jobs"`
 	Space                 Space        `json:"space"`
@@ -249,7 +252,7 @@ func stableCode(code string) bool {
 	return true
 }
 func (r Report) Validate(e Enrollment, now time.Time) error {
-	if e.Validate() != nil || r.Format != ReportFormat || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 256 || !r.Space.valid(r.ObservedUnix) {
+	if e.Validate() != nil || r.Format != ReportFormat || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
 		return ErrInvalid
 	}
 	if _, ok := e.Domain(r.Domain); !ok {
@@ -258,20 +261,20 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 	seen := map[string]bool{}
 	for _, g := range r.Generations {
 		k := g.Generation + g.Target
-		if !storage.ID(g.Generation) || !storage.ID(g.Target) || g.Sequence == 0 || !safe(g.Sequence) || !safe(g.LogicalBytes) || !safe(g.Objects) || !validTime(g.CreatedUnix) || g.CreatedUnix > r.ObservedUnix || !oneOf(g.Status, "INCOMPLETE", "COMPLETE", "CORRUPT", "UNAVAILABLE") || !oneOf(g.Verification, "NONE", "CIPHERTEXT", "DECRYPTED") || g.VerifiedUnix < 0 || g.VerifiedUnix > r.ObservedUnix || g.RestoreVerifiedUnix < 0 || g.RestoreVerifiedUnix > r.ObservedUnix || seen[k] {
+		if !storage.ID(g.Generation) || !storage.ID(g.Target) || g.Sequence == 0 || !safe(g.Sequence) || g.LogicalBytes != nil && (*g.LogicalBytes < 0 || *g.LogicalBytes > MaxSafeInteger) || !safe(g.Objects) || !validTime(g.CreatedUnix) || g.CreatedUnix > r.ObservedUnix || !oneOf(g.Status, "INCOMPLETE", "COMPLETE", "CORRUPT", "UNAVAILABLE") || !oneOf(g.Verification, "NONE", "CIPHERTEXT", "DECRYPTED") || g.VerifiedUnix < 0 || g.VerifiedUnix > r.ObservedUnix || g.RestoreVerifiedUnix < 0 || g.RestoreVerifiedUnix > r.ObservedUnix || seen[k] {
 			return ErrInvalid
 		}
-		if (g.Verification == "NONE") != (g.VerifiedUnix == 0) || g.Status == "COMPLETE" && g.VerifiedUnix == 0 || g.RestoreVerifiedUnix > 0 && g.Verification != "DECRYPTED" {
+		if (g.Verification == "NONE") != (g.VerifiedUnix == 0) || g.RestoreVerifiedUnix > 0 && g.Verification != "DECRYPTED" {
 			return ErrInvalid
 		}
 		seen[k] = true
 	}
 	seen = map[string]bool{}
 	for _, j := range r.Jobs {
-		if !storage.ID(j.Operation) || j.Domain != r.Domain || !storage.ID(j.Generation) || !oneOf(j.Kind, "SOURCE", "PEER", "UPLOAD", "SCRUB", "RESTORE", "MAINTENANCE") || !oneOf(j.Phase, "QUEUED", "RUNNING", "RETRY_WAIT", "PAUSED", "BLOCKED", "COMPLETE", "WITHDRAWN", "FAILED") || !validTime(j.UpdatedUnix) || j.UpdatedUnix > r.ObservedUnix || !safe(j.CompletedBytes) || !stableCode(j.ErrorCode) || seen[j.Operation] {
+		if !storage.ID(j.Operation) || j.Domain != r.Domain || !storage.ID(j.Generation) || !oneOf(j.Kind, "SOURCE", "PEER", "UPLOAD", "SCRUB", "RESTORE", "MAINTENANCE") || !oneOf(j.Phase, "QUEUED", "RUNNING", "RETRY_WAIT", "PAUSED", "BLOCKED", "COMPLETE", "WITHDRAWN", "FAILED") || !validTime(j.UpdatedUnix) || j.UpdatedUnix > r.ObservedUnix || !stableCode(j.ErrorCode) || seen[j.Operation] {
 			return ErrInvalid
 		}
-		if j.TotalBytes != nil && (*j.TotalBytes < 0 || *j.TotalBytes > MaxSafeInteger || j.CompletedBytes > uint64(*j.TotalBytes)) {
+		if j.TotalBytes != nil && (*j.TotalBytes < 0 || *j.TotalBytes > MaxSafeInteger) || j.CompletedBytes != nil && (*j.CompletedBytes < 0 || *j.CompletedBytes > MaxSafeInteger) || j.TotalBytes != nil && j.CompletedBytes != nil && *j.CompletedBytes > *j.TotalBytes {
 			return ErrInvalid
 		}
 		seen[j.Operation] = true
