@@ -3,6 +3,7 @@ package generation
 import (
 	"context"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"path/filepath"
@@ -91,7 +92,7 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 			if !item.Type().IsRegular() || !validID(item.Name()) {
 				return ErrInvalid
 			}
-			info, e := item.Info()
+			info, e := localfs.Stat(r.root, "objects/"+item.Name())
 			if e != nil {
 				return e
 			}

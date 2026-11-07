@@ -15,11 +15,16 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/volume"
 )
+
+const BootstrapFormat = "outpost-bootstrap-2"
 
 // Bootstrap is local-only. It cannot be supplied or expanded by a remote job.
 type Bootstrap struct {
+	Volume          volume.Binding    `json:"volume"`
 	Format          string            `json:"format"`
 	Directory       string            `json:"directory"`
 	Node            string            `json:"node"`
@@ -40,7 +45,12 @@ func ReadPrivate(path string, limit int) ([]byte, error) {
 	if !filepath.IsAbs(path) || limit < 1 || limit > 64<<20 {
 		return nil, ErrDenied
 	}
-	f, e := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	r, e := localfs.OpenRoot(filepath.Dir(path))
+	if e != nil {
+		return nil, e
+	}
+	defer r.Close()
+	f, e := localfs.OpenFile(r, filepath.Base(path), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -78,7 +88,7 @@ func LoadBootstrap(path string) (Bootstrap, error) {
 	if e != nil {
 		return b, e
 	}
-	if DecodeInput(raw, &b, 65536) != nil || b.Format != Format || !filepath.IsAbs(b.Directory) || !storage.ID(b.Node) || len(b.Owner) != 32 || len(b.Credentials) > 128 {
+	if DecodeInput(raw, &b, 65536) != nil || b.Format != BootstrapFormat || b.Volume.Scope != b.Node || !filepath.IsAbs(b.Directory) || !storage.ID(b.Node) || len(b.Owner) != 32 || len(b.Credentials) > 128 {
 		return b, ErrDenied
 	}
 	if b.Listen != "" {
@@ -121,6 +131,13 @@ func (b Bootstrap) TLS() (tls.Certificate, *x509.CertPool, error) {
 	return pair, roots, nil
 }
 func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) {
+	if b.Format != BootstrapFormat || b.Volume.Scope != b.Node {
+		return nil, nil, ErrDenied
+	}
+	if e := b.Volume.Check(context.Background(), b.Directory, initialize); e != nil {
+		return nil, nil, e
+	}
+
 	cert, roots, e := b.TLS()
 	if e != nil {
 		return nil, nil, e
@@ -132,8 +149,17 @@ func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) {
 			return nil, nil, e
 		}
 	}
-	w, e := Open(Options{Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: b.Resolve})
+	root, e := b.Volume.Open(context.Background(), b.Directory, initialize)
 	if e != nil {
+		if fetcher != nil {
+			fetcher.Close()
+		}
+		return nil, nil, e
+	}
+	// The guard owns this descriptor until cleanup; Worker keeps its own clone.
+	w, e := Open(Options{Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: b.Resolve})
+	if e != nil {
+		root.Close()
 		if fetcher != nil {
 			fetcher.Close()
 		}
@@ -141,6 +167,7 @@ func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) {
 	}
 	return w, func() {
 		w.Close()
+		root.Close()
 		if fetcher != nil {
 			fetcher.Close()
 		}

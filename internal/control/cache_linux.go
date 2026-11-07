@@ -28,10 +28,13 @@ type Cache struct {
 }
 
 func OpenCache(dir, node string, owner ed25519.PublicKey, initialize bool) (*Cache, error) {
+	return OpenCacheAt(nil, dir, node, owner, initialize)
+}
+func OpenCacheAt(parent *os.Root, dir, node string, owner ed25519.PublicKey, initialize bool) (*Cache, error) {
 	if !storage.ID(node) || len(owner) != 32 {
 		return nil, ErrDenied
 	}
-	s, e := statefile.Open(dir, MaxConfig+2<<20, initialize)
+	s, e := statefile.OpenAt(parent, dir, MaxConfig+2<<20, initialize)
 	if e != nil {
 		return nil, e
 	}

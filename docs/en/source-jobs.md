@@ -1,0 +1,15 @@
+# Source job lifecycle
+
+[Русский](../ru/source-jobs.md)
+
+This contract joins the private source planner, streaming file kits and authenticated ingress. It is a development contract; the completion map records implementation and acceptance separately.
+
+A source operation freezes its private profile, provider view identity, complete selection plan, file identities, previous versions and signed ingress intent before transferring payload. Paths, selection rules and data keys stay in the trusted source. Every file is classified together with its aliases before any packing. A changed source invalidates a best-effort plan; a directory read is never reported as an application snapshot.
+
+The durable order is `PLANNED`, `CAPTURING`, `SEALED`, `WAITING_COPIES`, `CHECKPOINTED`, `RELEASING`, `RELEASED`, `ACKNOWLEDGING`, `COMPLETE`. Retries preserve the same operation and signed intent. Each accepted file version has a local checkpoint; an interrupted large file uses encrypted accepted-pack progress. Checkpoints do not promise that source reads resume at the interrupted byte offset.
+
+Publication verifies the exact signed catalog through ingress. A configured copy threshold counts distinct authorized complete targets for that catalog and records verification type and original observation time. It never counts an upload attempt or queue entry. One ingress copy and a policy requiring two copies have different release conditions. Missing optional or long-offline nodes do not extend the source-view lease after the required threshold is met.
+
+The source saves its receipt and recovery checkpoint durably before entering provider release. Provider acquisition and release are idempotent by operation/view identity. An uncertain release is retried as release; it does not reacquire or recapture the source. Only after confirmed provider release may the source acknowledge ingress cleanup. A lost acknowledgement reply retries the same saved receipt. Progress cleanup removes only that operation's private metadata; it does not retire replica generations.
+
+Providers are installed implementations with explicit consistency and capability checks, not remote shell text. A best-effort tree, an admitted read-only snapshot and an application export have distinct declarations and restore procedures. Missing required capabilities stop admission. Runtime cache, metadata, progress and snapshot churn have separate bounded accounting; exhausting them preserves previous complete versions. Native provider and infrastructure acceptance is separate from synthetic job tests.

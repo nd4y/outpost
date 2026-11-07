@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"path/filepath"
@@ -51,7 +52,7 @@ type Journal struct {
 }
 
 func regular(root *os.Root, name string, max int) ([]byte, error) {
-	f, e := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -86,7 +87,7 @@ func atomicFile(root *os.Root, name string, data []byte) error {
 		return e
 	}
 	temp := ".pending-" + hex.EncodeToString(nonce[:])
-	f, e := root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, e := localfs.OpenFile(root, temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
 		return e
 	}
@@ -108,7 +109,7 @@ func atomicFile(root *os.Root, name string, data []byte) error {
 	return syncDir(root)
 }
 func lock(ctx context.Context, root *os.Root, name string) (func(), error) {
-	f, e := root.OpenFile(name, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(root, name, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
 	}

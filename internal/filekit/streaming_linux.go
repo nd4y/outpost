@@ -2,6 +2,7 @@ package filekit
 
 import (
 	"context"
+	"github.com/nd4y/outpost/internal/localfs"
 	"os"
 	"syscall"
 )
@@ -16,7 +17,7 @@ func (s *Store) checkObjectContext(ctx context.Context, ref Object) error {
 	if s.backend != nil {
 		return s.backend.Check(ctx, ref)
 	}
-	f, e := s.root.OpenFile(objectPath(ref.ID), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(s.root, objectPath(ref.ID), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return e
 	}

@@ -3,6 +3,7 @@ package filekit
 import (
 	"context"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"sort"
 	"strings"
@@ -73,7 +74,7 @@ func (s *Store) objectInventory() (map[string]int64, error) {
 			if !e.Type().IsRegular() || !validID(e.Name()) || !strings.HasPrefix(e.Name(), dir.Name()) {
 				return nil, ErrInvalid
 			}
-			info, err := e.Info()
+			info, err := localfs.Stat(s.root, "objects/"+dir.Name()+"/"+e.Name())
 			if err != nil {
 				return nil, err
 			}

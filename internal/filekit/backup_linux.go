@@ -51,6 +51,9 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	}
 	defer unlock()
 	s.Stats = Stats{}
+	if opt.Progress != "" && (!validID(opt.Progress) || !validID(opt.File) || s.backend == nil) {
+		return s.Stats, ErrInvalid
+	}
 	if opt.File == "" {
 		opt.File = randomID()
 	}
@@ -107,6 +110,22 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	if err != nil {
 		return s.Stats, err
 	}
+	var progress *captureProgress
+	if opt.Progress != "" {
+		var observed unix.Stat_t
+		if err = unix.Fstat(int(f.Fd()), &observed); err != nil {
+			return s.Stats, err
+		}
+		var accepted map[string]Block
+		progress, accepted, err = s.openProgress(ctx, opt, identity(observed), meta)
+		if err != nil {
+			return s.Stats, err
+		}
+		defer progress.file.Close()
+		for hash, block := range accepted {
+			reuse[hash] = block
+		}
+	}
 	d := Descriptor{Format: Format, Domain: s.Owner.Domain, File: opt.File, Names: append([]string(nil), opt.Names...), Metadata: meta}
 	h := sha256.New()
 	input := io.TeeReader(countedReader{contextReader{ctx, f}, &s.Stats.SourceBytes}, h)
@@ -124,11 +143,18 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 		if e != nil {
 			return e
 		}
+		checkpoint := make([]Block, 0, len(pending))
 		for hash, b := range pending {
 			b.Object = ref
 			reuse[hash] = b
+			checkpoint = append(checkpoint, b)
 			for _, i := range positions[hash] {
 				d.Blocks[i] = b
+			}
+		}
+		if progress != nil {
+			if e = progress.append(ctx, checkpoint); e != nil {
+				return e
 			}
 		}
 		pack = pack[:0]

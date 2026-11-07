@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"syscall"
@@ -36,7 +37,7 @@ type BatchResult struct {
 }
 
 func (r *Replica) objectStamp(ref Object) (catalogStamp, error) {
-	f, e := r.root.OpenFile("objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(r.root, "objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return catalogStamp{}, e
 	}
@@ -55,7 +56,7 @@ func (r *Replica) verifyObjectStamp(ctx context.Context, ref Object) (catalogSta
 	if e := ctx.Err(); e != nil {
 		return catalogStamp{}, e
 	}
-	f, e := r.root.OpenFile("objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(r.root, "objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return catalogStamp{}, e
 	}

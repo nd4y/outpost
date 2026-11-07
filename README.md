@@ -20,6 +20,8 @@ The [durable upload queue](docs/en/upload-queue.md) now admits signed plans, pin
 
 The [source and recovery components](docs/en/product-development.md) include bounded alias-aware scanning, a metadata-only streaming cache and whole-replica/directory recovery without the state index. [Authenticated source ingress](docs/en/source-ingress.md) adds current-policy admission, bounded verification and durable acknowledgement cleanup to workers. `restore-replica` validates an explicit checkpoint and publishes a complete selected result atomically. Source-job and consistency-provider orchestration and the installable product remain in development.
 
+Worker bootstrap now requires [runtime volume admission](docs/en/runtime-volume.md). Missing markers or replaced paths stop work, while opened descriptors keep writes on the admitted tree. Encrypted per-file progress reuses accepted packs after a crash; the source is still reread. The [source job lifecycle](docs/en/source-jobs.md) defines the remaining integration of copy thresholds, recovery checkpoints and provider release.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.

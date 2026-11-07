@@ -7,9 +7,9 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -69,7 +69,10 @@ func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize b
 	return OpenQueueAdmitted(dir, worker, a, limits, initialize, nil)
 }
 func OpenQueueAdmitted(dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
-	if !filepath.IsAbs(dir) || !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
+	return OpenQueueAt(nil, dir, worker, a, limits, initialize, admit)
+}
+func OpenQueueAt(parent *os.Root, dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
+	if !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
 		return nil, ErrDenied
 	}
 	raw, _ := json.Marshal(struct {
@@ -80,7 +83,7 @@ func OpenQueueAdmitted(dir, worker string, a Authority, limits QueueLimits, init
 	a.Planner = append([]byte(nil), a.Planner...)
 	a.Generation.Writer = append([]byte(nil), a.Generation.Writer...)
 	a.Generation.Maintenance = append([]byte(nil), a.Generation.Maintenance...)
-	r, e := os.OpenRoot(dir)
+	r, e := localfs.Directory(parent, dir, false)
 	if e != nil {
 		return nil, e
 	}
@@ -273,23 +276,8 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 	if e != nil {
 		return nil, e
 	}
-	// Root-relative opens keep journal access inside the originally opened queue.
-	if e = q.root.Mkdir("jobs", 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return nil, e
-	}
-	info, e := q.root.Lstat("jobs")
-	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, ErrDenied
-	}
 	name := "jobs/" + p.Operation
-	if e = q.root.Mkdir(name, 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return nil, e
-	}
-	info, e = q.root.Lstat(name)
-	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, ErrDenied
-	}
-	r, e := q.root.OpenRoot(name)
+	r, e := localfs.OpenAt(q.root, name, true)
 	if e != nil {
 		return nil, e
 	}

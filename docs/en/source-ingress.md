@@ -25,6 +25,8 @@ One capture occupies a receiver's domain slot. Its durable fence prevents replay
 
 ## Publication and acknowledgement
 
+The source-side capture-progress contract uses a private append-only encrypted log bound to domain, file, operation, source identity and capture options. A record names only packs already durably accepted by the receiver. Records carry sequence and previous-record digest; authenticated complete-record corruption stops resume, while an incomplete final record may be removed and its pack retried. Resume may reread source bytes while reusing accepted encrypted blocks. This local log is not a recovery kit, a complete generation or permission to release a snapshot. Provider/job integration and source-read costs need separate acceptance.
+
 Presence alone is not completeness. Verification processes at most 256 objects/256 MiB per request, persisting object identity/modification stamps. Publication requires the full closure, unchanged stamps and valid signed lineage. This records a verification window, not immunity to future corruption. Fresh scrub still rereads all bytes.
 
 A receipt identifies operation, ingress, tenant/domain, generation, new bytes/objects and original verification time. Lost replies preserve that time. The client confirms the exact published catalog. Body counters include attempted sends and reads; they are not TCP/TLS wire counters. A compromised receiver can lie about persistence, so report verification level and observation age.

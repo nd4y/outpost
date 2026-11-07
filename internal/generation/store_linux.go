@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"path/filepath"
@@ -57,12 +58,15 @@ type Replica struct {
 // First enrollment is explicit and requires an empty directory. It does not
 // implement volume/sentinel admission or an epoch transition procedure.
 func Open(dir string, t Trust, initialize bool) (*Replica, error) {
-	if !filepath.IsAbs(dir) || !t.valid() {
+	return OpenAt(nil, dir, t, initialize)
+}
+func OpenAt(parent *os.Root, dir string, t Trust, initialize bool) (*Replica, error) {
+	if !t.valid() {
 		return nil, ErrInvalid
 	}
 	t.Writer = append([]byte(nil), t.Writer...)
 	t.Maintenance = append([]byte(nil), t.Maintenance...)
-	r, err := os.OpenRoot(dir)
+	r, err := localfs.Directory(parent, dir, false)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +124,7 @@ func syncDir(root *os.Root, name string) error {
 	return f.Sync()
 }
 func read(root *os.Root, name string, limit int) ([]byte, error) {
-	f, e := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -152,7 +156,7 @@ func atomic(root *os.Root, name string, b []byte) error {
 		return e
 	}
 	temp := ".txn/" + id
-	f, e := root.OpenFile(temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, e := localfs.OpenFile(root, temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if e != nil {
 		return e
 	}
@@ -266,7 +270,7 @@ func (r *Replica) exclusive(ctx context.Context, fn func() error) error {
 	if e := ctx.Err(); e != nil {
 		return e
 	}
-	f, e := r.root.OpenFile(".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(r.root, ".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return e
 	}

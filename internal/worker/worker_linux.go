@@ -19,6 +19,7 @@ import (
 	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
+	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -26,6 +27,10 @@ import (
 )
 
 type Options struct {
+	// Root is an independently admitted, already opened worker directory.
+	// Open retains its own descriptor; the caller retains Root.
+	Root        *os.Root
+	Guard       func(context.Context) error
 	Directory   string
 	Node        string
 	Owner       ed25519.PublicKey
@@ -52,6 +57,8 @@ type view struct {
 	domains  map[string]*domainState
 }
 type Worker struct {
+	root         *os.Root
+	guard        func(context.Context) error
 	budgetMu     sync.Mutex
 	dir, node    string
 	cert         tls.Certificate
@@ -77,19 +84,27 @@ func Open(o Options) (*Worker, error) {
 	if _, ok := o.Certificate.PrivateKey.(ed25519.PrivateKey); !ok {
 		return nil, ErrDenied
 	}
-	w := &Worker{dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
-	if o.Initialize {
-		if _, e = os.Lstat(o.Directory); e == nil {
-			return nil, ErrDenied
-		} else if !errors.Is(e, os.ErrNotExist) {
-			return nil, e
-		}
-		if e = os.MkdirAll(o.Directory, 0700); e != nil {
-			return nil, e
-		}
+	w := &Worker{guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
+	if e = w.check(context.Background()); e != nil {
+		return nil, e
 	}
-	w.state, e = statefile.Open(filepath.Join(o.Directory, "state"), 32<<20, o.Initialize)
+	if o.Root != nil {
+		w.root, e = localfs.OpenAt(o.Root, ".", false)
+	} else {
+		if o.Initialize {
+			if _, err := os.Lstat(o.Directory); !errors.Is(err, os.ErrNotExist) {
+				return nil, ErrDenied
+			}
+		}
+		w.root, e = localfs.Directory(nil, o.Directory, o.Initialize)
+	}
 	if e != nil {
+		return nil, e
+	}
+
+	w.state, e = statefile.OpenAt(w.root, "state", 32<<20, o.Initialize)
+	if e != nil {
+		w.root.Close()
 		return nil, e
 	}
 	fail := func(e error) (*Worker, error) { w.Close(); return nil, e }
@@ -99,11 +114,11 @@ func Open(o Options) (*Worker, error) {
 	if _, e = w.Status(context.Background()); e != nil {
 		return fail(e)
 	}
-	w.lease, e = statefile.Open(filepath.Join(o.Directory, "lease"), 4096, o.Initialize)
+	w.lease, e = statefile.OpenAt(w.root, "lease", 4096, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
-	w.cache, e = control.OpenCache(filepath.Join(o.Directory, "control"), o.Node, o.Owner, o.Initialize)
+	w.cache, e = control.OpenCacheAt(w.root, "control", o.Node, o.Owner, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
@@ -125,9 +140,15 @@ func (w *Worker) Close() error {
 	if w.budget != nil {
 		e = errors.Join(e, w.budget.Close())
 	}
+	if w.root != nil {
+		e = errors.Join(e, w.root.Close())
+	}
 	return e
 }
 func (w *Worker) Accept(ctx context.Context, raw []byte) error {
+	if e := w.check(ctx); e != nil {
+		return e
+	}
 	c, e := w.cache.Verify(raw)
 	if e != nil {
 		return e
@@ -147,7 +168,7 @@ func (w *Worker) budgetFor(ctx context.Context, c control.Config, initialize boo
 	defer w.budgetMu.Unlock()
 	if w.budget == nil {
 		limits := diskbudget.Limits{Capacity: c.Limits.CapacityBytes, Reserve: c.Limits.ReserveBytes, Spool: c.Limits.SpoolBytes, Telemetry: c.Limits.TelemetryBytes}
-		b, e := diskbudget.Open(ctx, w.dir, limits, initialize)
+		b, e := diskbudget.OpenAt(w.root, ctx, ".", limits, initialize)
 		if e != nil {
 			return nil, e
 		}
@@ -161,10 +182,10 @@ func (w *Worker) budgetFor(ctx context.Context, c control.Config, initialize boo
 		}
 		w.budget = b
 	}
-	if e := w.state.SetAdmission(ctx, w.budget.Admission("state")); e != nil {
+	if e := w.state.SetAdmission(ctx, w.admission("state")); e != nil {
 		return nil, e
 	}
-	if e := w.cache.SetAdmission(ctx, w.budget.Admission("control")); e != nil {
+	if e := w.cache.SetAdmission(ctx, w.admission("control")); e != nil {
 		return nil, e
 	}
 	return w.budget, nil
@@ -172,19 +193,61 @@ func (w *Worker) budgetFor(ctx context.Context, c control.Config, initialize boo
 func DomainDirectory(root string, t generation.Trust) string {
 	return filepath.Join(root, "domains", t.Domain, t.Repository, strconv.FormatUint(t.Epoch, 10))
 }
-func createOrOpen(dir string, open func(bool) error) error {
-	e := os.MkdirAll(filepath.Dir(dir), 0700)
+func (w *Worker) check(ctx context.Context) error {
+	if e := ctx.Err(); e != nil {
+		return e
+	}
+	if w.guard != nil {
+		return w.guard(ctx)
+	}
+	return nil
+}
+func (w *Worker) relative(dir string) string {
+	rel, e := filepath.Rel(w.dir, dir)
+	if e != nil {
+		return ""
+	}
+	return rel
+}
+func (w *Worker) admission(prefix string) statefile.Admission {
+	return func(name string, size int) (func(bool) error, error) {
+		if e := w.check(context.Background()); e != nil {
+			return nil, e
+		}
+		if w.budget == nil {
+			return nil, ErrDenied
+		}
+		finish, e := w.budget.Admission(prefix)(name, size)
+		if e != nil {
+			return nil, e
+		}
+		return func(written bool) error { return errors.Join(finish(written), w.check(context.Background())) }, nil
+	}
+}
+func (w *Worker) createOrOpen(ctx context.Context, dir string, open func(bool) error) error {
+	if e := w.check(ctx); e != nil {
+		return e
+	}
+	relative := w.relative(dir)
+	parent, e := localfs.OpenAt(w.root, filepath.Dir(relative), true)
 	if e != nil {
 		return e
 	}
-	e = os.Mkdir(dir, 0700)
-	if e == nil {
-		return open(true)
-	}
-	if !errors.Is(e, os.ErrExist) {
+	defer parent.Close()
+	e = parent.Mkdir(filepath.Base(relative), 0700)
+	initialize := e == nil
+	if e != nil && !errors.Is(e, os.ErrExist) {
 		return e
 	}
-	return open(false)
+	d, e := parent.Open(".")
+	if e != nil {
+		return e
+	}
+	e = errors.Join(d.Sync(), d.Close())
+	if e != nil {
+		return e
+	}
+	return open(initialize)
 }
 func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, job control.Job) peer.Policy {
 	node, _ := c.NodeByID(self)
@@ -245,17 +308,17 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		local := &domainState{}
 		v.domains[d.Trust.Domain] = local
 		dir := DomainDirectory(w.dir, d.Trust)
-		e := createOrOpen(filepath.Join(dir, "replica"), func(init bool) error {
+		e := w.createOrOpen(ctx, filepath.Join(dir, "replica"), func(init bool) error {
 			var e error
-			local.replica, e = generation.Open(filepath.Join(dir, "replica"), d.Trust, init)
+			local.replica, e = generation.OpenAt(w.root, w.relative(filepath.Join(dir, "replica")), d.Trust, init)
 			return e
 		})
 		if e != nil {
 			return fail(e)
 		}
-		e = createOrOpen(filepath.Join(dir, "peer"), func(init bool) error {
+		e = w.createOrOpen(ctx, filepath.Join(dir, "peer"), func(init bool) error {
 			var e error
-			local.journal, e = peer.OpenJournal(filepath.Join(dir, "peer"), w.node, d.Trust, init)
+			local.journal, e = peer.OpenJournalAt(w.root, w.relative(filepath.Join(dir, "peer")), w.node, d.Trust, init)
 			return e
 		})
 		if e != nil {
@@ -277,10 +340,10 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	if e := w.budget.Reconcile(ctx, limits); e != nil {
 		return fail(e)
 	}
-	if e := w.state.SetAdmission(ctx, w.budget.Admission("state")); e != nil {
+	if e := w.state.SetAdmission(ctx, w.admission("state")); e != nil {
 		return fail(e)
 	}
-	if e := w.cache.SetAdmission(ctx, w.budget.Admission("control")); e != nil {
+	if e := w.cache.SetAdmission(ctx, w.admission("control")); e != nil {
 		return fail(e)
 	}
 	for id, local := range v.domains {
@@ -289,8 +352,8 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		if e != nil {
 			return fail(e)
 		}
-		local.replica.Admit = w.budget.Admission(filepath.ToSlash(filepath.Join(relative, "replica")))
-		local.journal.Admit = w.budget.Admission(filepath.ToSlash(filepath.Join(relative, "peer")))
+		local.replica.Admit = w.admission(filepath.ToSlash(filepath.Join(relative, "replica")))
+		local.journal.Admit = w.admission(filepath.ToSlash(filepath.Join(relative, "peer")))
 	}
 	for _, raw := range c.Ingress {
 		a, e := ingress.VerifyAuthority(raw, w.owner, time.Now())
@@ -309,11 +372,14 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		if e != nil {
 			return fail(e)
 		}
-		e = createOrOpen(dir, func(init bool) error {
+		e = w.createOrOpen(ctx, dir, func(init bool) error {
 			var e error
-			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Directory: dir, Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
-				return w.budget.Admission(filepath.ToSlash(filepath.Join(relative, prefix)))
+			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Parent: w.root, Directory: w.relative(dir), Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
+				return w.admission(filepath.ToSlash(filepath.Join(relative, prefix)))
 			}, RemoveObject: func(ctx context.Context, name string, size int64) error {
+				if e := w.check(ctx); e != nil {
+					return e
+				}
 				return w.budget.Remove(ctx, filepath.ToSlash(filepath.Join(relative, "current/objects", name)), size)
 			}})
 			return e
@@ -355,7 +421,38 @@ func (w *Worker) stop(v *view) error {
 
 // Run keeps using the cached unexpired policy while the controller is absent.
 // A new revision cancels and joins all old attempts before starting new work.
-func (w *Worker) Run(ctx context.Context) error {
+func (w *Worker) Run(ctx context.Context) (result error) {
+	if e := w.check(ctx); e != nil {
+		return e
+	}
+	parent := ctx
+	ctx, cancel := context.WithCancelCause(ctx)
+	monitorDone := make(chan struct{})
+	go func() {
+		defer close(monitorDone)
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				if e := w.check(ctx); e != nil {
+					cancel(e)
+					return
+				}
+			}
+		}
+	}()
+	defer func() {
+		cause := context.Cause(ctx)
+		cancel(context.Canceled)
+		<-monitorDone
+		if parent.Err() == nil && cause != nil && !errors.Is(cause, context.Canceled) {
+			result = errors.Join(result, cause)
+		}
+	}()
+
 	e := w.lease.WithLock(ctx, func() (runErr error) {
 		var active *view
 		defer func() {
@@ -428,6 +525,10 @@ func (w *Worker) Run(ctx context.Context) error {
 // ServeHTTP delegates only exact signed inbound jobs. It cannot be used as a
 // generic authenticated object server or as an implicit reverse route.
 func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
+	if w.check(r.Context()) != nil {
+		http.Error(out, "unavailable", 503)
+		return
+	}
 	if r.TLS == nil || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.PeerCertificates) == 0 {
 		http.Error(out, "denied", 403)
 		return
@@ -515,13 +616,13 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 	}
 	dir := filepath.Join(DomainDirectory(w.dir, d.Trust), "uploads", j.Operation)
 	var queue *upload.Queue
-	e := createOrOpen(dir, func(init bool) error {
+	e := w.createOrOpen(ctx, dir, func(init bool) error {
 		var e error
 		relative, err := filepath.Rel(w.dir, dir)
 		if err != nil || w.budget == nil {
 			return ErrDenied
 		}
-		queue, e = upload.OpenQueueAdmitted(dir, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, init, w.budget.Admission(filepath.ToSlash(relative)))
+		queue, e = upload.OpenQueueAt(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, init, w.admission(filepath.ToSlash(relative)))
 		return e
 	})
 	if e != nil {

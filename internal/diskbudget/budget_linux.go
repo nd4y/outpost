@@ -9,11 +9,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -107,10 +107,13 @@ func (b *Budget) size(name string) (int64, error) {
 	return allocated(i)
 }
 func Open(ctx context.Context, dir string, limits Limits, initialize bool) (*Budget, error) {
-	if !filepath.IsAbs(dir) || !limits.valid() {
+	return OpenAt(nil, ctx, dir, limits, initialize)
+}
+func OpenAt(parent *os.Root, ctx context.Context, dir string, limits Limits, initialize bool) (*Budget, error) {
+	if !limits.valid() {
 		return nil, ErrInvalid
 	}
-	root, e := os.OpenRoot(dir)
+	root, e := localfs.Directory(parent, dir, false)
 	if e != nil {
 		return nil, e
 	}
@@ -126,7 +129,7 @@ func Open(ctx context.Context, dir string, limits Limits, initialize bool) (*Bud
 		root.Close()
 		return nil, ErrInvalid
 	}
-	s, e := statefile.Open(filepath.Join(dir, ".capacity"), 1<<20, initialize)
+	s, e := statefile.OpenAt(root, ".capacity", 1<<20, initialize)
 	if e != nil {
 		root.Close()
 		return nil, e
@@ -184,7 +187,7 @@ func (b *Budget) save(s State) error {
 	return b.store.Write("ledger.json", raw)
 }
 func (b *Budget) lock(ctx context.Context, exclusive bool) (func(), error) {
-	f, e := b.root.OpenFile(".capacity/inflight.lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(b.root, ".capacity/inflight.lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -258,7 +261,7 @@ func (b *Budget) reconcile(ctx context.Context, limits Limits) error {
 		if e := ctx.Err(); e != nil {
 			return e
 		}
-		directory, e := b.root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_DIRECTORY, 0)
+		directory, e := localfs.OpenFile(b.root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_DIRECTORY, 0)
 		if e != nil {
 			return e
 		}
@@ -288,7 +291,7 @@ func (b *Budget) reconcile(ctx context.Context, limits Limits) error {
 						return err
 					}
 				} else {
-					info, err := entry.Info()
+					info, err := localfs.Stat(b.root, child)
 					if err != nil {
 						return err
 					}

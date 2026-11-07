@@ -13,6 +13,9 @@ import (
 // job. It excludes the running worker and uses the cached domain authority and
 // existing disk budget even when network policy has expired.
 func (w *Worker) MigrateDomain(ctx context.Context, domain string, rollback bool) error {
+	if e := w.check(ctx); e != nil {
+		return e
+	}
 	acquire, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	e := w.lease.WithLock(acquire, func() error {
@@ -29,7 +32,7 @@ func (w *Worker) MigrateDomain(ctx context.Context, domain string, rollback bool
 		if !ok {
 			return ErrDenied
 		}
-		budget, e := w.budgetFor(ctx, c, false)
+		_, e = w.budgetFor(ctx, c, false)
 		if e != nil {
 			return e
 		}
@@ -39,9 +42,9 @@ func (w *Worker) MigrateDomain(ctx context.Context, domain string, rollback bool
 			return e
 		}
 		if rollback {
-			return generation.RollbackLocal(ctx, dir, d.Trust, budget.Admission(filepath.ToSlash(prefix)))
+			return generation.RollbackLocalAt(w.root, ctx, prefix, d.Trust, w.admission(filepath.ToSlash(prefix)))
 		}
-		return generation.MigrateLocal(ctx, dir, d.Trust, budget.Admission(filepath.ToSlash(prefix)))
+		return generation.MigrateLocalAt(w.root, ctx, prefix, d.Trust, w.admission(filepath.ToSlash(prefix)))
 	})
 	if errors.Is(e, context.DeadlineExceeded) && ctx.Err() == nil {
 		return generation.ErrConflict

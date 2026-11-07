@@ -2,6 +2,7 @@ package generation
 
 import (
 	"context"
+	"github.com/nd4y/outpost/internal/localfs"
 	"os"
 	"syscall"
 )
@@ -22,7 +23,7 @@ func (r *Replica) CheckObject(ctx context.Context, id string, ref Object) error 
 		if expected, ok := refs[ref.ID]; !ok || expected != ref {
 			return ErrInvalid
 		}
-		f, e := r.root.OpenFile("objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+		f, e := localfs.OpenFile(r.root, "objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 		if e != nil {
 			return e
 		}

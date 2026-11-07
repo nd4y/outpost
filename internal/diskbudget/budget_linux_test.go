@@ -16,6 +16,27 @@ import (
 
 var testLimits = Limits{Capacity: 16 << 20, Reserve: 8 << 20, Spool: 4 << 20, Telemetry: 1 << 20}
 
+func TestReconciliationUsesOpenedTreeAfterPathReplacement(t *testing.T) {
+	b, root := newBudget(t)
+	ctx := context.Background()
+	must(t, os.WriteFile(filepath.Join(root, "objects", "retained"), make([]byte, 8192), 0600))
+	held := root + "-held"
+	must(t, os.Rename(root, held))
+	must(t, os.Mkdir(root, 0700))
+	t.Cleanup(func() { os.RemoveAll(held) })
+	must(t, b.Reconcile(ctx, testLimits))
+	state, e := b.Status(ctx)
+	must(t, e)
+	if state.Used["data"] < 8192 {
+		t.Fatal("did not account retained tree", state.Used)
+	}
+	entries, e := os.ReadDir(root)
+	must(t, e)
+	if len(entries) != 0 {
+		t.Fatal("replacement written", entries)
+	}
+}
+
 func must(t *testing.T, e error) {
 	t.Helper()
 	if e != nil {

@@ -150,7 +150,7 @@ func (w *Worker) Retry(ctx context.Context, operation string) error {
 	if e != nil {
 		return e
 	}
-	budget, e := w.budgetFor(ctx, known, false)
+	_, e = w.budgetFor(ctx, known, false)
 	if e != nil {
 		return e
 	}
@@ -184,7 +184,7 @@ func (w *Worker) Retry(ctx context.Context, operation string) error {
 			if e != nil {
 				return e
 			}
-			q, e := upload.OpenQueueAdmitted(dir, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, false, budget.Admission(filepath.ToSlash(relative)))
+			q, e := upload.OpenQueueAt(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, false, w.admission(filepath.ToSlash(relative)))
 			if e != nil {
 				return e
 			}

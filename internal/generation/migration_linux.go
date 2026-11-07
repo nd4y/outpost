@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"os"
-	"path/filepath"
 
 	"github.com/nd4y/outpost/internal/statefile"
 )
@@ -27,11 +27,11 @@ type legacyState struct {
 	Receipts        map[string]string      `json:"maintenanceReceipts"`
 }
 
-func migrationReplica(dir string, t Trust, admit statefile.Admission) (*Replica, error) {
-	if !filepath.IsAbs(dir) || !t.valid() {
+func migrationReplica(parent *os.Root, dir string, t Trust, admit statefile.Admission) (*Replica, error) {
+	if !t.valid() {
 		return nil, ErrInvalid
 	}
-	root, e := os.OpenRoot(dir)
+	root, e := localfs.Directory(parent, dir, false)
 	if e != nil {
 		return nil, e
 	}
@@ -89,7 +89,13 @@ func MigrateLocal(ctx context.Context, dir string, t Trust, admit statefile.Admi
 	return migrateLocal(ctx, dir, t, admit, nil)
 }
 func migrateLocal(ctx context.Context, dir string, t Trust, admit statefile.Admission, fault func(string) error) error {
-	r, e := migrationReplica(dir, t, admit)
+	return migrateLocalAt(nil, ctx, dir, t, admit, fault)
+}
+func MigrateLocalAt(parent *os.Root, ctx context.Context, dir string, t Trust, admit statefile.Admission) error {
+	return migrateLocalAt(parent, ctx, dir, t, admit, nil)
+}
+func migrateLocalAt(parent *os.Root, ctx context.Context, dir string, t Trust, admit statefile.Admission, fault func(string) error) error {
+	r, e := migrationReplica(parent, dir, t, admit)
 	if e != nil {
 		return e
 	}
@@ -162,7 +168,10 @@ func migrateLocal(ctx context.Context, dir string, t Trust, admit statefile.Admi
 // backup is not a perpetual recovery root or an authorization to discard new
 // generations, pins or maintenance receipts. Payload is reverified first.
 func RollbackLocal(ctx context.Context, dir string, t Trust, admit statefile.Admission) error {
-	r, e := migrationReplica(dir, t, admit)
+	return RollbackLocalAt(nil, ctx, dir, t, admit)
+}
+func RollbackLocalAt(parent *os.Root, ctx context.Context, dir string, t Trust, admit statefile.Admission) error {
+	r, e := migrationReplica(parent, dir, t, admit)
 	if e != nil {
 		return e
 	}

@@ -17,8 +17,51 @@ import (
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
+	"github.com/nd4y/outpost/internal/volume"
 	"github.com/nd4y/outpost/internal/worker"
 )
+
+func TestCLIVolumeProbeAndEnrollmentBindExactEmptyTarget(t *testing.T) {
+	ctx := context.Background()
+	base := teststore.Root(t)
+	root := filepath.Join(base, "volume")
+	if e := os.Mkdir(root, 0700); e != nil {
+		t.Fatal(e)
+	}
+	probe := filepath.Join(base, "probe.json")
+	binding := filepath.Join(base, "binding.json")
+	node := storage.Hash([]byte("node"))
+	if _, e := run(ctx, []string{"volume-probe", "--store", root, "--output", probe}); e != nil {
+		t.Fatal(e)
+	}
+	args := []string{"volume-enroll", "--store", root, "--input", probe, "--node", node, "--epoch", "1", "--output", binding}
+	if _, e := run(ctx, args); e != nil {
+		t.Fatal(e)
+	}
+	raw, e := os.ReadFile(binding)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var enrolled volume.Binding
+	if e = json.Unmarshal(raw, &enrolled); e != nil || enrolled.Scope != node || enrolled.Epoch != 1 {
+		t.Fatal("wrong binding", e)
+	}
+	state, e := enrolled.Open(ctx, filepath.Join(root, "worker"), true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	state.Close()
+	if _, e = run(ctx, args); e == nil {
+		t.Fatal("overwrote binding")
+	}
+	if e = os.Remove(filepath.Join(root, volume.Sentinel)); e != nil {
+		t.Fatal(e)
+	}
+	args[len(args)-1] = filepath.Join(base, "different-binding.json")
+	if _, e = run(ctx, args); !errors.Is(e, volume.ErrUnavailable) {
+		t.Fatal("missing marker reinitialized", e)
+	}
+}
 
 func TestCLIRestoresMaterializedReplicaWithoutIndexOrSource(t *testing.T) {
 	root := teststore.Root(t)

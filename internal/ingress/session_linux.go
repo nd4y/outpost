@@ -6,9 +6,9 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +23,7 @@ import (
 const SessionFormat = "outpost-ingress-session-1"
 
 type SessionOptions struct {
+	Parent                  *os.Root
 	Directory               string
 	Authority, Intent       []byte
 	Owner                   ed25519.PublicKey
@@ -53,6 +54,7 @@ type Receipt struct {
 	VerifiedAt int64  `json:"verifiedAt"`
 }
 type Session struct {
+	root          *os.Root
 	mu            sync.Mutex
 	state         sessionState
 	intent        Intent
@@ -137,7 +139,7 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 	if e != nil {
 		return nil, e
 	}
-	if o.Replica == nil || !filepath.IsAbs(o.Directory) || filepath.Clean(o.Directory) != o.Directory {
+	if o.Replica == nil {
 		return nil, ErrDenied
 	}
 	x, _ := json.Marshal(o.Replica.Trust())
@@ -145,19 +147,23 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 	if !bytes.Equal(x, y) {
 		return nil, ErrDenied
 	}
-	if o.Initialize {
-		if e = os.Mkdir(o.Directory, 0700); e != nil && !errors.Is(e, os.ErrExist) {
-			return nil, e
-		}
-	}
-	info, e := os.Lstat(o.Directory)
+	r, e := localfs.Directory(o.Parent, o.Directory, o.Initialize)
 	if e != nil {
 		return nil, e
 	}
-	if !info.IsDir() || info.Mode().Perm()&0077 != 0 {
+	// Transferred to the instance only after the lease is held.
+	owned := false
+	defer func() {
+		if !owned {
+			r.Close()
+		}
+	}()
+	info, e := r.Stat(".")
+	if e != nil || !info.IsDir() || info.Mode().Perm()&0077 != 0 {
 		return nil, ErrDenied
 	}
-	lease, e := os.OpenFile(filepath.Join(o.Directory, ".capture-lock"), os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
+
+	lease, e := localfs.OpenFile(r, ".capture-lock", os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -170,19 +176,20 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 		lease.Close()
 		return nil, ErrConflict
 	}
-	s := &Session{intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject}
+	owned = true
+	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject}
 	fail := func(e error) (*Session, error) { s.Close(); return nil, e }
-	s.meta, e = statefile.Open(filepath.Join(o.Directory, "state"), generation.MaxCatalog+2*MaxDocument+4096, o.Initialize)
+	s.meta, e = statefile.OpenAt(r, "state", generation.MaxCatalog+2*MaxDocument+4096, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
 	s.meta.Admit = o.AdmitState
-	s.objects, e = statefile.Open(filepath.Join(o.Directory, "objects"), generation.MaxObject, o.Initialize)
+	s.objects, e = statefile.OpenAt(r, "objects", generation.MaxObject, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
 	s.objects.Admit = o.AdmitObject
-	s.objectRoot, e = os.OpenRoot(filepath.Join(o.Directory, "objects"))
+	s.objectRoot, e = localfs.OpenAt(r, "objects", false)
 	if e != nil {
 		return fail(e)
 	}
@@ -287,7 +294,7 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 		if !storage.ID(name) {
 			return fail(ErrDenied)
 		}
-		info, e := entry.Info()
+		info, e := localfs.Stat(s.objectRoot, name)
 		if e != nil {
 			return fail(e)
 		}
@@ -316,6 +323,10 @@ func (s *Session) Close() error {
 	}
 	if s.lease != nil {
 		e = errors.Join(e, unix.Flock(int(s.lease.Fd()), unix.LOCK_UN), s.lease.Close())
+	}
+	if s.root != nil {
+		e = errors.Join(e, s.root.Close())
+		s.root = nil
 	}
 	return e
 }
@@ -373,7 +384,7 @@ func (s *Session) Check(ctx context.Context, ref filekit.Object) error {
 		if own != o {
 			return ErrConflict
 		}
-		f, e := s.objectRoot.OpenFile(ref.ID, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+		f, e := localfs.OpenFile(s.objectRoot, ref.ID, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 		if e != nil {
 			return e
 		}

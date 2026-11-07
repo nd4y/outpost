@@ -7,9 +7,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -43,24 +43,23 @@ func (s *Store) SetAdmission(ctx context.Context, admit Admission) error {
 }
 
 func Open(dir string, limit int, initialize bool) (*Store, error) {
-	if !filepath.IsAbs(dir) || limit < 1 || limit > 64<<20 {
+	return OpenAt(nil, dir, limit, initialize)
+}
+
+// OpenAt retains an independent descriptor rooted under parent. A nil parent
+// requires an absolute path and is intended for standalone local tools.
+func OpenAt(parent *os.Root, dir string, limit int, initialize bool) (*Store, error) {
+	if limit < 1 || limit > 64<<20 {
 		return nil, ErrInvalid
 	}
-	if initialize {
-		if e := os.MkdirAll(dir, 0700); e != nil {
-			return nil, e
-		}
-	}
-	i, e := os.Lstat(dir)
+	r, e := localfs.Directory(parent, dir, initialize)
 	if e != nil {
 		return nil, e
 	}
-	if !i.IsDir() || i.Mode().Perm()&0077 != 0 {
+	i, e := r.Stat(".")
+	if e != nil || !i.IsDir() || i.Mode().Perm()&0077 != 0 {
+		r.Close()
 		return nil, ErrInvalid
-	}
-	r, e := os.OpenRoot(dir)
-	if e != nil {
-		return nil, e
 	}
 	return &Store{root: r, limit: limit, gate: make(chan struct{}, 1)}, nil
 }
@@ -72,7 +71,7 @@ func (s *Store) Read(name string) ([]byte, error) {
 	if !nameOK(name) {
 		return nil, ErrInvalid
 	}
-	f, e := s.root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(s.root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -105,7 +104,7 @@ func (s *Store) write(name string, b []byte) error {
 		return e
 	}
 	temp := ".tmp-" + hex.EncodeToString(random[:])
-	f, e := s.root.OpenFile(temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, e := localfs.OpenFile(s.root, temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if e != nil {
 		return e
 	}
@@ -141,7 +140,7 @@ func (s *Store) WithLock(ctx context.Context, fn func() error) error {
 		return ctx.Err()
 	}
 	defer func() { <-s.gate }()
-	f, e := s.root.OpenFile(".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(s.root, ".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return e
 	}

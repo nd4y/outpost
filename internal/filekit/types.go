@@ -95,6 +95,9 @@ type BackupOptions struct {
 	Previous string
 	Names    []string
 	Expected *SourceIdentity
+	// Progress is an opaque capture operation ID. A stable explicit File is
+	// required; partial progress is available only for metadata-only stores.
+	Progress string
 }
 
 // Fault is an optional test hook. A caller may inject a failure or stop its own

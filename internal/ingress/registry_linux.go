@@ -8,10 +8,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +26,7 @@ import (
 const RegistryFormat = "outpost-ingress-registry-1"
 
 type RegistryOptions struct {
+	Parent      *os.Root
 	Directory   string
 	Authority   []byte
 	Owner       ed25519.PublicKey
@@ -45,6 +46,7 @@ type registryState struct {
 	ObservedUnix int64           `json:"observedUnix"`
 }
 type Registry struct {
+	root      *os.Root
 	mu        sync.Mutex
 	options   RegistryOptions
 	authority Authority
@@ -87,7 +89,7 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	if e != nil {
 		return nil, e
 	}
-	if !filepath.IsAbs(o.Directory) || filepath.Clean(o.Directory) != o.Directory || o.Replica == nil || !limitsOK(o.Limits) {
+	if o.Replica == nil || !limitsOK(o.Limits) {
 		return nil, ErrDenied
 	}
 	x, _ := json.Marshal(a.Trust)
@@ -102,19 +104,23 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	if e != nil {
 		return nil, e
 	}
-	if o.Initialize {
-		if e = os.Mkdir(o.Directory, 0700); e != nil && !errors.Is(e, os.ErrExist) {
-			return nil, e
-		}
-	}
-	i, e := os.Lstat(o.Directory)
+	r, e := localfs.Directory(o.Parent, o.Directory, o.Initialize)
 	if e != nil {
 		return nil, e
 	}
-	if !i.IsDir() || i.Mode().Perm()&0077 != 0 {
+	// Transferred to the instance only after the lease is held.
+	owned := false
+	defer func() {
+		if !owned {
+			r.Close()
+		}
+	}()
+	i, e := r.Stat(".")
+	if e != nil || !i.IsDir() || i.Mode().Perm()&0077 != 0 {
 		return nil, ErrDenied
 	}
-	lease, e := os.OpenFile(filepath.Join(o.Directory, ".registry-lock"), os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
+
+	lease, e := localfs.OpenFile(r, ".registry-lock", os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -129,9 +135,10 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	}
 	o.Authority = bytes.Clone(o.Authority)
 	o.Owner = bytes.Clone(o.Owner)
-	g := &Registry{options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
+	owned = true
+	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
 	fail := func(e error) (*Registry, error) { g.Close(); return nil, e }
-	g.store, e = statefile.Open(filepath.Join(o.Directory, "state"), 2*MaxDocument, o.Initialize)
+	g.store, e = statefile.OpenAt(r, "state", 2*MaxDocument, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
@@ -189,10 +196,14 @@ func (g *Registry) Close() error {
 	if g.lease != nil {
 		e = errors.Join(e, unix.Flock(int(g.lease.Fd()), unix.LOCK_UN), g.lease.Close())
 	}
+	if g.root != nil {
+		e = errors.Join(e, g.root.Close())
+		g.root = nil
+	}
 	return e
 }
 func (g *Registry) sessionOptions(raw []byte) SessionOptions {
-	return SessionOptions{Directory: filepath.Join(g.options.Directory, "current"), Authority: g.options.Authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject}
+	return SessionOptions{Parent: g.root, Directory: "current", Authority: g.options.Authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject}
 }
 func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	o := g.sessionOptions(raw)
@@ -202,7 +213,7 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	}
 	// A fence may have committed just before a crash. Only an acknowledged old
 	// slot can be reused, and it is cleaned before replacing its compact record.
-	meta, e := statefile.Open(filepath.Join(o.Directory, "state"), generation.MaxCatalog+2*MaxDocument+4096, false)
+	meta, e := statefile.OpenAt(g.root, "current/state", generation.MaxCatalog+2*MaxDocument+4096, false)
 	if e != nil {
 		return nil, e
 	}

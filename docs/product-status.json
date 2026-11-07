@@ -89,6 +89,10 @@
         {
           "path": "internal/worker/ingress_linux_test.go",
           "name": "TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant"
+        },
+        {
+          "path": "internal/filekit/progress_linux_test.go",
+          "name": "TestEncryptedCaptureProgressResumesAcceptedPacksAndTornTail"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
@@ -116,6 +120,10 @@
         {
           "path": "internal/ingress/ack_linux_test.go",
           "name": "TestAcknowledgementReleasesOnlyOwnCopiesAndPreservesReceipt"
+        },
+        {
+          "path": "internal/filekit/progress_linux_test.go",
+          "name": "TestCaptureProgressSIGKILLReusesDurablyAcceptedPack"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
@@ -907,6 +915,26 @@
         {
           "path": "internal/diskbudget/remove_linux_test.go",
           "name": "TestOwnedRemovalReturnsMeasuredQuotaWithoutDoubleDebit"
+        },
+        {
+          "path": "internal/volume/volume_linux_test.go",
+          "name": "TestMissingMarkerNeverReenrollsExistingState"
+        },
+        {
+          "path": "internal/worker/volume_linux_test.go",
+          "name": "TestWorkerVolumeLossStopsActiveViewAndDoesNotWriteFallback"
+        },
+        {
+          "path": "internal/worker/volume_linux_test.go",
+          "name": "TestWorkerRootReplacementCannotRedirectNewState"
+        },
+        {
+          "path": "internal/worker/volume_linux_test.go",
+          "name": "TestBoundBootstrapInitializesAndReopensOnlyEnrolledRuntime"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIVolumeProbeAndEnrollmentBindExactEmptyTarget"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -980,6 +1008,10 @@
         {
           "path": "internal/diskbudget/remove_linux_test.go",
           "name": "TestOwnedRemovalRejectsSymlinkAndTraversal"
+        },
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestReconciliationUsesOpenedTreeAfterPathReplacement"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -1045,6 +1077,14 @@
         {
           "path": "internal/control/control_linux_test.go",
           "name": "TestOwnerConfigurationRejectsExpansionAndAmbiguousIdentity"
+        },
+        {
+          "path": "internal/localfs/root_linux_test.go",
+          "name": "TestRootedFileOpenRejectsFinalAndAncestorLinks"
+        },
+        {
+          "path": "internal/filekit/progress_linux_test.go",
+          "name": "TestCaptureProgressRejectsTamperingRebindingAndLocalGCMode"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

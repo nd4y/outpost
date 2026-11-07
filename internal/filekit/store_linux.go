@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/statefile"
 	"io"
 	"os"
@@ -29,18 +30,19 @@ func OpenStreamingStore(dir string, owner Owner, create bool, backend ObjectBack
 	return openStore(dir, owner, create, backend)
 }
 func openStore(dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
-	if !filepath.IsAbs(dir) {
+	return openStoreAt(nil, dir, owner, create, backend)
+}
+func OpenStreamingStoreAt(parent *os.Root, dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
+	if backend == nil {
 		return nil, ErrInvalid
 	}
+	return openStoreAt(parent, dir, owner, create, backend)
+}
+func openStoreAt(parent *os.Root, dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
 	if err := owner.validate(); err != nil {
 		return nil, err
 	}
-	if create {
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return nil, err
-		}
-	}
-	r, err := os.OpenRoot(dir)
+	r, err := localfs.Directory(parent, dir, create)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +124,7 @@ func (s *Store) initialize() error {
 	if err != nil {
 		return err
 	}
-	f, err = s.root.OpenFile("store.json", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err = localfs.OpenFile(s.root, "store.json", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -146,7 +148,7 @@ func (s *Store) lock(ctx context.Context, exclusive bool) (func(), error) {
 	if err := s.authorize(); err != nil {
 		return nil, err
 	}
-	f, err := s.root.OpenFile(".lock", os.O_CREATE|os.O_RDWR, 0600)
+	f, err := localfs.OpenFile(s.root, ".lock", os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +185,7 @@ func (s *Store) syncDir(name string) error {
 }
 func (s *Store) readFile(name string, limit int) ([]byte, error) {
 	// Untrusted kit entries must not block open on a FIFO or follow a link.
-	f, err := s.root.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	f, err := localfs.OpenFile(s.root, name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +286,7 @@ func (s *Store) putLocalObject(b []byte, metadata bool) (Object, error) {
 		return ref, err
 	}
 	tmp := ".txn/" + randomID()
-	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := localfs.OpenFile(s.root, tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return ref, err
 	}
@@ -345,7 +347,7 @@ func (s *Store) writeEnvelope(name string, e Envelope) error {
 }
 func (s *Store) writeEnvelopeBytes(name string, b []byte) error {
 	tmp := ".txn/" + randomID()
-	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := localfs.OpenFile(s.root, tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}

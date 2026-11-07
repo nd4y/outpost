@@ -22,6 +22,7 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/volume"
 	"github.com/nd4y/outpost/internal/worker"
 )
 
@@ -56,13 +57,13 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "version" {
 		if len(args) != 1 {
 			return nil, errUsage
 		}
-		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
+		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "bootstrap": worker.BootstrapFormat, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -76,10 +77,55 @@ func run(ctx context.Context, args []string) (any, error) {
 	domain := flags.String("domain", "", "opaque domain ID")
 	trustFile := flags.String("trust", "", "public generation trust JSON")
 	generationID := flags.String("generation", "", "expected generation checkpoint")
+	nodeID := flags.String("node", "", "owner-selected node identity")
+	epoch := flags.Uint64("epoch", 0, "explicit admission epoch")
 	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 {
 		return nil, errUsage
 	}
 	switch args[0] {
+	case "volume-probe":
+		if !filepath.IsAbs(*output) {
+			return nil, errUsage
+		}
+		observation, e := volume.Probe(ctx, *store)
+		if e != nil {
+			return nil, e
+		}
+		raw, e := json.Marshal(observation)
+		if e != nil {
+			return nil, e
+		}
+		if e = writeNew(*output, raw); e != nil {
+			return nil, e
+		}
+		return map[string]any{"format": volume.Format, "probed": true}, nil
+	case "volume-enroll":
+		if !filepath.IsAbs(*output) || !storage.ID(*nodeID) || *epoch == 0 {
+			return nil, errUsage
+		}
+		if _, e := os.Lstat(*output); !errors.Is(e, os.ErrNotExist) {
+			return nil, errUsage
+		}
+		raw, e := worker.ReadPrivate(*input, 4096)
+		if e != nil {
+			return nil, e
+		}
+		var observation volume.Observation
+		if worker.DecodeInput(raw, &observation, 4096) != nil {
+			return nil, errUsage
+		}
+		binding, e := volume.Enroll(ctx, *store, observation, *nodeID, *epoch)
+		if e != nil {
+			return nil, e
+		}
+		raw, e = json.Marshal(binding)
+		if e != nil {
+			return nil, e
+		}
+		if e = writeNew(*output, raw); e != nil {
+			return nil, e
+		}
+		return map[string]any{"format": volume.Format, "enrolled": true, "scope": binding.Scope, "epoch": binding.Epoch}, nil
 	case "restore-replica":
 		owner, e := filekit.ReadOwner(*key)
 		if e != nil {
@@ -228,6 +274,8 @@ func failure(e error) (string, int) {
 	switch {
 	case errors.Is(e, context.Canceled):
 		return "CANCELED", 130
+	case errors.Is(e, volume.ErrUnavailable):
+		return "VOLUME_UNAVAILABLE", 5
 	case errors.Is(e, errUsage):
 		return "INVALID_ARGUMENT", 2
 	case errors.Is(e, generation.ErrMigrationRequired):

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/json"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"sync"
@@ -46,7 +47,7 @@ func (r *Replica) catalogFile(id string, item entry) (*os.File, catalogStamp, er
 	if !validID(id) {
 		return nil, catalogStamp{}, ErrInvalid
 	}
-	f, e := r.root.OpenFile("catalogs/"+id, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(r.root, "catalogs/"+id, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, catalogStamp{}, e
 	}
