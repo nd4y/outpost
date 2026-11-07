@@ -59,8 +59,9 @@ type Queue struct {
 	authority        Authority
 	limits           QueueLimits
 	// Fault is a development-test hook; production callers leave it nil.
-	Fault func(string) error
-	Admit statefile.Admission
+	Fault    func(string) error
+	Admit    statefile.Admission
+	Readback ReadbackOptions
 }
 
 // OpenQueue requires a caller-admitted persistent Linux directory. No credentials
@@ -158,7 +159,7 @@ func (q *Queue) load() (QueueState, error) {
 		}
 		if j.Receipt != nil {
 			r := j.Receipt
-			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || r.Verification != "full-target-readback" || r.ObservedUnix < 1 {
+			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
 				return s, ErrDenied
 			}
 		}
@@ -299,6 +300,9 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 		}
 	}
 	j, e := openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	if e == nil {
+		j.Readback = q.Readback
+	}
 	if e == nil && q.Admit != nil {
 		j.Admit = func(child string, size int) (func(bool) error, error) { return q.Admit(name+"/"+child, size) }
 	}
@@ -407,7 +411,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 			p, _ := Verify(j.Plan, q.authority)
 			if r.err == nil {
 				receipt := r.result.Receipt
-				if receipt.Target != p.Profile.ID() || receipt.Generation != p.Generation || receipt.Operation != p.Operation || receipt.Executor != q.worker || receipt.Verification != "full-target-readback" || receipt.ObservedUnix < 1 {
+				if receipt.Target != p.Profile.ID() || receipt.Generation != p.Generation || receipt.Operation != p.Operation || receipt.Executor != q.worker || !validVerification(receipt.Verification) || receipt.ObservedUnix < 1 {
 					return ErrDenied
 				}
 				j.Phase = "COMPLETE"

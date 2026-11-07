@@ -57,7 +57,7 @@ func TestUploadPlanningCrashProcess(t *testing.T) {
 	t.Fatal("child did not reach planning boundary")
 }
 func TestUploadPlanningSIGKILLKeepsProtectionAcrossQueueHandoff(t *testing.T) {
-	for _, point := range []string{"upload-planning-pin-durable", "upload-plan-durable", "upload-queue-admitted", "upload-planning-pin-released"} {
+	for _, point := range []string{"upload-planning-pin-durable", "upload-part-map-durable", "upload-plan-durable", "upload-queue-admitted", "upload-planning-pin-released"} {
 		t.Run(point, func(t *testing.T) {
 			f := newFixture(t)
 			ctx := context.Background()

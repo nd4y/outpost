@@ -7,7 +7,7 @@ import (
 
 func TestReadbackPolicyRequiresExplicitBoundedOwnerConfiguration(t *testing.T) {
 	c, key := configFixture(t)
-	if c.Domains[0].PeerReadbackMaxAgeSeconds != 0 {
+	if c.Domains[0].PeerReadbackMaxAgeSeconds != 0 || c.Domains[0].CloudReadbackMaxAgeSeconds != 0 {
 		t.Fatal("reuse enabled by default")
 	}
 	for _, age := range []int64{-1, readback.MaxAgeSeconds + 1} {
@@ -17,6 +17,13 @@ func TestReadbackPolicyRequiresExplicitBoundedOwnerConfiguration(t *testing.T) {
 		}
 	}
 	c.Domains[0].PeerReadbackMaxAgeSeconds = 3600
+	for _, age := range []int64{-1, readback.MaxAgeSeconds + 1} {
+		c.Domains[0].CloudReadbackMaxAgeSeconds = age
+		if _, e := Sign(c, key); e == nil {
+			t.Fatal("unbounded cloud reuse accepted")
+		}
+	}
+	c.Domains[0].CloudReadbackMaxAgeSeconds = 3600
 	if _, e := Sign(c, key); e != nil {
 		t.Fatal(e)
 	}

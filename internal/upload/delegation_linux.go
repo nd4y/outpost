@@ -88,6 +88,12 @@ func derivedTemplate(raw []byte, d Delegation, id string) Plan {
 // The signed catalog authenticates full objects; partition hashes are checked
 // against actual bytes again on upload and full target verification.
 func BuildDerived(ctx context.Context, source *generation.Replica, id string, raw []byte, a Authority) ([]byte, error) {
+	return BuildDerivedCached(ctx, source, id, raw, a, nil)
+}
+
+// BuildDerivedCached retains multipart descriptions between bounded attempts.
+// Cached maps are planning metadata, never evidence of available source/target bytes.
+func BuildDerivedCached(ctx context.Context, source *generation.Replica, id string, raw []byte, a Authority, cache *PlanningCache) ([]byte, error) {
 	d, e := VerifyDelegation(raw, a)
 	if e != nil || source == nil || !sameTrust(source.Trust(), a.Generation) || !storage.ID(id) {
 		return nil, ErrDenied
@@ -101,13 +107,26 @@ func BuildDerived(ctx context.Context, source *generation.Replica, id string, ra
 	if e != nil {
 		return nil, e
 	}
+	if e = preflightPlan(p, refs); e != nil {
+		return nil, e
+	}
+	scopeRaw, e := json.Marshal(struct {
+		Authority Authority `json:"authority"`
+		Operation string    `json:"operation"`
+	}{a, p.Operation})
+	if e != nil {
+		return nil, e
+	}
+	scope := storage.Hash(scopeRaw)
 	p.Blobs = make([]storage.Blob, 0, len(refs))
-	for _, ref := range refs {
-		data, e := source.ReadObject(ctx, id, ref)
-		if e != nil {
-			return nil, e
+	for i, ref := range refs {
+		compute := func() (storage.Blob, error) { return describeReference(ctx, source, id, ref, p.Profile.MaxObjectBytes) }
+		var blob storage.Blob
+		if cache != nil && ref.Bytes > p.Profile.MaxObjectBytes {
+			blob, e = cache.describe(ctx, scope, refs, i, p.Profile.MaxObjectBytes, compute)
+		} else {
+			blob, e = compute()
 		}
-		blob, e := storage.Describe(ref, data, p.Profile.MaxObjectBytes)
 		if e != nil {
 			return nil, e
 		}
@@ -135,21 +154,7 @@ func verifyDerived(raw []byte, p Plan, a Authority) error {
 		return ErrDenied
 	}
 	for _, blob := range p.Blobs {
-		remaining := blob.Object.Bytes
-		if len(blob.Parts) != (remaining+p.Profile.MaxObjectBytes-1)/p.Profile.MaxObjectBytes {
-			return ErrDenied
-		}
-		for _, part := range blob.Parts {
-			size := remaining
-			if size > p.Profile.MaxObjectBytes {
-				size = p.Profile.MaxObjectBytes
-			}
-			if part.Bytes != size {
-				return ErrDenied
-			}
-			remaining -= size
-		}
-		if len(blob.Parts) == 1 && blob.Parts[0].ID != blob.Object.ID {
+		if canonicalParts(blob, p.Profile.MaxObjectBytes) != nil {
 			return ErrDenied
 		}
 	}

@@ -49,6 +49,7 @@ type Journal struct {
 	authority      Authority
 	tasks          map[string]bool
 	Admit          statefile.Admission
+	Readback       ReadbackOptions
 }
 
 func regular(root *os.Root, name string, max int) ([]byte, error) {
@@ -229,7 +230,7 @@ func (j *Journal) load() (State, error) {
 	}
 	if s.Receipt != nil {
 		r := s.Receipt
-		if r.Target != j.plan.Profile.ID() || r.Generation != j.plan.Generation || r.Operation != j.plan.Operation || r.Executor != j.worker || r.Verification != "full-target-readback" || r.ObservedUnix < 1 {
+		if r.Target != j.plan.Profile.ID() || r.Generation != j.plan.Generation || r.Operation != j.plan.Operation || r.Executor != j.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
 			return s, ErrDenied
 		}
 	}

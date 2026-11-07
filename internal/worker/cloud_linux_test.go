@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,6 +24,7 @@ func TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery(t *testing.T) {
 	ctx := context.Background()
 	pub, planner := key(t)
 	f.domain.Planner = pub
+	f.domain.CloudReadbackMaxAgeSeconds = 3600
 	f.domain.Placement.Edges = nil
 	f.domain.Placement.AllowedClasses = append(f.domain.Placement.AllowedClasses, "external")
 	w := f.nodes[0]
@@ -68,6 +70,42 @@ func TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery(t *testing.T) {
 		}
 		return true
 	})
+	// New owner revisions explicitly enable reuse, then require a fresh audit.
+	// Completed receipts remain historical; a new operation requests new work.
+	for _, age := range []int64{3600, 0} {
+		f.cfg.Revision++
+		f.domain.CloudReadbackMaxAgeSeconds = age
+		for i, old := range jobs {
+			p, e := upload.Verify(old.Plan, upload.Authority{Generation: f.domain.Trust, Planner: pub})
+			must(t, e)
+			p.Operation = storage.Hash([]byte(old.Operation + time.Now().String()))
+			plan, e := upload.Build(ctx, replica, f.generation, p, planner)
+			must(t, e)
+			jobs[i].Operation, jobs[i].Plan = p.Operation, plan
+		}
+		f.config(t, 0, jobs)
+		wait(t, func() bool {
+			for _, j := range jobs {
+				if !complete(w, j.Operation) {
+					return false
+				}
+			}
+			return true
+		})
+		status, e := w.Status(ctx)
+		must(t, e)
+		for _, j := range jobs {
+			var receipt upload.Receipt
+			must(t, json.Unmarshal(status.Jobs[j.Operation].Receipt, &receipt))
+			want := "full-target-readback"
+			if age > 0 {
+				want = "cached-target-readback"
+			}
+			if receipt.Verification != want {
+				t.Fatal("owner cloud policy not applied", receipt)
+			}
+		}
+	}
 	stop()
 	for _, j := range jobs {
 		backend, e := w.resolve(ctx, profiles[j.Target])

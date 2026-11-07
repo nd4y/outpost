@@ -313,6 +313,14 @@
         {
           "path": "internal/peer/readback_linux_test.go",
           "name": "TestExplicitReadbackReuseTransfersOnlyNewObjectsAndPreservesAge"
+        },
+        {
+          "path": "internal/upload/planning_io_linux_test.go",
+          "name": "TestUnsplitPlansUseSignedReferencesAndMissingPayloadCannotPublish"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
@@ -479,6 +487,10 @@
         {
           "path": "internal/worker/readback_linux_test.go",
           "name": "TestOwnerReadbackPolicyEnablesReuseAndRestoresFreshOnlyAudits"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -622,6 +634,14 @@
         {
           "path": "internal/worker/planning_crash_linux_test.go",
           "name": "TestUploadPlanningSIGKILLKeepsProtectionAcrossQueueHandoff"
+        },
+        {
+          "path": "internal/upload/planning_cache_linux_test.go",
+          "name": "TestMultipartPlanningResumesAfterDurableObjectWithoutRereadingIt"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -822,6 +842,22 @@
         {
           "path": "internal/readback/cache_linux_test.go",
           "name": "TestReadbackEvidenceRetainsAgeAcrossRestartAndIsolatesScopes"
+        },
+        {
+          "path": "internal/upload/planning_io_linux_test.go",
+          "name": "TestTargetReadbackDoesNotRequireUnneededSourcePayload"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -987,6 +1023,30 @@
         {
           "path": "internal/upload/delegation_linux_test.go",
           "name": "TestDelegatedPlansAreIdenticalAcrossReplicasAndRecoverBothProtocols"
+        },
+        {
+          "path": "internal/upload/planning_io_linux_test.go",
+          "name": "TestUnsplitPlansUseSignedReferencesAndMissingPayloadCannotPublish"
+        },
+        {
+          "path": "internal/upload/planning_io_linux_test.go",
+          "name": "TestTargetReadbackDoesNotRequireUnneededSourcePayload"
+        },
+        {
+          "path": "internal/upload/planning_cache_linux_test.go",
+          "name": "TestMultipartPlanningResumesAfterDurableObjectWithoutRereadingIt"
+        },
+        {
+          "path": "internal/upload/planning_cache_linux_test.go",
+          "name": "TestPlanningPagesEnforceQuotaAndRejectOversizedPlanBeforePayload"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -1013,6 +1073,14 @@
         {
           "path": "internal/upload/delegation_linux_test.go",
           "name": "TestDelegatedPlansAreIdenticalAcrossReplicasAndRecoverBothProtocols"
+        },
+        {
+          "path": "internal/upload/planning_io_linux_test.go",
+          "name": "TestUnsplitPlansUseSignedReferencesAndMissingPayloadCannotPublish"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
         }
       ],
       "acceptance": ["AT-16"],
@@ -1035,6 +1103,18 @@
         {
           "path": "internal/upload/delegation_linux_test.go",
           "name": "TestDelegatedPlansAreIdenticalAcrossReplicasAndRecoverBothProtocols"
+        },
+        {
+          "path": "internal/upload/planning_io_linux_test.go",
+          "name": "TestUnsplitPlansUseSignedReferencesAndMissingPayloadCannotPublish"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -1082,6 +1162,10 @@
         {
           "path": "internal/worker/planning_crash_linux_test.go",
           "name": "TestUploadPlanningSIGKILLKeepsProtectionAcrossQueueHandoff"
+        },
+        {
+          "path": "internal/upload/planning_cache_linux_test.go",
+          "name": "TestMultipartPlanningResumesAfterDurableObjectWithoutRereadingIt"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
@@ -1213,6 +1297,14 @@
         {
           "path": "internal/peer/readback_linux_test.go",
           "name": "TestExplicitReadbackReuseTransfersOnlyNewObjectsAndPreservesAge"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
         }
       ],
       "acceptance": ["AT-24"],
@@ -1388,6 +1480,10 @@
         {
           "path": "internal/readback/cache_linux_test.go",
           "name": "TestReadbackPageEvictionNeverRewritesOriginalObservation"
+        },
+        {
+          "path": "internal/upload/planning_cache_linux_test.go",
+          "name": "TestPlanningPagesEnforceQuotaAndRejectOversizedPlanBeforePayload"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -1497,6 +1593,14 @@
         {
           "path": "internal/readback/cache_linux_test.go",
           "name": "TestReadbackEvidenceRetainsAgeAcrossRestartAndIsolatesScopes"
+        },
+        {
+          "path": "internal/upload/planning_cache_linux_test.go",
+          "name": "TestPlanningPagesEnforceQuotaAndRejectOversizedPlanBeforePayload"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -1557,6 +1661,10 @@
         {
           "path": "internal/peer/readback_linux_test.go",
           "name": "TestExplicitReadbackReuseTransfersOnlyNewObjectsAndPreservesAge"
+        },
+        {
+          "path": "internal/upload/readback_linux_test.go",
+          "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

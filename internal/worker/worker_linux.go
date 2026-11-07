@@ -699,6 +699,7 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		return nil, e
 	}
 	defer queue.Close()
+	queue.Readback = upload.ReadbackOptions{MaxAgeSeconds: d.CloudReadbackMaxAgeSeconds, Store: w.state}
 	if e = queue.Enqueue(ctx, local.replica, j.Plan); e != nil {
 		return nil, e
 	}

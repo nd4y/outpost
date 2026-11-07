@@ -43,10 +43,11 @@ func (l Limits) Validate() error {
 }
 
 type Domain struct {
-	PeerReadbackMaxAgeSeconds int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
-	Trust                     generation.Trust  `json:"trust"`
-	Planner                   ed25519.PublicKey `json:"planner"`
-	Placement                 policy.Placement  `json:"placement"`
+	PeerReadbackMaxAgeSeconds  int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
+	CloudReadbackMaxAgeSeconds int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
+	Trust                      generation.Trust  `json:"trust"`
+	Planner                    ed25519.PublicKey `json:"planner"`
+	Placement                  policy.Placement  `json:"placement"`
 }
 type Target struct {
 	ID      string          `json:"id"`
@@ -144,7 +145,7 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	domains := map[string]Domain{}
 	for _, d := range c.Domains {
-		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds {
+		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds || d.CloudReadbackMaxAgeSeconds < 0 || d.CloudReadbackMaxAgeSeconds > readback.MaxAgeSeconds {
 			return ErrDenied
 		}
 		t := d.Trust

@@ -151,13 +151,12 @@ func Build(ctx context.Context, source *generation.Replica, id string, p Plan, p
 	if e != nil {
 		return nil, e
 	}
+	if e = preflightPlan(p, refs); e != nil {
+		return nil, e
+	}
 	p.Blobs = make([]storage.Blob, 0, len(refs))
 	for _, ref := range refs {
-		data, e := source.ReadObject(ctx, id, ref)
-		if e != nil {
-			return nil, e
-		}
-		blob, e := storage.Describe(ref, data, p.Profile.MaxObjectBytes)
+		blob, e := describeReference(ctx, source, id, ref, p.Profile.MaxObjectBytes)
 		if e != nil {
 			return nil, e
 		}
@@ -173,6 +172,23 @@ func Build(ctx context.Context, source *generation.Replica, id string, p Plan, p
 	}
 	p.Signature = ed25519.Sign(planner, append([]byte(Format+"\x00"), unsigned...))
 	return json.Marshal(p)
+}
+
+// An unsplit immutable object already has its exact digest and length in the
+// authenticated catalog. Planning is not a fresh source integrity observation.
+// Multipart maps still require actual bytes to determine each part digest.
+func describeReference(ctx context.Context, source *generation.Replica, id string, ref generation.Object, limit int) (storage.Blob, error) {
+	if e := ctx.Err(); e != nil {
+		return storage.Blob{}, e
+	}
+	if ref.Bytes <= limit {
+		return storage.Blob{Format: storage.BlobFormat, Object: ref, Parts: []generation.Object{ref}}, nil
+	}
+	data, e := source.ReadObject(ctx, id, ref)
+	if e != nil {
+		return storage.Blob{}, e
+	}
+	return storage.Describe(ref, data, limit)
 }
 func Verify(raw []byte, a Authority) (Plan, error) {
 	var p Plan

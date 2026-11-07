@@ -79,7 +79,7 @@ func VerifyClaim(raw []byte, p Plan, planID string) error {
 	}
 	return nil
 }
-func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend) error {
+func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit *cloudAudit) error {
 	raw, e := b.Catalog(ctx, j.plan.Generation, j.authority.Generation)
 	if e != nil {
 		return e
@@ -88,9 +88,18 @@ func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend) error 
 		return storage.ErrIntegrity
 	}
 	for _, blob := range j.plan.Blobs {
-		if _, e = b.ReadBlob(ctx, blob.Object); e != nil {
+		if audit != nil {
+			e = audit.verify(ctx, blob.Object.ID, false)
+		} else {
+			_, e = b.ReadBlob(ctx, blob.Object)
+		}
+		if e != nil {
 			return e
 		}
+	}
+	if audit != nil {
+		_, _, e = audit.evidence()
+		return e
 	}
 	return nil
 }
@@ -121,20 +130,15 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 	}
-	if e = b.Probe(ctx); e != nil {
+	// Require the exact recorded complete catalog and protect it before IO.
+	// Payloads are verified when read or when auditing the target. A separate
+	// full source scrub cannot be a prerequisite for every bounded retry.
+	catalog, e := source.Catalog(ctx, j.plan.Generation)
+	if e != nil {
 		return result, e
 	}
-	binding, _ := json.Marshal(struct {
-		Plan       string `json:"plan"`
-		Operation  string `json:"operation"`
-		Generation string `json:"generation"`
-		Target     string `json:"target"`
-	}{j.planID, j.plan.Operation, j.plan.Generation, j.plan.Profile.ID()})
-	if e = b.Put(ctx, "plan-"+j.plan.Operation, binding); e != nil {
-		return result, e
-	}
-	if e = source.VerifyComplete(ctx, j.plan.Generation); e != nil {
-		return result, e
+	if !bytes.Equal(catalog, j.plan.Catalog) {
+		return result, storage.ErrIntegrity
 	}
 	pin := storage.Hash([]byte(Format + "/pin/" + j.planID + "/" + j.worker))
 	if e = source.Pin(ctx, pin, j.plan.Generation, "generation"); e != nil {
@@ -147,6 +151,23 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			_ = j.edit(short, func(s *State) error { s.Phase = "RETRYABLE"; return nil })
 		}
 	}()
+	if e = b.Probe(ctx); e != nil {
+		return result, e
+	}
+	binding, _ := json.Marshal(struct {
+		Plan       string `json:"plan"`
+		Operation  string `json:"operation"`
+		Generation string `json:"generation"`
+		Target     string `json:"target"`
+	}{j.planID, j.plan.Operation, j.plan.Generation, j.plan.Profile.ID()})
+	if e = b.Put(ctx, "plan-"+j.plan.Operation, binding); e != nil {
+		return result, e
+	}
+	audit, e := j.newAudit(ctx, b)
+	if e != nil {
+		return result, e
+	}
+	defer audit.close()
 	tasks, e := j.plan.Tasks()
 	if e != nil {
 		return result, e
@@ -161,8 +182,14 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 		// A target marker is only a hint until the whole generation is read back.
-		if e = j.verifyComplete(ctx, b); e == nil {
+		if e = j.verifyComplete(ctx, b, audit); e == nil {
 			receipt := Receipt{b.Profile().ID(), j.plan.Generation, j.plan.Operation, j.worker, "full-target-readback", time.Now().Unix()}
+			if audit != nil {
+				receipt.Verification, receipt.ObservedUnix, e = audit.evidence()
+				if e != nil {
+					return result, e
+				}
+			}
 			if e = j.edit(ctx, func(s *State) error { s.Phase = "COMPLETE"; s.Receipt = &receipt; return nil }); e != nil {
 				return result, e
 			}
@@ -178,6 +205,15 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		}
 		round, end := j.plan.round(time.Now())
 		for _, task := range tasks {
+			if audit != nil {
+				reuse, e := audit.reusable(ctx, task.Object.ID)
+				if e != nil {
+					return result, e
+				}
+				if reuse {
+					continue
+				}
+			}
 			progress := state.Parts[task.Part.ID]
 			// Completion belongs to immutable bytes, not to an assignment slot.
 			// Rechecking every completed prefix on slot rotation can starve the
@@ -234,7 +270,11 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		if j.plan.owner("publication", round) == j.worker {
 			// Full-generation audit may outlive a part slot. A successor can
 			// audit concurrently; immutable publication makes the duplicate safe.
-			e = j.publish(ctx, b)
+			if audit != nil {
+				e = audit.publish(ctx, j.plan.Catalog, j.authority.Generation)
+			} else {
+				e = j.publish(ctx, b)
+			}
 			if e != nil && !storage.Missing(e) && !errors.Is(e, storage.ErrUnavailable) && !errors.Is(e, context.DeadlineExceeded) && !errors.Is(e, context.Canceled) {
 				return result, e
 			}

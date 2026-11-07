@@ -97,19 +97,8 @@ func (b *Backend) ReadPart(ctx context.Context, part generation.Object) ([]byte,
 
 // SealBlob publishes its immutable descriptor only after every part is read back.
 func (b *Backend) SealBlob(ctx context.Context, blob Blob) error {
-	if e := blob.Validate(b.profile.MaxObjectBytes); e != nil {
+	if _, e := b.ReadDescribed(ctx, blob); e != nil {
 		return e
-	}
-	all := make([]byte, 0, blob.Object.Bytes)
-	for _, p := range blob.Parts {
-		raw, e := b.ReadPart(ctx, p)
-		if e != nil {
-			return e
-		}
-		all = append(all, raw...)
-	}
-	if Hash(all) != blob.Object.ID {
-		return ErrIntegrity
 	}
 	raw, e := json.Marshal(blob)
 	if e != nil {
@@ -117,30 +106,48 @@ func (b *Backend) SealBlob(ctx context.Context, blob Blob) error {
 	}
 	return b.Put(ctx, "blob-"+blob.Object.ID, raw)
 }
-func (b *Backend) ReadBlob(ctx context.Context, ref generation.Object) ([]byte, error) {
-	if !ID(ref.ID) || ref.Bytes < 1 || ref.Bytes > MaxPhysical {
-		return nil, ErrIntegrity
-	}
-	raw, e := b.Get(ctx, "blob-"+ref.ID)
-	if e != nil {
+
+// ReadDescribed always reads actual parts and verifies the reconstructed hash.
+// It never accepts cached evidence, even when an uploader enables reuse.
+func (b *Backend) ReadDescribed(ctx context.Context, blob Blob) ([]byte, error) {
+	if e := blob.Validate(b.profile.MaxObjectBytes); e != nil {
 		return nil, e
 	}
-	var blob Blob
-	if Decode(raw, &blob, b.profile.MaxObjectBytes) != nil || blob.Validate(b.profile.MaxObjectBytes) != nil || blob.Object != ref {
-		return nil, ErrIntegrity
-	}
-	result := make([]byte, 0, ref.Bytes)
+	all := make([]byte, 0, blob.Object.Bytes)
 	for _, p := range blob.Parts {
-		data, e := b.ReadPart(ctx, p)
+		raw, e := b.ReadPart(ctx, p)
 		if e != nil {
 			return nil, e
 		}
-		result = append(result, data...)
+		all = append(all, raw...)
 	}
-	if Hash(result) != ref.ID {
+	if Hash(all) != blob.Object.ID {
 		return nil, ErrIntegrity
 	}
-	return result, nil
+	return all, nil
+}
+
+// Descriptor validates the remote immutable map, not the underlying payload.
+func (b *Backend) Descriptor(ctx context.Context, ref generation.Object) (Blob, error) {
+	var blob Blob
+	if !ID(ref.ID) || ref.Bytes < 1 || ref.Bytes > MaxPhysical {
+		return blob, ErrIntegrity
+	}
+	raw, e := b.Get(ctx, "blob-"+ref.ID)
+	if e != nil {
+		return blob, e
+	}
+	if Decode(raw, &blob, b.profile.MaxObjectBytes) != nil || blob.Validate(b.profile.MaxObjectBytes) != nil || blob.Object != ref {
+		return blob, ErrIntegrity
+	}
+	return blob, nil
+}
+func (b *Backend) ReadBlob(ctx context.Context, ref generation.Object) ([]byte, error) {
+	blob, e := b.Descriptor(ctx, ref)
+	if e != nil {
+		return nil, e
+	}
+	return b.ReadDescribed(ctx, blob)
 }
 func (b *Backend) PutBlob(ctx context.Context, ref generation.Object, data []byte) error {
 	blob, e := Describe(ref, data, b.profile.MaxObjectBytes)
@@ -167,6 +174,20 @@ type Complete struct {
 }
 
 func (b *Backend) Publish(ctx context.Context, raw []byte, trust generation.Trust) error {
+	return b.PublishChecked(ctx, raw, trust, func(ctx context.Context, refs []generation.Object) error {
+		for _, ref := range refs {
+			if _, e := b.ReadBlob(ctx, ref); e != nil {
+				return e
+			}
+		}
+		return nil
+	})
+}
+
+// PublishChecked authenticates the catalog and requires its entire closure to
+// pass the caller's explicit verification policy before writing COMPLETE last.
+// Ordinary Publish and all recovery reads use fresh payload verification.
+func (b *Backend) PublishChecked(ctx context.Context, raw []byte, trust generation.Trust, verify func(context.Context, []generation.Object) error) error {
 	catalog, e := generation.VerifyCatalog(raw, trust)
 	if e != nil {
 		return e
@@ -179,10 +200,11 @@ func (b *Backend) Publish(ctx context.Context, raw []byte, trust generation.Trus
 	if e != nil {
 		return e
 	}
-	for _, ref := range refs {
-		if _, e = b.ReadBlob(ctx, ref); e != nil {
-			return e
-		}
+	if verify == nil {
+		return ErrDenied
+	}
+	if e = verify(ctx, refs); e != nil {
+		return e
 	}
 	ref := generation.Object{ID: id, Bytes: len(raw)}
 	if e = b.PutBlob(ctx, ref, raw); e != nil {

@@ -185,3 +185,44 @@ func (c Cache) Remember(ctx context.Context, records map[string]Record, now time
 		return nil
 	})
 }
+
+// Invalidate removes only advisory evidence for bytes observed absent or
+// corrupt. It never changes payload or protection pins. Malformed pages remain
+// preserved and block reuse rather than being silently replaced.
+func (c Cache) Invalidate(ctx context.Context, refs []generation.Object, now time.Time) error {
+	if !c.valid() || now.Unix() < 1 {
+		return ErrInvalid
+	}
+	parts, e := groups(refs)
+	if e != nil {
+		return e
+	}
+	return c.Store.WithLock(ctx, func() error {
+		for prefix, objects := range parts {
+			p, e := c.load(prefix, now.Unix())
+			if e != nil {
+				return e
+			}
+			changed := false
+			for _, ref := range objects {
+				if r, ok := p.Records[ref.ID]; ok {
+					if r.Bytes != ref.Bytes {
+						return ErrInvalid
+					}
+					delete(p.Records, ref.ID)
+					changed = true
+				}
+			}
+			if changed {
+				raw, e := json.Marshal(p)
+				if e != nil {
+					return e
+				}
+				if e = c.Store.Write(c.name(prefix), raw); e != nil {
+					return e
+				}
+			}
+		}
+		return nil
+	})
+}
