@@ -1251,6 +1251,10 @@
         {
           "path": "internal/managementservice/snapshot_linux_test.go",
           "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
+        },
+        {
+          "path": "internal/upload/source_cache_linux_test.go",
+          "name": "TestSourceObjectCacheCancelledReplacementPreservesReadableBytes"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1655,6 +1659,22 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
+        },
+        {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/external_reporting_linux_test.go",
+          "name": "TestExternalCopyObservationsPreserveReceiptAgeAndUnknown"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "external target observations preserve original readback age and unconfirmed state"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy external report and assigned target without receipts remain unknown"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -1931,6 +1951,10 @@
         {
           "path": "internal/worker/retry_linux_test.go",
           "name": "TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat"
+        },
+        {
+          "path": "internal/upload/source_cache_linux_test.go",
+          "name": "TestSourceObjectCacheCancelledReplacementPreservesReadableBytes"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -2765,10 +2789,26 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "owner abandonment at full journal survives lost reply with exact resolution replay"
+        },
+        {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/external_reporting_linux_test.go",
+          "name": "TestExternalCopyObservationsPreserveReceiptAgeAndUnknown"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "external target observations preserve original readback age and unconfirmed state"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy external report and assigned target without receipts remain unknown"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-38",
@@ -3052,7 +3092,7 @@
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-39",
@@ -3256,7 +3296,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -3598,7 +3638,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-42",
@@ -3613,7 +3653,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-43",
@@ -3785,7 +3825,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-44",
@@ -3961,7 +4001,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-45",
@@ -4250,10 +4290,22 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "owner abandonment at full journal survives lost reply with exact resolution replay"
+        },
+        {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "external target observations preserve original readback age and unconfirmed state"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy external report and assigned target without receipts remain unknown"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-46",
@@ -4816,6 +4868,10 @@
         {
           "path": "internal/managementservice/service_linux_test.go",
           "name": "TestManagementServiceProfileOwnsNestedMemoryAfterOpen"
+        },
+        {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -4976,10 +5032,18 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "owner abandonment at full journal survives lost reply with exact resolution replay"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "external target observations preserve original readback age and unconfirmed state"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy external report and assigned target without receipts remain unknown"
         }
       ],
       "acceptance": ["AT-31"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-50",
@@ -5047,7 +5111,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-51",
@@ -5062,7 +5126,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-34"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-52",
@@ -5077,7 +5141,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],
-      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-53",

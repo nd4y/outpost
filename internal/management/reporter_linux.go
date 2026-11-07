@@ -19,6 +19,8 @@ const maxReporter = 12 << 20
 
 // Snapshot contains only observations. Reporter supplies identity and counters.
 type Snapshot struct {
+	ExternalState         string
+	ExternalCopies        []ExternalCopy
 	EnrollmentRevision    uint64
 	ConfigurationRevision uint64
 	ObservedUnix          int64
@@ -234,7 +236,7 @@ func (r *Reporter) Enqueue(ctx context.Context, in Snapshot) ([]byte, error) {
 		if in.ObservedUnix < s.ObservedUnix {
 			return ErrConflict
 		}
-		report := Report{Format: ReportFormat, Node: r.node, Tenant: grant.Tenant, Domain: r.domain, EnrollmentRevision: grant.Revision, Sequence: s.Sequence + 1, ConfigurationRevision: in.ConfigurationRevision, ObservedUnix: in.ObservedUnix, InventoryState: in.InventoryState, Generations: in.Generations, Jobs: in.Jobs, Commands: in.Commands, Space: in.Space}
+		report := Report{Format: ReportFormat, Node: r.node, Tenant: grant.Tenant, Domain: r.domain, EnrollmentRevision: grant.Revision, Sequence: s.Sequence + 1, ConfigurationRevision: in.ConfigurationRevision, ObservedUnix: in.ObservedUnix, InventoryState: in.InventoryState, ExternalState: in.ExternalState, ExternalCopies: in.ExternalCopies, Generations: in.Generations, Jobs: in.Jobs, Commands: in.Commands, Space: in.Space}
 		if len(in.Commands) > 0 {
 			report.Format = CommandReportFormat
 			for _, c := range in.Commands {
@@ -249,6 +251,9 @@ func (r *Reporter) Enqueue(ctx context.Context, in Snapshot) ([]byte, error) {
 				report.Format = CatalogReportFormat
 				break
 			}
+		}
+		if in.ExternalState != "" || len(in.ExternalCopies) > 0 {
+			report.Format = ExternalReportFormat
 		}
 		raw, e := SignReport(report, grant, r.signer, time.Now())
 		if e != nil {

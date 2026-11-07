@@ -97,6 +97,56 @@ try {
       original.split(" · View retrieved")[0],
     );
   });
+  await test("external target observations preserve original readback age and unconfirmed state", async () => {
+    const row = page.locator("#external-copies tbody tr").filter({ hasText: meta.cloudTarget });
+    assert.equal(await row.count(), 1);
+    assert.match(await row.innerText(), /Complete at the recorded check time/);
+    const verified = await row.locator("td").nth(4).innerText();
+    const expected = await page.evaluate(
+      (t) => new Date(t * 1000).toLocaleString("en", { timeZoneName: "short" }),
+      meta.cloudVerifiedUnix,
+    );
+    assert.equal(verified, expected);
+    const pending = page
+      .locator("#external-copies tbody tr")
+      .filter({ hasText: meta.pendingTarget });
+    assert.match(await pending.innerText(), /Completeness unconfirmed/);
+    assert.equal(await pending.locator("td").nth(4).innerText(), "Unknown");
+    assert.match(await page.locator("#external-state").innerText(), /not current cloud health/);
+    await page.locator("#refresh").click();
+    await contains(page, "#notice", "View loaded");
+    assert.equal(await row.locator("td").nth(4).innerText(), verified);
+  });
+  await test("legacy external report and assigned target without receipts remain unknown", async () => {
+    const missing = "d".repeat(64);
+    await page.route("**/domains/**/policy", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      body.targets.push({ id: missing, kind: "s3", maxObjectBytes: 65536 });
+      await route.fulfill({ response, json: body });
+    });
+    await page.route("**/domains/**/report", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      body.format = "outpost-management-report-view-1";
+      delete body.externalState;
+      delete body.externalCopies;
+      await route.fulfill({ response, json: body });
+    });
+    await page.locator("#refresh").click();
+    await contains(page, "#notice", "View loaded");
+    const row = page.locator("#external-copies tbody tr").filter({ hasText: missing });
+    assert.equal(await row.count(), 1);
+    assert.equal(await row.locator("td").nth(2).innerText(), "Unknown");
+    assert.match(
+      await page.locator("#external-state").innerText(),
+      /no external-copy observation support/,
+    );
+    await page.unroute("**/domains/**/report");
+    await page.unroute("**/domains/**/policy");
+    await page.locator("#refresh").click();
+    await contains(page, "#notice", "View loaded");
+  });
   await test("bounded table pages preserve measured unknown progress", async () => {
     assert.equal(await page.locator("#jobs tbody tr").count(), 50);
     assert.match(await page.locator("#jobs").innerText(), /Unknown \/ Unknown/);
@@ -162,6 +212,12 @@ try {
     await contains(page, "#notice", "View loaded");
     await contains(page, "#report-state", "No signed report");
     assert.equal(await page.locator("#generations tbody tr").count(), 0);
+    const copies = page.locator("#external-copies tbody tr");
+    assert.equal(await copies.count(), 1);
+    assert.equal(await copies.locator("td").nth(0).innerText(), meta.otherTarget);
+    assert.equal(await copies.locator("td").nth(2).innerText(), "Unknown");
+    assert.equal(await copies.filter({ hasText: meta.cloudTarget }).count(), 0);
+    assert.equal(await copies.filter({ hasText: meta.pendingTarget }).count(), 0);
     assert.equal(await page.locator("#command-form button[type=submit]").isDisabled(), true);
     await page.locator("#domain").selectOption(meta.domain);
     await contains(page, "#report-state", "STALE");
@@ -187,6 +243,7 @@ try {
     await page.locator("#refresh").click();
     await contains(page, "#notice", "Access denied");
     assert.equal(await page.locator("#generations tbody tr").count(), 0);
+    assert.equal(await page.locator("#external-copies tbody tr").count(), 0);
     assert.equal(await page.locator("#command-form button[type=submit]").isDisabled(), true);
     await page.unroute("**/domains/**");
     await page.locator("#refresh").click();

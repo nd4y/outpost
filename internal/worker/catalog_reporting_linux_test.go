@@ -111,7 +111,7 @@ func TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota(t *testin
 	must(t, e)
 	report, e := management.VerifyReport(encoded, enrollment, time.Now())
 	must(t, e)
-	if report.Format != management.CatalogReportFormat {
+	if report.Format != management.ExternalReportFormat {
 		t.Fatal("unknown metadata used old report")
 	}
 	out := filepath.Join(f.base, "healthy-restore")

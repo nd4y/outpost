@@ -81,26 +81,75 @@ func TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols(t *tes
 			}
 			return true
 		}
-		// This fixture runs six target jobs on one CPU. Its completion bound
-		// includes race instrumentation; protocol attempt deadlines stay unchanged.
-		for time.Since(started) < 30*time.Second {
+		diagnose := func() {
+			for _, w := range f.nodes {
+				s, e := w.Status(ctx)
+				if e != nil {
+					t.Log("status", e)
+					continue
+				}
+				for _, grant := range f.cfg.Uploads {
+					j := s.Jobs[upload.DelegatedOperation(grant, id)]
+					t.Logf("node=%s target-job=%s phase=%s attempts=%d error=%s", w.node, j.Job.Operation, j.Phase, j.Attempts, j.ErrorCode)
+					relative := w.relative(filepath.Join(DomainDirectory(w.dir, f.domain.Trust), "uploads", j.Job.Operation))
+					q, qe := upload.OpenQueueAt(w.root, relative, w.node, upload.Authority{Generation: f.domain.Trust, Planner: f.domain.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, false, nil)
+					if qe == nil {
+						qs, readErr := q.Status(ctx)
+						if readErr == nil {
+							for op, inner := range qs.Jobs {
+								t.Logf("inner-upload op=%s phase=%s error=%s attempts=%d", op, inner.Phase, inner.ErrorCode, inner.Attempts)
+								journal, je := upload.Open(filepath.Join(w.dir, relative, "jobs", op), inner.Plan, w.node, upload.Authority{Generation: f.domain.Trust, Planner: f.domain.Planner}, false)
+								if je == nil {
+									js, readErr := journal.Status(ctx)
+									if readErr == nil {
+										done := 0
+										for _, part := range js.Parts {
+											if part.Complete {
+												done++
+											}
+										}
+										plan, pe := upload.Verify(inner.Plan, upload.Authority{Generation: f.domain.Trust, Planner: f.domain.Planner})
+										if pe == nil {
+											tasks, _ := plan.Tasks()
+											t.Logf("part-progress kind=%s phase=%s done=%d seen=%d total=%d", plan.Profile.Kind, js.Phase, done, len(js.Parts), len(tasks))
+										}
+									}
+									must(t, journal.Close())
+								} else {
+									t.Logf("part-progress unavailable=%v", je)
+								}
+
+							}
+						} else {
+							t.Logf("inner-upload read error=%v", readErr)
+						}
+						must(t, q.Close())
+					} else {
+						t.Logf("inner-upload open error=%v", qe)
+					}
+
+				}
+			}
+			for target, server := range targets {
+				snapshot := server.Snapshot()
+				t.Logf("target-progress kind=%s requests=%d immutableWrites=%d", profiles[target].Kind, snapshot.Requests, len(snapshot.Writes))
+			}
+		}
+		// Six durable target jobs share one test CPU. This is a bounded fixture
+		// wait, not a throughput promise. Slot and protocol deadlines stay unchanged.
+		diagnosed := false
+		for time.Since(started) < 45*time.Second {
 			if ready() {
 				t.Logf("generation completed across three workers/two targets in %s", time.Since(started))
 				return
 			}
+			if !diagnosed && time.Since(started) >= 30*time.Second {
+				diagnose()
+				diagnosed = true
+			}
 			time.Sleep(25 * time.Millisecond)
 		}
-		for _, w := range f.nodes {
-			s, e := w.Status(ctx)
-			if e != nil {
-				t.Log("status", e)
-				continue
-			}
-			for _, grant := range f.cfg.Uploads {
-				j := s.Jobs[upload.DelegatedOperation(grant, id)]
-				t.Logf("node=%s target-job=%s phase=%s attempts=%d error=%s", w.node, j.Job.Operation, j.Phase, j.Attempts, j.ErrorCode)
-			}
-		}
+		diagnose()
 		t.Fatal("autonomous cloud generation did not complete within fixture budget")
 	}
 	waitComplete(f.generation)
@@ -131,6 +180,24 @@ func TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols(t *tes
 	must(t, store.Close())
 	// The owner published no new job, delegation or configuration for generation2.
 	waitComplete(second)
+	// Reports retain the actual receipt's target and oldest verified time for
+	// each generation, without issuing any additional storage reads.
+	for index, w := range f.nodes {
+		observed, e := w.ManagementSnapshot(ctx, workerEnrollment(t, f, index), f.domain.Trust.Domain)
+		must(t, e)
+		if observed.ExternalState != "OBSERVED" || len(observed.ExternalCopies) != 4 {
+			t.Fatal("external coverage missing", observed.ExternalState, len(observed.ExternalCopies))
+		}
+		current, e := w.Status(ctx)
+		must(t, e)
+		for _, copy := range observed.ExternalCopies {
+			var receipt upload.Receipt
+			must(t, json.Unmarshal(current.Jobs[copy.Operation].Receipt, &receipt))
+			if copy.State != "OBSERVED_COMPLETE" || copy.Target != receipt.Target || copy.VerifiedUnix != receipt.ObservedUnix || copy.ReceiptDigest != storage.Hash(current.Jobs[copy.Operation].Receipt) {
+				t.Fatal("receipt lost or age refreshed", copy, receipt)
+			}
+		}
+	}
 	stopC()
 	stopA()
 	stopB()

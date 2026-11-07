@@ -18,6 +18,7 @@ const ReportFormat = "outpost-management-report-1"
 const CommandReportFormat = "outpost-management-report-2"
 const RecoveryReportFormat = "outpost-management-report-3"
 const CatalogReportFormat = "outpost-management-report-4"
+const ExternalReportFormat = "outpost-management-report-5"
 const CommandFormat = "outpost-management-command-1"
 const MaxEnrollment = 65536
 const MaxReport = 8 << 20
@@ -228,6 +229,20 @@ type Job struct {
 	TotalBytes     *int64 `json:"totalBytes"`
 	ErrorCode      string `json:"errorCode,omitempty"`
 }
+
+// ExternalCopy is an original-age observation of a target readback. It is
+// neither current cloud health nor a count of distinct copies across observers.
+type ExternalCopy struct {
+	Operation     string `json:"operationId"`
+	Generation    string `json:"generation"`
+	Target        string `json:"target"`
+	State         string `json:"state"`
+	Verification  string `json:"verification"`
+	VerifiedUnix  int64  `json:"verifiedUnix"`
+	ReceiptDigest string `json:"receiptDigest,omitempty"`
+	ErrorCode     string `json:"errorCode,omitempty"`
+}
+
 type Report struct {
 	Format                string               `json:"format"`
 	Node                  string               `json:"node"`
@@ -242,6 +257,8 @@ type Report struct {
 	Jobs                  []Job                `json:"jobs"`
 	Commands              []CommandObservation `json:"commands,omitempty"`
 	Space                 Space                `json:"space"`
+	ExternalState         string               `json:"externalState,omitempty"`
+	ExternalCopies        []ExternalCopy       `json:"externalCopies,omitempty"`
 	Signature             []byte               `json:"signature,omitempty"`
 }
 
@@ -257,7 +274,7 @@ func stableCode(code string) bool {
 	return true
 }
 func (r Report) Validate(e Enrollment, now time.Time) error {
-	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat && r.Format != RecoveryReportFormat && r.Format != CatalogReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
+	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat && r.Format != RecoveryReportFormat && r.Format != CatalogReportFormat && r.Format != ExternalReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
 		return ErrInvalid
 	}
 	if _, ok := e.Domain(r.Domain); !ok {
@@ -268,7 +285,7 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 		return ErrInvalid
 	}
 	for _, c := range r.Commands {
-		if c.Kind == "restore" && r.Format != RecoveryReportFormat && r.Format != CatalogReportFormat || seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
+		if c.Kind == "restore" && r.Format != RecoveryReportFormat && r.Format != CatalogReportFormat && r.Format != ExternalReportFormat || seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
 			return ErrInvalid
 		}
 		seen[c.Operation] = true
@@ -276,7 +293,7 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 	seen = map[string]bool{}
 	for _, g := range r.Generations {
 		if g.MetadataState != "" {
-			if r.Format != CatalogReportFormat || g.MetadataState != "UNAVAILABLE" || g.CreatedUnix != 0 || g.Objects != 0 || g.LogicalBytes != nil || g.Status != "CORRUPT" || g.Verification != "NONE" || g.VerifiedUnix != 0 || g.RestoreVerifiedUnix != 0 {
+			if (r.Format != CatalogReportFormat && r.Format != ExternalReportFormat) || g.MetadataState != "UNAVAILABLE" || g.CreatedUnix != 0 || g.Objects != 0 || g.LogicalBytes != nil || g.Status != "CORRUPT" || g.Verification != "NONE" || g.VerifiedUnix != 0 || g.RestoreVerifiedUnix != 0 {
 				return ErrInvalid
 			}
 		}
@@ -298,6 +315,39 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 			return ErrInvalid
 		}
 		seen[j.Operation] = true
+	}
+	if r.Format != ExternalReportFormat {
+		if r.ExternalState != "" || len(r.ExternalCopies) != 0 {
+			return ErrInvalid
+		}
+	} else {
+		if r.ExternalState != "OBSERVED" || len(r.ExternalCopies) > 4096 {
+			return ErrInvalid
+		}
+		jobs := map[string]Job{}
+		for _, j := range r.Jobs {
+			jobs[j.Operation] = j
+		}
+		copies := map[string]bool{}
+		for _, copy := range r.ExternalCopies {
+			j, ok := jobs[copy.Operation]
+			if !ok || j.Kind != "UPLOAD" || j.Generation != copy.Generation || !storage.ID(copy.Target) || copies[copy.Operation] || !oneOf(copy.State, "UNCONFIRMED", "OBSERVED_COMPLETE", "UNAVAILABLE") || !stableCode(copy.ErrorCode) {
+				return ErrInvalid
+			}
+			if copy.State == "OBSERVED_COMPLETE" {
+				if !oneOf(copy.Verification, "full-target-readback", "cached-target-readback") || !validTime(copy.VerifiedUnix) || copy.VerifiedUnix > j.UpdatedUnix || copy.VerifiedUnix > r.ObservedUnix || !storage.ID(copy.ReceiptDigest) || copy.ErrorCode != "" {
+					return ErrInvalid
+				}
+			} else if copy.Verification != "NONE" || copy.VerifiedUnix != 0 || copy.ReceiptDigest != "" || (copy.State == "UNAVAILABLE") != (copy.ErrorCode != "") {
+				return ErrInvalid
+			}
+			copies[copy.Operation] = true
+		}
+		for _, j := range r.Jobs {
+			if j.Kind == "UPLOAD" && !copies[j.Operation] {
+				return ErrInvalid
+			}
+		}
 	}
 	return nil
 }

@@ -21,6 +21,15 @@ const words = {
     activity: "Activity",
     evidenceHelp:
       "Backup creation, target readback and verified restore are separate observations. Unknown values are not zero.",
+    externalCopies: "External target observations",
+    externalHelp:
+      "These are historical worker readbacks, not current cloud health. Repeated observations of the same target are not extra copies. No receipt means unknown, not absent.",
+    observedComplete: "Complete at the recorded check time",
+    unconfirmedCopy: "Completeness unconfirmed",
+    externalUnknown: "This report has no external-copy observation support.",
+    assignment: "Current placement",
+    currentAssignment: "Assigned",
+    historicalAssignment: "Historical or unknown",
     generations: "Generations",
     jobs: "Queue",
     commandResults: "Worker results",
@@ -221,6 +230,15 @@ const words = {
     activity: "Журнал",
     evidenceHelp:
       "Создание копии, чтение из целевого хранилища и проверенное восстановление - разные наблюдения. Неизвестное значение не равно нулю.",
+    externalCopies: "Наблюдения внешних копий",
+    externalHelp:
+      "Это исторические проверки воркера, а не текущее здоровье облака. Повторные наблюдения одного назначения не увеличивают число копий. Нет квитанции - неизвестно, а не отсутствует.",
+    observedComplete: "Полнота подтверждена в указанное время",
+    unconfirmedCopy: "Полнота не подтверждена",
+    externalUnknown: "Этот отчет не поддерживает наблюдения внешних копий.",
+    assignment: "Текущее размещение",
+    currentAssignment: "Назначено",
+    historicalAssignment: "Историческое или неизвестное",
     generations: "Поколения",
     jobs: "Очередь",
     commandResults: "Результаты воркера",
@@ -412,6 +430,10 @@ const stateNames = {
     UNKNOWN: "Неизвестно",
     UNAVAILABLE: "Недоступно",
     OBSERVED: "Наблюдалось",
+    OBSERVED_COMPLETE: "Полнота подтверждена в указанное время",
+    UNCONFIRMED: "Полнота не подтверждена",
+    "full-target-readback": "Полное чтение назначения",
+    "cached-target-readback": "Чтение с сохранением возраста прежних проверок",
     COMPLETE: "Завершено",
     ABANDONED: "Отказ до публикации",
     INCOMPLETE: "Не завершено",
@@ -928,7 +950,14 @@ async function loadDomain() {
       !Array.isArray(r.generations) ||
       r.generations.length > 256 ||
       !Array.isArray(r.jobs) ||
-      r.jobs.length > 4096
+      r.jobs.length > 4096 ||
+      !/^outpost-management-report-view-[1-5]$/.test(r.format) ||
+      (r.externalState !== undefined &&
+        (r.format !== "outpost-management-report-view-5" || r.externalState !== "OBSERVED")) ||
+      (r.externalCopies !== undefined &&
+        (!Array.isArray(r.externalCopies) ||
+          r.externalCopies.length > 4096 ||
+          r.externalState !== "OBSERVED"))
     )
       throw new Error("INVALID");
     state.report = r;
@@ -1020,6 +1049,54 @@ function renderPolicy() {
   $("command-fields").disabled = state.loading || !kinds.length;
   commandFields();
 }
+function renderExternalCopies() {
+  const report = state.report;
+  const supported = report?.externalState === "OBSERVED";
+  $("external-state").textContent = supported ? tr("externalHelp") : tr("externalUnknown");
+  const desired = new Set((state.policy?.targets || []).map((t) => t.id));
+  const observations = supported ? report.externalCopies || [] : [];
+  const seen = new Set(observations.map((c) => c.target));
+  const rows = observations.map((c) => [
+    c.target,
+    c.generation,
+    c.state === "OBSERVED_COMPLETE"
+      ? tr("observedComplete")
+      : c.state === "UNCONFIRMED"
+        ? tr("unconfirmedCopy")
+        : label(c.state),
+    label(c.verification),
+    date(c.verifiedUnix),
+    c.operationId,
+    desired.has(c.target) ? tr("currentAssignment") : tr("historicalAssignment"),
+    c.errorCode || "-",
+  ]);
+  for (const target of desired)
+    if (!seen.has(target))
+      rows.push([
+        target,
+        null,
+        tr("unknown"),
+        tr("unknown"),
+        tr("unknown"),
+        null,
+        tr("currentAssignment"),
+        "-",
+      ]);
+  table(
+    $("external-copies"),
+    [
+      "target",
+      "generation",
+      "status",
+      "verification",
+      "verified",
+      "operationId",
+      "assignment",
+      "error",
+    ],
+    rows,
+  );
+}
 function renderReport() {
   const r = state.report;
   $("report-state").textContent = r
@@ -1031,6 +1108,7 @@ function renderReport() {
   $("space").replaceChildren();
   $("generation-list").replaceChildren();
   for (const id of ["generations", "jobs", "command-results"]) $(id).replaceChildren();
+  renderExternalCopies();
   if (!r) return;
   const s = r.space || {};
   pairs($("space"), [

@@ -2771,7 +2771,7 @@
             "type": "string",
             "contentEncoding": "base64",
             "maxLength": 11184812,
-            "description": "Signed outpost-management-report-1 through report-4. Version2 carries scrub/maintenance, version3 adds trusted restore, version4 adds unavailable catalog metadata. Original times, sequence and exact tenant/domain scope are required."
+            "description": "Signed outpost-management-report-1 through report-5. Version2 carries scrub/maintenance, version3 adds trusted restore, version4 adds unavailable catalog metadata; version5 adds original-age external-copy receipt observations. Original times, sequence and exact tenant/domain scope are required."
           }
         },
         "required": ["document"]
@@ -2786,7 +2786,8 @@
               "outpost-management-report-view-1",
               "outpost-management-report-view-2",
               "outpost-management-report-view-3",
-              "outpost-management-report-view-4"
+              "outpost-management-report-view-4",
+              "outpost-management-report-view-5"
             ]
           },
           "node": {
@@ -2848,6 +2849,19 @@
             "items": {
               "$ref": "#/components/schemas/CommandObservation"
             }
+          },
+          "externalState": {
+            "type": "string",
+            "const": "OBSERVED",
+            "description": "The worker inspected its retained external-copy receipts. This is not a fresh probe of cloud health; absence in older report formats is unknown."
+          },
+          "externalCopies": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "$ref": "#/components/schemas/ExternalCopy"
+            },
+            "description": "Historical readbacks per upload operation. Each operation/generation must match an UPLOAD job. Multiple observations of one target are not distinct copies."
           }
         },
         "required": [
@@ -2922,6 +2936,30 @@
                     }
                   }
                 }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-5"
+                }
+              }
+            },
+            "then": {
+              "required": ["externalState"]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["externalState"]
+                  },
+                  {
+                    "required": ["externalCopies"]
+                  }
+                ]
               }
             }
           }
@@ -4186,6 +4224,107 @@
             "type": "string"
           }
         }
+      },
+      "ExternalCopy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["UNCONFIRMED", "OBSERVED_COMPLETE", "UNAVAILABLE"]
+          },
+          "verification": {
+            "type": "string",
+            "enum": ["NONE", "full-target-readback", "cached-target-readback"]
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776,
+            "description": "Original oldest supporting target read time; never refreshed by report delivery. Must not exceed the job update or report observation time."
+          },
+          "receiptDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "errorCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 48,
+            "pattern": "^[A-Z_]+$"
+          }
+        },
+        "required": [
+          "operationId",
+          "generation",
+          "target",
+          "state",
+          "verification",
+          "verifiedUnix"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "OBSERVED_COMPLETE"
+                }
+              }
+            },
+            "then": {
+              "required": ["receiptDigest"],
+              "properties": {
+                "verification": {
+                  "enum": ["full-target-readback", "cached-target-readback"]
+                },
+                "verifiedUnix": {
+                  "minimum": 1
+                }
+              },
+              "not": {
+                "required": ["errorCode"]
+              }
+            },
+            "else": {
+              "properties": {
+                "verification": {
+                  "const": "NONE"
+                },
+                "verifiedUnix": {
+                  "const": 0
+                }
+              },
+              "not": {
+                "required": ["receiptDigest"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "UNAVAILABLE"
+                }
+              }
+            },
+            "then": {
+              "required": ["errorCode"]
+            },
+            "else": {
+              "not": {
+                "required": ["errorCode"]
+              }
+            }
+          }
+        ]
       }
     }
   }

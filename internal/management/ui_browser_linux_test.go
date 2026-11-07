@@ -46,6 +46,15 @@ func TestManagementBrowserFixture(t *testing.T) {
 	for i := 0; i < 61; i++ {
 		view.Jobs = append(view.Jobs, Job{Operation: id(fmt.Sprint("browser-job-", i)), Domain: view.Domain, Generation: id("generation"), Kind: "PEER", Phase: "QUEUED", UpdatedUnix: view.ObservedUnix})
 	}
+	view.Format = ExternalReportFormat
+	view.ExternalState = "OBSERVED"
+	for i := 0; i < 2; i++ {
+		view.Jobs[i].Kind = "UPLOAD"
+	}
+	view.ExternalCopies = []ExternalCopy{
+		{Operation: view.Jobs[0].Operation, Generation: view.Jobs[0].Generation, Target: id("browser-cloud-target"), State: "OBSERVED_COMPLETE", Verification: "cached-target-readback", VerifiedUnix: view.ObservedUnix - 300, ReceiptDigest: id("browser-cloud-receipt")},
+		{Operation: view.Jobs[1].Operation, Generation: view.Jobs[1].Generation, Target: id("browser-pending-target"), State: "UNCONFIRMED", Verification: "NONE"},
+	}
 	raw, e := SignReport(view, f.e, f.node, time.Now())
 	must(t, e)
 	_, e = f.r.PublishReport(context.Background(), f.e.Node, f.e.Tenant, f.e.Node, raw)
@@ -72,7 +81,7 @@ func TestManagementBrowserFixture(t *testing.T) {
 		must(t, os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}), 0600))
 		clients[name] = map[string]string{"certPath": certPath, "keyPath": keyPath}
 	}
-	meta := map[string]any{"url": h.server.URL, "clients": clients, "tenant": f.e.Tenant, "node": f.e.Node, "domain": id("domain"), "otherDomain": id("second-domain"), "generation": id("generation"), "preset": id("browser-recovery-preset"), "config": config, "futureConfig": future, "observedUnix": view.ObservedUnix, "pendingCommand": pending}
+	meta := map[string]any{"url": h.server.URL, "clients": clients, "tenant": f.e.Tenant, "node": f.e.Node, "domain": id("domain"), "otherDomain": id("second-domain"), "generation": id("generation"), "preset": id("browser-recovery-preset"), "config": config, "futureConfig": future, "observedUnix": view.ObservedUnix, "pendingCommand": pending, "cloudTarget": id("browser-cloud-target"), "pendingTarget": id("browser-pending-target"), "cloudVerifiedUnix": view.ObservedUnix - 300, "otherTarget": cfg.Targets[1].ID}
 	raw, e = json.Marshal(meta)
 	must(t, e)
 	must(t, os.WriteFile(filepath.Join(dir, "ready.json"), raw, 0600))

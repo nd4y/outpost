@@ -18,6 +18,7 @@ import (
 	"github.com/nd4y/outpost/internal/management"
 	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/upload"
 )
 
 // reportConfiguration checks independent reporting enrollment against the
@@ -170,6 +171,11 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 			return out, management.ErrInvalid
 		}
 		out.Jobs = append(out.Jobs, management.Job{Operation: j.Job.Operation, Domain: domain, Generation: j.Job.Generation, Kind: kind, Phase: j.Phase, UpdatedUnix: j.UpdatedUnix, ErrorCode: j.ErrorCode})
+	}
+	out.ExternalState = "OBSERVED"
+	out.ExternalCopies, e = externalCopyObservations(status, domain, w.node)
+	if e != nil {
+		return out, e
 	}
 	if len(out.Jobs) > 4096 {
 		return out, management.ErrCapacity
@@ -338,6 +344,45 @@ func commandObservations(status Status, tenant, domain string) ([]management.Com
 		out = append(out, c)
 	}
 	if len(out) > 2048 {
+		return nil, management.ErrCapacity
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Operation < out[j].Operation })
+	return out, nil
+}
+
+// externalCopyObservations uses the immutable target identity and original
+// receipt timestamp. It never probes storage or upgrades admission into proof.
+func externalCopyObservations(status Status, domain, node string) ([]management.ExternalCopy, error) {
+	out := []management.ExternalCopy{}
+	for _, job := range status.Jobs {
+		j := job.Job
+		if j.Domain != domain || j.Kind != "upload" {
+			continue
+		}
+		if !storage.ID(j.Target) || j.Executor != node {
+			return nil, management.ErrInvalid
+		}
+		copy := management.ExternalCopy{Operation: j.Operation, Generation: j.Generation, Target: j.Target, State: "UNCONFIRMED", Verification: "NONE"}
+		if len(job.Receipt) == 0 {
+			if job.Phase == "COMPLETE" {
+				copy.State = "UNAVAILABLE"
+				copy.ErrorCode = "MISSING_RECEIPT"
+			}
+		} else {
+			var receipt upload.Receipt
+			if storage.Decode(job.Receipt, &receipt, 4096) != nil || receipt.Target != j.Target || receipt.Generation != j.Generation || receipt.Operation != j.Operation || receipt.Executor != node || (receipt.Verification != "full-target-readback" && receipt.Verification != "cached-target-readback") || receipt.ObservedUnix < 1 || receipt.ObservedUnix > job.UpdatedUnix {
+				copy.State = "UNAVAILABLE"
+				copy.ErrorCode = "INVALID_RECEIPT"
+			} else {
+				copy.State = "OBSERVED_COMPLETE"
+				copy.Verification = receipt.Verification
+				copy.VerifiedUnix = receipt.ObservedUnix
+				copy.ReceiptDigest = storage.Hash(job.Receipt)
+			}
+		}
+		out = append(out, copy)
+	}
+	if len(out) > 4096 {
 		return nil, management.ErrCapacity
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Operation < out[j].Operation })

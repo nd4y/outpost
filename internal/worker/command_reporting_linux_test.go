@@ -61,7 +61,7 @@ func TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak(t 
 	must(t, e)
 	report, e := management.VerifyReport(raw, grant, time.Now())
 	must(t, e)
-	if report.Format != management.CommandReportFormat || len(report.Commands) != 1 || report.Generations[0].VerifiedUnix != 0 {
+	if report.Format != management.ExternalReportFormat || len(report.Commands) != 1 || report.Generations[0].VerifiedUnix != 0 {
 		t.Fatal("command observation recertified whole inventory")
 	}
 	other, e := w.ManagementSnapshot(ctx, workerEnrollment(t, f, 0), f.domain.Trust.Domain)

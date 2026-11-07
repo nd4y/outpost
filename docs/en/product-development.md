@@ -67,3 +67,5 @@ The [embedded management interface](management-ui.md) exposes scoped policy meta
 The persistent browser journal keeps original requests across actual browser restart, migrates tab-local records and coordinates same-origin tabs with bounded locks. Current authority is read again before dispatch; scope changes clear old views. Full storage preserves uncertain records and requires fresh review after terminal-record removal. Service-side unconfirmed-request resolution remains open.
 
 A [private management snapshot](management-snapshots.md) now preserves administrative dependencies and restores historical audit/receipts through a keyless independent reader. It keeps abandonment fences and durable caches ahead of their receipts. Activation after journal loss remains separate: inspection never reports current authority or replays commands.
+
+Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.

@@ -122,6 +122,27 @@ func (j *Journal) publish(ctx context.Context, b *storage.Backend) error {
 	return b.Publish(ctx, j.plan.Catalog, j.authority.Generation)
 }
 
+// sourceObjectCache retains one verified object between assignment slots.
+type sourceObjectCache struct {
+	object generation.Object
+	data   []byte
+}
+
+func (c *sourceObjectCache) read(ctx context.Context, source *generation.Replica, id string, ref generation.Object) ([]byte, error) {
+	if c.object != ref {
+		// A cancelled read may return no bytes. Clear the previous identity
+		// before replacing its buffer so later slots cannot reuse a false hit.
+		c.object, c.data = generation.Object{}, nil
+		var err error
+		c.data, err = source.ReadObject(ctx, id, ref)
+		if err != nil {
+			return nil, err
+		}
+		c.object = ref
+	}
+	return c.data, nil
+}
+
 // Run consumes a cached signed plan. Each worker has its own journal, complete
 // keyless replica and identity key. No controller or peer RPC is needed at run time.
 func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storage.Backend, key ed25519.PrivateKey) (result Result, err error) {
@@ -185,8 +206,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 	if e = j.edit(ctx, func(s *State) error { s.Phase = "TRANSFERRING"; return nil }); e != nil {
 		return result, e
 	}
-	var cached generation.Object
-	var data []byte
+	var cache sourceObjectCache
 	for {
 		if e = ctx.Err(); e != nil {
 			return result, e
@@ -257,12 +277,8 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			if storage.Missing(e) {
 				e = claim(bounded, b, j, task.Part, round, end, key)
 				if e == nil {
-					if cached != task.Object {
-						data, e = source.ReadObject(bounded, j.plan.Generation, task.Object)
-						if e == nil {
-							cached = task.Object
-						}
-					}
+					var data []byte
+					data, e = cache.read(bounded, source, j.plan.Generation, task.Object)
 					if e == nil {
 						endOffset := task.Offset + task.Part.Bytes
 						if task.Offset < 0 || endOffset > len(data) {

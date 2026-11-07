@@ -112,7 +112,7 @@ func TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport(t *testin
 	must(t, e)
 	report, e := management.VerifyReport(encoded, enrollment, time.Now())
 	must(t, e)
-	if report.Format != management.RecoveryReportFormat || report.Generations[0].VerifiedUnix != 0 {
+	if report.Format != management.ExternalReportFormat || report.Generations[0].VerifiedUnix != 0 {
 		t.Fatal("selected restore recertified whole inventory")
 	}
 	for _, private := range []string{p.Directory, p.Presets[0].OwnerFile, "dataset/", "данные.bin"} {
@@ -120,6 +120,8 @@ func TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport(t *testin
 			t.Fatal("private recovery metadata in report")
 		}
 	}
+	report.ExternalState = ""
+	report.ExternalCopies = nil
 	report.Format = management.CommandReportFormat
 	if _, e = management.SignReport(report, enrollment, w.cert.PrivateKey.(ed25519.PrivateKey), time.Now()); e == nil {
 		t.Fatal("restore accepted old report")

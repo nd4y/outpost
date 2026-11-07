@@ -14,6 +14,8 @@ type reportRecord struct {
 	Document   []byte `json:"document"`
 }
 type ReportView struct {
+	ExternalState         string               `json:"externalState,omitempty"`
+	ExternalCopies        []ExternalCopy       `json:"externalCopies,omitempty"`
 	Format                string               `json:"format"`
 	Node                  string               `json:"node"`
 	Tenant                string               `json:"tenant"`
@@ -173,7 +175,10 @@ func (r *Registry) Report(ctx context.Context, p Principal, tenant, node, domain
 		if time.Now().Unix()-report.ObservedUnix > int64(maxAge/time.Second) || !enrollment.Active(time.Now()) || report.EnrollmentRevision != enrollment.Revision {
 			state = "STALE"
 		}
-		out = ReportView{Format: "outpost-management-report-view-1", Node: node, Tenant: tenant, Domain: domain, Sequence: report.Sequence, ConfigurationRevision: report.ConfigurationRevision, ObservedUnix: report.ObservedUnix, InventoryState: report.InventoryState, State: state, DocumentDigest: pointer.Digest, Generations: report.Generations, Jobs: report.Jobs, Commands: report.Commands, Space: report.Space}
+		out = ReportView{Format: "outpost-management-report-view-1", Node: node, Tenant: tenant, Domain: domain, Sequence: report.Sequence, ConfigurationRevision: report.ConfigurationRevision, ObservedUnix: report.ObservedUnix, InventoryState: report.InventoryState, ExternalState: report.ExternalState, ExternalCopies: report.ExternalCopies, State: state, DocumentDigest: pointer.Digest, Generations: report.Generations, Jobs: report.Jobs, Commands: report.Commands, Space: report.Space}
+		if report.Format == ExternalReportFormat {
+			out.Format = "outpost-management-report-view-5"
+		}
 		if report.Format == CatalogReportFormat {
 			out.Format = "outpost-management-report-view-4"
 		}
