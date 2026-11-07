@@ -10,7 +10,7 @@ import (
 func TestManagementUIUsesAuthenticatedExactRoutesAndRestrictiveBrowserHeaders(t *testing.T) {
 	h := newHTTPFixture(t)
 	h.f.enroll(t)
-	for path, media := range map[string]string{"/": "text/html", "/ui/app.js": "text/javascript", "/ui/app.css": "text/css"} {
+	for path, media := range map[string]string{"/": "text/html", "/ui/app.js": "text/javascript", "/ui/journal.js": "text/javascript", "/ui/app.css": "text/css"} {
 		for _, client := range []*http.Client{h.owner, h.viewer} {
 			res, e := client.Get(h.server.URL + path)
 			must(t, e)

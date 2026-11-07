@@ -8,7 +8,7 @@ import (
 // Static files are part of the reviewed binary. No directory serving, remote
 // dependencies or unauthenticated fallback is allowed.
 //
-//go:embed ui/index.html ui/app.js ui/app.css
+//go:embed ui/index.html ui/app.js ui/app.css ui/journal.js
 var interfaceFiles embed.FS
 
 func (h *httpService) serveUI(w http.ResponseWriter, r *http.Request, p Principal) bool {
@@ -18,6 +18,8 @@ func (h *httpService) serveUI(w http.ResponseWriter, r *http.Request, p Principa
 		path, media = "ui/index.html", "text/html; charset=utf-8"
 	case "/ui/app.js":
 		path, media = "ui/app.js", "text/javascript; charset=utf-8"
+	case "/ui/journal.js":
+		path, media = "ui/journal.js", "text/javascript; charset=utf-8"
 	case "/ui/app.css":
 		path, media = "ui/app.css", "text/css; charset=utf-8"
 	default:

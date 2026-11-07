@@ -1,3 +1,4 @@
+import { OperationJournal, terminal } from "./journal.js";
 const $ = (id) => document.getElementById(id);
 const ID = /^[a-f0-9]{64}$/;
 const words = {
@@ -153,9 +154,9 @@ const words = {
       "Cannot load the authenticated session. Check the client certificate and reload.",
     newReady: "New operation draft. Review the identifiers before sending.",
     recordLimit:
-      "The tab holds 16 operations. Remove a completed local record before submitting another.",
+      "The browser holds 16 operations. Remove a completed local record before submitting another.",
     storageError:
-      "The browser cannot safely retain the operation. Enable session storage or free space; no request was sent.",
+      "The browser cannot safely retain the operation. Enable local storage and Web Locks or free space. Keep the original operation identifier if another tab already sent it.",
     storageAfterReply:
       "The service returned a receipt, but the browser could not save it. Keep the original operation identifier and read its receipt; do not submit a replacement.",
     invalid: "Invalid input or response. Check the identifiers and signed file.",
@@ -343,9 +344,9 @@ const words = {
       "Не удалось открыть сессию. Проверьте клиентский сертификат и перезагрузите страницу.",
     newReady: "Новый черновик операции. Проверьте идентификаторы перед отправкой.",
     recordLimit:
-      "Во вкладке сохранено 16 операций. Уберите завершённую локальную запись перед отправкой новой.",
+      "В браузере сохранено 16 операций. Уберите завершённую локальную запись перед отправкой новой.",
     storageError:
-      "Браузер не может надёжно сохранить операцию. Разрешите session storage или освободите место; запрос не отправлен.",
+      "Браузер не может надёжно сохранить операцию. Разрешите local storage и Web Locks или освободите место. Сохраните исходный идентификатор, если другая вкладка уже отправила запрос.",
     storageAfterReply:
       "Сервис вернул квитанцию, но браузер не смог её сохранить. Сохраните исходный идентификатор и прочитайте квитанцию; не отправляйте новую операцию взамен.",
     invalid: "Некорректный ввод или ответ. Проверьте идентификаторы и подписанный файл.",
@@ -482,8 +483,71 @@ const domainPath = (s) => {
   if (!ID.test(s.domain)) throw new Error("INVALID");
   return `${nodePath(s)}/domains/${s.domain}`;
 };
-const journalKey = () => `outpost-operations-1-${state.session.actor}`;
-const terminal = (record) => ["COMPLETE", "FAILED"].includes(record.receipt?.state);
+let journal;
+function sessionValid(value) {
+  return (
+    value?.format === "outpost-management-session-1" &&
+    ID.test(value.actor) &&
+    Array.isArray(value.roles) &&
+    Array.isArray(value.scopes) &&
+    value.scopes.every((s) => ID.test(s.tenant) && ID.test(s.domain))
+  );
+}
+function recordAllowed(record) {
+  const session = state.session;
+  if (!session || !session.roles.some((r) => ["owner", "operator", "recovery"].includes(r)))
+    return false;
+  const domains = record.type === "command" ? [record.domain] : record.accessDomains;
+  return (
+    Array.isArray(domains) &&
+    domains.length > 0 &&
+    domains.every((d) => session.scopes.some((s) => s.tenant === record.tenant && s.domain === d))
+  );
+}
+async function currentAuthority(record) {
+  const session = await api("/api/v1/session");
+  const previous = state.session;
+  if (!sessionValid(session) || session.actor !== previous.actor) {
+    state.session = null;
+    state.journal = [];
+    resetView();
+    throw new Error("DENIED");
+  }
+  state.session = session;
+  if (
+    JSON.stringify(previous.roles) !== JSON.stringify(session.roles) ||
+    JSON.stringify(previous.scopes) !== JSON.stringify(session.scopes)
+  ) {
+    // Previously rendered grants and reports do not establish current access.
+    resetView();
+  }
+  renderOperations();
+  if (!recordAllowed(record)) throw new Error("DENIED");
+  if (record.type === "config" && !session.roles.includes("owner")) throw new Error("DENIED");
+  if (record.type === "command") {
+    const roles = ["restore"].includes(record.body.kind)
+      ? ["owner", "recovery"]
+      : record.body.kind === "maintenance"
+        ? ["owner"]
+        : ["owner", "operator"];
+    if (!session.roles.some((role) => roles.includes(role))) throw new Error("DENIED");
+  }
+}
+function journalSnapshot() {
+  if (state.storageInvalid || !journal) throw new Error("STORAGE");
+  return journal.snapshot();
+}
+window.addEventListener("storage", (event) => {
+  if (!journal || (event.key !== null && event.key !== journal.key)) return;
+  try {
+    journalSnapshot();
+  } catch (e) {
+    state.journal = [];
+    state.storageInvalid = true;
+    renderOperations();
+    showError(e);
+  }
+});
 function notice(key, level = "info") {
   state.noticeKey = key;
   state.noticeLevel = level;
@@ -690,34 +754,15 @@ async function loadSession() {
   notice("loading");
   try {
     const value = await api("/api/v1/session");
-    if (
-      value.format !== "outpost-management-session-1" ||
-      !ID.test(value.actor) ||
-      !Array.isArray(value.roles) ||
-      !Array.isArray(value.scopes)
-    )
-      throw new Error("INVALID");
+    if (!sessionValid(value)) throw new Error("INVALID");
     state.session = value;
     try {
-      const raw = sessionStorage.getItem(journalKey());
-      if (raw) {
-        if (raw.length > 3 * 1024 * 1024) throw new Error("STORAGE");
-        const records = JSON.parse(raw);
-        if (
-          !Array.isArray(records) ||
-          records.length > 16 ||
-          records.some(
-            (v) =>
-              !ID.test(v.operation) ||
-              !ID.test(v.tenant) ||
-              !ID.test(v.node) ||
-              !ID.test(v.fingerprint) ||
-              !["command", "config"].includes(v.type),
-          )
-        )
-          throw new Error("STORAGE");
+      journal = new OperationJournal(value.actor, (records) => {
         state.journal = records;
-      }
+        renderOperations();
+      });
+      state.storageInvalid = false;
+      await journal.open();
     } catch {
       state.journal = [];
       state.storageInvalid = true;
@@ -1117,29 +1162,6 @@ async function fileBytes(input, max) {
   if (!file || file.size === 0 || file.size > max) throw new Error("INVALID");
   return new Uint8Array(await file.arrayBuffer());
 }
-function persist(records) {
-  if (state.storageInvalid) throw new Error("STORAGE");
-  try {
-    const raw = JSON.stringify(records);
-    if (raw.length > 3 * 1024 * 1024) throw new Error("STORAGE");
-    sessionStorage.setItem(journalKey(), raw);
-    if (sessionStorage.getItem(journalKey()) !== raw) throw new Error("STORAGE");
-  } catch {
-    throw new Error("STORAGE");
-  }
-  state.journal = records;
-}
-function remember(record) {
-  const old = state.journal.find((r) => r.operation === record.operation);
-  if (old && terminal(old) && !terminal(record)) record = { ...record, receipt: old.receipt };
-  if (!old && state.journal.length >= 16) throw new Error("LIMIT");
-  persist(
-    old
-      ? state.journal.map((r) => (r.operation === record.operation ? record : r))
-      : [...state.journal, record],
-  );
-  renderOperations();
-}
 async function reviewCommand() {
   const edit = state.edit;
   const s = scope(),
@@ -1184,14 +1206,19 @@ async function reviewCommand() {
     body.maintenancePermit = base64(bytes);
   }
   const fingerprint = await hash(JSON.stringify({ node: s.node, ...body }));
-  const existing = state.journal.find(
-    (r) => r.type === "command" && r.fingerprint === fingerprint && !r.freshDraft,
+  const snapshot = journalSnapshot();
+  const latest = snapshot.records.findLast(
+    (r) => r.type === "command" && r.fingerprint === fingerprint,
   );
+  const existing =
+    latest && !(terminal(latest) && state.newAfter === latest.operation) ? latest : null;
   const record = existing || {
     ...s,
     type: "command",
     operation: newID(),
     fingerprint,
+    journalRevision: snapshot.revision,
+    basedOn: latest?.operation,
     body: {
       ...body,
       operationId: "",
@@ -1225,27 +1252,43 @@ async function submit(record, configBody) {
   $("send-command").disabled = true;
   $("apply-config").disabled = true;
   try {
-    const body = record.type === "command" ? record.body : configBody;
-    if (!body || body.operationId !== record.operation) throw new Error("FILE");
-    remember(record); // Persistence must precede every possible remote effect.
-    let result;
-    try {
-      result = await api(
-        `${nodePath(record)}/${record.type === "command" ? "commands" : "configuration"}`,
-        { method: record.type === "command" ? "POST" : "PUT", body },
-      );
-    } catch (e) {
-      if (e.message === "OFFLINE" || e.message === "UNAVAILABLE") notice("uncertain", "error");
-      else showError(e);
-      return;
-    }
-    if (result.operationId !== record.operation) throw new Error("INVALID");
-    try {
-      remember({ ...record, receipt: result });
-    } catch {
-      throw new Error("STORAGE_AFTER");
-    }
-    notice("admitted");
+    await journal.dispatch(async () => {
+      if (state.storageInvalid) throw new Error("STORAGE");
+      await currentAuthority(record);
+      if (record.type === "config" && (!configBody || configBody.previewDigest !== record.digest))
+        throw new Error("FILE");
+      record = await journal.admit(record); // Shared durable request precedes every remote effect.
+      await currentAuthority(record);
+      const body =
+        record.type === "command"
+          ? record.body
+          : { ...configBody, operationId: record.operation, expectedRevision: record.expected };
+      if (!body || body.operationId !== record.operation) throw new Error("FILE");
+      if (
+        record.type === "command" &&
+        scopeKey() ===
+          JSON.stringify({ tenant: record.tenant, node: record.node, domain: record.domain })
+      )
+        state.command = record;
+      let result;
+      try {
+        result = await api(
+          `${nodePath(record)}/${record.type === "command" ? "commands" : "configuration"}`,
+          { method: record.type === "command" ? "POST" : "PUT", body },
+        );
+      } catch (e) {
+        if (e.message === "OFFLINE" || e.message === "UNAVAILABLE") notice("uncertain", "error");
+        else showError(e);
+        return;
+      }
+      if (result.operationId !== record.operation) throw new Error("INVALID");
+      try {
+        await journal.receipt(record.operation, result);
+      } catch {
+        throw new Error("STORAGE_AFTER");
+      }
+      notice("admitted");
+    });
   } finally {
     state.busy = false;
     $("send-command").disabled = false;
@@ -1261,8 +1304,27 @@ async function previewConfig() {
     digest = await hash(file);
   const expected = state.policy?.configurationRevision || 0;
   const fingerprint = await hash(JSON.stringify({ tenant: s.tenant, node: s.node, digest }));
-  const old = state.journal.find((r) => r.type === "config" && r.fingerprint === fingerprint);
-  const record = old || { ...s, type: "config", fingerprint, operation: newID(), digest, expected };
+  const snapshot = journalSnapshot();
+  const old = snapshot.records.findLast(
+    (r) => r.type === "config" && r.fingerprint === fingerprint,
+  );
+  const record = old || {
+    ...s,
+    type: "config",
+    fingerprint,
+    operation: newID(),
+    digest,
+    expected,
+    journalRevision: snapshot.revision,
+  };
+  // Retain all original owner domains conservatively, including unchanged ones.
+  // Old tab-format records get authority only after the server checks their receipt.
+  const legacyScope = old && !old.accessDomains;
+  if (!record.accessDomains)
+    record.accessDomains = state.session.scopes
+      .filter((v) => v.tenant === s.tenant)
+      .map((v) => v.domain);
+  await currentAuthority(record);
   const body = {
     operationId: record.operation,
     reason: "POLICY_CHANGE",
@@ -1271,8 +1333,20 @@ async function previewConfig() {
   };
   // An uncertain previously submitted operation must replay its original
   // preview, even if the effect already advanced the configuration pointer.
-  const preview =
-    old?.preview || (await api(`${nodePath(s)}/configuration/preview`, { method: "POST", body }));
+  let preview = old?.preview;
+  if (preview) {
+    try {
+      await api(`/api/v1/tenants/${s.tenant}/operations/${record.operation}`);
+    } catch (e) {
+      if (e.message !== "UNAVAILABLE") throw e;
+      // A retained request may never have reached the service. In that case
+      // the original revision must still pass a fresh authorized preview.
+      preview = null;
+    }
+  }
+  if (!preview)
+    preview = await api(`${nodePath(s)}/configuration/preview`, { method: "POST", body });
+  if (legacyScope) await journal.authorize(record.operation, record.accessDomains);
   if (key !== scopeKey() || edit !== state.configEdit) return;
   if (
     preview.candidateDigest !== digest ||
@@ -1310,21 +1384,20 @@ async function readReceipt(record) {
   if (!ID.test(record.tenant) || !ID.test(record.operation)) throw new Error("INVALID");
   const result = await api(`/api/v1/tenants/${record.tenant}/operations/${record.operation}`);
   if (result.operationId !== record.operation) throw new Error("INVALID");
-  const stored = state.journal.find((r) => r.operation === record.operation);
-  if (stored) {
+  let confirmed = result;
+  if (state.journal.some((r) => r.operation === record.operation)) {
     try {
-      remember({ ...stored, receipt: result });
+      confirmed = await journal.receipt(record.operation, result);
     } catch {
       throw new Error("STORAGE_AFTER");
     }
   }
   if (epoch !== state.epoch) return;
-  const confirmed = state.journal.find((r) => r.operation === record.operation)?.receipt || result;
   $("receipt-result").textContent = JSON.stringify(confirmed, null, 2);
   notice("admitted");
 }
 function renderOperations() {
-  const records = state.journal.filter((r) => r.tenant === $("tenant").value);
+  const records = state.journal.filter((r) => r.tenant === $("tenant").value && recordAllowed(r));
   table(
     $("operations"),
     ["operationId", "node", "kind", "status", "details"],
@@ -1342,13 +1415,7 @@ function renderOperations() {
               r.type === "command" ? submit(r) : Promise.reject(new Error("FILE")),
             ),
           );
-        else
-          box.append(
-            button("forget", () => {
-              persist(state.journal.filter((v) => v.operation !== r.operation));
-              renderOperations();
-            }),
-          );
+        else box.append(button("forget", () => journal.remove(r.operation)));
         return box;
       },
     ]),
@@ -1439,7 +1506,7 @@ on("new-command", "click", () => {
     notice("uncertain", "error");
     return;
   }
-  if (old) remember({ ...old, freshDraft: true });
+  if (old) state.newAfter = old.operation;
   invalidateCommand();
   $("command-form").reset();
   commandFields();

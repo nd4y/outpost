@@ -27,6 +27,8 @@ const exited = new Promise((resolve) => {
 });
 const cases = [];
 let browser;
+let browserVersion;
+let persistentBrowser;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function ready() {
   for (let i = 0; i < 150; i++) {
@@ -64,6 +66,7 @@ async function test(name, fn) {
 try {
   const meta = await ready();
   browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
+  browserVersion = browser.version();
   const context = async (role, extra = {}) =>
     browser.newContext({
       ignoreHTTPSErrors: true,
@@ -280,10 +283,8 @@ try {
     await page.reload();
     await selectScope(page, meta);
     const retained = await page.evaluate((id) => {
-      const key = Object.keys(sessionStorage).find((key) =>
-        key.startsWith("outpost-operations-1-"),
-      );
-      return JSON.parse(sessionStorage.getItem(key)).find((r) => r.operation === id);
+      const key = Object.keys(localStorage).find((key) => key.startsWith("outpost-operations-2-"));
+      return JSON.parse(localStorage.getItem(key)).records.find((r) => r.operation === id);
     }, commandBody.operationId);
     assert.equal(retained.type, "command");
     assert.equal(retained.node, meta.node);
@@ -352,7 +353,7 @@ try {
     assert.equal(await view.locator("#node").isDisabled(), true);
     await empty.close();
   });
-  await test("session-storage failure blocks a new mutation before transmission", async () => {
+  await test("persistent-storage failure blocks a new mutation before transmission", async () => {
     const blocked = await context("owner");
     await blocked.addInitScript(() => {
       Storage.prototype.setItem = function () {
@@ -382,7 +383,7 @@ try {
       const original = Storage.prototype.setItem;
       let writes = 0;
       Storage.prototype.setItem = function (key, value) {
-        if (key.startsWith("outpost-operations-1-") && ++writes === 2)
+        if (key.startsWith("outpost-operations-2-") && ++writes === 2)
           throw new DOMException("quota", "QuotaExceededError");
         return original.call(this, key, value);
       };
@@ -410,16 +411,305 @@ try {
     await contains(view, "#receipt-result", "ADMITTED");
     await limited.close();
   });
+  await test("simultaneous tabs reuse one request and retain independent operations", async () => {
+    const shared = await context("owner");
+    const a = await shared.newPage(),
+      b = await shared.newPage();
+    const prepare = async (view, kind) => {
+      await view.goto(meta.url);
+      await selectScope(view, meta);
+      await view.locator("#kind").selectOption(kind);
+      await view.locator("#command-form button[type=submit]").click();
+      await view.locator("#send-command").waitFor({ state: "visible" });
+    };
+    // The API has one large-response lane; prepare independently, submit concurrently.
+    await prepare(a, "pause");
+    await prepare(b, "pause");
+    const sent = [];
+    shared.on("request", (request) => {
+      if (request.method() === "POST" && request.url().endsWith("/commands"))
+        sent.push(request.postData());
+    });
+    await Promise.all([a.locator("#send-command").click(), b.locator("#send-command").click()]);
+    try {
+      await contains(a, "#notice", "Receipt received");
+      await contains(b, "#notice", "Receipt received");
+    } catch (e) {
+      throw new Error(
+        `${e.message}; first=${await a.locator("#notice").innerText()}; second=${await b.locator("#notice").innerText()}; writes=${sent.length}`,
+      );
+    }
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0], sent[1]);
+    const first = JSON.parse(sent[0]).operationId;
+    assert.equal(await a.locator("#operations tbody tr").count(), 1);
+    assert.equal(await b.locator("#operations tbody tr").count(), 1);
+    // A new, different request cannot overwrite the first tab's receipt.
+    await b.locator("#kind").selectOption("resume");
+    await b.locator("#command-form button[type=submit]").click();
+    await b.locator("#send-command").click();
+    await contains(b, "#notice", "Receipt received");
+    await a.waitForFunction(() => document.querySelectorAll("#operations tbody tr").length === 2);
+    await a.close();
+    await b.close();
+    const reopened = await shared.newPage();
+    await reopened.goto(meta.url);
+    await selectScope(reopened, meta);
+    assert.equal(await reopened.locator("#operations tbody tr").count(), 2);
+    await reopened
+      .locator("#operations tbody tr")
+      .filter({ hasText: first })
+      .getByRole("button", { name: "Refresh receipt", exact: true })
+      .click();
+    await contains(reopened, "#receipt-result", first);
+    await shared.close();
+  });
+  await test("legacy tab journal migrates without losing request bytes or pending receipts", async () => {
+    const legacy = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((key) => key.startsWith("outpost-operations-2-"));
+      return {
+        key: key.replace("operations-2-", "operations-1-"),
+        records: JSON.parse(localStorage.getItem(key)).records,
+      };
+    });
+    const migrated = await context("owner");
+    await migrated.addInitScript(({ key, records }) => {
+      if (!sessionStorage.getItem("migration-fixture")) {
+        sessionStorage.setItem(key, JSON.stringify(records));
+        sessionStorage.setItem("migration-fixture", "1");
+      }
+    }, legacy);
+    const view = await migrated.newPage();
+    let writes = 0;
+    view.on("request", (request) => {
+      if (["POST", "PUT"].includes(request.method())) writes++;
+    });
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    const result = await view.evaluate(
+      (key) => ({
+        legacy: sessionStorage.getItem(key),
+        current: JSON.parse(localStorage.getItem(key.replace("operations-1-", "operations-2-"))),
+      }),
+      legacy.key,
+    );
+    assert.equal(result.legacy, null);
+    assert.deepEqual(
+      result.current.records.map((r) => r.body),
+      legacy.records.map((r) => r.body),
+    );
+    assert.equal(writes, 0);
+    await migrated.close();
+  });
+  await test("changed role and domain scope hide saved records and reject stale review", async () => {
+    const restricted = await context("owner");
+    const view = await restricted.newPage();
+    // A changed authorization response models the next authenticated session.
+    // The actual API continues enforcing its own independent mTLS policy.
+    const stored = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((key) => key.startsWith("outpost-operations-2-"));
+      return { key, raw: localStorage.getItem(key) };
+    });
+    await restricted.addInitScript(({ key, raw }) => localStorage.setItem(key, raw), stored);
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    await view.locator("#kind").selectOption("pause");
+    await view.locator("#command-form button[type=submit]").click();
+    await view.locator("#send-command").waitFor({ state: "visible" });
+    let writes = 0;
+    view.on("request", (request) => {
+      if (request.method() === "POST" && request.url().endsWith("/commands")) writes++;
+    });
+    await view.route("**/api/v1/session", async (route) => {
+      const response = await route.fetch();
+      const value = await response.json();
+      value.roles = ["viewer"];
+      value.scopes = value.scopes.filter((scope) => scope.domain !== meta.domain);
+      await route.fulfill({ response, json: value });
+    });
+    await view.locator("#send-command").click();
+    await contains(view, "#notice", "Access denied");
+    assert.equal(await view.locator("#operations tbody tr").count(), 0);
+    assert.equal(await view.locator("#generations tbody tr").count(), 0);
+    assert.equal(await view.locator("#command-form button[type=submit]").isDisabled(), true);
+    assert.equal(writes, 0);
+    await restricted.close();
+  });
+  await test("missing browser locks and corrupt journal never fall back to unsafe admission", async () => {
+    for (const fault of ["locks", "corrupt"]) {
+      const blocked = await context("owner");
+      await blocked.addInitScript((fault) => {
+        if (fault === "locks") Object.defineProperty(navigator, "locks", { value: undefined });
+        else {
+          const read = Storage.prototype.getItem;
+          Storage.prototype.getItem = function (key) {
+            return key.startsWith("outpost-operations-2-") ? "broken" : read.call(this, key);
+          };
+        }
+      }, fault);
+      const view = await blocked.newPage();
+      let writes = 0;
+      view.on("request", (request) => {
+        if (request.method() === "POST" && request.url().endsWith("/commands")) writes++;
+      });
+      await view.goto(meta.url);
+      await selectScope(view, meta);
+      await view.locator("#kind").selectOption("pause");
+      await view.locator("#command-form button[type=submit]").click();
+      if (fault === "locks") await view.locator("#send-command").click();
+      await contains(view, "#notice", "cannot safely retain");
+      assert.equal(writes, 0);
+      await blocked.close();
+    }
+  });
+  await test("journal capacity preserves pending work and requires fresh review after removal", async () => {
+    const seeded = await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((key) => key.startsWith("outpost-operations-2-"));
+      const value = JSON.parse(localStorage.getItem(key));
+      const pending = value.records.find((r) => r.receipt?.state === "ADMITTED");
+      while (value.records.length < 16) {
+        const record = structuredClone(pending);
+        record.operation = (value.records.length + 100).toString(16).padStart(64, "0");
+        record.body.operationId = record.operation;
+        record.receipt.operationId = record.operation;
+        record.fingerprint = record.operation;
+        value.records.push(record);
+      }
+      return { key, raw: JSON.stringify(value), pending: pending.operation };
+    });
+    const full = await context("owner");
+    await full.addInitScript(({ key, raw }) => localStorage.setItem(key, raw), seeded);
+    const view = await full.newPage();
+    let writes = 0;
+    view.on("request", (request) => {
+      if (request.method() === "POST" && request.url().endsWith("/commands")) writes++;
+    });
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    await view.locator("#kind").selectOption("pause");
+    await view.locator("#command-form button[type=submit]").click();
+    await view.locator("#send-command").click();
+    await contains(view, "#notice", "holds 16 operations");
+    assert.equal(writes, 0);
+    const pending = view.locator("#operations tbody tr").filter({ hasText: seeded.pending });
+    assert.equal(
+      await pending
+        .getByRole("button", { name: "Remove completed local record", exact: true })
+        .count(),
+      0,
+    );
+    await view
+      .locator("#operations")
+      .getByRole("button", { name: "Remove completed local record", exact: true })
+      .click();
+    await view.locator("#send-command").click();
+    await contains(view, "#notice", "State changed");
+    assert.equal(writes, 0);
+    await view.locator("#command-form button[type=submit]").click();
+    await view.locator("#send-command").click();
+    await contains(view, "#notice", "Receipt received");
+    assert.equal(writes, 1);
+    assert.equal(await view.locator("#operations tbody tr").count(), 16);
+    await full.close();
+  });
+  await test("terminal removal cannot resurrect stale requests or downgrade confirmed receipts", async () => {
+    const result = await page.evaluate(async () => {
+      const { OperationJournal } = await import("/ui/journal.js");
+      const session = await (await fetch("/api/v1/session")).json();
+      const journal = new OperationJournal(session.actor, () => {});
+      const records = journal.snapshot().records;
+      const complete = records.find((r) => r.receipt?.state === "COMPLETE");
+      const pending = records.find((r) => r.receipt?.state === "ADMITTED");
+      const receipt = await journal.receipt(complete.operation, {
+        ...complete.receipt,
+        state: "ADMITTED",
+      });
+      let pendingRejected = false,
+        staleRejected = false;
+      try {
+        await journal.remove(pending.operation);
+      } catch (e) {
+        pendingRejected = e.message === "CONFLICT";
+      }
+      await journal.remove(complete.operation);
+      try {
+        await journal.admit(complete);
+      } catch (e) {
+        staleRejected = e.message === "CONFLICT";
+      }
+      return {
+        state: receipt.state,
+        pendingRejected,
+        staleRejected,
+        retained: journal.snapshot().records.some((r) => r.operation === pending.operation),
+      };
+    });
+    assert.deepEqual(result, {
+      state: "COMPLETE",
+      pendingRejected: true,
+      staleRejected: true,
+      retained: true,
+    });
+  });
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(remote, []);
   await owner.close();
+  await browser.close();
+  browser = null;
+  await test("actual browser restart preserves an uncertain operation and exact retry", async () => {
+    const profile = path.join(root, "persistent-browser");
+    const options = {
+      headless: true,
+      ignoreHTTPSErrors: true,
+      locale: "en-US",
+      clientCertificates: [{ origin: meta.url, ...meta.clients.owner }],
+      args: ["--disable-dev-shm-usage"],
+    };
+    let persistent = await chromium.launchPersistentContext(profile, options);
+    persistentBrowser = persistent;
+    let view = await persistent.newPage();
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    await view.locator("#kind").selectOption("pause");
+    await view.locator("#command-form button[type=submit]").click();
+    let original;
+    await view.route("**/commands", async (route) => {
+      original = route.request().postData();
+      await route.fetch();
+      await route.abort("failed");
+    });
+    await view.locator("#send-command").click();
+    await contains(view, "#notice", "Reply unavailable");
+    await persistent.close();
+    persistent = await chromium.launchPersistentContext(profile, options);
+    persistentBrowser = persistent;
+    try {
+      view = await persistent.newPage();
+      await view.goto(meta.url);
+      await selectScope(view, meta);
+      let replay;
+      view.on("request", (request) => {
+        if (request.method() === "POST" && request.url().endsWith("/commands"))
+          replay = request.postData();
+      });
+      await view
+        .locator("#operations")
+        .getByRole("button", { name: "Retry same request", exact: true })
+        .click();
+      await contains(view, "#notice", "Receipt received");
+      assert.equal(replay, original);
+      await contains(view, "#operations", JSON.parse(original).operationId);
+    } finally {
+      await persistent.close();
+    }
+  });
   await fs.writeFile(
     path.join(root, "result.json"),
     JSON.stringify(
       {
         state: "PASS",
         cases,
-        browser: browser.version(),
+        browser: browserVersion,
         limits:
           "Synthetic loopback API; admission and UI checks do not establish worker execution, full accessibility or installed-service acceptance.",
       },
@@ -435,6 +725,7 @@ try {
   );
   throw error;
 } finally {
+  await persistentBrowser?.close();
   await browser?.close();
   child.kill("SIGTERM");
   const result = await Promise.race([exited, delay(5000).then(() => null)]);

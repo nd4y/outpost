@@ -1139,6 +1139,30 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "receipt storage failure after admission preserves original request and truthful status"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "simultaneous tabs reuse one request and retain independent operations"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy tab journal migrates without losing request bytes or pending receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "missing browser locks and corrupt journal never fall back to unsafe admission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "journal capacity preserves pending work and requires fresh review after removal"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "terminal removal cannot resurrect stale requests or downgrade confirmed receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "actual browser restart preserves an uncertain operation and exact retry"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2576,15 +2600,39 @@
         },
         {
           "path": "scripts/browser/check.mjs",
-          "name": "session-storage failure blocks a new mutation before transmission"
+          "name": "persistent-storage failure blocks a new mutation before transmission"
         },
         {
           "path": "scripts/browser/check.mjs",
           "name": "receipt storage failure after admission preserves original request and truthful status"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "simultaneous tabs reuse one request and retain independent operations"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy tab journal migrates without losing request bytes or pending receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "missing browser locks and corrupt journal never fall back to unsafe admission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "journal capacity preserves pending work and requires fresh review after removal"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "terminal removal cannot resurrect stale requests or downgrade confirmed receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "actual browser restart preserves an uncertain operation and exact retry"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-38",
@@ -2780,15 +2828,43 @@
         },
         {
           "path": "scripts/browser/check.mjs",
-          "name": "session-storage failure blocks a new mutation before transmission"
+          "name": "persistent-storage failure blocks a new mutation before transmission"
         },
         {
           "path": "scripts/browser/check.mjs",
           "name": "receipt storage failure after admission preserves original request and truthful status"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "simultaneous tabs reuse one request and retain independent operations"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy tab journal migrates without losing request bytes or pending receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "changed role and domain scope hide saved records and reject stale review"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "missing browser locks and corrupt journal never fall back to unsafe admission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "journal capacity preserves pending work and requires fresh review after removal"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "terminal removal cannot resurrect stale requests or downgrade confirmed receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "actual browser restart preserves an uncertain operation and exact retry"
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-39",
@@ -2980,7 +3056,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -3282,7 +3358,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-42",
@@ -3297,7 +3373,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-43",
@@ -3429,7 +3505,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-44",
@@ -3605,7 +3681,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-45",
@@ -3817,15 +3893,39 @@
         },
         {
           "path": "scripts/browser/check.mjs",
-          "name": "session-storage failure blocks a new mutation before transmission"
+          "name": "persistent-storage failure blocks a new mutation before transmission"
         },
         {
           "path": "scripts/browser/check.mjs",
           "name": "receipt storage failure after admission preserves original request and truthful status"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "simultaneous tabs reuse one request and retain independent operations"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy tab journal migrates without losing request bytes or pending receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "missing browser locks and corrupt journal never fall back to unsafe admission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "journal capacity preserves pending work and requires fresh review after removal"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "terminal removal cannot resurrect stale requests or downgrade confirmed receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "actual browser restart preserves an uncertain operation and exact retry"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-46",
@@ -4300,6 +4400,10 @@
         {
           "path": "internal/managementservice/shutdown_linux_test.go",
           "name": "TestManagementServiceStopClosesSilentTLSWithoutReportingGraceDeadline"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "changed role and domain scope hide saved records and reject stale review"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -4423,15 +4527,39 @@
         },
         {
           "path": "scripts/browser/check.mjs",
-          "name": "session-storage failure blocks a new mutation before transmission"
+          "name": "persistent-storage failure blocks a new mutation before transmission"
         },
         {
           "path": "scripts/browser/check.mjs",
           "name": "receipt storage failure after admission preserves original request and truthful status"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "simultaneous tabs reuse one request and retain independent operations"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "legacy tab journal migrates without losing request bytes or pending receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "missing browser locks and corrupt journal never fall back to unsafe admission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "journal capacity preserves pending work and requires fresh review after removal"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "terminal removal cannot resurrect stale requests or downgrade confirmed receipts"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "actual browser restart preserves an uncertain operation and exact retry"
         }
       ],
       "acceptance": ["AT-31"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-50",
@@ -4455,7 +4583,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-51",
@@ -4470,7 +4598,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-34"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-52",
@@ -4485,7 +4613,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],
-      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, unconfirmed-request resolution, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-53",
