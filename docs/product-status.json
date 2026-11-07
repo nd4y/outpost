@@ -1211,6 +1211,46 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "owner abandonment at full journal survives lost reply with exact resolution replay"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotIndependentHistoryPreservesAbandonment"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotKeepsPublishedCommandsAndDurableCacheBeforeReceipt"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotPendingFirstCacheAbsenceAndCorruptDependency"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsTruncatedTamperedUntrustedAndOversized"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsSignedPathInjectionAndMissingClosure"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotBoundsInterruptionAndSymlink"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotCurrentReportSlotAndDependencyChanges"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotAtomicNewFileLeaseAndOfflineRead"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotFailedPrefixNeverPublished"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -3005,6 +3045,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "owner abandonment at full journal survives lost reply with exact resolution replay"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileOwnsNestedMemoryAfterOpen"
         }
       ],
       "acceptance": ["AT-27"],
@@ -3197,6 +3241,18 @@
         {
           "path": "cmd/outpost/management_service_linux_test.go",
           "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotAtomicNewFileLeaseAndOfflineRead"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotFailedPrefixNeverPublished"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -3499,6 +3555,46 @@
         {
           "path": "cmd/outpost/management_service_linux_test.go",
           "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotIndependentHistoryPreservesAbandonment"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotKeepsPublishedCommandsAndDurableCacheBeforeReceipt"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotPendingFirstCacheAbsenceAndCorruptDependency"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsTruncatedTamperedUntrustedAndOversized"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsSignedPathInjectionAndMissingClosure"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotBoundsInterruptionAndSymlink"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotCurrentReportSlotAndDependencyChanges"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotAtomicNewFileLeaseAndOfflineRead"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotFailedPrefixNeverPublished"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -3646,6 +3742,46 @@
         {
           "path": "internal/managementservice/crash_linux_test.go",
           "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotIndependentHistoryPreservesAbandonment"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotKeepsPublishedCommandsAndDurableCacheBeforeReceipt"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotPendingFirstCacheAbsenceAndCorruptDependency"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsTruncatedTamperedUntrustedAndOversized"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsSignedPathInjectionAndMissingClosure"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotBoundsInterruptionAndSymlink"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotCurrentReportSlotAndDependencyChanges"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotAtomicNewFileLeaseAndOfflineRead"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotFailedPrefixNeverPublished"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -4636,6 +4772,50 @@
         {
           "path": "internal/management/resolution_linux_test.go",
           "name": "TestManagementResolutionRejectsInvalidSequenceAndFormatDowngrade"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotIndependentHistoryPreservesAbandonment"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotKeepsPublishedCommandsAndDurableCacheBeforeReceipt"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotPendingFirstCacheAbsenceAndCorruptDependency"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsTruncatedTamperedUntrustedAndOversized"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsSignedPathInjectionAndMissingClosure"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotBoundsInterruptionAndSymlink"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotCurrentReportSlotAndDependencyChanges"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotAtomicNewFileLeaseAndOfflineRead"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotFailedPrefixNeverPublished"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileOwnsNestedMemoryAfterOpen"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -4820,6 +5000,50 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubNewCyclesReadFreshAndRestartKeepsOriginalAge"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotIndependentHistoryPreservesAbandonment"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotKeepsPublishedCommandsAndDurableCacheBeforeReceipt"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotPendingFirstCacheAbsenceAndCorruptDependency"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsTruncatedTamperedUntrustedAndOversized"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotRejectsSignedPathInjectionAndMissingClosure"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotBoundsInterruptionAndSymlink"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotCurrentReportSlotAndDependencyChanges"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotAtomicNewFileLeaseAndOfflineRead"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotFailedPrefixNeverPublished"
+        },
+        {
+          "path": "internal/managementservice/snapshot_linux_test.go",
+          "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileOwnsNestedMemoryAfterOpen"
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],

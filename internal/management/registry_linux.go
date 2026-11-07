@@ -176,12 +176,18 @@ func (r *Registry) point(p string) error {
 	return nil
 }
 func (r *Registry) load() (registryState, error) {
-	var s registryState
 	raw, e := r.store.Read("registry.json")
 	if e != nil {
-		return s, e
+		return registryState{}, e
 	}
-	if canonical(raw, &s, maxRegistry) != nil || (s.Format != registryFormat && s.Format != resolutionFormat) || !bytes.Equal(s.Owner, r.owner) || !bytes.Equal(s.Signer, r.signer.Public().(ed25519.PublicKey)) || !safe(s.Revision) || !validTime(s.ObservedUnix) || s.ObservedUnix > time.Now().Unix() || s.Enrollments == nil || len(s.Enrollments) > 128 || s.Domains == nil || len(s.Domains) > 128 || s.Operations == nil || len(s.Operations) > maxOperations || s.Reports == nil || len(s.Reports) > 16384 {
+	return validateRegistry(raw, r.owner, r.signer.Public().(ed25519.PublicKey))
+}
+
+// validateRegistry is shared by the live store and the keyless snapshot reader.
+func validateRegistry(raw []byte, owner, signer ed25519.PublicKey) (registryState, error) {
+	var s registryState
+	r := &Registry{owner: owner}
+	if canonical(raw, &s, maxRegistry) != nil || (s.Format != registryFormat && s.Format != resolutionFormat) || !bytes.Equal(s.Owner, r.owner) || !bytes.Equal(s.Signer, signer) || !safe(s.Revision) || !validTime(s.ObservedUnix) || s.ObservedUnix > time.Now().Unix() || s.Enrollments == nil || len(s.Enrollments) > 128 || s.Domains == nil || len(s.Domains) > 128 || s.Operations == nil || len(s.Operations) > maxOperations || s.Reports == nil || len(s.Reports) > 16384 {
 		return s, ErrInvalid
 	}
 	sig := s.Signature

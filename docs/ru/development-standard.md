@@ -26,7 +26,7 @@ node scripts/check-format.mjs
 node scripts/check-standard-adoption.mjs
 ```
 
-Инструменты: локально Node.js 22+, в CI Node.js 24.18.0, Prettier 3.9.10 и проверенный по сумме Gitleaks 8.30.1. Нужны Git, npm, tar и POSIX shell для hook. Прототип M0 использует Go 1.27.3: штатные gofmt, go test и go vet запускаются в prototype workflow. Синтетическая интеграционная фикстура работает без сети и приватных credentials; см. [команды G1 и ограничения](g1-prototype.md). Производственный worker ещё не реализован.
+Инструменты: локально Node.js 22+, в CI Node.js 24.18.0, Prettier 3.9.10 и проверенный по сумме Gitleaks 8.30.1. Нужны Git, npm, tar и POSIX shell для hook. Прототип M0 использует Go 1.27.3: штатные gofmt, go test и go vet запускаются в prototype workflow. Синтетическая интеграционная фикстура работает без сети и приватных credentials; см. [команды G1 и ограничения](g1-prototype.md). Исходники воркера и сервиса управления имеют изолированные проверки; установочный пакет и полная приемка продукта остаются открытыми.
 
 Форматирование: `node scripts/check-format.mjs --write`, затем просмотр diff и staging только нужных файлов. Pre-commit запускает `node .standards/check.mjs staged` по содержимому индекса, сохраняет частичный staging и вызывает прежний hook первым. Не правьте vendored toolkit ради форматирования проекта.
 

@@ -79,6 +79,26 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	invoke("management-init")
 	invoke("management-status")
 	invoke("management-reconcile")
+	exportDirectory := filepath.Join(base, "exports")
+	must(os.Mkdir(exportDirectory, 0700))
+	checkpointFile := filepath.Join(exportDirectory, "checkpoint.ops")
+	exported, e := run(ctx, []string{"management-snapshot", "--input", file, "--output", checkpointFile, "--max-bytes", "8388608"})
+	must(e)
+	receipt := exported.(management.SnapshotReceipt)
+	trust := management.SnapshotTrust{Format: management.SnapshotTrustFormat, Owner: owner, Signer: pub, Checkpoint: receipt.Checkpoint}
+	trustRaw, e := json.Marshal(trust)
+	must(e)
+	trustPath := filepath.Join(base, "snapshot-trust.json")
+	must(os.WriteFile(trustPath, trustRaw, 0600))
+	inspected, e := run(ctx, []string{"management-snapshot-inspect", "--input", checkpointFile, "--trust", trustPath})
+	must(e)
+	historical := inspected.(management.SnapshotInspection)
+	if historical.SnapshotReceipt != receipt || historical.ReplayAllowed || historical.CurrentState != "UNKNOWN" {
+		t.Fatal(historical)
+	}
+	if _, e = run(ctx, []string{"management-snapshot", "--input", file, "--output", checkpointFile}); e == nil {
+		t.Fatal("CLI replaced snapshot")
+	}
 	if _, e = run(ctx, []string{"management-init", "--input", file}); e == nil {
 		t.Fatal("runtime reinitialized")
 	}

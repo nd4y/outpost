@@ -2,7 +2,7 @@
 
 [Русский](../ru/management-service.md)
 
-The Linux management process serves the [operator API](management-api.md) over mutual TLS and reconciles admitted registry operations after restart. It uses an explicitly enrolled local volume, shared persistent quota and a process lease. It does not need a data-decryption key. The browser interface and packaged installation are separate work in progress.
+The Linux management process serves the [operator API](management-api.md) over mutual TLS and reconciles admitted registry operations after restart. It uses an explicitly enrolled local volume, shared persistent quota and a process lease. It does not need a data-decryption key. The embedded browser interface has isolated journey checks; packaged installation and full product acceptance remain open.
 
 ## Local enrollment
 
@@ -34,7 +34,7 @@ Reconciliation reads signed registry intents in original sequence order, at most
 
 An exactly matching, already-durable configuration cache can finish its original registry receipt without reapplying the policy, even when the original actor has since been removed. This confirms a previous local effect. It does not grant new access or certify execution by a node. Command publication stays `ADMITTED` until a valid node acknowledgement arrives. Historical completed receipts keep their original timestamps. Reconciliation deletes neither intents nor audit evidence.
 
-Short isolated checks cover current/revoked roles, quota, candidate corruption, cancelled contexts, original receipts and actual process-kill recovery without replay from the original client. Full installation, journal export/retention and recovery, published-command uncertainty, UI accessibility and admitted-scale operation remain acceptance work.
+Short isolated checks cover current/revoked roles, quota, candidate corruption, cancelled contexts, original receipts and actual process-kill recovery without replay from the original client. Private journal export and historical inspection have isolated checks. Full installation, active recovery, retention, published-command uncertainty, manual UI accessibility and admitted-scale operation remain acceptance work.
 
 The same authenticated origin serves the [embedded interface](management-ui.md). Shutdown closes new application admission before joining handlers. After the three-second grace period, silent TLS sockets are closed; a successful forced close is an orderly stop. Independent state or close errors remain errors. Handler completion still depends on operating-system I/O; an uninterruptible device stall is not certified by these short tests.
 
@@ -49,3 +49,5 @@ Successful resolution retains the original request and audit, appends a separate
 The first resolution promotes registry1 to registry2 and retains an immutable exact registry1 checkpoint within the same admitted volume budget before publication. Older readers reject registry2. That checkpoint is evidence and recovery material, not permission to restore an earlier state and forget abandonment fences. There is no automatic downgrade after resolution. Crash, quota, replay, scope and publication-race tests must pass before this candidate is accepted. Unknown browser-only requests, archive retention and full journal-loss recovery remain separate work.
 
 The implemented resolution path has isolated race checks for authorization, original replay, later queue delivery, a concurrently published command and both configuration persistence boundaries. Real process-kill checks cover the legacy checkpoint and abandonment commit. Browser checks refuse published commands and retry an actual lost resolution response from a full local journal. These checks establish the bounded path, not journal-loss recovery or production admission. POST input is limited to 4 KiB.
+
+A stopped service can now export and independently inspect a [private management snapshot](management-snapshots.md). The reader recovers historical audit and receipts without replay; active journal-loss recovery and retention remain open.

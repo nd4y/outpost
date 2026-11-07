@@ -64,11 +64,15 @@ func (c *Cache) SetAdmission(ctx context.Context, admit statefile.Admission) err
 	return c.store.SetAdmission(ctx, admit)
 }
 func (c *Cache) load() (cacheState, error) {
-	var s cacheState
 	b, e := c.store.Read("cache.json")
 	if e != nil {
-		return s, e
+		return cacheState{}, e
 	}
+	return checkCacheBytes(b, c.node, c.owner)
+}
+func checkCacheBytes(b []byte, node string, owner ed25519.PublicKey) (cacheState, error) {
+	var s cacheState
+	c := &Cache{node: node, owner: owner}
 	if storage.Decode(b, &s, MaxConfig+2<<20) != nil || s.Format != Format || s.Node != c.node || !bytes.Equal(s.Owner, c.owner) || s.Authorities == nil || len(s.Authorities) > 128 || s.ObservedUnix < 0 {
 		return s, ErrDenied
 	}
@@ -90,6 +94,20 @@ func (c *Cache) load() (cacheState, error) {
 		}
 	}
 	return s, nil
+}
+
+// InspectCacheSnapshot validates the retained authority fences without opening
+// a store or requiring an active (unexpired) configuration.
+func InspectCacheSnapshot(raw []byte, node string, owner ed25519.PublicKey) (Config, string, error) {
+	s, e := checkCacheBytes(raw, node, owner)
+	if e != nil {
+		return Config{}, "", e
+	}
+	if len(s.Current) == 0 {
+		return Config{}, "", nil
+	}
+	c, e := Verify(s.Current, owner, node)
+	return c, storage.Hash(s.Current), e
 }
 func sameAuthority(a, b Domain) bool {
 	return a.Trust.Domain == b.Trust.Domain && a.Trust.Repository == b.Trust.Repository && a.Trust.Epoch == b.Trust.Epoch && bytes.Equal(a.Trust.Writer, b.Trust.Writer) && bytes.Equal(a.Trust.Maintenance, b.Trust.Maintenance) && bytes.Equal(a.Planner, b.Planner)

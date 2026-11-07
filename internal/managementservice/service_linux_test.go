@@ -301,3 +301,25 @@ func TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment(t *testing.T
 		t.Fatal("existing journal silently initialized")
 	}
 }
+
+func TestManagementServiceProfileOwnsNestedMemoryAfterOpen(t *testing.T) {
+	f := newFixture(t)
+	f.p.Relays = map[string][]string{}
+	ctx := context.Background()
+	s, e := Open(ctx, f.p, true)
+	must(t, e)
+	defer s.Close()
+	expected := s.p.digest()
+	f.p.Local.Owner[0] ^= 1
+	f.p.Principals[0].Roles[0] = "viewer"
+	f.p.Principals[0].Scopes[0].Domain = id("changed-by-caller")
+	f.p.Relays[id("new-relay")] = []string{id("changed-by-caller")}
+	if s.p.digest() != expected {
+		t.Fatal("caller mutated admitted profile")
+	}
+	status, e := s.Status(ctx)
+	must(t, e)
+	if status.ProfileDigest != expected {
+		t.Fatal(status)
+	}
+}

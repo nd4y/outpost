@@ -77,6 +77,8 @@ type Service struct {
 	registry     *management.Registry
 	tls          *tls.Config
 	signer       ed25519.PrivateKey
+	// SnapshotFault is a local process-interruption hook, never profile input.
+	SnapshotFault func(string) error
 }
 
 func Open(ctx context.Context, p Profile, initialize bool) (*Service, error) {
@@ -99,9 +101,13 @@ func Open(ctx context.Context, p Profile, initialize bool) (*Service, error) {
 	if len(raw) > maxProfile {
 		return nil, management.ErrInvalid
 	}
-	if e = json.Unmarshal(raw, &p); e != nil {
+	// Unmarshal into a zero value: decoding into p can reuse caller-owned
+	// slices/maps, racing an already running service opened from that profile.
+	var admitted Profile
+	if e = json.Unmarshal(raw, &admitted); e != nil {
 		return nil, e
 	}
+	p = admitted
 	cert, roots, e := p.Local.TLS()
 	if e != nil {
 		return nil, e
