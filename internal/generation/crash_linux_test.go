@@ -46,6 +46,8 @@ func TestReplicaCrashChild(t *testing.T) {
 		e = r.Complete(ctx, input.ID)
 	case "window":
 		_, e = r.VerifyWindow(ctx, input.ID, Hash([]byte("crash-window")), 2, MaxObject)
+	case "repair":
+		_, e = r.RepairWindow(ctx, input.ID, Hash([]byte("crash-repair-window")), 2, MaxObject, fetch(input.Objects))
 	case "maintain":
 		_, e = r.Maintain(ctx, input.Permit)
 	default:

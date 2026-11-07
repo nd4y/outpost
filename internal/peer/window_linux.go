@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
@@ -50,12 +51,24 @@ func (c *Client) completeRemote(ctx context.Context, b Binding, total int) (Rece
 	}
 	return Receipt{}, ErrProtocol
 }
-func (c *Client) completeLocal(ctx context.Context, b Binding, r *generation.Replica, total int) (Receipt, error) {
+func (c *Client) completeLocal(ctx context.Context, b Binding, r *generation.Replica, total int, received *atomic.Int64) (Receipt, error) {
 	for batch := 0; batch <= total; batch++ {
 		if e := c.authorized(false); e != nil {
 			return Receipt{}, e
 		}
-		result, e := r.VerifyWindow(ctx, b.Generation, verificationWindow(b), windowObjects, windowBytes)
+		var result generation.BatchResult
+		var e error
+		if c.repair != "" {
+			result, e = r.RepairWindowFor(ctx, b.Generation, verificationWindow(b), c.repair, windowObjects, windowBytes, func(ref generation.Object) ([]byte, error) {
+				data, err := c.getObject(ctx, b.Operation, b.Generation, "pull", ref)
+				if err == nil {
+					received.Add(int64(len(data)))
+				}
+				return data, err
+			})
+		} else {
+			result, e = r.VerifyWindow(ctx, b.Generation, verificationWindow(b), windowObjects, windowBytes)
+		}
 		if e != nil {
 			return Receipt{}, e
 		}

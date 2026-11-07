@@ -27,6 +27,7 @@ type Client struct {
 	trust       generation.Trust
 	limits      Limits
 	certificate *x509.Certificate
+	repair      string
 }
 type Result struct {
 	CachedObjects  int      `json:"cachedObjects,omitempty"`
@@ -53,13 +54,16 @@ func NewClient(endpoint, target string, cert tls.Certificate, roots *x509.CertPo
 	}
 	trust.Writer = append([]byte(nil), trust.Writer...)
 	trust.Maintenance = append([]byte(nil), trust.Maintenance...)
-	return &Client{client, u, target, clonePolicy(policy), journal, trust, limits, leaf}, nil
+	return &Client{http: client, endpoint: u, peer: target, policy: clonePolicy(policy), journal: journal, trust: trust, limits: limits, certificate: leaf}, nil
 }
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) binding(op, id, kind string) Binding {
-	return Binding{op, kind, c.policy.Domain, c.policy.Repository, c.policy.Epoch, id, c.peer, c.policy.Self, id}
+	return Binding{op, kind, c.policy.Domain, c.policy.Repository, c.policy.Epoch, id, c.peer, c.policy.Self, id, c.repair}
 }
 func (c *Client) authorized(push bool) error {
+	if c.repair != "" && (!validID(c.repair) || !c.policy.Peers[c.peer].Repair) {
+		return ErrDenied
+	}
 	if !certCurrent(c.certificate, time.Now()) {
 		return ErrDenied
 	}
@@ -103,6 +107,9 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			req.Header.Set("Outpost-Required-Revision", strconv.FormatUint(c.policy.RequiredRevision, 10))
 		}
 		req.Header.Set("Outpost-Mode", mode)
+		if c.repair != "" {
+			req.Header.Set("Outpost-Repair", c.repair)
+		}
 		window := mode == "push" && method == http.MethodPost && (resource == "missing" || resource == "complete")
 		if window {
 			req.Header.Set(windowHeader, "1")
@@ -149,6 +156,8 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 					return result, ErrDenied
 				case http.StatusConflict:
 					return result, ErrConflict
+				case http.StatusPreconditionFailed:
+					return result, generation.ErrIncomplete
 				case http.StatusInsufficientStorage:
 					return result, ErrCapacity
 				default:
@@ -222,6 +231,28 @@ func (c *Client) Push(ctx context.Context, operation, id string, source *generat
 }
 func (c *Client) Pull(ctx context.Context, operation, id string, target *generation.Replica) (Result, error) {
 	return c.transfer(ctx, operation, id, target, false)
+}
+
+func (c *Client) RepairPush(ctx context.Context, operation, id, token string, source *generation.Replica) (Result, error) {
+	if !validID(token) {
+		return Result{}, ErrDenied
+	}
+	copy := *c
+	copy.repair = token
+	copy.policy = clonePolicy(c.policy)
+	copy.policy.ReadbackMaxAgeSeconds = 0
+	return copy.transfer(ctx, operation, id, source, true)
+}
+func (c *Client) RepairPull(ctx context.Context, operation, id, token string, target *generation.Replica) (Result, error) {
+	if !validID(token) || target == nil {
+		return Result{}, ErrDenied
+	}
+	if e := target.CheckRepair(ctx, id, token); e != nil {
+		return Result{}, e
+	}
+	copy := *c
+	copy.repair = token
+	return copy.transfer(ctx, operation, id, target, false)
 }
 
 func (c *Client) transfer(ctx context.Context, operation, id string, local *generation.Replica, push bool) (result Result, err error) {
@@ -351,6 +382,16 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			return result, err
 		}
 		receipt, e := c.completeRemote(ctx, binding, len(refs))
+		for repaired := 0; c.repair != "" && errors.Is(e, generation.ErrIncomplete) && repaired < len(refs); repaired++ {
+			count, err := c.sendRepairMissing(ctx, binding, local, refs, &submitted)
+			if err != nil {
+				return result, err
+			}
+			if count == 0 {
+				return result, e
+			}
+			receipt, e = c.completeRemote(ctx, binding, len(refs))
+		}
 		if e != nil {
 			return result, e
 		}
@@ -378,6 +419,9 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		}
 	} else {
 		missing, e := local.MissingMetadata(ctx, id)
+		if c.repair != "" {
+			missing, e = local.RepairMissing(ctx, id)
+		}
 		if e != nil {
 			return result, e
 		}
@@ -387,6 +431,9 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 				return e
 			}
 			received.Add(int64(len(b)))
+			if c.repair != "" {
+				return local.RepairPutFor(ctx, id, ref.ID, c.repair, b)
+			}
 			return local.Put(ctx, id, ref.ID, b)
 		})
 		if err != nil {
@@ -395,7 +442,7 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if err = c.journal.Update(ctx, binding, "VERIFYING", nil, counters()); err != nil {
 			return result, err
 		}
-		result.Receipt, err = c.completeLocal(ctx, binding, local, len(refs))
+		result.Receipt, err = c.completeLocal(ctx, binding, local, len(refs), &received)
 		if err != nil {
 			return result, err
 		}

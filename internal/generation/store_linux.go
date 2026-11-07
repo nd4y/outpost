@@ -19,25 +19,29 @@ import (
 )
 
 type entry struct {
-	Sequence uint64 `json:"sequence"`
-	Bytes    int    `json:"bytes"`
-	Complete bool   `json:"complete"`
+	Sequence    uint64 `json:"sequence"`
+	Bytes       int    `json:"bytes"`
+	Complete    bool   `json:"complete"`
+	Damaged     bool   `json:"damaged,omitempty"`
+	RepairToken string `json:"repairToken,omitempty"`
 }
 type Pin struct {
 	Generation string `json:"generation"`
 	Kind       string `json:"kind"`
 }
 type state struct {
-	Format          string              `json:"format"`
-	Trust           Trust               `json:"trust"`
-	Revision        uint64              `json:"revision"`
-	HighestSequence uint64              `json:"highestSequence"`
-	HighestID       string              `json:"highestId"`
-	Latest          string              `json:"latestComplete"`
-	Generations     map[string]entry    `json:"generations"`
-	Pins            map[string]Pin      `json:"pins"`
-	Receipts        map[string]string   `json:"maintenanceReceipts"`
-	GC              map[string]gcRecord `json:"gc,omitempty"`
+	Format          string                  `json:"format"`
+	Trust           Trust                   `json:"trust"`
+	Revision        uint64                  `json:"revision"`
+	HighestSequence uint64                  `json:"highestSequence"`
+	HighestID       string                  `json:"highestId"`
+	Latest          string                  `json:"latestComplete"`
+	Generations     map[string]entry        `json:"generations"`
+	Pins            map[string]Pin          `json:"pins"`
+	Receipts        map[string]string       `json:"maintenanceReceipts"`
+	GC              map[string]gcRecord     `json:"gc,omitempty"`
+	Damage          map[string]DamageRecord `json:"damage,omitempty"`
+	Repairs         map[string]RepairRecord `json:"repairs,omitempty"`
 }
 type Status struct {
 	Revision        uint64         `json:"revision"`
@@ -45,6 +49,7 @@ type Status struct {
 	LatestComplete  string         `json:"latestKnownComplete"`
 	Complete        []string       `json:"complete"`
 	Receiving       []string       `json:"receiving"`
+	Corrupt         []string       `json:"corrupt,omitempty"`
 	Pins            map[string]Pin `json:"pins"`
 }
 type Replica struct {
@@ -214,7 +219,7 @@ func (r *Replica) load() (state, error) {
 func (r *Replica) validateState(s state) (state, error) {
 	t, _ := json.Marshal(r.trust)
 	u, _ := json.Marshal(s.Trust)
-	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
+	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat && s.Format != IntegrityStateFormat) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
 		return s, ErrInvalid
 	}
 	if s.Format == StateFormat && s.GC != nil || s.Format == MaintenanceStateFormat && len(s.GC) == 0 || len(s.GC) > len(s.Receipts) {
@@ -230,6 +235,22 @@ func (r *Replica) validateState(s state) (state, error) {
 			return s, ErrInvalid
 		}
 	}
+	if len(s.Damage) > MaxObjects || s.Format != IntegrityStateFormat && len(s.Damage) > 0 {
+		return s, ErrInvalid
+	}
+	for id, damage := range s.Damage {
+		if id != damage.Object.ID || !validID(id) || damage.Object.Bytes < 1 || damage.Object.Bytes > MaxObject || damage.DetectedUnix < 1 || damage.Repair != "" && (!validID(damage.Repair) || s.Repairs[damage.Repair].Object != damage.Object || s.Repairs[damage.Repair].CompletedUnix != 0) {
+			return s, ErrInvalid
+		}
+	}
+	if len(s.Repairs) > MaxPins || s.Format != IntegrityStateFormat && len(s.Repairs) > 0 {
+		return s, ErrInvalid
+	}
+	for id, repair := range s.Repairs {
+		if !validID(id) || !repair.valid() || repair.CompletedUnix == 0 && s.Damage[repair.Object.ID].Repair != id {
+			return s, ErrInvalid
+		}
+	}
 	if (s.HighestSequence == 0) != (s.HighestID == "") || (s.HighestID != "" && !validID(s.HighestID)) {
 		return s, ErrInvalid
 	}
@@ -237,6 +258,9 @@ func (r *Replica) validateState(s state) (state, error) {
 	latestSequence := uint64(0)
 	latestID := ""
 	for id, item := range s.Generations {
+		if (item.Damaged || item.RepairToken != "") && s.Format != IntegrityStateFormat || item.Damaged && !validID(item.RepairToken) || item.RepairToken != "" && !validID(item.RepairToken) {
+			return s, ErrInvalid
+		}
 		if !validID(id) || item.Sequence == 0 || item.Sequence > s.HighestSequence || item.Bytes < 1 || item.Bytes > MaxCatalog {
 			return s, ErrInvalid
 		}
@@ -247,7 +271,7 @@ func (r *Replica) validateState(s state) (state, error) {
 		if item.Sequence == s.HighestSequence && id != s.HighestID {
 			return s, ErrConflict
 		}
-		if item.Complete && item.Sequence > latestSequence {
+		if item.Complete && !item.Damaged && item.Sequence > latestSequence {
 			latestSequence = item.Sequence
 			latestID = id
 		}
@@ -391,31 +415,15 @@ func (r *Replica) Complete(ctx context.Context, id string) error {
 				return e
 			}
 			if _, e = r.object(refs[key]); e != nil {
+				if integrityFailure(e) && (!errors.Is(e, os.ErrNotExist) || s.Generations[id].Complete) {
+					if mark := r.recordDamage(s, refs[key]); mark != nil {
+						return mark
+					}
+				}
 				return ErrIncomplete
 			}
 		}
-		if s.Generations[id].Complete {
-			return nil
-		}
-		if e = r.point("before-complete"); e != nil {
-			return e
-		}
-		item := s.Generations[id]
-		item.Complete = true
-		s.Generations[id] = item
-		if s.Latest == "" {
-			s.Latest = id
-		} else {
-			latest, _, e := r.get(s, s.Latest, false)
-			if e != nil {
-				return e
-			}
-			if c.Sequence > latest.Sequence {
-				s.Latest = id
-			}
-		}
-		s.Revision++
-		return r.save(*s)
+		return r.publishComplete(s, id, c)
 	})
 }
 
@@ -485,7 +493,7 @@ func (r *Replica) Catalog(ctx context.Context, id string) ([]byte, error) {
 	var b []byte
 	e := r.locked(ctx, func(s *state) error {
 		item, ok := s.Generations[id]
-		if !ok || !item.Complete {
+		if !ok || !item.Complete || item.Damaged {
 			return ErrIncomplete
 		}
 		raw, err := r.catalogRaw(id, item)
@@ -499,7 +507,9 @@ func (r *Replica) Status(ctx context.Context) (Status, error) {
 	e := r.locked(ctx, func(s *state) error {
 		result = Status{Revision: s.Revision, HighestSequence: s.HighestSequence, LatestComplete: s.Latest, Pins: s.Pins}
 		for id, item := range s.Generations {
-			if item.Complete {
+			if item.Damaged {
+				result.Corrupt = append(result.Corrupt, id)
+			} else if item.Complete {
 				result.Complete = append(result.Complete, id)
 			} else {
 				result.Receiving = append(result.Receiving, id)
@@ -507,6 +517,7 @@ func (r *Replica) Status(ctx context.Context) (Status, error) {
 		}
 		sort.Strings(result.Complete)
 		sort.Strings(result.Receiving)
+		sort.Strings(result.Corrupt)
 		return nil
 	})
 	return result, e
@@ -524,7 +535,7 @@ func (r *Replica) Pin(ctx context.Context, id, generation, kind string) error {
 			return nil
 		}
 		item, ok := s.Generations[generation]
-		if !ok || !item.Complete || len(s.Pins) >= MaxPins {
+		if !ok || !item.Complete || item.Damaged || len(s.Pins) >= MaxPins {
 			return ErrInvalid
 		}
 		s.Pins[id] = p

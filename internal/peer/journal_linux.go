@@ -30,6 +30,7 @@ type Binding struct {
 	Peer       string `json:"peer"`
 	Executor   string `json:"executor"`
 	Expected   string `json:"expectedResultDigest"`
+	Repair     string `json:"repair,omitempty"`
 }
 type Counters struct {
 	ObjectBytesSubmitted int64 `json:"objectBytesSubmitted"`
@@ -149,6 +150,9 @@ func (j *Journal) writeState(b []byte) error {
 	return syncRoot(j.root)
 }
 func (j *Journal) binding(b Binding) bool {
+	if b.Repair != "" && !validID(b.Repair) {
+		return false
+	}
 	return validID(b.Operation) && validID(b.Generation) && validID(b.Peer) && b.Peer != b.Executor && b.Expected == b.Generation && b.Domain == j.identity.Domain && b.Repository == j.identity.Repository && b.Epoch == j.identity.Epoch && b.Executor == j.identity.Self && (b.Kind == "push" || b.Kind == "pull" || b.Kind == "receive" || b.Kind == "serve")
 }
 func jobKey(b Binding) string {

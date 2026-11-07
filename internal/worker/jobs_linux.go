@@ -14,6 +14,7 @@ type result struct {
 	receipt json.RawMessage
 	err     error
 	action  *actionResult
+	scrub   *scrubResult
 }
 
 func (w *Worker) jobs(v *view) error {
@@ -22,6 +23,10 @@ func (w *Worker) jobs(v *view) error {
 	finish := func(r result) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		if r.scrub != nil {
+			delete(running, "scrub/"+r.scrub.key)
+			return w.finishScrub(ctx, v, r.scrub)
+		}
 		if r.action != nil {
 			delete(running, "command/"+r.action.envelope.Request.Operation)
 			return w.finishAction(ctx, v, r.action)
@@ -130,6 +135,12 @@ func (w *Worker) jobs(v *view) error {
 				receipt, e := w.attempt(ctx, v, job)
 				results <- result{job: job, receipt: receipt, err: e}
 			}(j)
+		}
+		if len(running) < v.cfg.Limits.Parallel {
+			if e = w.scheduleScrub(v, running, results); e != nil {
+				v.cancel()
+				return errors.Join(e, drain())
+			}
 		}
 		select {
 		case r := <-results:

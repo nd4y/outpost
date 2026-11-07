@@ -43,6 +43,7 @@ func (l Limits) Validate() error {
 }
 
 type Domain struct {
+	ScrubIntervalSeconds       int64             `json:"scrubIntervalSeconds,omitempty"`
 	PeerReadbackMaxAgeSeconds  int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
 	Trust                      generation.Trust  `json:"trust"`
@@ -67,6 +68,7 @@ type Job struct {
 	Target       string          `json:"target,omitempty"`
 	Plan         json.RawMessage `json:"plan,omitempty"`
 	Delegation   string          `json:"delegation,omitempty"`
+	Repair       string          `json:"repair,omitempty"`
 }
 type Config struct {
 	Format       string            `json:"format"`
@@ -146,6 +148,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	domains := map[string]Domain{}
 	for _, d := range c.Domains {
+		if d.ScrubIntervalSeconds < 0 || d.ScrubIntervalSeconds > 30*24*3600 {
+			return ErrDenied
+		}
 		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds || d.CloudReadbackMaxAgeSeconds < 0 || d.CloudReadbackMaxAgeSeconds > readback.MaxAgeSeconds {
 			return ErrDenied
 		}
@@ -242,6 +247,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		operations[j.Operation] = true
 		switch j.Kind {
 		case "push", "pull":
+			if j.Repair != "" && !storage.ID(j.Repair) {
+				return ErrDenied
+			}
 			if j.PeerRevision == 0 || c.Node == j.Peer && j.PeerRevision > c.Revision {
 				return ErrDenied
 			}
@@ -259,6 +267,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 				return ErrDenied
 			}
 		case "upload":
+			if j.Repair != "" {
+				return ErrDenied
+			}
 			if j.PeerRevision != 0 {
 				return ErrDenied
 			}

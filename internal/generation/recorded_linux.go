@@ -13,6 +13,8 @@ type RecordedGeneration struct {
 	CreatedUnix      int64
 	Objects          int
 	Complete, Pinned bool
+	Damaged          bool
+	RepairToken      string
 }
 
 func (r *Replica) Recorded(ctx context.Context) ([]RecordedGeneration, error) {
@@ -30,7 +32,7 @@ func (r *Replica) Recorded(ctx context.Context) ([]RecordedGeneration, error) {
 			if e != nil {
 				return e
 			}
-			out = append(out, RecordedGeneration{Generation: id, Sequence: item.Sequence, CreatedUnix: catalog.SnapshotUnix, Objects: len(refs), Complete: item.Complete, Pinned: pins[id]})
+			out = append(out, RecordedGeneration{Generation: id, Sequence: item.Sequence, CreatedUnix: catalog.SnapshotUnix, Objects: len(refs), Complete: item.Complete && !item.Damaged, Pinned: pins[id], Damaged: item.Damaged, RepairToken: item.RepairToken})
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Sequence < out[j].Sequence })
 		return nil

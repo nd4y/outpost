@@ -20,6 +20,7 @@ import (
 
 const LegacyFormat = "outpost-worker-1"
 const Format = "outpost-worker-2"
+const ScheduledFormat = "outpost-worker-3"
 const MaxJobs = 4096
 
 var ErrDenied = errors.New("worker operation denied")
@@ -36,14 +37,15 @@ type JobState struct {
 	Receipt     json.RawMessage `json:"receipt,omitempty"`
 }
 type Status struct {
-	Format      string              `json:"format"`
-	Node        string              `json:"node"`
-	Revision    uint64              `json:"configurationRevision"`
-	Phase       string              `json:"phase"`
-	UpdatedUnix int64               `json:"updatedUnix"`
-	Jobs        map[string]JobState `json:"jobs"`
-	Rejected    map[string]string   `json:"rejectedJobs,omitempty"`
-	Controls    *Controls           `json:"controls,omitempty"`
+	Format      string                `json:"format"`
+	Node        string                `json:"node"`
+	Revision    uint64                `json:"configurationRevision"`
+	Phase       string                `json:"phase"`
+	UpdatedUnix int64                 `json:"updatedUnix"`
+	Jobs        map[string]JobState   `json:"jobs"`
+	Rejected    map[string]string     `json:"rejectedJobs,omitempty"`
+	Controls    *Controls             `json:"controls,omitempty"`
+	Scrubs      map[string]ScrubState `json:"scrubs,omitempty"`
 }
 
 func binding(j control.Job) string        { b, _ := json.Marshal(j); return storage.Hash(b) }
@@ -54,10 +56,13 @@ func (w *Worker) load() (Status, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, 32<<20) != nil || (s.Format != Format && s.Format != LegacyFormat) || s.Node != w.node || s.Jobs == nil || len(s.Jobs) > MaxJobs {
+	if storage.Decode(raw, &s, 32<<20) != nil || (s.Format != Format && s.Format != LegacyFormat && s.Format != ScheduledFormat) || s.Node != w.node || s.Jobs == nil || len(s.Jobs) > MaxJobs {
 		return s, ErrDenied
 	}
-	if s.Format == LegacyFormat && s.Controls != nil || s.Format == Format && w.validateControls(s.Controls) != nil {
+	if s.Format == LegacyFormat && s.Controls != nil || s.Format != LegacyFormat && w.validateControls(s.Controls) != nil {
+		return s, ErrDenied
+	}
+	if validateScrubs(s) != nil {
 		return s, ErrDenied
 	}
 	if len(s.Rejected) > 64 {
@@ -81,7 +86,7 @@ func (w *Worker) load() (Status, error) {
 	return s, nil
 }
 func (w *Worker) save(s Status) error {
-	if s.Format == Format {
+	if s.Format == Format || s.Format == ScheduledFormat {
 		if e := w.signControls(s.Controls); e != nil {
 			return e
 		}

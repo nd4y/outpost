@@ -68,7 +68,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 		if e != nil {
 			return e
 		}
-		if s.Format != Format || s.Controls == nil {
+		if s.Format != Format && s.Format != ScheduledFormat || s.Controls == nil {
 			return ErrDenied
 		}
 		scope := command.SequenceScope(env.Service, env.Request.Kind)

@@ -104,6 +104,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	push := mode == "push"
+	repair := r.Header.Get("Outpost-Repair")
+	if repair != "" && (!validID(repair) || !h.policy.Peers[peer].Repair) {
+		fail(w, ErrDenied)
+		return
+	}
 	window := r.Header.Get(windowHeader)
 	if window != "" && window != "1" {
 		fail(w, ErrProtocol)
@@ -148,11 +153,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithDeadline(r.Context(), deadline)
 	defer cancel()
+	if repair != "" && push {
+		if e := h.replica.CheckRepair(ctx, id, repair); e != nil {
+			fail(w, e)
+			return
+		}
+	}
 	kind := "serve"
 	if push {
 		kind = "receive"
 	}
 	binding := h.bind(op, peer, id, kind)
+	binding.Repair = repair
 	if push && r.Method == http.MethodPut && resource == "catalog" {
 		raw, e := body(w, r, generation.MaxCatalog)
 		if e != nil {
@@ -294,7 +306,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if e = h.replica.Put(ctx, id, parts[6], b); e != nil {
+		if repair != "" {
+			e = h.replica.RepairPutFor(ctx, id, parts[6], repair, b)
+		} else {
+			e = h.replica.Put(ctx, id, parts[6], b)
+		}
+		if e != nil {
 			fail(w, e)
 			return
 		}
@@ -313,7 +330,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "missing":
 		var refs []generation.Object
 		var e error
-		if window == "1" {
+		if repair != "" {
+			refs, e = h.replica.RepairMissing(ctx, id)
+		} else if window == "1" {
 			refs, e = h.replica.MissingMetadata(ctx, id)
 		} else {
 			refs, e = h.replica.Missing(ctx, id)
@@ -330,7 +349,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		receipt := Receipt{Format, h.policy.Self, id, id, op, "target-full-read", time.Now().Unix()}
 		if window == "1" {
-			result, e := h.replica.VerifyWindow(ctx, id, verificationWindow(binding), windowObjects, windowBytes)
+			var result generation.BatchResult
+			var e error
+			if repair != "" {
+				result, e = h.replica.RepairWindowFor(ctx, id, verificationWindow(binding), repair, windowObjects, windowBytes, nil)
+			} else {
+				result, e = h.replica.VerifyWindow(ctx, id, verificationWindow(binding), windowObjects, windowBytes)
+			}
 			if e != nil {
 				fail(w, e)
 				return

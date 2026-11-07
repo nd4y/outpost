@@ -140,7 +140,16 @@ func (r *Replica) saveVerification(v verificationState) error {
 	return r.point("verification-batch-durable")
 }
 func (r *Replica) publishComplete(s *state, id string, c Catalog) error {
-	if s.Generations[id].Complete {
+	refs, e := closure(c)
+	if e != nil {
+		return e
+	}
+	for key := range refs {
+		if _, damaged := s.Damage[key]; damaged {
+			return ErrIncomplete
+		}
+	}
+	if s.Generations[id].Complete && !s.Generations[id].Damaged {
 		return nil
 	}
 	if e := r.point("before-complete"); e != nil {
@@ -148,6 +157,7 @@ func (r *Replica) publishComplete(s *state, id string, c Catalog) error {
 	}
 	item := s.Generations[id]
 	item.Complete = true
+	item.Damaged = false
 	s.Generations[id] = item
 	if s.Latest == "" {
 		s.Latest = id
@@ -180,7 +190,7 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 	if e != nil {
 		return result, e
 	}
-	return r.receiveBatch(ctx, id, "", maxObjects, maxBytes, fetch)
+	return r.receiveBatch(ctx, id, "", maxObjects, maxBytes, fetch, false, "")
 }
 
 // VerifyWindow reads bounded payload of an already admitted generation. The
@@ -191,7 +201,26 @@ func (r *Replica) VerifyWindow(ctx context.Context, id, window string, maxObject
 	if !validID(id) || !validID(window) || maxObjects < 1 || maxObjects > 256 || maxBytes < MaxObject || maxBytes > 256<<20 {
 		return BatchResult{}, ErrInvalid
 	}
-	return r.receiveBatch(ctx, id, window, maxObjects, maxBytes, nil)
+	return r.receiveBatch(ctx, id, window, maxObjects, maxBytes, nil, false, "")
+}
+
+// RepairWindow uses an already admitted catalog and an explicitly authorized
+// fetcher. A unique operation window rechecks the complete closure, fetching
+// only damaged/missing objects and preserving corrupt bytes before replacement.
+func (r *Replica) RepairWindow(ctx context.Context, id, window string, maxObjects int, maxBytes int64, fetch func(Object) ([]byte, error)) (BatchResult, error) {
+	if !validID(id) || !validID(window) || fetch == nil || maxObjects < 1 || maxObjects > 256 || maxBytes < MaxObject || maxBytes > 256<<20 {
+		return BatchResult{}, ErrInvalid
+	}
+	return r.receiveBatch(ctx, id, window, maxObjects, maxBytes, fetch, true, "")
+}
+
+// RepairWindowFor binds every locked checkpoint to the same damage incarnation.
+// A nil fetcher verifies already delivered objects without fetching replacements.
+func (r *Replica) RepairWindowFor(ctx context.Context, id, window, token string, maxObjects int, maxBytes int64, fetch func(Object) ([]byte, error)) (BatchResult, error) {
+	if !validID(id) || !validID(window) || !validID(token) || maxObjects < 1 || maxObjects > 256 || maxBytes < MaxObject || maxBytes > 256<<20 {
+		return BatchResult{}, ErrInvalid
+	}
+	return r.receiveBatch(ctx, id, window, maxObjects, maxBytes, fetch, fetch != nil, token)
 }
 func verificationTime(v verificationState) int64 {
 	oldest := v.CompletedAt
@@ -202,11 +231,16 @@ func verificationTime(v verificationState) int64 {
 	}
 	return oldest
 }
-func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObjects int, maxBytes int64, fetch func(Object) ([]byte, error)) (BatchResult, error) {
+func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObjects int, maxBytes int64, fetch func(Object) ([]byte, error), repair bool, token string) (BatchResult, error) {
 	var result BatchResult
 	result.Generation = id
 	var todo []Object
 	e := r.locked(ctx, func(s *state) error {
+		if token != "" {
+			if e := checkRepair(s, id, token); e != nil {
+				return e
+			}
+		}
 		_, refs, e := r.get(s, id, true)
 		if e != nil {
 			return e
@@ -222,7 +256,8 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 				return e
 			}
 			ref := refs[key]
-			if checked, ok := v.Objects[key]; ok {
+			_, damaged := s.Damage[key]
+			if checked, ok := v.Objects[key]; ok && !damaged {
 				stamp, e := r.objectStamp(ref)
 				if e == nil && stamp == checked.Stamp {
 					continue
@@ -234,7 +269,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 			todo = append(todo, ref)
 			bytes += int64(ref.Bytes)
 		}
-		if len(todo) == 0 && len(v.Objects) == len(refs) && v.CompletedAt > 0 && s.Generations[id].Complete {
+		if len(todo) == 0 && len(v.Objects) == len(refs) && v.CompletedAt > 0 && s.Generations[id].Complete && !s.Generations[id].Damaged {
 			result.Complete = true
 			result.VerifiedObjects = len(refs)
 			result.VerifiedAt = verificationTime(v)
@@ -247,8 +282,14 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 	verified := map[string]objectVerification{}
 	for _, ref := range todo {
 		var stamp catalogStamp
+		needsRepair := false
 		observed := time.Now().Unix()
 		e = r.locked(ctx, func(s *state) error {
+			if token != "" {
+				if e := checkRepair(s, id, token); e != nil {
+					return e
+				}
+			}
 			var e error
 			_, refs, e := r.get(s, id, false)
 			if e != nil {
@@ -258,9 +299,16 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 				return ErrInvalid
 			}
 			stamp, e = r.verifyObjectStamp(ctx, ref)
+			if integrityFailure(e) && (!errors.Is(e, os.ErrNotExist) || s.Generations[id].Complete) {
+				if mark := r.recordDamage(s, ref); mark != nil {
+					return mark
+				}
+			}
+			_, damaged := s.Damage[ref.ID]
+			needsRepair = repair && (damaged || integrityFailure(e))
 			return e
 		})
-		if errors.Is(e, os.ErrNotExist) {
+		if errors.Is(e, os.ErrNotExist) || needsRepair {
 			if fetch == nil {
 				return result, ErrIncomplete
 			}
@@ -268,7 +316,12 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 			if err != nil {
 				return result, err
 			}
-			if err = r.Put(ctx, id, ref.ID, b); err != nil {
+			if repair {
+				err = r.repairPut(ctx, id, ref.ID, token, b)
+			} else {
+				err = r.Put(ctx, id, ref.ID, b)
+			}
+			if err != nil {
 				return result, err
 			}
 			result.WrittenBytes += int64(len(b))
@@ -281,6 +334,11 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		verified[ref.ID] = objectVerification{Stamp: stamp, CheckedUnix: observed}
 	}
 	e = r.locked(ctx, func(s *state) error {
+		if token != "" {
+			if e := checkRepair(s, id, token); e != nil {
+				return e
+			}
+		}
 		c, refs, e := r.get(s, id, true)
 		if e != nil {
 			return e

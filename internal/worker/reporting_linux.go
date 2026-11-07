@@ -180,7 +180,16 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 			if g.Complete {
 				state = "COMPLETE"
 			}
-			out.Generations = append(out.Generations, management.Generation{Generation: g.Generation, Sequence: g.Sequence, CreatedUnix: g.CreatedUnix, Status: state, Target: w.node, Verification: "NONE", Objects: uint64(g.Objects), Pinned: g.Pinned})
+			if g.Damaged {
+				state = "CORRUPT"
+			}
+			item := management.Generation{Generation: g.Generation, Sequence: g.Sequence, CreatedUnix: g.CreatedUnix, Status: state, Target: w.node, Verification: "NONE", Objects: uint64(g.Objects), Pinned: g.Pinned}
+			scrub := status.Scrubs[scrubKey(domain, d.Trust.Repository, d.Trust.Epoch, g.Generation)]
+			if g.Complete && scrub.Phase == "COMPLETE" && scrub.VerifiedUnix > 0 && scrub.HealthToken == g.RepairToken {
+				item.Verification = "CIPHERTEXT"
+				item.VerifiedUnix = scrub.VerifiedUnix
+			}
+			out.Generations = append(out.Generations, item)
 		}
 	} else if !errors.Is(e, os.ErrNotExist) {
 		return out, e

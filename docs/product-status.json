@@ -533,6 +533,26 @@
         {
           "path": "internal/worker/maintenance_linux_test.go",
           "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairRequiresBothExplicitPeerGrants"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestIntegrityRepairDelegationBindsTokenRouteAndOwnerPermission"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairNeedsRequiresExactCurrentPushDelegation"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestScheduledScrubRequiresBoundedSignedInterval"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -835,6 +855,34 @@
         {
           "path": "internal/worker/maintenance_linux_test.go",
           "name": "TestWorkerCommandMaintenanceSIGKILLAfterReplicaResultDoesNotDeleteLaterData"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairPeerPushPullPreserveHistoryAndFenceOldIncarnation"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubPauseJoinsAndResumePreservesReadWindow"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSIGKILLRetainsWindowAndReceipt"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSharesSlotsAndPreservesTransferPriority"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1179,6 +1227,34 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestDetectedCorruptionRevokesEveryDependentPublication"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantinesAndReverifiesSharedGenerations"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairPeerPushPullPreserveHistoryAndFenceOldIncarnation"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubNewCyclesReadFreshAndRestartKeepsOriginalAge"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSIGKILLRetainsWindowAndReceipt"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -1233,6 +1309,18 @@
         {
           "path": "internal/worker/observation_window_linux_test.go",
           "name": "TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairPeerPushPullPreserveHistoryAndFenceOldIncarnation"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -1271,6 +1359,14 @@
         {
           "path": "internal/worker/observations_linux_test.go",
           "name": "TestOutboundOnlyNodePublishesOriginalObservationThroughCollector"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestIntegrityRepairDelegationBindsTokenRouteAndOwnerPermission"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08"],
@@ -1673,10 +1769,50 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestDetectedCorruptionRevokesEveryDependentPublication"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantinesAndReverifiesSharedGenerations"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestScheduledScrubRequiresBoundedSignedInterval"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubNewCyclesReadFreshAndRestartKeepsOriginalAge"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubPauseJoinsAndResumePreservesReadWindow"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubQuotaDenialPrecedesPayloadRead"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSIGKILLRetainsWindowAndReceipt"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSharesSlotsAndPreservesTransferPriority"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
         }
       ],
       "acceptance": ["AT-13"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
+      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
     },
     {
       "id": "REQ-35",
@@ -1688,9 +1824,54 @@
         "internal/storage",
         "cmd/outpost"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestDetectedCorruptionRevokesEveryDependentPublication"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantinesAndReverifiesSharedGenerations"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantineAdmissionAndTampering"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairHandlesMissingEmptyAndRejectsUnsafeEntries"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairPeerPushPullPreserveHistoryAndFenceOldIncarnation"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairRequiresBothExplicitPeerGrants"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestIntegrityRepairDelegationBindsTokenRouteAndOwnerPermission"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairNeedsRequiresExactCurrentPushDelegation"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
+        }
+      ],
       "acceptance": ["AT-13"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
+      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
     },
     {
       "id": "REQ-36",
@@ -1750,10 +1931,22 @@
         {
           "path": "internal/peer/window_linux_test.go",
           "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantinesAndReverifiesSharedGenerations"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairPeerPushPullPreserveHistoryAndFenceOldIncarnation"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-24"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
+      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
     },
     {
       "id": "REQ-37",
@@ -1825,6 +2018,10 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -1967,6 +2164,18 @@
         {
           "path": "internal/worker/command_cache_capacity_linux_test.go",
           "name": "TestWorkerCommandCacheWriteRespectsForeignReservationAndSpoolQuota"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantineAdmissionAndTampering"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubQuotaDenialPrecedesPayloadRead"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSharesSlotsAndPreservesTransferPriority"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2097,6 +2306,14 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubPauseJoinsAndResumePreservesReadWindow"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2197,6 +2414,10 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairSIGKILLBoundaries"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -2308,6 +2529,10 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubQuotaDenialPrecedesPayloadRead"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -2395,6 +2620,18 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubNewCyclesReadFreshAndRestartKeepsOriginalAge"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubPauseJoinsAndResumePreservesReadWindow"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubSIGKILLRetainsWindowAndReceipt"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -2421,7 +2658,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, trusted recovery executor, recovery-kit distribution and admitted-scale recovery."
+      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
     },
     {
       "id": "REQ-47",
@@ -2663,6 +2900,30 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairQuarantineAdmissionAndTampering"
+        },
+        {
+          "path": "internal/generation/integrity_linux_test.go",
+          "name": "TestIntegrityRepairHandlesMissingEmptyAndRejectsUnsafeEntries"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairRequiresBothExplicitPeerGrants"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestIntegrityRepairDelegationBindsTokenRouteAndOwnerPermission"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestIntegrityRepairNeedsRequiresExactCurrentPushDelegation"
+        },
+        {
+          "path": "internal/control/replication_test.go",
+          "name": "TestScheduledScrubRequiresBoundedSignedInterval"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -2705,6 +2966,10 @@
         {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"
+        },
+        {
+          "path": "internal/worker/scrub_linux_test.go",
+          "name": "TestScheduledScrubNewCyclesReadFreshAndRestartKeepsOriginalAge"
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],

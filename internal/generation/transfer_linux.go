@@ -73,7 +73,7 @@ func (r *Replica) missing(ctx context.Context, id string, metadataOnly bool) ([]
 // reception, even when its last object has arrived.
 func (r *Replica) VerifyComplete(ctx context.Context, id string) error {
 	return r.locked(ctx, func(s *state) error {
-		if !s.Generations[id].Complete {
+		if !s.Generations[id].Complete || s.Generations[id].Damaged {
 			return ErrIncomplete
 		}
 		_, refs, err := r.get(s, id, true)

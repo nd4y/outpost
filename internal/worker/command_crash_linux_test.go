@@ -109,6 +109,7 @@ type commandChild struct {
 	Envelope  []byte
 	Migration bool
 	Run       bool
+	Scheduled bool
 }
 
 func TestWorkerCommandSIGKILLChild(t *testing.T) {
@@ -134,7 +135,9 @@ func TestWorkerCommandSIGKILLChild(t *testing.T) {
 		}
 		return nil
 	}
-	if in.Migration {
+	if in.Scheduled {
+		e = w.Run(context.Background())
+	} else if in.Migration {
 		e = w.MigrateControls(context.Background(), false)
 	} else {
 		_, e = w.ExecuteCommand(context.Background(), in.Envelope)

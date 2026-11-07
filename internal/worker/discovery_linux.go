@@ -75,6 +75,9 @@ func validInventory(entries []generation.InventoryEntry) bool {
 	return true
 }
 func (w *Worker) serveInventory(out http.ResponseWriter, r *http.Request, domain string) {
+	w.serveDiscovery(out, r, domain, false)
+}
+func (w *Worker) serveDiscovery(out http.ResponseWriter, r *http.Request, domain string, repair bool) {
 	if r.Method != http.MethodGet || r.ContentLength != 0 || len(r.TransferEncoding) != 0 || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.RawPath != "" || r.URL.Path != r.URL.EscapedPath() {
 		http.Error(out, "denied", 403)
 		return
@@ -103,7 +106,8 @@ func (w *Worker) serveInventory(out http.ResponseWriter, r *http.Request, domain
 	local := v.domains[domain]
 	allowed := false
 	for _, rule := range v.cfg.Replication {
-		if rule.Domain == domain && rule.Mode == "pull" && rule.From == w.node && rule.To == remote && rule.ID(d.Trust) == r.Header.Get("Outpost-Replication") {
+		direction := !repair && rule.Mode == "pull" && rule.From == w.node && rule.To == remote || repair && rule.Repair && rule.Mode == "push" && rule.To == w.node && rule.From == remote
+		if rule.Domain == domain && direction && rule.ID(d.Trust) == r.Header.Get("Outpost-Replication") {
 			allowed = true
 			break
 		}
@@ -131,13 +135,24 @@ func (w *Worker) serveInventory(out http.ResponseWriter, r *http.Request, domain
 		return
 	}
 	defer cleanup()
-	entries, e := local.replica.Inventory(ctx)
+	var raw []byte
+	if repair {
+		var needs []generation.RepairNeed
+		needs, e = local.replica.RepairNeeds(ctx)
+		if e == nil {
+			raw, e = json.Marshal(repairNeedsReply{repairNeedsFormat, domain, d.Trust.Repository, d.Trust.Epoch, r.Header.Get("Outpost-Replication"), needs})
+		}
+	} else {
+		var entries []generation.InventoryEntry
+		entries, e = local.replica.Inventory(ctx)
+		if e == nil {
+			raw, e = json.Marshal(inventoryReply{inventoryFormat, domain, d.Trust.Repository, d.Trust.Epoch, r.Header.Get("Outpost-Replication"), entries})
+		}
+	}
 	if e != nil || ctx.Err() != nil {
 		http.Error(out, "unavailable", 503)
 		return
 	}
-	reply := inventoryReply{inventoryFormat, domain, d.Trust.Repository, d.Trust.Epoch, r.Header.Get("Outpost-Replication"), entries}
-	raw, e := json.Marshal(reply)
 	if e != nil || len(raw) > maxInventory {
 		http.Error(out, "capacity", 507)
 		return
@@ -157,6 +172,21 @@ func (w *Worker) inventory(ctx context.Context, v *view, rule control.Replicatio
 	if rule.Mode == "push" {
 		return local.replica.Inventory(ctx)
 	}
+	raw, e := w.discoveryRequest(ctx, v, rule, "inventory")
+	if e != nil {
+		return nil, e
+	}
+	var reply inventoryReply
+	if storage.Decode(raw, &reply, maxInventory) != nil || reply.Format != inventoryFormat || reply.Domain != rule.Domain || reply.Repository != d.Trust.Repository || reply.Epoch != d.Trust.Epoch || reply.Rule != rule.ID(d.Trust) || !validInventory(reply.Generations) {
+		return nil, peer.ErrProtocol
+	}
+	return reply.Generations, nil
+}
+func (w *Worker) discoveryRequest(ctx context.Context, v *view, rule control.Replication, resource string) ([]byte, error) {
+	d, ok := v.cfg.DomainByID(rule.Domain)
+	if !ok {
+		return nil, ErrDenied
+	}
 	node, ok := v.cfg.NodeByID(rule.Peer())
 	if !ok || !w.certificateCurrent() {
 		return nil, ErrDenied
@@ -166,7 +196,7 @@ func (w *Worker) inventory(ctx context.Context, v *view, rule control.Replicatio
 		return nil, e
 	}
 	defer h.CloseIdleConnections()
-	u.Path += "/v1/" + rule.Domain + "/inventory"
+	u.Path += "/v1/" + rule.Domain + "/" + resource
 	req, e := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if e != nil {
 		return nil, e
@@ -195,11 +225,10 @@ func (w *Worker) inventory(ctx context.Context, v *view, rule control.Replicatio
 	if e != nil {
 		return nil, e
 	}
-	var reply inventoryReply
-	if storage.Decode(raw, &reply, maxInventory) != nil || reply.Format != inventoryFormat || reply.Domain != rule.Domain || reply.Repository != d.Trust.Repository || reply.Epoch != d.Trust.Epoch || reply.Rule != rule.ID(d.Trust) || !validInventory(reply.Generations) || !currentPeer(res.TLS, node.ID) {
+	if len(raw) > maxInventory || !currentPeer(res.TLS, node.ID) {
 		return nil, peer.ErrProtocol
 	}
-	return reply.Generations, nil
+	return raw, nil
 }
 
 func (w *Worker) DiscoveryStatus(ctx context.Context) (DiscoveryStatus, error) {
@@ -312,6 +341,25 @@ func (w *Worker) admitDiscovered(ctx context.Context, v *view, rule control.Repl
 	jobs := make([]control.Job, 0, len(entries))
 	for _, item := range entries {
 		jobs = append(jobs, rule.Job(d.Trust, item.Generation))
+	}
+	if rule.Repair {
+		if e := w.admitDerived(ctx, v, jobs); e != nil {
+			return e
+		}
+		jobs = nil
+		needs, e := w.repairNeeds(ctx, v, rule)
+		if e != nil {
+			return e
+		}
+		healthy := map[string]uint64{}
+		for _, item := range entries {
+			healthy[item.Generation] = item.Sequence
+		}
+		for _, need := range needs {
+			if healthy[need.Generation] == need.Sequence {
+				jobs = append(jobs, rule.RepairJob(d.Trust, need.Generation, need.Token))
+			}
+		}
 	}
 	return w.admitDerived(ctx, v, jobs)
 }

@@ -181,7 +181,7 @@ func (r *Replica) Inventory(ctx context.Context) ([]InventoryEntry, error) {
 	out := []InventoryEntry{}
 	e := r.locked(ctx, func(s *state) error {
 		for id, item := range s.Generations {
-			if item.Complete {
+			if item.Complete && !item.Damaged {
 				out = append(out, InventoryEntry{id, item.Sequence})
 			}
 		}

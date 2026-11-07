@@ -187,13 +187,16 @@ func (w *Worker) MigrateControls(ctx context.Context, rollback bool) error {
 				return e
 			}
 			if rollback {
+				if s.Format == ScheduledFormat || len(s.Scrubs) > 0 {
+					return ErrDenied
+				}
 				if s.Format == LegacyFormat {
 					return nil
 				}
 				if len(s.Controls.Operations) != 0 || len(s.Controls.Domains) != 0 || len(s.Controls.Jobs) != 0 || s.Controls.Applied != s.Controls.Revision {
 					return ErrDenied
 				}
-			} else if s.Format == Format {
+			} else if s.Format == Format || s.Format == ScheduledFormat {
 				return nil
 			}
 			previous, e := w.state.Read("worker.json")

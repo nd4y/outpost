@@ -52,8 +52,10 @@ func TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead(t *testing.T
 	if !bytes.Equal(kept, old) {
 		t.Fatal("failed refresh replaced historical proof")
 	}
-	// Restore only this synthetic fault, then retry the same persisted window.
-	must(t, os.WriteFile(victim, original, 0600))
+	// Repair the synthetic fault through the durable quarantine path, then
+	// verify publication before retrying the same persisted observation window.
+	must(t, replica.RepairPut(ctx, f.generation, refs[0].ID, original))
+	must(t, replica.Complete(ctx, f.generation))
 	must(t, w.observeOne(ctx, v, grant, g, f.generation))
 	fresh, e := w.readObservation(ctx, grant, f.generation, w.node)
 	must(t, e)

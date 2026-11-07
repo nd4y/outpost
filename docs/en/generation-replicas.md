@@ -60,6 +60,8 @@ Remaining acceptance includes full-scale G1, large catalogs/history, multi-node 
 
 ## Frozen maintenance replay
 
+Detected object corruption advances local metadata to `outpost-replica-state-4`, preserving state3 maintenance history. The [integrity contract](integrity-repair.md) defines shared-generation fencing, admitted quarantine and separately authorized repair. Older writers reject state4; immutable catalogs, objects and independent recovery retain their formats.
+
 The first explicit new maintenance operation upgrades local metadata to `outpost-replica-state-3`. State2 remains readable; wire catalogs, encryption and independent file-kit recovery do not change. Older state writers reject v3. This feature transition has no automatic downgrade: retain the current reader and recover from the unchanged catalogs/kits; binary rollback cannot discard maintenance history.
 
 Before retiring a generation, maintenance writes a sorted immutable GC candidate set and binds its hash to the accepted permit in local state. Retried work uses this original set, never a new orphan scan. Newly created orphan objects are outside the old permit; candidates that gained complete/receiving references are preserved. Missing or altered plan data blocks replay. A legacy receipt without a frozen set requires a newly signed revision-bound permit, not reconstruction of an old deletion scope.

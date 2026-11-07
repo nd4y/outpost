@@ -13,7 +13,7 @@ import (
 func (r *Replica) CheckObject(ctx context.Context, id string, ref Object) error {
 	return r.locked(ctx, func(s *state) error {
 		item, ok := s.Generations[id]
-		if !ok || !item.Complete {
+		if !ok || !item.Complete || item.Damaged {
 			return ErrIncomplete
 		}
 		_, refs, e := r.get(s, id, false)

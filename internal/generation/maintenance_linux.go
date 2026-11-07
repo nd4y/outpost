@@ -126,7 +126,9 @@ func (r *Replica) MaintainAdmitted(ctx context.Context, raw []byte, admit func()
 				s.GC = map[string]gcRecord{}
 			}
 			s.GC[p.Operation] = gcRecord{Plan: digest}
-			s.Format = MaintenanceStateFormat
+			if s.Format != IntegrityStateFormat {
+				s.Format = MaintenanceStateFormat
+			}
 			s.Revision++
 			if e = r.save(*s); e != nil {
 				return e
@@ -231,7 +233,7 @@ func (r *Replica) ExportKit(ctx context.Context, generation, version, destinatio
 		if e != nil {
 			return e
 		}
-		if !s.Generations[generation].Complete {
+		if !s.Generations[generation].Complete || s.Generations[generation].Damaged {
 			return ErrIncomplete
 		}
 		var selected *Kit

@@ -49,16 +49,17 @@ type domainState struct {
 	ingress *ingress.Registry
 }
 type view struct {
-	cfg      control.Config
-	autonomy *control.Autonomy
-	ctx      context.Context
-	cancel   context.CancelFunc
-	done     chan struct{}
-	err      error
-	requests sync.WaitGroup
-	metadata chan struct{}
-	domains  map[string]*domainState
-	controls *Controls
+	cfg           control.Config
+	autonomy      *control.Autonomy
+	ctx           context.Context
+	cancel        context.CancelFunc
+	done          chan struct{}
+	err           error
+	requests      sync.WaitGroup
+	metadata      chan struct{}
+	domains       map[string]*domainState
+	controls      *Controls
+	nextScrubScan time.Time
 }
 type Worker struct {
 	// Fault is a local test hook, never accepted from shared configuration.
@@ -279,7 +280,7 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 		p.ReadbackMaxAgeSeconds = d.PeerReadbackMaxAgeSeconds
 		p.RequiredRevision = job.PeerRevision
 		n, _ := c.NodeByID(job.Peer)
-		p.Peers[job.Peer] = peer.Grant{Class: n.Class, Push: job.Kind == "push", Pull: true, History: c.Autonomous(job), ExpiresUnix: c.ExpiresUnix}
+		p.Peers[job.Peer] = peer.Grant{Class: n.Class, Push: job.Kind == "push", Pull: true, History: c.Autonomous(job), Repair: job.Repair != "", ExpiresUnix: c.ExpiresUnix}
 		return p
 	}
 	for _, j := range c.Jobs {
@@ -290,6 +291,7 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 		g := p.Peers[j.Executor]
 		g.Class = n.Class
 		g.ExpiresUnix = c.ExpiresUnix
+		g.Repair = g.Repair || j.Repair != ""
 		if j.Kind == "push" {
 			g.Push = true
 			// The transport requires read authority for full readback. The outer
@@ -309,6 +311,7 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 		g.Class = n.Class
 		g.ExpiresUnix = c.ExpiresUnix
 		g.History = true
+		g.Repair = g.Repair || rule.Repair
 		g.Pull = true
 		if rule.Mode == "push" {
 			g.Push = true
@@ -718,6 +721,10 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 		w.serveInventory(out, r, parts[2])
 		return
 	}
+	if len(parts) == 4 && parts[1] == "v1" && parts[3] == "repair-needs" {
+		w.serveDiscovery(out, r, parts[2], true)
+		return
+	}
 	if len(parts) >= 8 && parts[1] == "v1" && parts[2] == "tenants" && parts[4] == "domains" && parts[6] == "captures" {
 		w.serveIngress(out, r, parts[5])
 		return
@@ -745,7 +752,7 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 	}
 	allowed := false
 	for _, j := range v.cfg.Jobs {
-		if j.Peer == w.node && j.Executor == remote && j.Domain == parts[2] && j.Generation == parts[4] && j.Operation == r.Header.Get("Outpost-Operation") && j.Kind == r.Header.Get("Outpost-Mode") {
+		if j.Peer == w.node && j.Executor == remote && j.Domain == parts[2] && j.Generation == parts[4] && j.Operation == r.Header.Get("Outpost-Operation") && j.Kind == r.Header.Get("Outpost-Mode") && j.Repair == r.Header.Get("Outpost-Repair") {
 			allowed = true
 			break
 		}
@@ -758,6 +765,12 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				j := rule.Job(domain.Trust, parts[4])
+				if token := r.Header.Get("Outpost-Repair"); token != "" {
+					if !rule.Repair || !storage.ID(token) {
+						continue
+					}
+					j = rule.RepairJob(domain.Trust, parts[4], token)
+				}
 				if storage.ID(parts[4]) && j.Operation == r.Header.Get("Outpost-Operation") {
 					allowed = true
 					break
@@ -802,7 +815,11 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		}
 		defer client.Close()
 		var result peer.Result
-		if j.Kind == "push" {
+		if j.Repair != "" && j.Kind == "push" {
+			result, e = client.RepairPush(ctx, j.Operation, j.Generation, j.Repair, local.replica)
+		} else if j.Repair != "" {
+			result, e = client.RepairPull(ctx, j.Operation, j.Generation, j.Repair, local.replica)
+		} else if j.Kind == "push" {
 			result, e = client.Push(ctx, j.Operation, j.Generation, local.replica)
 		} else {
 			result, e = client.Pull(ctx, j.Operation, j.Generation, local.replica)

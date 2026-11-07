@@ -17,6 +17,7 @@ type Replication struct {
 	Mode         string `json:"mode"`
 	Epoch        uint64 `json:"epoch"`
 	PeerRevision uint64 `json:"peerRevision"`
+	Repair       bool   `json:"repair,omitempty"`
 }
 
 func (r Replication) Executor() string {
@@ -42,6 +43,12 @@ func (r Replication) ID(t generation.Trust) string {
 func (r Replication) Job(t generation.Trust, id string) Job {
 	return Job{PeerRevision: r.PeerRevision, Operation: storage.Hash([]byte(r.ID(t) + "/" + id)), Executor: r.Executor(), Kind: r.Mode, Domain: r.Domain, Generation: id, Peer: r.Peer()}
 }
+func (r Replication) RepairJob(t generation.Trust, id, token string) Job {
+	j := r.Job(t, id)
+	j.Repair = token
+	j.Operation = storage.Hash([]byte(r.ID(t) + "/" + id + "/repair/" + token))
+	return j
+}
 func (c Config) Autonomous(j Job) bool {
 	if j.Kind == "upload" {
 		return c.AutonomousUpload(j)
@@ -58,7 +65,14 @@ func (c Config) Autonomous(j Job) bool {
 		if r.Domain != j.Domain {
 			continue
 		}
-		expected, _ := json.Marshal(r.Job(d.Trust, j.Generation))
+		job := r.Job(d.Trust, j.Generation)
+		if j.Repair != "" {
+			if !r.Repair || !storage.ID(j.Repair) {
+				continue
+			}
+			job = r.RepairJob(d.Trust, j.Generation, j.Repair)
+		}
+		expected, _ := json.Marshal(job)
 		if string(actual) == string(expected) {
 			return true
 		}

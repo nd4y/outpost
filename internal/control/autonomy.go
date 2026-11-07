@@ -61,6 +61,9 @@ func (a *Autonomy) Permits(j Job) bool {
 		return false
 	}
 	if j.Kind == "upload" {
+		if j.Repair != "" {
+			return false
+		}
 		g, ok := a.uploads[j.Delegation]
 		return ok && j.Executor == a.node && j.Peer == "" && j.PeerRevision == 0 && j.Domain == g.domain && j.Target == g.target && j.Operation == storage.Hash([]byte(j.Delegation+"/"+j.Generation))
 	}
@@ -68,5 +71,12 @@ func (a *Autonomy) Permits(j Job) bool {
 		return false
 	}
 	r, ok := a.routes[routeKey(j.Domain, j.Kind, j.Executor, j.Peer)]
-	return ok && j.PeerRevision == r.rule.PeerRevision && j.Operation == storage.Hash([]byte(r.id+"/"+j.Generation))
+	expected := storage.Hash([]byte(r.id + "/" + j.Generation))
+	if j.Repair != "" {
+		if !r.rule.Repair || !storage.ID(j.Repair) {
+			return false
+		}
+		expected = storage.Hash([]byte(r.id + "/" + j.Generation + "/repair/" + j.Repair))
+	}
+	return ok && j.PeerRevision == r.rule.PeerRevision && j.Operation == expected
 }
