@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
@@ -63,17 +64,18 @@ type Job struct {
 	Plan         json.RawMessage `json:"plan,omitempty"`
 }
 type Config struct {
-	Format      string        `json:"format"`
-	Node        string        `json:"node"`
-	Revision    uint64        `json:"revision"`
-	NotBefore   int64         `json:"notBefore"`
-	ExpiresUnix int64         `json:"expiresUnix"`
-	Limits      Limits        `json:"limits"`
-	Nodes       []policy.Node `json:"nodes"`
-	Targets     []Target      `json:"targets"`
-	Domains     []Domain      `json:"domains"`
-	Jobs        []Job         `json:"jobs"`
-	Signature   []byte        `json:"signature,omitempty"`
+	Format      string            `json:"format"`
+	Node        string            `json:"node"`
+	Revision    uint64            `json:"revision"`
+	NotBefore   int64             `json:"notBefore"`
+	ExpiresUnix int64             `json:"expiresUnix"`
+	Limits      Limits            `json:"limits"`
+	Nodes       []policy.Node     `json:"nodes"`
+	Targets     []Target          `json:"targets"`
+	Domains     []Domain          `json:"domains"`
+	Jobs        []Job             `json:"jobs"`
+	Ingress     []json.RawMessage `json:"ingress,omitempty"`
+	Signature   []byte            `json:"signature,omitempty"`
 }
 
 func (c Config) NodeByID(id string) (policy.Node, bool) {
@@ -107,7 +109,7 @@ func (c Config) Active(now time.Time) error {
 	return nil
 }
 func (c Config) validate(owner ed25519.PublicKey) error {
-	if c.Format != Format || !storage.ID(c.Node) || c.Revision == 0 || c.NotBefore <= 0 || c.ExpiresUnix <= c.NotBefore || c.ExpiresUnix > 1<<40 || c.Limits.Validate() != nil || len(c.Nodes) < 1 || len(c.Nodes) > 128 || len(c.Targets) > 128 || len(c.Domains) > 128 || len(c.Jobs) > 64 {
+	if c.Format != Format || !storage.ID(c.Node) || c.Revision == 0 || c.NotBefore <= 0 || c.ExpiresUnix <= c.NotBefore || c.ExpiresUnix > 1<<40 || c.Limits.Validate() != nil || len(c.Nodes) < 1 || len(c.Nodes) > 128 || len(c.Targets) > 128 || len(c.Domains) > 128 || len(c.Jobs) > 64 || len(c.Ingress) > 128 {
 		return ErrDenied
 	}
 	nodes := map[string]policy.Node{}
@@ -150,6 +152,33 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		}
 	}
 	operations := map[string]bool{}
+	grants := map[string]bool{}
+	for _, raw := range c.Ingress {
+		a, e := ingress.VerifyAuthorityDocument(raw, owner)
+		if e != nil || a.Revision > c.Revision || a.NotBefore > c.NotBefore || a.ExpiresUnix < c.ExpiresUnix || c.Node != a.Source && c.Node != a.Ingress {
+			return ErrDenied
+		}
+		d, ok := domains[a.Trust.Domain]
+		x, _ := json.Marshal(d.Trust)
+		y, _ := json.Marshal(a.Trust)
+		if !ok || !bytes.Equal(x, y) || nodes[a.Source].Class != "trusted" || !d.Placement.HasEdge(a.Source, a.Ingress, "push") {
+			return ErrDenied
+		}
+		holder := false
+		for _, id := range d.Placement.Holders {
+			if id == a.Ingress {
+				holder = true
+			}
+		}
+		if !holder {
+			return ErrDenied
+		}
+		binding := a.Trust.Domain + "/" + a.Ingress
+		if grants[binding] {
+			return ErrDenied
+		}
+		grants[binding] = true
+	}
 	for _, j := range c.Jobs {
 		d, ok := domains[j.Domain]
 		if !ok || !storage.ID(j.Operation) || !storage.ID(j.Generation) || operations[j.Operation] || !d.Placement.PermitsNode(c.Node) || !d.Placement.PermitsNode(j.Executor) {

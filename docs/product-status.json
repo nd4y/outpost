@@ -8,25 +8,40 @@
       "id": "REQ-01",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-02",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-03",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [
         {
           "path": "internal/source/scan_linux_test.go",
@@ -54,44 +69,71 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-04",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [
         {
           "path": "internal/filekit/streaming_linux_test.go",
           "name": "TestStreamingCaptureKeepsOnlyMetadataAndRestoresBothDeltaVersions"
+        },
+        {
+          "path": "internal/worker/ingress_linux_test.go",
+          "name": "TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-05",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [
         {
           "path": "internal/generation/streaming_linux_test.go",
           "name": "TestBuildCatalogDoesNotFetchPayloadBackThroughSource"
+        },
+        {
+          "path": "internal/ingress/http_linux_test.go",
+          "name": "TestAuthenticatedSourceIngressAndOfflineReplicaRecovery"
+        },
+        {
+          "path": "internal/ingress/ack_linux_test.go",
+          "name": "TestAcknowledgementReleasesOnlyOwnCopiesAndPreservesReceipt"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-06",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-07",
@@ -106,10 +148,15 @@
       "id": "REQ-08",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-09",
@@ -232,7 +279,12 @@
       "id": "REQ-14",
       "workstream": "source",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/source", "internal/filekit", "internal/policy"],
+      "implementation": [
+        "internal/source",
+        "internal/filekit",
+        "internal/ingress",
+        "internal/policy"
+      ],
       "checks": [
         {
           "path": "internal/policy/rules_test.go",
@@ -244,7 +296,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Source profile enrollment, declared consistency providers, authenticated remote ingress, resumable capture/release and recovery-kit orchestration."
+      "remaining": "Source profile enrollment, declared consistency providers, resumable capture/provider release, grant renewal and recovery-kit orchestration."
     },
     {
       "id": "REQ-15",
@@ -261,6 +313,10 @@
         {
           "path": "internal/policy/placement_test.go",
           "name": "TestPlacementPushThenPullRoute"
+        },
+        {
+          "path": "internal/control/ingress_linux_test.go",
+          "name": "TestIngressCapabilityRequiresCurrentPlacementAndIndependentSource"
         }
       ],
       "acceptance": ["AT-06", "AT-07", "AT-08", "AT-19", "AT-27"],
@@ -289,6 +345,10 @@
         {
           "path": "internal/worker/revisions_linux_test.go",
           "name": "TestReceiverPolicyLagRetriesWithoutExpandingAuthority"
+        },
+        {
+          "path": "internal/worker/ingress_linux_test.go",
+          "name": "TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -385,6 +445,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueThrottleDeadlineSurvivesReopen"
+        },
+        {
+          "path": "internal/ingress/crash_linux_test.go",
+          "name": "TestIngressSIGKILLDurabilityAndPublicationBoundaries"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -429,6 +493,14 @@
         {
           "path": "internal/control/control_linux_test.go",
           "name": "TestAuthorityHistorySurvivesDomainRemoval"
+        },
+        {
+          "path": "internal/ingress/registry_linux_test.go",
+          "name": "TestRegistryFencesAdmissionAndRecyclesOnlyAcknowledgedSlot"
+        },
+        {
+          "path": "internal/ingress/registry_linux_test.go",
+          "name": "TestRegistryRejectsClockRollbackAcrossSlotReplacement"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
@@ -517,6 +589,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueInstancesKeepIndependentPins"
+        },
+        {
+          "path": "internal/ingress/ack_linux_test.go",
+          "name": "TestHTTPSAcknowledgementIsIdempotentAfterLostReply"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -827,6 +903,10 @@
         {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestConcurrentReservationsShareQuotaAndKeepSeparateSpool"
+        },
+        {
+          "path": "internal/diskbudget/remove_linux_test.go",
+          "name": "TestOwnedRemovalReturnsMeasuredQuotaWithoutDoubleDebit"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -896,6 +976,10 @@
         {
           "path": "internal/worker/migration_linux_test.go",
           "name": "TestOperatorMigrationUsesWorkerLeaseDomainAndBudget"
+        },
+        {
+          "path": "internal/diskbudget/remove_linux_test.go",
+          "name": "TestOwnedRemovalRejectsSymlinkAndTraversal"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],

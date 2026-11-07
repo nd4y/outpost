@@ -18,6 +18,7 @@ import (
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -39,6 +40,7 @@ type domainState struct {
 	replica *generation.Replica
 	journal *peer.Journal
 	handler http.Handler
+	ingress *ingress.Registry
 }
 type view struct {
 	cfg      control.Config
@@ -61,6 +63,7 @@ type Worker struct {
 	mu           sync.Mutex
 	active       *view
 	budget       *diskbudget.Budget
+	owner        ed25519.PublicKey
 }
 
 func Open(o Options) (*Worker, error) {
@@ -74,7 +77,7 @@ func Open(o Options) (*Worker, error) {
 	if _, ok := o.Certificate.PrivateKey.(ed25519.PrivateKey); !ok {
 		return nil, ErrDenied
 	}
-	w := &Worker{dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve}
+	w := &Worker{dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
 	if o.Initialize {
 		if _, e = os.Lstat(o.Directory); e == nil {
 			return nil, ErrDenied
@@ -223,6 +226,9 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	fail := func(e error) (*view, error) {
 		v.cancel()
 		for _, d := range v.domains {
+			if d.ingress != nil {
+				d.ingress.Close()
+			}
 			if d.journal != nil {
 				d.journal.Close()
 			}
@@ -286,6 +292,36 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		local.replica.Admit = w.budget.Admission(filepath.ToSlash(filepath.Join(relative, "replica")))
 		local.journal.Admit = w.budget.Admission(filepath.ToSlash(filepath.Join(relative, "peer")))
 	}
+	for _, raw := range c.Ingress {
+		a, e := ingress.VerifyAuthority(raw, w.owner, time.Now())
+		if e != nil {
+			return fail(e)
+		}
+		if a.Ingress != w.node {
+			continue
+		}
+		local := v.domains[a.Trust.Domain]
+		if local == nil {
+			return fail(ErrDenied)
+		}
+		dir := filepath.Join(DomainDirectory(w.dir, a.Trust), "ingress")
+		relative, e := filepath.Rel(w.dir, dir)
+		if e != nil {
+			return fail(e)
+		}
+		e = createOrOpen(dir, func(init bool) error {
+			var e error
+			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Directory: dir, Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
+				return w.budget.Admission(filepath.ToSlash(filepath.Join(relative, prefix)))
+			}, RemoveObject: func(ctx context.Context, name string, size int64) error {
+				return w.budget.Remove(ctx, filepath.ToSlash(filepath.Join(relative, "current/objects", name)), size)
+			}})
+			return e
+		})
+		if e != nil {
+			return fail(e)
+		}
+	}
 	if e := w.admit(ctx, c); e != nil {
 		return fail(e)
 	}
@@ -309,6 +345,9 @@ func (w *Worker) stop(v *view) error {
 	e := v.err
 	v.requests.Wait()
 	for _, d := range v.domains {
+		if d.ingress != nil {
+			e = errors.Join(e, d.ingress.Close())
+		}
 		e = errors.Join(e, d.journal.Close(), d.replica.Close())
 	}
 	return e
@@ -394,6 +433,10 @@ func (w *Worker) ServeHTTP(out http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) >= 8 && parts[1] == "v1" && parts[2] == "tenants" && parts[4] == "domains" && parts[6] == "captures" {
+		w.serveIngress(out, r, parts[5])
+		return
+	}
 	if len(parts) < 6 || parts[1] != "v1" || parts[3] != "generations" {
 		http.Error(out, "denied", 403)
 		return
