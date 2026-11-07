@@ -75,6 +75,9 @@ func (r *Replica) MaintainAdmitted(ctx context.Context, raw []byte, admit func()
 				}
 			}
 		}
+		if len(s.CatalogDamage) > 0 {
+			return ErrCatalogUnavailable
+		}
 		// Validate *all* current complete roots before retiring any of them.
 		keep := map[string]Object{}
 		retiring := map[string]bool{}
@@ -126,7 +129,7 @@ func (r *Replica) MaintainAdmitted(ctx context.Context, raw []byte, admit func()
 				s.GC = map[string]gcRecord{}
 			}
 			s.GC[p.Operation] = gcRecord{Plan: digest}
-			if s.Format != IntegrityStateFormat {
+			if !integrityState(s.Format) {
 				s.Format = MaintenanceStateFormat
 			}
 			s.Revision++

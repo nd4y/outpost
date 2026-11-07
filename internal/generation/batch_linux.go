@@ -140,6 +140,9 @@ func (r *Replica) saveVerification(v verificationState) error {
 	return r.point("verification-batch-durable")
 }
 func (r *Replica) publishComplete(s *state, id string, c Catalog) error {
+	if _, bad := s.CatalogDamage[id]; bad {
+		return ErrCatalogUnavailable
+	}
 	refs, e := closure(c)
 	if e != nil {
 		return e

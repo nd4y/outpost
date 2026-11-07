@@ -124,7 +124,8 @@ func (w *Worker) OpenReporter(ctx context.Context, target, domain string, enroll
 	return out, nil
 }
 
-// ManagementSnapshot reads bounded metadata, not payloads. Inventory absence
+// ManagementSnapshot reads bounded metadata and admits catalog-damage journal
+// writes through the existing worker budget. It reads no payloads. Inventory absence
 // is explicit; it cannot turn a missing mount/journal into an empty healthy copy.
 func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, domain string) (management.Snapshot, error) {
 	out := management.Snapshot{Generations: []management.Generation{}, Jobs: []management.Job{}, Space: management.Space{State: "UNKNOWN"}, InventoryState: "UNAVAILABLE"}
@@ -142,6 +143,13 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	}
 	if status.Revision != cfg.Revision {
 		return out, management.ErrConflict
+	}
+	budget, owned, e := w.reportingBudget(ctx, cfg)
+	if e != nil {
+		return out, e
+	}
+	if owned {
+		defer budget.Close()
 	}
 	out.ConfigurationRevision = status.Revision
 	out.EnrollmentRevision = grant.Revision
@@ -170,6 +178,17 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	d, _ := cfg.DomainByID(domain)
 	replica, e := generation.OpenAt(w.root, w.relative(filepath.Join(DomainDirectory(w.dir, d.Trust), "replica")), d.Trust, false)
 	if e == nil {
+		prefix := filepath.ToSlash(w.relative(filepath.Join(DomainDirectory(w.dir, d.Trust), "replica")))
+		replica.Admit = func(name string, size int) (func(bool) error, error) {
+			if e := w.check(ctx); e != nil {
+				return nil, e
+			}
+			done, e := budget.Admission(prefix)(name, size)
+			if e != nil {
+				return nil, e
+			}
+			return func(written bool) error { return errors.Join(done(written), w.check(ctx)) }, nil
+		}
 		recorded, re := replica.Recorded(ctx)
 		ce := replica.Close()
 		if re != nil || ce != nil {
@@ -185,6 +204,9 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 				state = "CORRUPT"
 			}
 			item := management.Generation{Generation: g.Generation, Sequence: g.Sequence, CreatedUnix: g.CreatedUnix, Status: state, Target: w.node, Verification: "NONE", Objects: uint64(g.Objects), Pinned: g.Pinned}
+			if g.CatalogUnavailable {
+				item.MetadataState = "UNAVAILABLE"
+			}
 			scrub := status.Scrubs[scrubKey(domain, d.Trust.Repository, d.Trust.Epoch, g.Generation)]
 			if g.Complete && scrub.Phase == "COMPLETE" && scrub.VerifiedUnix > 0 && scrub.HealthToken == g.RepairToken {
 				item.Verification = "CIPHERTEXT"
@@ -211,13 +233,7 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 		return out, management.ErrInvalid
 	}
 	used, free := int64(fs.Blocks-fs.Bfree)*fs.Bsize, int64(fs.Bavail)*fs.Bsize
-	budget, owned, e := w.reportingBudget(ctx, cfg)
-	if e != nil {
-		return out, e
-	}
-	if owned {
-		defer budget.Close()
-	}
+
 	var accounted, reserved *int64
 	if budget != nil {
 		ledger, e := budget.Status(ctx)

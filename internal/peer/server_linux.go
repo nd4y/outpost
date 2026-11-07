@@ -187,9 +187,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		_, e = h.replica.Begin(ctx, raw)
-		if errors.Is(e, generation.ErrRollback) && history == "1" {
-			_, e = h.replica.BeginHistorical(ctx, raw)
+		if repair != "" {
+			e = h.replica.RepairCatalogFor(ctx, id, repair, raw)
+		} else {
+			_, e = h.replica.Begin(ctx, raw)
+			if errors.Is(e, generation.ErrRollback) && history == "1" {
+				_, e = h.replica.BeginHistorical(ctx, raw)
+			}
 		}
 		if e != nil {
 			fail(w, e)

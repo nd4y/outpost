@@ -211,7 +211,20 @@ func TestCatalogCacheCannotHideTamperingFromCompletionOrMaintenance(t *testing.T
 		}
 		break
 	}
-	ok(t, os.WriteFile(filepath.Join(dir, "catalogs", id), raw, 0600))
+	needs, e := r.RepairNeeds(ctx)
+	ok(t, e)
+	if len(needs) != 1 || needs[0].Generation != id {
+		t.Fatal("missing catalog repair fence", needs)
+	}
+	ok(t, r.RepairCatalogFor(ctx, id, needs[0].Token, raw))
+	if e = r.VerifyComplete(ctx, id); !errors.Is(e, ErrIncomplete) {
+		t.Fatal("catalog repair published unchecked payload", e)
+	}
+	verified, e := r.VerifyWindow(ctx, id, Hash([]byte("cache-repair-full-verification")), 16, 64<<20)
+	ok(t, e)
+	if !verified.Complete {
+		t.Fatal("full verification unfinished", verified)
+	}
 	ok(t, r.VerifyComplete(ctx, id))
 }
 func TestCompactIndexSupportsHistoryBeyondFormerEmbeddedLimit(t *testing.T) {

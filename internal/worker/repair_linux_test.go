@@ -44,6 +44,33 @@ func damageWorkerReplica(t *testing.T, f *fixture, index int) generation.RepairN
 }
 
 func TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes(t *testing.T) {
+	exerciseAutonomousRepair(t, damageWorkerReplica, false)
+}
+func TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes(t *testing.T) {
+	exerciseAutonomousRepair(t, damageWorkerCatalog, true)
+}
+func damageWorkerCatalog(t *testing.T, f *fixture, index int) generation.RepairNeed {
+	t.Helper()
+	dir := filepath.Join(DomainDirectory(f.nodes[index].dir, f.domain.Trust), "replica")
+	r, e := generation.Open(dir, f.domain.Trust, false)
+	must(t, e)
+	defer r.Close()
+	path := filepath.Join(dir, "catalogs", f.generation)
+	raw, e := os.ReadFile(path)
+	must(t, e)
+	raw[0] ^= 1
+	must(t, os.WriteFile(path, raw, 0600))
+	if _, e = r.Catalog(context.Background(), f.generation); !errors.Is(e, generation.ErrCatalogUnavailable) {
+		t.Fatal("catalog damage not detected", e)
+	}
+	needs, e := r.RepairNeeds(context.Background())
+	must(t, e)
+	if len(needs) != 1 {
+		t.Fatal(needs)
+	}
+	return needs[0]
+}
+func exerciseAutonomousRepair(t *testing.T, damage func(*testing.T, *fixture, int) generation.RepairNeed, catalog bool) {
 	f := newFixture(t)
 	f.endpoint(t, nil)
 	push, pull := f.rules()
@@ -66,8 +93,8 @@ func TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes(t *
 	stopA()
 	stopC()
 	stopB()
-	bNeed := damageWorkerReplica(t, f, 1)
-	cNeed := damageWorkerReplica(t, f, 2)
+	bNeed := damage(t, f, 1)
+	cNeed := damage(t, f, 2)
 	// The relay alone listens. Both endpoints still initiate their own HTTPS
 	// connections; no control publication or reverse network route is added.
 	stopB = start(t, f.nodes[1])
@@ -103,7 +130,11 @@ func TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes(t *
 		journal, e := r.Integrity(context.Background())
 		must(t, e)
 		must(t, r.Close())
-		if len(journal.Repairs) != 1 || len(journal.Damage) != 0 {
+		repairs, damages := journal.Repairs, journal.Damage
+		if catalog {
+			repairs, damages = journal.CatalogRepairs, journal.CatalogDamage
+		}
+		if len(repairs) != 1 || len(damages) != 0 {
 			t.Fatal("automatic repair has no durable quarantine", journal)
 		}
 		out := filepath.Join(f.base, "repaired-recovery-"+f.cfg.Nodes[index].ID)

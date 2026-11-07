@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"syscall"
 	"time"
 
@@ -42,6 +43,8 @@ type state struct {
 	GC              map[string]gcRecord     `json:"gc,omitempty"`
 	Damage          map[string]DamageRecord `json:"damage,omitempty"`
 	Repairs         map[string]RepairRecord `json:"repairs,omitempty"`
+	CatalogDamage   map[string]DamageRecord `json:"catalogDamage,omitempty"`
+	CatalogRepairs  map[string]RepairRecord `json:"catalogRepairs,omitempty"`
 }
 type Status struct {
 	Revision        uint64         `json:"revision"`
@@ -56,8 +59,10 @@ type Replica struct {
 	root  *os.Root
 	trust Trust
 	// Fault is a development-test hook; production callers leave it nil.
-	Fault func(string) error
-	Admit statefile.Admission
+	Fault           func(string) error
+	Admit           statefile.Admission
+	pendingCatalogs map[string]bool
+	pendingMu       sync.Mutex
 }
 
 // Open requires an existing directory on an independently admitted filesystem.
@@ -102,9 +107,14 @@ func OpenAt(parent *os.Root, dir string, t Trust, initialize bool) (*Replica, er
 		}
 	}
 	if err = p.locked(context.Background(), func(s *state) error {
-		for id := range s.Generations {
-			if _, _, e := p.get(s, id, true); e != nil {
-				return e
+		// Diagnose without writing before the caller installs quota/volume
+		// admission. The first operation durably fences only unreadable roots.
+		for id, item := range s.Generations {
+			if _, _, e := p.catalogEntry(id, item, true); e != nil {
+				if p.pendingCatalogs == nil {
+					p.pendingCatalogs = map[string]bool{}
+				}
+				p.pendingCatalogs[id] = true
 			}
 		}
 		return nil
@@ -219,7 +229,7 @@ func (r *Replica) load() (state, error) {
 func (r *Replica) validateState(s state) (state, error) {
 	t, _ := json.Marshal(r.trust)
 	u, _ := json.Marshal(s.Trust)
-	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat && s.Format != IntegrityStateFormat) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
+	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat && !integrityState(s.Format)) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
 		return s, ErrInvalid
 	}
 	if s.Format == StateFormat && s.GC != nil || s.Format == MaintenanceStateFormat && len(s.GC) == 0 || len(s.GC) > len(s.Receipts) {
@@ -235,7 +245,7 @@ func (r *Replica) validateState(s state) (state, error) {
 			return s, ErrInvalid
 		}
 	}
-	if len(s.Damage) > MaxObjects || s.Format != IntegrityStateFormat && len(s.Damage) > 0 {
+	if len(s.Damage) > MaxObjects || !integrityState(s.Format) && len(s.Damage) > 0 {
 		return s, ErrInvalid
 	}
 	for id, damage := range s.Damage {
@@ -243,13 +253,16 @@ func (r *Replica) validateState(s state) (state, error) {
 			return s, ErrInvalid
 		}
 	}
-	if len(s.Repairs) > MaxPins || s.Format != IntegrityStateFormat && len(s.Repairs) > 0 {
+	if len(s.Repairs)+len(s.CatalogRepairs) > MaxPins || !integrityState(s.Format) && len(s.Repairs) > 0 {
 		return s, ErrInvalid
 	}
 	for id, repair := range s.Repairs {
 		if !validID(id) || !repair.valid() || repair.CompletedUnix == 0 && s.Damage[repair.Object.ID].Repair != id {
 			return s, ErrInvalid
 		}
+	}
+	if e := validateCatalogDamage(s); e != nil {
+		return s, e
 	}
 	if (s.HighestSequence == 0) != (s.HighestID == "") || (s.HighestID != "" && !validID(s.HighestID)) {
 		return s, ErrInvalid
@@ -258,7 +271,7 @@ func (r *Replica) validateState(s state) (state, error) {
 	latestSequence := uint64(0)
 	latestID := ""
 	for id, item := range s.Generations {
-		if (item.Damaged || item.RepairToken != "") && s.Format != IntegrityStateFormat || item.Damaged && !validID(item.RepairToken) || item.RepairToken != "" && !validID(item.RepairToken) {
+		if (item.Damaged || item.RepairToken != "") && !integrityState(s.Format) || item.Damaged && !validID(item.RepairToken) || item.RepairToken != "" && !validID(item.RepairToken) {
 			return s, ErrInvalid
 		}
 		if !validID(id) || item.Sequence == 0 || item.Sequence > s.HighestSequence || item.Bytes < 1 || item.Bytes > MaxCatalog {
@@ -294,6 +307,9 @@ func (r *Replica) locked(ctx context.Context, fn func(*state) error) error {
 	return r.exclusive(ctx, func() error {
 		s, e := r.load()
 		if e != nil {
+			return e
+		}
+		if e := r.applyCatalogDiagnosis(ctx, &s); e != nil {
 			return e
 		}
 		return fn(&s)
@@ -347,7 +363,14 @@ func (r *Replica) get(s *state, id string, fresh bool) (Catalog, map[string]Obje
 	if !ok {
 		return Catalog{}, nil, ErrInvalid
 	}
-	return r.catalogEntry(id, item, fresh)
+	c, refs, e := r.catalogEntry(id, item, fresh)
+	if e != nil {
+		if mark := r.recordCatalogDamage(s, id); mark != nil {
+			return c, nil, mark
+		}
+		return c, nil, errors.Join(ErrCatalogUnavailable, e)
+	}
+	return c, refs, nil
 }
 func (r *Replica) Begin(ctx context.Context, raw []byte) (string, error) {
 	c, e := VerifyCatalog(raw, r.trust)
@@ -497,6 +520,12 @@ func (r *Replica) Catalog(ctx context.Context, id string) ([]byte, error) {
 			return ErrIncomplete
 		}
 		raw, err := r.catalogRaw(id, item)
+		if err != nil {
+			if mark := r.recordCatalogDamage(s, id); mark != nil {
+				return mark
+			}
+			return errors.Join(ErrCatalogUnavailable, err)
+		}
 		b = raw
 		return err
 	})

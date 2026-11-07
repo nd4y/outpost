@@ -1035,6 +1035,26 @@
         {
           "path": "internal/worker/recovery_linux_test.go",
           "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1077,6 +1097,22 @@
         {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
@@ -1415,6 +1451,14 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/catalog_reporting_linux_test.go",
+          "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -1485,6 +1529,26 @@
         {
           "path": "internal/generation/verify_linux_test.go",
           "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -1830,6 +1894,30 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportMaintenanceRetainsReplicaOutcome"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/worker/catalog_reporting_linux_test.go",
+          "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
@@ -1994,7 +2082,7 @@
         }
       ],
       "acceptance": ["AT-13"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-35",
@@ -2063,7 +2151,7 @@
         }
       ],
       "acceptance": ["AT-13"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-36",
@@ -2185,10 +2273,30 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-24"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-37",
@@ -2288,6 +2396,14 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
+        },
+        {
+          "path": "internal/worker/catalog_reporting_linux_test.go",
+          "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -2359,6 +2475,10 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
         }
       ],
       "acceptance": ["AT-27"],
@@ -2510,6 +2630,26 @@
         {
           "path": "cmd/outpost/recovery_linux_test.go",
           "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/worker/catalog_reporting_linux_test.go",
+          "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2664,6 +2804,10 @@
         {
           "path": "internal/worker/recovery_linux_test.go",
           "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/worker/repair_linux_test.go",
+          "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2828,6 +2972,22 @@
         {
           "path": "internal/worker/recovery_linux_test.go",
           "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -2975,6 +3135,10 @@
         {
           "path": "internal/recovery/admission_linux_test.go",
           "name": "TestRecoveryAdmissionSIGKILLPreservesOwnedOutputAndReservation"
+        },
+        {
+          "path": "internal/worker/catalog_reporting_linux_test.go",
+          "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -3126,7 +3290,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-47",
@@ -3484,6 +3648,26 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageReopenIsolatesGenerationAndAdmitsJournalBeforeServing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogDamageDoesNotPreventSharedObjectFencing"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairSIGKILLPreservesOriginalAndReplay"
+        },
+        {
+          "path": "internal/generation/catalog_integrity_linux_test.go",
+          "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

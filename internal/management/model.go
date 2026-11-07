@@ -17,6 +17,7 @@ const EnrollmentFormat = "outpost-management-enrollment-1"
 const ReportFormat = "outpost-management-report-1"
 const CommandReportFormat = "outpost-management-report-2"
 const RecoveryReportFormat = "outpost-management-report-3"
+const CatalogReportFormat = "outpost-management-report-4"
 const CommandFormat = "outpost-management-command-1"
 const MaxEnrollment = 65536
 const MaxReport = 8 << 20
@@ -203,6 +204,7 @@ func (s Space) valid(now int64) bool {
 }
 
 type Generation struct {
+	MetadataState       string `json:"metadataState,omitempty"`
 	Generation          string `json:"generation"`
 	Sequence            uint64 `json:"sequence"`
 	CreatedUnix         int64  `json:"createdUnix"`
@@ -255,7 +257,7 @@ func stableCode(code string) bool {
 	return true
 }
 func (r Report) Validate(e Enrollment, now time.Time) error {
-	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat && r.Format != RecoveryReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
+	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat && r.Format != RecoveryReportFormat && r.Format != CatalogReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
 		return ErrInvalid
 	}
 	if _, ok := e.Domain(r.Domain); !ok {
@@ -266,15 +268,20 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 		return ErrInvalid
 	}
 	for _, c := range r.Commands {
-		if c.Kind == "restore" && r.Format != RecoveryReportFormat || seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
+		if c.Kind == "restore" && r.Format != RecoveryReportFormat && r.Format != CatalogReportFormat || seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
 			return ErrInvalid
 		}
 		seen[c.Operation] = true
 	}
 	seen = map[string]bool{}
 	for _, g := range r.Generations {
+		if g.MetadataState != "" {
+			if r.Format != CatalogReportFormat || g.MetadataState != "UNAVAILABLE" || g.CreatedUnix != 0 || g.Objects != 0 || g.LogicalBytes != nil || g.Status != "CORRUPT" || g.Verification != "NONE" || g.VerifiedUnix != 0 || g.RestoreVerifiedUnix != 0 {
+				return ErrInvalid
+			}
+		}
 		k := g.Generation + g.Target
-		if !storage.ID(g.Generation) || !storage.ID(g.Target) || g.Sequence == 0 || !safe(g.Sequence) || g.LogicalBytes != nil && (*g.LogicalBytes < 0 || *g.LogicalBytes > MaxSafeInteger) || !safe(g.Objects) || !validTime(g.CreatedUnix) || g.CreatedUnix > r.ObservedUnix || !oneOf(g.Status, "INCOMPLETE", "COMPLETE", "CORRUPT", "UNAVAILABLE") || !oneOf(g.Verification, "NONE", "CIPHERTEXT", "DECRYPTED") || g.VerifiedUnix < 0 || g.VerifiedUnix > r.ObservedUnix || g.RestoreVerifiedUnix < 0 || g.RestoreVerifiedUnix > r.ObservedUnix || seen[k] {
+		if !storage.ID(g.Generation) || !storage.ID(g.Target) || g.Sequence == 0 || !safe(g.Sequence) || g.LogicalBytes != nil && (*g.LogicalBytes < 0 || *g.LogicalBytes > MaxSafeInteger) || !safe(g.Objects) || (g.MetadataState == "" && !validTime(g.CreatedUnix)) || g.CreatedUnix > r.ObservedUnix || !oneOf(g.Status, "INCOMPLETE", "COMPLETE", "CORRUPT", "UNAVAILABLE") || !oneOf(g.Verification, "NONE", "CIPHERTEXT", "DECRYPTED") || g.VerifiedUnix < 0 || g.VerifiedUnix > r.ObservedUnix || g.RestoreVerifiedUnix < 0 || g.RestoreVerifiedUnix > r.ObservedUnix || seen[k] {
 			return ErrInvalid
 		}
 		if (g.Verification == "NONE") != (g.VerifiedUnix == 0) || g.RestoreVerifiedUnix > 0 && g.Verification != "DECRYPTED" {

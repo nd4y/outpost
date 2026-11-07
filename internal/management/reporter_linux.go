@@ -244,6 +244,12 @@ func (r *Reporter) Enqueue(ctx context.Context, in Snapshot) ([]byte, error) {
 				}
 			}
 		}
+		for _, g := range in.Generations {
+			if g.MetadataState != "" {
+				report.Format = CatalogReportFormat
+				break
+			}
+		}
 		raw, e := SignReport(report, grant, r.signer, time.Now())
 		if e != nil {
 			return e

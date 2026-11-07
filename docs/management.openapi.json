@@ -2434,7 +2434,7 @@
             "type": "string",
             "contentEncoding": "base64",
             "maxLength": 11184812,
-            "description": "Signed outpost-management-report-1, report-2 or report-3. Version 2 carries scrub/maintenance observations; version 3 adds trusted restore. Original times, sequence and exact tenant/domain scope are required."
+            "description": "Signed outpost-management-report-1 through report-4. Version2 carries scrub/maintenance, version3 adds trusted restore, version4 adds unavailable catalog metadata. Original times, sequence and exact tenant/domain scope are required."
           }
         },
         "required": ["document"]
@@ -2448,7 +2448,8 @@
             "enum": [
               "outpost-management-report-view-1",
               "outpost-management-report-view-2",
-              "outpost-management-report-view-3"
+              "outpost-management-report-view-3",
+              "outpost-management-report-view-4"
             ]
           },
           "node": {
@@ -2562,6 +2563,30 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "enum": [
+                    "outpost-management-report-view-1",
+                    "outpost-management-report-view-2",
+                    "outpost-management-report-view-3"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "generations": {
+                  "items": {
+                    "not": {
+                      "required": ["metadataState"]
+                    }
+                  }
+                }
+              }
+            }
           }
         ]
       },
@@ -2666,6 +2691,10 @@
           },
           "pinned": {
             "type": "boolean"
+          },
+          "metadataState": {
+            "const": "UNAVAILABLE",
+            "description": "Only report4/view4 and generation page2. Catalog is unreadable; zero creation/object values are unknown, not measured empty values."
           }
         },
         "required": [
@@ -2680,6 +2709,38 @@
           "logicalBytes",
           "objects",
           "pinned"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": ["metadataState"]
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "CORRUPT"
+                },
+                "createdUnix": {
+                  "const": 0
+                },
+                "objects": {
+                  "const": 0
+                },
+                "logicalBytes": {
+                  "type": "null"
+                },
+                "verification": {
+                  "const": "NONE"
+                },
+                "verifiedUnix": {
+                  "const": 0
+                },
+                "restoreVerifiedUnix": {
+                  "const": 0
+                }
+              }
+            }
+          }
         ]
       },
       "GenerationPage": {
@@ -2687,7 +2748,7 @@
         "additionalProperties": false,
         "properties": {
           "format": {
-            "const": "outpost-management-generations-1"
+            "enum": ["outpost-management-generations-1", "outpost-management-generations-2"]
           },
           "reportSequence": {
             "type": "integer",
@@ -2719,7 +2780,36 @@
             "enum": ["UNKNOWN", "OBSERVED", "UNAVAILABLE"]
           }
         },
-        "required": ["format", "reportSequence", "observedUnix", "items", "state", "inventoryState"]
+        "required": [
+          "format",
+          "reportSequence",
+          "observedUnix",
+          "items",
+          "state",
+          "inventoryState"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-generations-1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "not": {
+                      "required": ["metadataState"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "Job": {
         "type": "object",

@@ -39,8 +39,10 @@ func (v RepairRecord) valid() bool {
 }
 
 type IntegrityStatus struct {
-	Damage  map[string]DamageRecord `json:"damage"`
-	Repairs map[string]RepairRecord `json:"repairs"`
+	Damage         map[string]DamageRecord `json:"damage"`
+	Repairs        map[string]RepairRecord `json:"repairs"`
+	CatalogDamage  map[string]DamageRecord `json:"catalogDamage,omitempty"`
+	CatalogRepairs map[string]RepairRecord `json:"catalogRepairs,omitempty"`
 }
 
 type RepairNeed struct {
@@ -109,7 +111,10 @@ func (r *Replica) RepairMissing(ctx context.Context, id string) ([]Object, error
 
 func (r *Replica) Integrity(ctx context.Context) (IntegrityStatus, error) {
 	var result IntegrityStatus
-	e := r.locked(ctx, func(s *state) error { result = IntegrityStatus{Damage: s.Damage, Repairs: s.Repairs}; return nil })
+	e := r.locked(ctx, func(s *state) error {
+		result = IntegrityStatus{Damage: s.Damage, Repairs: s.Repairs, CatalogDamage: s.CatalogDamage, CatalogRepairs: s.CatalogRepairs}
+		return nil
+	})
 	return result, e
 }
 
@@ -197,13 +202,16 @@ func (r *Replica) repairPut(ctx context.Context, generation, id, token string, b
 }
 
 func (r *Replica) replaceDamaged(ctx context.Context, s *state, ref Object, b []byte) error {
-	damage := s.Damage[ref.ID]
+	return r.replaceDamagedEntry(ctx, s, ref, b, "objects", s.Damage, &s.Repairs, func() error { _, e := r.verifyObjectStamp(ctx, ref); return e })
+}
+func (r *Replica) replaceDamagedEntry(ctx context.Context, s *state, ref Object, b []byte, namespace string, damages map[string]DamageRecord, repairs *map[string]RepairRecord, verify func() error) error {
+	damage := damages[ref.ID]
 	caseID := damage.Repair
 	if caseID == "" {
-		if len(s.Repairs) >= MaxPins {
+		if len(s.Repairs)+len(s.CatalogRepairs) >= MaxPins {
 			return statefile.ErrCapacity
 		}
-		bad, e := r.damagedBytes("objects/" + ref.ID)
+		bad, e := r.damagedBytes(namespace + "/" + ref.ID)
 		missing := errors.Is(e, os.ErrNotExist)
 		if e != nil && !missing {
 			return e
@@ -221,12 +229,12 @@ func (r *Replica) replaceDamaged(ctx context.Context, s *state, ref Object, b []
 		if !missing {
 			repair.OriginalHash = Hash(bad)
 		}
-		if s.Repairs == nil {
-			s.Repairs = map[string]RepairRecord{}
+		if *repairs == nil {
+			*repairs = map[string]RepairRecord{}
 		}
-		s.Repairs[caseID] = repair
+		(*repairs)[caseID] = repair
 		damage.Repair = caseID
-		s.Damage[ref.ID] = damage
+		damages[ref.ID] = damage
 		s.Revision++
 		if e = r.save(*s); e != nil {
 			return e
@@ -235,19 +243,19 @@ func (r *Replica) replaceDamaged(ctx context.Context, s *state, ref Object, b []
 			return e
 		}
 	}
-	repair := s.Repairs[caseID]
+	repair := (*repairs)[caseID]
 	if !repair.Missing {
-		dir, e := localfs.OpenAt(r.root, "quarantine/objects", true)
+		dir, e := localfs.OpenAt(r.root, "quarantine/"+namespace, true)
 		if e != nil {
 			return e
 		}
 		if e = dir.Close(); e != nil {
 			return e
 		}
-		name := "quarantine/objects/" + caseID
+		name := "quarantine/" + namespace + "/" + caseID
 		bad, e := r.damagedBytes(name)
 		if errors.Is(e, os.ErrNotExist) {
-			bad, e = r.damagedBytes("objects/" + ref.ID)
+			bad, e = r.damagedBytes(namespace + "/" + ref.ID)
 			if e != nil {
 				return e
 			}
@@ -270,7 +278,7 @@ func (r *Replica) replaceDamaged(ctx context.Context, s *state, ref Object, b []
 			return e
 		}
 	}
-	current, e := r.damagedBytes("objects/" + ref.ID)
+	current, e := r.damagedBytes(namespace + "/" + ref.ID)
 	already := e == nil && len(current) == ref.Bytes && Hash(current) == ref.ID
 	if !already {
 		if repair.Missing {
@@ -283,22 +291,22 @@ func (r *Replica) replaceDamaged(ctx context.Context, s *state, ref Object, b []
 		if e = ctx.Err(); e != nil {
 			return e
 		}
-		if e = r.write("objects/"+ref.ID, b); e != nil {
+		if e = r.write(namespace+"/"+ref.ID, b); e != nil {
 			return e
 		}
 		if e = r.point("repair-object-durable"); e != nil {
 			return e
 		}
 	}
-	if _, e = r.verifyObjectStamp(ctx, ref); e != nil {
+	if e = verify(); e != nil {
 		return e
 	}
 	repair.CompletedUnix = time.Now().Unix()
 	if repair.CompletedUnix < repair.DetectedUnix {
 		return ErrInvalid
 	}
-	s.Repairs[caseID] = repair
-	delete(s.Damage, ref.ID)
+	(*repairs)[caseID] = repair
+	delete(damages, ref.ID)
 	s.Revision++
 	if e = r.save(*s); e != nil {
 		return e
@@ -313,7 +321,7 @@ func integrityFailure(e error) bool {
 // The caller holds the replica lock. All affected publications lose readiness
 // together; their catalogs, original complete history and pins remain intact.
 func (r *Replica) recordDamage(s *state, ref Object) error {
-	changed := s.Format != IntegrityStateFormat
+	changed := !integrityState(s.Format)
 	if s.Damage == nil {
 		s.Damage = map[string]DamageRecord{}
 	}
@@ -330,6 +338,9 @@ func (r *Replica) recordDamage(s *state, ref Object) error {
 	}
 	for id, item := range s.Generations {
 		_, refs, e := r.get(s, id, true)
+		if errors.Is(e, ErrCatalogUnavailable) {
+			continue
+		}
 		if e != nil {
 			return e
 		}
@@ -352,7 +363,9 @@ func (r *Replica) recordDamage(s *state, ref Object) error {
 	if !changed {
 		return nil
 	}
-	s.Format = IntegrityStateFormat
+	if s.Format != CatalogStateFormat {
+		s.Format = IntegrityStateFormat
+	}
 	s.Latest = ""
 	highest := uint64(0)
 	for id, item := range s.Generations {

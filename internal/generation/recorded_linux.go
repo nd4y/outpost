@@ -2,19 +2,21 @@ package generation
 
 import (
 	"context"
+	"errors"
 	"sort"
 )
 
 // RecordedGeneration summarizes the authenticated catalog and publication
 // ledger. It deliberately makes no claim about present payload integrity.
 type RecordedGeneration struct {
-	Generation       string
-	Sequence         uint64
-	CreatedUnix      int64
-	Objects          int
-	Complete, Pinned bool
-	Damaged          bool
-	RepairToken      string
+	Generation         string
+	Sequence           uint64
+	CreatedUnix        int64
+	Objects            int
+	Complete, Pinned   bool
+	Damaged            bool
+	CatalogUnavailable bool
+	RepairToken        string
 }
 
 func (r *Replica) Recorded(ctx context.Context) ([]RecordedGeneration, error) {
@@ -29,6 +31,11 @@ func (r *Replica) Recorded(ctx context.Context) ([]RecordedGeneration, error) {
 				return e
 			}
 			catalog, refs, e := r.get(s, id, false)
+			if errors.Is(e, ErrCatalogUnavailable) {
+				current := s.Generations[id]
+				out = append(out, RecordedGeneration{Generation: id, Sequence: current.Sequence, Pinned: pins[id], Damaged: true, RepairToken: current.RepairToken, CatalogUnavailable: true})
+				continue
+			}
 			if e != nil {
 				return e
 			}

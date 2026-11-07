@@ -321,9 +321,13 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if _, err = generation.VerifyCatalog(raw, c.trust); err != nil {
 			return result, err
 		}
-		_, err = local.Begin(ctx, raw)
-		if errors.Is(err, generation.ErrRollback) && c.policy.Peers[c.peer].History {
-			_, err = local.BeginHistorical(ctx, raw)
+		if c.repair != "" {
+			err = local.RepairCatalogFor(ctx, id, c.repair, raw)
+		} else {
+			_, err = local.Begin(ctx, raw)
+			if errors.Is(err, generation.ErrRollback) && c.policy.Peers[c.peer].History {
+				_, err = local.BeginHistorical(ctx, raw)
+			}
 		}
 		if err != nil {
 			return result, err

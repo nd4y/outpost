@@ -172,3 +172,70 @@ func TestRecoveryReportVersionAndOriginalTimeOverHTTPS(t *testing.T) {
 		}
 	}
 }
+
+func TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS(t *testing.T) {
+	h := newHTTPFixture(t)
+	r, _, client := reporterFixture(t, h)
+	defer r.Close()
+	ctx := context.Background()
+	now := time.Now().Unix() - 20
+	snapshot := reporterSnapshot(t, h.f, now)
+	good := snapshot.Generations[0]
+	good.Generation = id("healthy-generation")
+	good.Sequence++
+	bad := &snapshot.Generations[0]
+	bad.MetadataState = "UNAVAILABLE"
+	bad.CreatedUnix = 0
+	bad.Objects = 0
+	bad.LogicalBytes = nil
+	bad.Status = "CORRUPT"
+	bad.Verification = "NONE"
+	bad.VerifiedUnix = 0
+	bad.RestoreVerifiedUnix = 0
+	snapshot.Generations = append(snapshot.Generations, good)
+	raw, e := r.Enqueue(ctx, snapshot)
+	must(t, e)
+	report, e := VerifyReport(raw, h.f.e, time.Now())
+	must(t, e)
+	if report.Format != CatalogReportFormat {
+		t.Fatal("missing catalog report fence")
+	}
+	_, e = r.Deliver(ctx, client)
+	must(t, e)
+	view, e := h.f.r.Report(ctx, h.f.p, h.f.e.Tenant, h.f.e.Node, id("domain"), time.Second)
+	must(t, e)
+	if view.Format != "outpost-management-report-view-4" || view.State != "STALE" || len(view.Generations) != 2 {
+		t.Fatal(view)
+	}
+	status, body := h.request(t, h.viewer, "GET", h.base()+"/domains/"+id("domain")+"/generations?limit=2", nil)
+	if status != 200 {
+		t.Fatalf("%d %s", status, body)
+	}
+	var page struct {
+		Format string
+		Items  []Generation
+	}
+	must(t, json.Unmarshal(body, &page))
+	if page.Format != "outpost-management-generations-2" || len(page.Items) != 2 || page.Items[0].MetadataState != "UNAVAILABLE" || page.Items[1].MetadataState != "" {
+		t.Fatal("partial metadata lost", page)
+	}
+	for _, format := range []string{ReportFormat, CommandReportFormat, RecoveryReportFormat} {
+		copy := report
+		copy.Format = format
+		if _, e = SignReport(copy, h.f.e, h.f.node, time.Now()); e == nil {
+			t.Fatal("old reader accepted unknown catalog")
+		}
+	}
+	for _, mutate := range []func(*Report){
+		func(r *Report) { r.Generations[0].Status = "COMPLETE" }, func(r *Report) { r.Generations[0].Objects = 1 },
+		func(r *Report) { r.Generations[0].CreatedUnix = now }, func(r *Report) { r.Generations[0].Verification = "CIPHERTEXT" },
+		func(r *Report) { r.Generations[0].MetadataState = "GUESS" },
+	} {
+		var bad Report
+		must(t, json.Unmarshal(raw, &bad))
+		mutate(&bad)
+		if _, e = SignReport(bad, h.f.e, h.f.node, time.Now()); e == nil {
+			t.Fatal("unknown metadata certified")
+		}
+	}
+}

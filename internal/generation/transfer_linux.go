@@ -76,8 +76,8 @@ func (r *Replica) missing(ctx context.Context, id string, metadataOnly bool) ([]
 	return missing, err
 }
 
-// VerifyComplete is read-only. A status query must never publish an unfinished
-// reception, even when its last object has arrived.
+// VerifyComplete never publishes an unfinished reception, even when its last
+// object has arrived. Detected catalog damage is durably fenced under admission.
 func (r *Replica) VerifyComplete(ctx context.Context, id string) error {
 	return r.locked(ctx, func(s *state) error {
 		if !s.Generations[id].Complete || s.Generations[id].Damaged {
