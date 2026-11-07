@@ -594,6 +594,10 @@ func (h *httpService) reportPage(p Principal, r *http.Request, view ReportView, 
 		}{"outpost-management-generations-1", view.Sequence, view.ObservedUnix, view.State, inventoryState(view.InventoryState), view.Generations[offset:end], next}, nil
 	}
 	if kind == "command-status" {
+		format := "outpost-management-command-status-1"
+		if view.Format == "outpost-management-report-view-3" {
+			format = "outpost-management-command-status-2"
+		}
 		items := view.Commands[offset:end]
 		if items == nil {
 			items = []CommandObservation{}
@@ -605,7 +609,7 @@ func (h *httpService) reportPage(p Principal, r *http.Request, view ReportView, 
 			State          string               `json:"state"`
 			Items          []CommandObservation `json:"items"`
 			NextCursor     string               `json:"nextCursor,omitempty"`
-		}{"outpost-management-command-status-1", view.Sequence, view.ObservedUnix, view.State, items, next}, nil
+		}{format, view.Sequence, view.ObservedUnix, view.State, items, next}, nil
 	}
 	return struct {
 		Format         string `json:"format"`

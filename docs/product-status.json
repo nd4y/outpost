@@ -78,6 +78,14 @@
           "name": "TestSourceInitRejectsOverlapBeforeCreatingRuntime"
         },
         {
+          "path": "internal/generation/typed_linux_test.go",
+          "name": "TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss"
+        },
+        {
+          "path": "internal/filekit/recovery_at_linux_test.go",
+          "name": "TestRecoveryPlanMetadataOnlyAndHeldDestination"
+        },
+        {
           "path": "internal/filekit/entries_linux_test.go",
           "name": "TestTypedIndependentDirectoryAndSymlinkRecovery"
         },
@@ -229,6 +237,54 @@
         {
           "path": "internal/sourceagent/observations_linux_test.go",
           "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/generation/typed_linux_test.go",
+          "name": "TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "internal/filekit/recovery_at_linux_test.go",
+          "name": "TestRecoveryPlanMetadataOnlyAndHeldDestination"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -247,6 +303,30 @@
         {
           "path": "internal/filekit/tamper_linux_test.go",
           "name": "TestCrossFileCiphertextAndVersionSubstitution"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationCancellationAndCatalogClosure"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
         }
       ],
       "acceptance": ["AT-02", "AT-03"],
@@ -435,6 +515,10 @@
         {
           "path": "internal/control/readback_test.go",
           "name": "TestReadbackPolicyRequiresExplicitBoundedOwnerConfiguration"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationCancellationAndCatalogClosure"
         }
       ],
       "acceptance": ["AT-06", "AT-07", "AT-08", "AT-19", "AT-27"],
@@ -883,6 +967,74 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionFreeFloorsAndEntryExhaustion"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionMidWriteVolumeLossRetainsPromise"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionPreservesCrashReservationsAndRefusesConflicts"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSerializesWritersAndRetainsCanceledOutput"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionCountsTreesWithoutFollowingLinksAndChecksGrowth"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionVolumeLossNeverFallsBack"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSIGKILLPreservesOwnedOutputAndReservation"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorSIGKILLBoundariesPreserveReceiptAndRetainedStages"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorPreparedReceiptTamperingCannotBeCompleted"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1255,6 +1407,14 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubSIGKILLRetainsWindowAndReceipt"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -1321,6 +1481,10 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -1750,6 +1914,8 @@
       "implementation": [
         "internal/filekit",
         "internal/generation",
+        "internal/recovery",
+        "internal/worker",
         "internal/storage",
         "cmd/outpost"
       ],
@@ -1809,10 +1975,26 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationCancellationAndCatalogClosure"
+        },
+        {
+          "path": "internal/generation/typed_linux_test.go",
+          "name": "TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
         }
       ],
       "acceptance": ["AT-13"],
-      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-35",
@@ -1821,6 +2003,8 @@
       "implementation": [
         "internal/filekit",
         "internal/generation",
+        "internal/recovery",
+        "internal/worker",
         "internal/storage",
         "cmd/outpost"
       ],
@@ -1868,10 +2052,18 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairRejectsMalformedMissingBeforeSourceRead"
         }
       ],
       "acceptance": ["AT-13"],
-      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-36",
@@ -1880,6 +2072,8 @@
       "implementation": [
         "internal/filekit",
         "internal/generation",
+        "internal/recovery",
+        "internal/worker",
         "internal/storage",
         "cmd/outpost"
       ],
@@ -1943,10 +2137,58 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorSIGKILLBoundariesPreserveReceiptAndRetainedStages"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorPreparedReceiptTamperingCannotBeCompleted"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/generation/recovery_boundary_linux_test.go",
+          "name": "TestRecoveryDestinationCannotContainOrEnterReplica"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
         }
       ],
       "acceptance": ["AT-24"],
-      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-37",
@@ -2022,6 +2264,30 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubAutomaticallyDetectsAndRepairsBothOutboundRoutes"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationIndependentVersionsAndKnownDamage"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -2081,6 +2347,18 @@
         {
           "path": "internal/worker/command_reporting_linux_test.go",
           "name": "TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "cmd/outpost/recovery_linux_test.go",
+          "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
         }
       ],
       "acceptance": ["AT-27"],
@@ -2176,6 +2454,62 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubSharesSlotsAndPreservesTransferPriority"
+        },
+        {
+          "path": "internal/filekit/recovery_at_linux_test.go",
+          "name": "TestRecoveryPlanMetadataOnlyAndHeldDestination"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionFreeFloorsAndEntryExhaustion"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionMidWriteVolumeLossRetainsPromise"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionPreservesCrashReservationsAndRefusesConflicts"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSerializesWritersAndRetainsCanceledOutput"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionCountsTreesWithoutFollowingLinksAndChecksGrowth"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionVolumeLossNeverFallsBack"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSIGKILLPreservesOwnedOutputAndReservation"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "internal/generation/recovery_boundary_linux_test.go",
+          "name": "TestRecoveryDestinationCannotContainOrEnterReplica"
+        },
+        {
+          "path": "cmd/outpost/recovery_linux_test.go",
+          "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2314,6 +2648,22 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2341,6 +2691,42 @@
         {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "internal/filekit/recovery_at_linux_test.go",
+          "name": "TestRecoveryPlanMetadataOnlyAndHeldDestination"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorSIGKILLBoundariesPreserveReceiptAndRetainedStages"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorPreparedReceiptTamperingCannotBeCompleted"
+        },
+        {
+          "path": "cmd/outpost/recovery_linux_test.go",
+          "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -2418,6 +2804,30 @@
         {
           "path": "internal/generation/integrity_linux_test.go",
           "name": "TestIntegrityRepairSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorSIGKILLBoundariesPreserveReceiptAndRetainedStages"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorPreparedReceiptTamperingCannotBeCompleted"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -2533,6 +2943,38 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubQuotaDenialPrecedesPayloadRead"
+        },
+        {
+          "path": "internal/filekit/recovery_at_linux_test.go",
+          "name": "TestRecoveryPlanMetadataOnlyAndHeldDestination"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionFreeFloorsAndEntryExhaustion"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionMidWriteVolumeLossRetainsPromise"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionPreservesCrashReservationsAndRefusesConflicts"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSerializesWritersAndRetainsCanceledOutput"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionCountsTreesWithoutFollowingLinksAndChecksGrowth"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionVolumeLossNeverFallsBack"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSIGKILLPreservesOwnedOutputAndReservation"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -2632,6 +3074,30 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubSIGKILLRetainsWindowAndReceipt"
+        },
+        {
+          "path": "internal/generation/typed_linux_test.go",
+          "name": "TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -2644,6 +3110,8 @@
       "implementation": [
         "internal/filekit",
         "internal/generation",
+        "internal/recovery",
+        "internal/worker",
         "internal/storage",
         "cmd/outpost"
       ],
@@ -2658,7 +3126,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Trusted decryption verification, affected-version reporting, trusted recovery executor, recovery-kit distribution, media-failure handling and admitted-scale repair/recovery."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, catalog/media repair and admitted-scale restore acceptance."
     },
     {
       "id": "REQ-47",
@@ -2924,6 +3392,98 @@
         {
           "path": "internal/control/replication_test.go",
           "name": "TestScheduledScrubRequiresBoundedSignedInterval"
+        },
+        {
+          "path": "internal/generation/verify_linux_test.go",
+          "name": "TestContentVerificationCancellationAndCatalogClosure"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "internal/filekit/recovery_at_linux_test.go",
+          "name": "TestRecoveryPlanMetadataOnlyAndHeldDestination"
+        },
+        {
+          "path": "internal/peer/repair_linux_test.go",
+          "name": "TestIntegrityRepairRejectsMalformedMissingBeforeSourceRead"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionFreeFloorsAndEntryExhaustion"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionMidWriteVolumeLossRetainsPromise"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionPreservesCrashReservationsAndRefusesConflicts"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSerializesWritersAndRetainsCanceledOutput"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionCountsTreesWithoutFollowingLinksAndChecksGrowth"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionVolumeLossNeverFallsBack"
+        },
+        {
+          "path": "internal/recovery/admission_linux_test.go",
+          "name": "TestRecoveryAdmissionSIGKILLPreservesOwnedOutputAndReservation"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorPublishesBoundBundleAndReplaysWithoutKeys"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorScopeQuotaAndPublicationWithdrawal"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorExistingUnknownOutputAndProfileChangeFailClosed"
+        },
+        {
+          "path": "internal/recovery/executor_linux_test.go",
+          "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorSIGKILLBoundariesPreserveReceiptAndRetainedStages"
+        },
+        {
+          "path": "internal/recovery/executor_crash_linux_test.go",
+          "name": "TestRecoveryExecutorPreparedReceiptTamperingCannotBeCompleted"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryPauseBeforePublicationJoinsAndResumes"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoverySIGKILLBetweenBundleAndSignedResult"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/generation/recovery_boundary_linux_test.go",
+          "name": "TestRecoveryDestinationCannotContainOrEnterReplica"
+        },
+        {
+          "path": "internal/management/command_observation_linux_test.go",
+          "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -2947,6 +3507,10 @@
         {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLISourceProbeAndCapabilityErrors"
+        },
+        {
+          "path": "cmd/outpost/recovery_linux_test.go",
+          "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
         }
       ],
       "acceptance": ["AT-31"],

@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"github.com/nd4y/outpost/internal/recovery"
 	"io"
 	"net"
 	"os"
@@ -130,7 +131,16 @@ func (b Bootstrap) TLS() (tls.Certificate, *x509.CertPool, error) {
 	}
 	return pair, roots, nil
 }
-func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) {
+func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) { return b.open(initialize, nil) }
+
+// OpenTrusted is explicit local enrollment; ordinary Open never loads recovery keys.
+func (b Bootstrap) OpenTrusted(x *recovery.Executor) (*Worker, func(), error) {
+	if x == nil || x.NodeIdentity() != b.Node {
+		return nil, nil, ErrDenied
+	}
+	return b.open(false, x)
+}
+func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(), error) {
 	if b.Format != BootstrapFormat || b.Volume.Scope != b.Node {
 		return nil, nil, ErrDenied
 	}
@@ -157,7 +167,7 @@ func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) {
 		return nil, nil, e
 	}
 	// The guard owns this descriptor until cleanup; Worker keeps its own clone.
-	w, e := Open(Options{Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: b.Resolve})
+	w, e := Open(Options{Recovery: x, Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: b.Resolve})
 	if e != nil {
 		root.Close()
 		if fetcher != nil {

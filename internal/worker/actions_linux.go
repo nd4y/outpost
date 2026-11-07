@@ -11,6 +11,7 @@ import (
 	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
@@ -65,6 +66,9 @@ func (w *Worker) actionPolicy(ctx context.Context, v *view, env command.Envelope
 // Long commands use the same running set and concurrency ceiling as backup
 // jobs. The view's cancellation/join boundary therefore also covers their I/O.
 func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, results chan<- result) error {
+	if e := w.cleanupRecoveries(v, s); e != nil {
+		return e
+	}
 	if s.Controls == nil {
 		return nil
 	}
@@ -82,6 +86,9 @@ func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, res
 			break
 		}
 		op := s.Controls.Operations[id]
+		if op.Kind == "restore" && w.recovery == nil {
+			continue
+		}
 		key := "command/" + id
 		if running[key] {
 			continue
@@ -112,6 +119,9 @@ func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, res
 			}
 			old.Work.Phase = "RUNNING"
 			old.Work.Attempts++
+			if old.Kind == "restore" {
+				old.Work.CleanupPending = true
+			}
 			old.Work.NextMillis = 0
 			old.Work.ErrorCode = ""
 			current.Controls.Operations[id] = old
@@ -130,7 +140,7 @@ func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, res
 			if policyErr == nil {
 				deadline := min(time.Now().Add(time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond).UnixMilli(), env.Request.ExpiresUnix*1000)
 				ctx, cancel := context.WithDeadline(v.ctx, time.UnixMilli(deadline))
-				out.result, out.err = w.executeAction(ctx, v, env)
+				out.result, out.err = w.executeAction(ctx, v, env, raw)
 				cancel()
 			}
 			results <- result{action: out}
@@ -139,7 +149,10 @@ func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, res
 	return nil
 }
 
-func (w *Worker) executeAction(ctx context.Context, v *view, env command.Envelope) ([]byte, error) {
+func (w *Worker) executeAction(ctx context.Context, v *view, env command.Envelope, raw []byte) ([]byte, error) {
+	if env.Request.Kind == "restore" {
+		return w.executeRestore(ctx, v, env, raw)
+	}
 	if env.Request.Kind == "maintenance" {
 		return w.executeMaintenance(ctx, v, env)
 	}
@@ -204,6 +217,7 @@ func (w *Worker) finishAction(ctx context.Context, v *view, out *actionResult) e
 		case out.err == nil:
 			op.Result = out.result
 			op.Work.Phase = "COMPLETE"
+			op.Work.CleanupPending = false
 		case v.ctx.Err() != nil && (errors.Is(out.err, context.Canceled) || errors.Is(out.err, context.DeadlineExceeded)):
 			op.Work.Phase = "QUEUED"
 			op.Work.NextMillis = 0
@@ -216,6 +230,9 @@ func (w *Worker) finishAction(ctx context.Context, v *view, out *actionResult) e
 			if out.envelope.Request.Kind == "maintenance" {
 				code = "EFFECT_UNCONFIRMED"
 			}
+		case errors.Is(out.err, recovery.ErrInvalid), errors.Is(out.err, recovery.ErrConflict), errors.Is(out.err, recovery.ErrStopped):
+			op.Work.Phase = "FAILED"
+			code = "RESTORE_BLOCKED"
 		case errors.Is(out.err, generation.ErrProtected), errors.Is(out.err, generation.ErrRollback), errors.Is(out.err, generation.ErrConflict), errors.Is(out.err, generation.ErrMigrationRequired):
 			op.Work.Phase = "FAILED"
 			code = "MAINTENANCE_BLOCKED"

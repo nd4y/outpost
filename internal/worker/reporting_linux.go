@@ -16,6 +16,7 @@ import (
 	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/management"
+	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -267,7 +268,7 @@ func commandObservations(status Status, tenant, domain string) ([]management.Com
 			continue
 		}
 		work := op.Work
-		c := management.CommandObservation{Operation: id, EnvelopeDigest: op.Envelope, Kind: op.Kind, Phase: work.Phase, Generation: op.Generation, StartedUnix: op.StartedUnix, Attempts: work.Attempts, NextAttemptMillis: work.NextMillis, VerifiedObjects: uint64(work.VerifiedObjects), TotalObjects: uint64(work.TotalObjects), ErrorCode: work.ErrorCode}
+		c := management.CommandObservation{Operation: id, EnvelopeDigest: op.Envelope, Kind: op.Kind, Phase: work.Phase, CleanupPending: work.CleanupPending, Generation: op.Generation, StartedUnix: op.StartedUnix, Attempts: work.Attempts, NextAttemptMillis: work.NextMillis, VerifiedObjects: uint64(work.VerifiedObjects), TotalObjects: uint64(work.TotalObjects), ErrorCode: work.ErrorCode}
 		if len(op.Ack) > 0 {
 			var ack command.Ack
 			if e := json.Unmarshal(op.Ack, &ack); e != nil {
@@ -293,6 +294,14 @@ func commandObservations(status Status, tenant, domain string) ([]management.Com
 					}
 					c.Verification = "CIPHERTEXT"
 					c.VerifiedUnix = result.VerifiedAt
+				case "restore":
+					var result recovery.Receipt
+					if e := storage.Decode(op.Result, &result, 16<<10); e != nil {
+						return nil, e
+					}
+					c.Restore = &result
+					c.Verification = "DECRYPTED"
+					c.VerifiedUnix = result.VerifiedUnix
 				case "maintenance":
 					var result MaintenanceReceipt
 					if e := storage.Decode(op.Result, &result, 16<<10); e != nil {

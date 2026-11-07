@@ -13,6 +13,7 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/peer"
+	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
@@ -21,6 +22,7 @@ import (
 const LegacyFormat = "outpost-worker-1"
 const Format = "outpost-worker-2"
 const ScheduledFormat = "outpost-worker-3"
+const RecoveryFormat = "outpost-worker-4"
 const MaxJobs = 4096
 
 var ErrDenied = errors.New("worker operation denied")
@@ -56,11 +58,18 @@ func (w *Worker) load() (Status, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, 32<<20) != nil || (s.Format != Format && s.Format != LegacyFormat && s.Format != ScheduledFormat) || s.Node != w.node || s.Jobs == nil || len(s.Jobs) > MaxJobs {
+	if storage.Decode(raw, &s, 32<<20) != nil || (s.Format != Format && s.Format != LegacyFormat && s.Format != ScheduledFormat && s.Format != RecoveryFormat) || s.Node != w.node || s.Jobs == nil || len(s.Jobs) > MaxJobs {
 		return s, ErrDenied
 	}
 	if s.Format == LegacyFormat && s.Controls != nil || s.Format != LegacyFormat && w.validateControls(s.Controls) != nil {
 		return s, ErrDenied
+	}
+	if s.Format != RecoveryFormat && s.Controls != nil {
+		for _, op := range s.Controls.Operations {
+			if op.Kind == "restore" {
+				return s, ErrDenied
+			}
+		}
 	}
 	if validateScrubs(s) != nil {
 		return s, ErrDenied
@@ -86,7 +95,7 @@ func (w *Worker) load() (Status, error) {
 	return s, nil
 }
 func (w *Worker) save(s Status) error {
-	if s.Format == Format || s.Format == ScheduledFormat {
+	if s.Format == Format || s.Format == ScheduledFormat || s.Format == RecoveryFormat {
 		if e := w.signControls(s.Controls); e != nil {
 			return e
 		}
@@ -175,7 +184,7 @@ func errorCode(e error) string {
 		return "CANCELED"
 	case errors.Is(e, context.DeadlineExceeded):
 		return "DEADLINE"
-	case errors.Is(e, ErrCapacity), errors.Is(e, statefile.ErrCapacity):
+	case errors.Is(e, ErrCapacity), errors.Is(e, statefile.ErrCapacity), errors.Is(e, recovery.ErrCapacity):
 		return "CAPACITY_BLOCKED"
 	case errors.Is(e, control.ErrInactive):
 		return "POLICY_EXPIRED"

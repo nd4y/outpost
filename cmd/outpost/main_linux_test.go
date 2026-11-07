@@ -165,6 +165,42 @@ func TestCLIRestoresMaterializedReplicaWithoutIndexOrSource(t *testing.T) {
 	if bytes.Contains(raw, []byte("private")) || bytes.Contains(raw, []byte("данные")) {
 		t.Fatal("private names in summary")
 	}
+	reportFile := filepath.Join(root, "verification.json")
+	verifyArgs := []string{"verify-replica", "--key", ownerFile, "--trust", trustFile, "--store", replicaDir, "--generation", id, "--output", reportFile}
+	value, e = run(ctx, verifyArgs)
+	must(e)
+	verified := value.(generation.ContentVerification)
+	if !verified.Complete || !verified.WholeGeneration || len(verified.Versions) != 1 || verified.Versions[0].State != "DECRYPTED" {
+		t.Fatal(verified)
+	}
+	saved, e := os.ReadFile(reportFile)
+	must(e)
+	for _, private := range []string{"private", "данные", "outside-alias", "independent whole replica"} {
+		if bytes.Contains(saved, []byte(private)) {
+			t.Fatal("private data in verification report")
+		}
+	}
+	if _, e = run(ctx, verifyArgs); !errors.Is(e, os.ErrExist) {
+		t.Fatal("overwrote existing verification", e)
+	}
+	catalogRaw, e := os.ReadFile(filepath.Join(replicaDir, "catalogs", id))
+	must(e)
+	catalog, e := generation.VerifyCatalog(catalogRaw, trust)
+	must(e)
+	must(os.Remove(filepath.Join(replicaDir, "objects", catalog.Kits[0].Root.ID)))
+	verifyArgs[len(verifyArgs)-1] = filepath.Join(root, "failed-verification.json")
+	value, e = run(ctx, verifyArgs)
+	if !errors.Is(e, generation.ErrIncomplete) {
+		t.Fatal("missing kit verified", e)
+	}
+	if _, status := failure(e); status != 4 {
+		t.Fatal("partial verification returned success", status)
+	}
+	failed, e := os.ReadFile(verifyArgs[len(verifyArgs)-1])
+	must(e)
+	if e = json.Unmarshal(failed, &verified); e != nil || verified.Complete || verified.Versions[0].State != "UNREADABLE" {
+		t.Fatal("missing failure report", e)
+	}
 }
 
 func TestCLIVerifiesFrozenIndependentV1Kit(t *testing.T) {

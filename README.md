@@ -24,6 +24,8 @@ The [source and recovery components](docs/en/product-development.md) include bou
 
 Worker bootstrap now requires [runtime volume admission](docs/en/runtime-volume.md). Missing markers or replaced paths stop work, while opened descriptors keep writes on the admitted tree. Encrypted per-file progress reuses accepted packs after a crash; the source is still reread. The [source job lifecycle](docs/en/source-jobs.md) defines enforced checkpoint/release ordering and the remaining network copy-threshold integration.
 
+[Trusted content verification](docs/en/trusted-verification.md) decrypts selected retained versions without plaintext output or a replica index. Private reports preserve per-version outcomes and original check times; partial checks return a failure status. Ordinary workers remain keyless.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.
@@ -84,3 +86,5 @@ Original project material is [MIT licensed](LICENSE). The vendored toolkit retai
 The private source agent supports a [durable interval schedule](docs/en/source-scheduling.md) with pause, restart and unchanged pending-operation recovery. Full product acceptance remains open.
 
 The [management API candidate](docs/en/management-api.md) supports signed configuration, durable original-age reports and a signed command queue. Workers persist pause/resume across restart and policy changes, join active transfers before acknowledging pause, and retry the same receipt after a lost reply. Blocked-job retries use a durable token across worker/upload journals and never repeat a completed upload. Foreground reporting and command polling remain independent of backup execution. Asynchronous ciphertext scrub and separately signed maintenance preserve original results across restart. Signed reports expose bounded command progress separately from backup jobs. [Authorized replica repair](docs/en/integrity-repair.md) preserves quarantine and repairs detected damage through existing push/pull routes. Trusted recovery execution, management service bootstrap and the operator UI are still in development.
+
+[Trusted recovery](docs/en/trusted-recovery.md) connects signed restore commands to a private local executor with separate output admission, atomic bundles, historical receipts and versioned reports. The normal worker remains keyless.

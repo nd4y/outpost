@@ -53,13 +53,12 @@ func RecoverDirectory(ctx context.Context, owner Owner, kits []RecoveryKit, read
 	}
 	return recoverSet(ctx, owner, kits, read, relative, dest)
 }
-func recoverSet(ctx context.Context, owner Owner, kits []RecoveryKit, read ObjectReader, directory, dest string) (RecoverySummary, error) {
-	var summary RecoverySummary
+func loadRecoveryDescriptors(ctx context.Context, owner Owner, kits []RecoveryKit, read ObjectReader, directory string) ([]Descriptor, error) {
 	if e := owner.validate(); e != nil {
-		return summary, e
+		return nil, e
 	}
 	if read == nil || len(kits) == 0 || len(kits) > MaxRecoveryKits {
-		return summary, ErrInvalid
+		return nil, ErrInvalid
 	}
 	s := &Store{Owner: owner, backend: readOnlyBackend{read: read}}
 	var descriptors []Descriptor
@@ -68,23 +67,23 @@ func recoverSet(ctx context.Context, owner Owner, kits []RecoveryKit, read Objec
 	for _, k := range kits {
 		size += len(k.Root)
 		if size > MaxDescriptor {
-			return summary, ErrInvalid
+			return nil, ErrInvalid
 		}
 		_, d, e := s.loadEnvelope(ctx, k.Root, k.Version)
 		if e != nil {
-			return summary, e
+			return nil, e
 		}
 		if seen[d.File] {
-			return summary, ErrInvalid
+			return nil, ErrInvalid
 		}
 		seen[d.File] = true
 		b, e := json.Marshal(d)
 		if e != nil {
-			return summary, e
+			return nil, e
 		}
 		size += len(b)
 		if size > MaxDescriptor {
-			return summary, ErrInvalid
+			return nil, ErrInvalid
 		}
 		if directory != "" {
 			var selected []string
@@ -101,9 +100,49 @@ func recoverSet(ctx context.Context, owner Owner, kits []RecoveryKit, read Objec
 		descriptors = append(descriptors, d)
 	}
 	if len(descriptors) == 0 {
-		return summary, os.ErrNotExist
+		return nil, os.ErrNotExist
 	}
-	return s.restoreSet(ctx, descriptors, dest)
+	return descriptors, nil
+}
+
+// PlanRecovery authenticates selection metadata and names before any plaintext
+// output. Counts are an admission estimate, not a content verification receipt.
+func PlanRecovery(ctx context.Context, owner Owner, kits []RecoveryKit, read ObjectReader, directory string) (RecoverySummary, error) {
+	if directory != "" && !safeName(directory) {
+		return RecoverySummary{}, ErrInvalid
+	}
+	ds, e := loadRecoveryDescriptors(ctx, owner, kits, read, directory)
+	if e != nil {
+		return RecoverySummary{}, e
+	}
+	summary, _, e := validateSet(ds)
+	return summary, e
+}
+
+func recoverSet(ctx context.Context, owner Owner, kits []RecoveryKit, read ObjectReader, directory, dest string) (RecoverySummary, error) {
+	ds, e := loadRecoveryDescriptors(ctx, owner, kits, read, directory)
+	if e != nil {
+		return RecoverySummary{}, e
+	}
+	s := &Store{Owner: owner, backend: readOnlyBackend{read: read}}
+	return s.restoreSet(ctx, ds, dest)
+}
+
+// RecoverSetAt retains the caller's admitted parent descriptor across writes
+// and publication. Remote commands supply no absolute destination path.
+func RecoverSetAt(ctx context.Context, owner Owner, kits []RecoveryKit, read ObjectReader, directory string, parent *os.Root, name string) (RecoverySummary, error) {
+	if parent == nil || !safeName(name) || strings.Contains(name, "/") {
+		return RecoverySummary{}, ErrInvalid
+	}
+	if directory != "" && !safeName(directory) {
+		return RecoverySummary{}, ErrInvalid
+	}
+	ds, e := loadRecoveryDescriptors(ctx, owner, kits, read, directory)
+	if e != nil {
+		return RecoverySummary{}, e
+	}
+	s := &Store{Owner: owner, backend: readOnlyBackend{read: read}}
+	return s.restoreSetAt(ctx, ds, parent, name)
 }
 
 func validateSet(ds []Descriptor) (RecoverySummary, []string, error) {
@@ -170,23 +209,29 @@ func validateSet(ds []Descriptor) (RecoverySummary, []string, error) {
 	})
 	return summary, ordered, nil
 }
-func (s *Store) restoreSet(ctx context.Context, ds []Descriptor, dest string) (summary RecoverySummary, err error) {
+func (s *Store) restoreSet(ctx context.Context, ds []Descriptor, dest string) (RecoverySummary, error) {
+	if !filepath.IsAbs(dest) || filepath.Clean(dest) != dest || path.Base(dest) == "/" {
+		return RecoverySummary{}, ErrInvalid
+	}
+	parent, e := os.OpenRoot(path.Dir(dest))
+	if e != nil {
+		return RecoverySummary{}, e
+	}
+	defer parent.Close()
+	return s.restoreSetAt(ctx, ds, parent, path.Base(dest))
+}
+
+func (s *Store) restoreSetAt(ctx context.Context, ds []Descriptor, parent *os.Root, name string) (summary RecoverySummary, err error) {
 	if err = ctx.Err(); err != nil {
 		return
+	}
+	if parent == nil || !safeName(name) || strings.Contains(name, "/") {
+		return summary, ErrInvalid
 	}
 	summary, dirs, err := validateSet(ds)
 	if err != nil {
 		return summary, err
 	}
-	if !filepath.IsAbs(dest) || filepath.Clean(dest) != dest || path.Base(dest) == "/" {
-		return summary, ErrInvalid
-	}
-	parent, err := os.OpenRoot(path.Dir(dest))
-	if err != nil {
-		return summary, err
-	}
-	defer parent.Close()
-	name := path.Base(dest)
 	if _, err = parent.Lstat(name); !errors.Is(err, os.ErrNotExist) {
 		if err == nil {
 			err = os.ErrExist

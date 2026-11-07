@@ -51,22 +51,21 @@ func RecoverMaterialized(ctx context.Context, dir, expected string, trust Trust,
 
 // RecoverCatalog also accepts an authenticated external-storage object reader.
 // Every read is restricted to the selected catalog closure and checked again.
-func RecoverCatalog(ctx context.Context, expected string, raw []byte, trust Trust, owner filekit.Owner, selection RecoverySelection, fetch func(context.Context, Object) ([]byte, error), dest string) (RecoveryReceipt, error) {
-	var result RecoveryReceipt
+func recoveryMaterial(ctx context.Context, expected string, raw []byte, trust Trust, owner filekit.Owner, selection RecoverySelection, fetch func(context.Context, Object) ([]byte, error)) (Catalog, []filekit.RecoveryKit, filekit.ObjectReader, error) {
 	if !validID(expected) || Hash(raw) != expected || fetch == nil || owner.Domain != trust.Domain {
-		return result, ErrInvalid
+		return Catalog{}, nil, nil, ErrInvalid
 	}
 	c, e := VerifyCatalog(raw, trust)
 	if e != nil {
-		return result, e
+		return Catalog{}, nil, nil, e
 	}
 	wanted := map[string]bool{}
 	if len(selection.Versions) > MaxKits {
-		return result, ErrInvalid
+		return Catalog{}, nil, nil, ErrInvalid
 	}
 	for _, v := range selection.Versions {
 		if !validID(v) || wanted[v] {
-			return result, ErrInvalid
+			return Catalog{}, nil, nil, ErrInvalid
 		}
 		wanted[v] = true
 	}
@@ -83,7 +82,7 @@ func RecoverCatalog(ctx context.Context, expected string, raw []byte, trust Trus
 		}
 	}
 	if len(selected) == 0 || (len(wanted) > 0 && len(selected) != len(wanted)) {
-		return result, ErrIncomplete
+		return Catalog{}, nil, nil, ErrIncomplete
 	}
 	get := func(ctx context.Context, o Object) ([]byte, error) {
 		if e := ctx.Err(); e != nil {
@@ -106,16 +105,25 @@ func RecoverCatalog(ctx context.Context, expected string, raw []byte, trust Trus
 	for _, k := range selected {
 		rootBytes += k.Root.Bytes
 		if rootBytes > filekit.MaxDescriptor {
-			return result, ErrInvalid
+			return Catalog{}, nil, nil, ErrInvalid
 		}
 		b, e := get(ctx, k.Root)
 		if e != nil {
-			return result, e
+			return Catalog{}, nil, nil, e
 		}
 		kits = append(kits, filekit.RecoveryKit{Version: k.Version, Root: b})
 	}
 	readObject := func(ctx context.Context, o filekit.Object) ([]byte, error) {
 		return get(ctx, Object{ID: o.ID, Bytes: o.Bytes})
+	}
+	return c, kits, readObject, nil
+}
+
+func RecoverCatalog(ctx context.Context, expected string, raw []byte, trust Trust, owner filekit.Owner, selection RecoverySelection, fetch func(context.Context, Object) ([]byte, error), dest string) (RecoveryReceipt, error) {
+	var result RecoveryReceipt
+	c, kits, readObject, e := recoveryMaterial(ctx, expected, raw, trust, owner, selection, fetch)
+	if e != nil {
+		return result, e
 	}
 	var restored filekit.RecoverySummary
 	if selection.Directory == "" {
@@ -123,6 +131,29 @@ func RecoverCatalog(ctx context.Context, expected string, raw []byte, trust Trus
 	} else {
 		restored, e = filekit.RecoverDirectory(ctx, owner, kits, readObject, selection.Directory, dest)
 	}
+	if e != nil {
+		return result, e
+	}
+	return RecoveryReceipt{Generation: expected, Epoch: c.Epoch, Sequence: c.Sequence, CheckpointMatch: true, Restored: restored}, nil
+}
+
+// PlanRecoveryCatalog checks authenticated selection metadata before the
+// trusted executor reserves output space. Payload is not decrypted here.
+func PlanRecoveryCatalog(ctx context.Context, expected string, raw []byte, trust Trust, owner filekit.Owner, selection RecoverySelection, fetch func(context.Context, Object) ([]byte, error)) (filekit.RecoverySummary, error) {
+	_, kits, readObject, e := recoveryMaterial(ctx, expected, raw, trust, owner, selection, fetch)
+	if e != nil {
+		return filekit.RecoverySummary{}, e
+	}
+	return filekit.PlanRecovery(ctx, owner, kits, readObject, selection.Directory)
+}
+
+func RecoverCatalogAt(ctx context.Context, expected string, raw []byte, trust Trust, owner filekit.Owner, selection RecoverySelection, fetch func(context.Context, Object) ([]byte, error), parent *os.Root, name string) (RecoveryReceipt, error) {
+	var result RecoveryReceipt
+	c, kits, readObject, e := recoveryMaterial(ctx, expected, raw, trust, owner, selection, fetch)
+	if e != nil {
+		return result, e
+	}
+	restored, e := filekit.RecoverSetAt(ctx, owner, kits, readObject, selection.Directory, parent, name)
 	if e != nil {
 		return result, e
 	}

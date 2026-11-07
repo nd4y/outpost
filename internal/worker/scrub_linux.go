@@ -36,13 +36,13 @@ func scrubKey(domain, repository string, epoch uint64, id string) string {
 	return storage.Hash([]byte(domain + "/" + repository + "/" + strconv.FormatUint(epoch, 10) + "/" + id))
 }
 func validateScrubs(s Status) error {
-	if s.Format != ScheduledFormat {
+	if s.Format != ScheduledFormat && s.Format != RecoveryFormat {
 		if s.Scrubs != nil {
 			return ErrDenied
 		}
 		return nil
 	}
-	if len(s.Scrubs) == 0 || len(s.Scrubs) > MaxJobs {
+	if s.Format == ScheduledFormat && len(s.Scrubs) == 0 || len(s.Scrubs) > MaxJobs {
 		return ErrDenied
 	}
 	for key, entry := range s.Scrubs {
@@ -192,7 +192,9 @@ func (w *Worker) scheduleScrub(v *view, running map[string]bool, results chan<- 
 		if s.Scrubs == nil {
 			s.Scrubs = map[string]ScrubState{}
 		}
-		s.Format = ScheduledFormat
+		if s.Format != RecoveryFormat {
+			s.Format = ScheduledFormat
+		}
 		s.Scrubs[chosen.key] = old
 		window = old.Window
 		return nil

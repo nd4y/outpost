@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/nd4y/outpost/internal/filekit"
+	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/recovery"
 	"testing"
 	"time"
 )
@@ -108,6 +111,64 @@ func TestCommandObservationReportVersionBoundsAndOriginalAgeOverHTTPS(t *testing
 		mutate(&bad)
 		if _, e = SignReport(bad, h.f.e, h.f.node, time.Now()); e == nil {
 			t.Fatal("inconsistent command observation signed")
+		}
+	}
+}
+
+func TestRecoveryReportVersionAndOriginalTimeOverHTTPS(t *testing.T) {
+	h := newHTTPFixture(t)
+	r, _, client := reporterFixture(t, h)
+	defer r.Close()
+	ctx := context.Background()
+	now := time.Now().Unix() - 20
+	snapshot := reporterSnapshot(t, h.f, now)
+	result := recovery.Receipt{Format: recovery.ReceiptFormat, Operation: id("restore"), Binding: id("restore-envelope"), Preset: id("private-preset"), VerifiedUnix: now - 5, Restored: generation.RecoveryReceipt{Generation: id("generation"), Epoch: 1, Sequence: 2, CheckpointMatch: true, Restored: filekit.RecoverySummary{Files: 1, Bytes: 32}}}
+	snapshot.Commands = []CommandObservation{{Operation: result.Operation, EnvelopeDigest: result.Binding, Kind: "restore", Phase: "COMPLETE", Generation: result.Restored.Generation, StartedUnix: now - 10, FinishedUnix: now - 3, Attempts: 1, Verification: "DECRYPTED", VerifiedUnix: result.VerifiedUnix, ResultDigest: id("restore-result"), Restore: &result}}
+	raw, e := r.Enqueue(ctx, snapshot)
+	must(t, e)
+	report, e := VerifyReport(raw, h.f.e, time.Now())
+	must(t, e)
+	if report.Format != RecoveryReportFormat {
+		t.Fatal("missing reader fence")
+	}
+	_, e = r.Deliver(ctx, client)
+	must(t, e)
+	view, e := h.f.r.Report(ctx, h.f.p, h.f.e.Tenant, h.f.e.Node, id("domain"), time.Second)
+	must(t, e)
+	if view.Format != "outpost-management-report-view-3" || view.State != "STALE" || view.Commands[0].VerifiedUnix != now-5 {
+		t.Fatal("report refreshed recovery", view)
+	}
+	status, body := h.request(t, h.viewer, "GET", h.base()+"/domains/"+id("domain")+"/command-status?limit=1", nil)
+	if status != 200 {
+		t.Fatalf("%d %s", status, body)
+	}
+	var page struct {
+		Format string
+		Items  []CommandObservation
+	}
+	must(t, json.Unmarshal(body, &page))
+	if page.Format != "outpost-management-command-status-2" || len(page.Items) != 1 || page.Items[0].Restore.VerifiedUnix != now-5 {
+		t.Fatal("restore page lost version/original age", page)
+	}
+	for _, format := range []string{ReportFormat, CommandReportFormat} {
+		copy := report
+		copy.Format = format
+		if _, e = SignReport(copy, h.f.e, h.f.node, time.Now()); e == nil {
+			t.Fatal("new result accepted old format")
+		}
+	}
+	for _, mutate := range []func(*Report){
+		func(r *Report) { r.Commands[0].Restore.Binding = id("wrong-envelope") },
+		func(r *Report) { r.Commands[0].Restore.Restored.Restored.Bytes = -1 },
+		func(r *Report) { r.Commands[0].Restore.Restored.Sequence = 1 << 63 },
+		func(r *Report) { r.Commands[0].VerifiedUnix++ },
+		func(r *Report) { r.Commands[0].Restore.Restored.CheckpointMatch = false },
+	} {
+		var bad Report
+		must(t, json.Unmarshal(raw, &bad))
+		mutate(&bad)
+		if _, e = SignReport(bad, h.f.e, h.f.node, time.Now()); e == nil {
+			t.Fatal("invalid recovery report signed")
 		}
 	}
 }

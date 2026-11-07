@@ -38,6 +38,7 @@ type CommandWork struct {
 	NextMillis      int64  `json:"nextMillis"`
 	VerifiedObjects int    `json:"verifiedObjects"`
 	TotalObjects    int    `json:"totalObjects"`
+	CleanupPending  bool   `json:"cleanupPending,omitempty"`
 	ErrorCode       string `json:"errorCode,omitempty"`
 }
 type Controls struct {
@@ -108,17 +109,20 @@ func (w *Worker) validateControls(c *Controls) error {
 		if len(op.Result) > 16<<10 || op.Generation != "" && !storage.ID(op.Generation) {
 			return ErrDenied
 		}
-		if op.Kind == "scrub" && op.StartedUnix > 0 && (op.Generation == "" || op.Work == nil) {
+		if (op.Kind == "scrub" || op.Kind == "restore") && op.StartedUnix > 0 && (op.Generation == "" || op.Work == nil) {
 			return ErrDenied
 		}
 		if op.Kind == "maintenance" && (op.Generation != "" || op.StartedUnix > 0 && op.Work == nil) {
 			return ErrDenied
 		}
 		if op.Work != nil {
+			if op.Work.CleanupPending && op.Kind != "restore" {
+				return ErrDenied
+			}
 			if !storage.ID(op.Tenant) {
 				return ErrDenied
 			}
-			if (op.Kind != "scrub" && op.Kind != "maintenance") || op.Work.Attempts > command.MaxSafeInteger || op.Work.NextMillis < 0 || op.Work.VerifiedObjects < 0 || op.Work.TotalObjects < op.Work.VerifiedObjects {
+			if (op.Kind != "scrub" && op.Kind != "maintenance" && op.Kind != "restore") || op.Work.Attempts > command.MaxSafeInteger || op.Work.NextMillis < 0 || op.Work.VerifiedObjects < 0 || op.Work.TotalObjects < op.Work.VerifiedObjects {
 				return ErrDenied
 			}
 			switch op.Work.Phase {
@@ -187,7 +191,7 @@ func (w *Worker) MigrateControls(ctx context.Context, rollback bool) error {
 				return e
 			}
 			if rollback {
-				if s.Format == ScheduledFormat || len(s.Scrubs) > 0 {
+				if s.Format == ScheduledFormat || s.Format == RecoveryFormat || len(s.Scrubs) > 0 {
 					return ErrDenied
 				}
 				if s.Format == LegacyFormat {
@@ -196,7 +200,7 @@ func (w *Worker) MigrateControls(ctx context.Context, rollback bool) error {
 				if len(s.Controls.Operations) != 0 || len(s.Controls.Domains) != 0 || len(s.Controls.Jobs) != 0 || s.Controls.Applied != s.Controls.Revision {
 					return ErrDenied
 				}
-			} else if s.Format == Format || s.Format == ScheduledFormat {
+			} else if s.Format == Format || s.Format == ScheduledFormat || s.Format == RecoveryFormat {
 				return nil
 			}
 			previous, e := w.state.Read("worker.json")
@@ -290,7 +294,7 @@ func (w *Worker) commandSession(ctx context.Context) (*Worker, *statefile.Store,
 		cleanup()
 		return nil, nil, nil, e
 	}
-	shadow := &Worker{state: state, cache: cache, node: w.node, cert: w.cert, owner: w.owner, root: w.root, dir: w.dir, budget: budget, guard: w.guard}
+	shadow := &Worker{recovery: w.recovery, state: state, cache: cache, node: w.node, cert: w.cert, owner: w.owner, root: w.root, dir: w.dir, budget: budget, guard: w.guard}
 	return shadow, commands, func() { cache.Close(); commands.Close(); state.Close(); cleanup() }, nil
 }
 

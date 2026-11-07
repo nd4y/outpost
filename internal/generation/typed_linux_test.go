@@ -78,6 +78,21 @@ func TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss(t *testing.T) {
 	}
 	ok(t, receiver.Close())
 	ok(t, os.Remove(filepath.Join(base, "receiver/state.json")))
+	verified, e := VerifyMaterialized(ctx, filepath.Join(base, "receiver"), id, trust, owner, nil)
+	ok(t, e)
+	if !verified.Complete || len(verified.Versions) != 3 {
+		t.Fatal("typed verification incomplete", verified)
+	}
+	kinds := map[string]int{}
+	for _, v := range verified.Versions {
+		if v.State != "DECRYPTED" || v.Content == nil {
+			t.Fatal(v)
+		}
+		kinds[v.Content.Kind]++
+	}
+	if kinds["file"] != 1 || kinds["directory"] != 1 || kinds["symlink"] != 1 {
+		t.Fatal(kinds)
+	}
 	whole, e := RecoverMaterialized(ctx, filepath.Join(base, "receiver"), id, trust, owner, RecoverySelection{}, filepath.Join(base, "whole-dataset"))
 	ok(t, e)
 	if whole.Generation != id || !whole.CheckpointMatch || whole.Restored.Files != 1 || whole.Restored.Directories != 1 || whole.Restored.Symlinks != 1 {

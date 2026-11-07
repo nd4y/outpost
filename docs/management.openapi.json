@@ -2434,7 +2434,7 @@
             "type": "string",
             "contentEncoding": "base64",
             "maxLength": 11184812,
-            "description": "outpost-management-report-1 or report-2 signed by the enrolled node key; v2 carries bounded command observations. Sequence, original observation time and exact tenant/domain scope are required."
+            "description": "Signed outpost-management-report-1, report-2 or report-3. Version 2 carries scrub/maintenance observations; version 3 adds trusted restore. Original times, sequence and exact tenant/domain scope are required."
           }
         },
         "required": ["document"]
@@ -2445,7 +2445,11 @@
         "properties": {
           "format": {
             "type": "string",
-            "enum": ["outpost-management-report-view-1", "outpost-management-report-view-2"]
+            "enum": [
+              "outpost-management-report-view-1",
+              "outpost-management-report-view-2",
+              "outpost-management-report-view-3"
+            ]
           },
           "node": {
             "$ref": "#/components/schemas/ID"
@@ -2534,6 +2538,28 @@
             "then": {
               "not": {
                 "required": ["commands"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-2"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "commands": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": ["scrub", "maintenance"]
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -3023,14 +3049,15 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["scrub", "maintenance"]
+            "enum": ["scrub", "maintenance", "restore"]
           },
           "phase": {
             "type": "string",
             "enum": ["QUEUED", "RUNNING", "RETRY_WAIT", "COMPLETE", "FAILED"]
           },
           "verification": {
-            "const": "CIPHERTEXT"
+            "type": "string",
+            "enum": ["CIPHERTEXT", "DECRYPTED"]
           },
           "errorCode": {
             "type": "string",
@@ -3074,6 +3101,13 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 1125899906842624
+          },
+          "restore": {
+            "$ref": "#/components/schemas/RecoveryOutcome"
+          },
+          "cleanupPending": {
+            "type": "boolean",
+            "description": "Owned source pin/reservation cleanup remains pending; never means restored/staged bytes were deleted."
           }
         },
         "required": [
@@ -3116,12 +3150,31 @@
               }
             },
             "then": {
-              "required": ["generation"],
               "not": {
-                "required": ["maintenance"]
+                "anyOf": [
+                  {
+                    "required": ["maintenance"]
+                  },
+                  {
+                    "required": ["restore"]
+                  },
+                  {
+                    "required": ["cleanupPending"]
+                  }
+                ]
+              },
+              "required": ["generation"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "maintenance"
+                }
               }
             },
-            "else": {
+            "then": {
               "not": {
                 "anyOf": [
                   {
@@ -3129,9 +3182,65 @@
                   },
                   {
                     "required": ["verification"]
+                  },
+                  {
+                    "required": ["restore"]
+                  },
+                  {
+                    "required": ["cleanupPending"]
                   }
                 ]
               }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "restore"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["maintenance"]
+                  }
+                ]
+              },
+              "required": ["generation"],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "phase": {
+                        "const": "COMPLETE"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": ["restore", "verification"],
+                    "properties": {
+                      "verification": {
+                        "const": "DECRYPTED"
+                      }
+                    }
+                  },
+                  "else": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": ["restore"]
+                        },
+                        {
+                          "required": ["verification"]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
             }
           }
         ]
@@ -3200,7 +3309,8 @@
         "additionalProperties": false,
         "properties": {
           "format": {
-            "const": "outpost-management-command-status-1"
+            "type": "string",
+            "enum": ["outpost-management-command-status-1", "outpost-management-command-status-2"]
           },
           "reportSequence": {
             "type": "integer",
@@ -3228,7 +3338,123 @@
             "enum": ["CURRENT", "STALE"]
           }
         },
-        "required": ["format", "reportSequence", "observedUnix", "items", "state"]
+        "required": ["format", "reportSequence", "observedUnix", "items", "state"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-command-status-1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": ["scrub", "maintenance"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RecoverySummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "directories": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "symlinks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "aliases": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "implicitDirectories": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 288230376151711744
+          }
+        },
+        "required": ["files", "directories", "symlinks", "aliases", "implicitDirectories", "bytes"],
+        "description": "Actual selected output counts; total entries must be between 1 and 32768."
+      },
+      "GenerationRecoveryOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "checkpointMatch": {
+            "const": true
+          },
+          "restored": {
+            "$ref": "#/components/schemas/RecoverySummary"
+          }
+        },
+        "required": ["generation", "epoch", "sequence", "checkpointMatch", "restored"]
+      },
+      "RecoveryOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-recovery-result-1"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1125899906842624
+          },
+          "restored": {
+            "$ref": "#/components/schemas/GenerationRecoveryOutcome"
+          }
+        },
+        "required": ["format", "operation", "binding", "preset", "verifiedUnix", "restored"],
+        "description": "Historical opaque trusted recovery receipt. Binding must equal the command envelope digest; operation, generation and original verification time must match the observation. No paths or keys."
       }
     }
   }

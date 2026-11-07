@@ -237,6 +237,12 @@ func (r *Reporter) Enqueue(ctx context.Context, in Snapshot) ([]byte, error) {
 		report := Report{Format: ReportFormat, Node: r.node, Tenant: grant.Tenant, Domain: r.domain, EnrollmentRevision: grant.Revision, Sequence: s.Sequence + 1, ConfigurationRevision: in.ConfigurationRevision, ObservedUnix: in.ObservedUnix, InventoryState: in.InventoryState, Generations: in.Generations, Jobs: in.Jobs, Commands: in.Commands, Space: in.Space}
 		if len(in.Commands) > 0 {
 			report.Format = CommandReportFormat
+			for _, c := range in.Commands {
+				if c.Kind == "restore" {
+					report.Format = RecoveryReportFormat
+					break
+				}
+			}
 		}
 		raw, e := SignReport(report, grant, r.signer, time.Now())
 		if e != nil {

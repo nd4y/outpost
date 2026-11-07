@@ -21,6 +21,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/recovery"
 )
 
 func TestWorkerCommandPauseCancelsTransferWhileConfigurationFetchIsBlocked(t *testing.T) {
@@ -110,6 +111,7 @@ type commandChild struct {
 	Migration bool
 	Run       bool
 	Scheduled bool
+	Recovery  *recovery.Profile
 }
 
 func TestWorkerCommandSIGKILLChild(t *testing.T) {
@@ -134,6 +136,13 @@ func TestWorkerCommandSIGKILLChild(t *testing.T) {
 			select {}
 		}
 		return nil
+	}
+	if in.Recovery != nil {
+		x, e := recovery.OpenExecutor(context.Background(), *in.Recovery, false)
+		must(t, e)
+		defer x.Close()
+		x.Fault = w.Fault
+		w.recovery = x
 	}
 	if in.Scheduled {
 		e = w.Run(context.Background())

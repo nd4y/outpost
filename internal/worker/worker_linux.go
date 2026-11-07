@@ -22,6 +22,7 @@ import (
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/peer"
+	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
@@ -38,6 +39,7 @@ type Options struct {
 	Certificate tls.Certificate
 	Roots       *x509.CertPool
 	Initialize  bool
+	Recovery    *recovery.Executor
 	Fetcher     *control.Fetcher
 	// Resolve is local, bounded and context-aware. No secrets enter shared state.
 	Resolve func(context.Context, storage.Profile) (*storage.Backend, error)
@@ -78,9 +80,13 @@ type Worker struct {
 	active       *view
 	budget       *diskbudget.Budget
 	owner        ed25519.PublicKey
+	recovery     *recovery.Executor
 }
 
 func Open(o Options) (*Worker, error) {
+	if o.Recovery != nil && o.Recovery.NodeIdentity() != o.Node {
+		return nil, ErrDenied
+	}
 	if !filepath.IsAbs(o.Directory) || !storage.ID(o.Node) || len(o.Owner) != 32 || len(o.Certificate.Certificate) == 0 || o.Roots == nil {
 		return nil, ErrDenied
 	}
@@ -93,7 +99,7 @@ func Open(o Options) (*Worker, error) {
 	if !ok || !publicOK || len(private) != ed25519.PrivateKeySize || !bytes.Equal(public, private.Public().(ed25519.PublicKey)) {
 		return nil, ErrDenied
 	}
-	w := &Worker{guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
+	w := &Worker{recovery: o.Recovery, guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
 	if e = w.check(context.Background()); e != nil {
 		return nil, e
 	}

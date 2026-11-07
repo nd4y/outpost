@@ -3,8 +3,15 @@ package generation
 import (
 	"context"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"os"
 )
+
+// CheckRecoveryDestination prevents a trusted executor from placing plaintext
+// inside its ciphertext replica, or making that replica part of its output tree.
+func (r *Replica) CheckRecoveryDestination(ctx context.Context, destination *os.Root) error {
+	return localfs.Disjoint(ctx, r.root, destination)
+}
 
 // Trust returns public verification material only, detached from mutable state.
 func (r *Replica) Trust() Trust {

@@ -51,7 +51,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 	if e != nil || env.Node != w.node {
 		return nil, ErrDenied
 	}
-	if env.Request.Kind != "pause" && env.Request.Kind != "resume" && env.Request.Kind != "retry" && env.Request.Kind != "scrub" && env.Request.Kind != "maintenance" {
+	if env.Request.Kind != "pause" && env.Request.Kind != "resume" && env.Request.Kind != "retry" && env.Request.Kind != "scrub" && env.Request.Kind != "maintenance" && env.Request.Kind != "restore" {
 		return nil, ErrDenied
 	}
 	if e = w.check(ctx); e != nil {
@@ -68,7 +68,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 		if e != nil {
 			return e
 		}
-		if s.Format != Format && s.Format != ScheduledFormat || s.Controls == nil {
+		if s.Format != Format && s.Format != ScheduledFormat && s.Format != RecoveryFormat || s.Controls == nil {
 			return ErrDenied
 		}
 		scope := command.SequenceScope(env.Service, env.Request.Kind)
@@ -141,9 +141,12 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 					if s.Controls == nil || s.Controls.Revision >= command.MaxSafeInteger || cfg.Active(time.Now()) != nil || env.Active(time.Now()) != nil {
 						return ErrDenied
 					}
-					if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" {
+					if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" || env.Request.Kind == "restore" {
 						op.Generation = env.Request.Generation
 						op.Work = &CommandWork{Phase: "QUEUED"}
+						if env.Request.Kind == "restore" {
+							s.Format = RecoveryFormat
+						}
 						op.StartedUnix = time.Now().Unix()
 						s.Controls.Operations[env.Request.Operation] = op
 						s.Controls.Sequences[scope] = env.Sequence
@@ -179,6 +182,9 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 					s.Controls.Revision++
 					op.Revision = s.Controls.Revision
 					op.StartedUnix = time.Now().Unix()
+					if env.Request.Kind == "restore" {
+						s.Format = RecoveryFormat
+					}
 					s.Controls.Operations[env.Request.Operation] = op
 					s.Controls.Sequences[scope] = env.Sequence
 					return nil
@@ -203,6 +209,9 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 				}
 				op.Ack = ack
 				if e = state.update(ctx, func(s *Status) error {
+					if env.Request.Kind == "restore" {
+						s.Format = RecoveryFormat
+					}
 					s.Controls.Operations[env.Request.Operation] = op
 					s.Controls.Sequences[scope] = env.Sequence
 					return nil
@@ -216,7 +225,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 				return e
 			}
 		}
-		if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" {
+		if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" || env.Request.Kind == "restore" {
 			if exists {
 				acquire, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
 				err := w.lease.WithLock(acquire, func() error { return state.reconcileActions(ctx) })

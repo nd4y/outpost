@@ -16,6 +16,7 @@ import (
 const EnrollmentFormat = "outpost-management-enrollment-1"
 const ReportFormat = "outpost-management-report-1"
 const CommandReportFormat = "outpost-management-report-2"
+const RecoveryReportFormat = "outpost-management-report-3"
 const CommandFormat = "outpost-management-command-1"
 const MaxEnrollment = 65536
 const MaxReport = 8 << 20
@@ -254,7 +255,7 @@ func stableCode(code string) bool {
 	return true
 }
 func (r Report) Validate(e Enrollment, now time.Time) error {
-	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
+	if e.Validate() != nil || (r.Format != ReportFormat && r.Format != CommandReportFormat && r.Format != RecoveryReportFormat) || r.Node != e.Node || r.Tenant != e.Tenant || r.EnrollmentRevision != e.Revision || r.Sequence == 0 || !safe(r.Sequence) || !safe(r.ConfigurationRevision) || !validTime(r.ObservedUnix) || r.ObservedUnix > now.Unix() || r.ObservedUnix < e.NotBefore || r.ObservedUnix >= e.ExpiresUnix || r.Generations == nil || r.Jobs == nil || len(r.Generations) > 256 || len(r.Jobs) > 4096 || !r.Space.valid(r.ObservedUnix) || !oneOf(r.InventoryState, "", "UNKNOWN", "OBSERVED", "UNAVAILABLE") || r.InventoryState == "UNAVAILABLE" && len(r.Generations) != 0 {
 		return ErrInvalid
 	}
 	if _, ok := e.Domain(r.Domain); !ok {
@@ -265,7 +266,7 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 		return ErrInvalid
 	}
 	for _, c := range r.Commands {
-		if seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
+		if c.Kind == "restore" && r.Format != RecoveryReportFormat || seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
 			return ErrInvalid
 		}
 		seen[c.Operation] = true
