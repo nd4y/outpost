@@ -2,6 +2,8 @@
 
 [Русский](README.ru.md)
 
+[Bounded verification windows](docs/en/verification-windows.md) continue peer generation checks across HTTPS requests and cloud object hashing across physical parts. Receipts preserve original read time. Short tests exercise interrupted progress, fresh operations, legacy peers, corruption and independent recovery; this does not close the full product or large-scale gates.
+
 ![Outpost architecture preview: encrypted replicas and policy-controlled storage](docs/assets/architecture.svg)
 
 Autonomous encrypted backups with complete assigned replicas, granular placement and recovery after long disconnections.

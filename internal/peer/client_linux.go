@@ -75,6 +75,7 @@ func (c *Client) authorized(push bool) error {
 type response struct {
 	data   []byte
 	header http.Header
+	status int
 }
 
 func (c *Client) request(ctx context.Context, op, id, mode, method, resource string, payload []byte, max int, submitted *atomic.Int64) (response, error) {
@@ -102,6 +103,10 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			req.Header.Set("Outpost-Required-Revision", strconv.FormatUint(c.policy.RequiredRevision, 10))
 		}
 		req.Header.Set("Outpost-Mode", mode)
+		window := mode == "push" && method == http.MethodPost && (resource == "missing" || resource == "complete")
+		if window {
+			req.Header.Set(windowHeader, "1")
+		}
 		if mode == "push" && method == http.MethodPut && resource == "catalog" && c.policy.Peers[c.peer].History {
 			req.Header.Set("Outpost-History", "1")
 		}
@@ -118,7 +123,7 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 				cancel()
 				return result, ErrDenied
 			}
-			if res.StatusCode == http.StatusOK {
+			if res.StatusCode == http.StatusOK || window && resource == "complete" && res.StatusCode == http.StatusAccepted {
 				if res.ContentLength > int64(max) || res.Header.Get("Content-Encoding") != "" {
 					res.Body.Close()
 					cancel()
@@ -128,7 +133,7 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 				res.Body.Close()
 				cancel()
 				if readErr == nil && len(b) <= max {
-					return response{b, res.Header.Clone()}, nil
+					return response{b, res.Header.Clone(), res.StatusCode}, nil
 				}
 				if len(b) > max {
 					return result, ErrProtocol
@@ -345,13 +350,9 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if err = c.journal.Update(ctx, binding, "VERIFYING", nil, counters()); err != nil {
 			return result, err
 		}
-		r, e = c.request(ctx, operation, id, kind, http.MethodPost, "complete", nil, 4096, nil)
+		receipt, e := c.completeRemote(ctx, binding, len(refs))
 		if e != nil {
 			return result, e
-		}
-		var receipt Receipt
-		if e = decode(r.data, &receipt, 4096); e != nil || !validReceipt(receipt, binding) || receipt.Verification != "target-full-read" || receipt.ObservedUnix > time.Now().Add(5*time.Minute).Unix() {
-			return result, ErrProtocol
 		}
 		result.TargetReceipt = &receipt
 		// A successful status/receipt alone is insufficient. Read back the signed
@@ -376,7 +377,7 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			result.Receipt.ObservedUnix = oldest
 		}
 	} else {
-		missing, e := local.Missing(ctx, id)
+		missing, e := local.MissingMetadata(ctx, id)
 		if e != nil {
 			return result, e
 		}
@@ -394,10 +395,10 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if err = c.journal.Update(ctx, binding, "VERIFYING", nil, counters()); err != nil {
 			return result, err
 		}
-		if err = local.Complete(ctx, id); err != nil {
+		result.Receipt, err = c.completeLocal(ctx, binding, local, len(refs))
+		if err != nil {
 			return result, err
 		}
-		result.Receipt = Receipt{Format, c.policy.Self, id, id, operation, "local-full-read", time.Now().Unix()}
 	}
 	if err = c.journal.Update(ctx, binding, "COMPLETE", &result.Receipt, counters()); err != nil {
 		return result, err

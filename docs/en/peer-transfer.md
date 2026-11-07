@@ -2,6 +2,8 @@
 
 [Русский](../ru/peer-transfer.md)
 
+The [bounded verification-window contract](verification-windows.md) specifies the compatible HTTPS extension and original-time receipts for resumable verification.
+
 Status: bounded Linux library candidate in `internal/peer`, built on the [G2 replica](generation-replicas.md). It transfers real encrypted file kits over mutually authenticated HTTPS. Full G3, distributed external upload, large-file bandwidth and operational acceptance remain **NOT_VERIFIED**. No worker daemon, live certificates or network configuration are installed by this change.
 
 ## Trust and routes
@@ -53,3 +55,5 @@ The 2 MiB integration fixture transfers two generations through a bridge, remove
 The corruption fixture requires an actual injected data fault and forwards cancelled sibling requests as cancellation responses. This avoids confusing normal parallel cancellation with a broken fault fixture.
 
 The [G3 trace](../g3-trace.json) links scoped implementation checks to all six gate requirements. The [external-upload candidate](external-upload.md) extends REQ-27 coverage with three independent processes, cached signed assignment, SIGKILL takeover, multipart adapters and complete external-target recovery. Peer tests alone remain prerequisites. Real S3-compatible/WebDAV limits and ACLs, power loss, large history, long partitions, low-memory deployment, full traffic accounting and heavy G1-G3 acceptance remain open. Keep the [roadmap](roadmap.md) and private deployment holds in force.
+
+The current peer client uses operation-bound [verification windows](verification-windows.md). New peers return `target-window-read` or `local-window-read` with the oldest supporting read time; legacy peers retain full-read receipts. Metadata presence never substitutes for the mandatory final hash verification. A new operation starts a fresh window. Payload work is bounded per request, while the final catalog/stamp scan still needs large-scale acceptance.

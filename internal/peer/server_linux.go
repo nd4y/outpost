@@ -104,6 +104,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	push := mode == "push"
+	window := r.Header.Get(windowHeader)
+	if window != "" && window != "1" {
+		fail(w, ErrProtocol)
+		return
+	}
 	if e := h.policy.grant(peer, push, time.Now()); e != nil {
 		fail(w, e)
 		return
@@ -306,7 +311,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	switch resource {
 	case "missing":
-		refs, e := h.replica.Missing(ctx, id)
+		var refs []generation.Object
+		var e error
+		if window == "1" {
+			refs, e = h.replica.MissingMetadata(ctx, id)
+		} else {
+			refs, e = h.replica.Missing(ctx, id)
+		}
 		if e != nil {
 			fail(w, e)
 			return
@@ -317,11 +328,29 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if e = h.replica.Complete(ctx, id); e != nil {
-			fail(w, e)
-			return
-		}
 		receipt := Receipt{Format, h.policy.Self, id, id, op, "target-full-read", time.Now().Unix()}
+		if window == "1" {
+			result, e := h.replica.VerifyWindow(ctx, id, verificationWindow(binding), windowObjects, windowBytes)
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if !result.Complete {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusAccepted)
+				_ = json.NewEncoder(w).Encode(windowProgress{windowProgressFormat, op, id, result.VerifiedObjects, result.TotalObjects})
+				return
+			}
+			receipt.Format = WindowReceiptFormat
+			receipt.Verification = "target-window-read"
+			receipt.ObservedUnix = result.VerifiedAt
+		} else {
+			if e = h.replica.Complete(ctx, id); e != nil {
+				fail(w, e)
+				return
+			}
+			receipt.ObservedUnix = time.Now().Unix()
+		}
 		if e = h.journal.Update(ctx, binding, "COMPLETE", &receipt, Counters{}); e != nil {
 			fail(w, e)
 			return

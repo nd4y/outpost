@@ -51,3 +51,5 @@ outpost restore-replica --key /private/recovery-owner.json \
 ## Completion boundary
 
 Finish the applicable main profile through M4 with an installable artifact, standalone recovery, exact-source checks and measured limits. The delayed archive profile remains a separate M5 admission. Production deployment, endpoint credentials, real notifications and destructive infrastructure tests require their own authorized environment. Keep the [roadmap](roadmap.md), English/Russian documentation, requirement links and actual acceptance evidence consistent throughout development.
+
+The current peer client uses operation-bound [verification windows](verification-windows.md). New peers return `target-window-read` or `local-window-read` with the oldest supporting read time; legacy peers retain full-read receipts. Metadata presence never substitutes for the mandatory final hash verification. A new operation starts a fresh window. Payload work is bounded per request, while the final catalog/stamp scan still needs large-scale acceptance.

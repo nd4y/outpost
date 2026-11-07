@@ -14,6 +14,7 @@ import (
 )
 
 const VerificationFormat = "outpost-generation-verification-1"
+const WindowVerificationFormat = "outpost-generation-window-1"
 
 type objectVerification struct {
 	Stamp       catalogStamp `json:"stamp"`
@@ -23,6 +24,7 @@ type verificationState struct {
 	Format      string                        `json:"format"`
 	Generation  string                        `json:"generation"`
 	Trust       string                        `json:"trust"`
+	Window      string                        `json:"window,omitempty"`
 	Objects     map[string]objectVerification `json:"objects"`
 	CompletedAt int64                         `json:"completedAt,omitempty"`
 }
@@ -86,10 +88,20 @@ func (r *Replica) verifyObjectStamp(ctx context.Context, ref Object) (catalogSta
 	}
 	return before, ctx.Err()
 }
-func (r *Replica) verification(id string, refs map[string]Object) (verificationState, error) {
+func verificationName(id, window string) string {
+	if window == "" {
+		return id
+	}
+	return "window-" + Hash([]byte(id+"/"+window))
+}
+func (r *Replica) verification(id, window string, refs map[string]Object) (verificationState, error) {
 	t, _ := json.Marshal(r.trust)
 	v := verificationState{Format: VerificationFormat, Generation: id, Trust: Hash(t), Objects: map[string]objectVerification{}}
-	b, e := read(r.root, "verification/"+id, MaxState)
+	if window != "" {
+		v.Format = WindowVerificationFormat
+		v.Window = window
+	}
+	b, e := read(r.root, "verification/"+verificationName(id, window), MaxState)
 	if errors.Is(e, os.ErrNotExist) {
 		return v, nil
 	}
@@ -97,12 +109,12 @@ func (r *Replica) verification(id string, refs map[string]Object) (verificationS
 		return v, e
 	}
 	var old verificationState
-	if canonical(b, &old, MaxState) != nil || old.Format != v.Format || old.Generation != id || old.Trust != v.Trust || old.Objects == nil || len(old.Objects) > len(refs) || old.CompletedAt < 0 || old.CompletedAt > 0 && len(old.Objects) != len(refs) {
+	if canonical(b, &old, MaxState) != nil || old.Format != v.Format || old.Generation != id || old.Trust != v.Trust || old.Window != window || old.Objects == nil || len(old.Objects) > len(refs) || old.CompletedAt < 0 || old.CompletedAt > time.Now().Unix() || old.CompletedAt > 0 && len(old.Objects) != len(refs) {
 		return v, ErrInvalid
 	}
 	for key, checked := range old.Objects {
 		ref, ok := refs[key]
-		if !ok || checked.Stamp.Size != int64(ref.Bytes) || checked.CheckedUnix <= 0 || old.CompletedAt > 0 && checked.CheckedUnix > old.CompletedAt {
+		if !ok || checked.Stamp.Size != int64(ref.Bytes) || checked.CheckedUnix <= 0 || checked.CheckedUnix > time.Now().Unix() || old.CompletedAt > 0 && checked.CheckedUnix > old.CompletedAt {
 			return v, ErrInvalid
 		}
 	}
@@ -122,7 +134,7 @@ func (r *Replica) saveVerification(v verificationState) error {
 	if len(b) > MaxState {
 		return statefile.ErrCapacity
 	}
-	if e = r.write("verification/"+v.Generation, b); e != nil {
+	if e = r.write("verification/"+verificationName(v.Generation, v.Window), b); e != nil {
 		return e
 	}
 	return r.point("verification-batch-durable")
@@ -168,15 +180,39 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 	if e != nil {
 		return result, e
 	}
+	return r.receiveBatch(ctx, id, "", maxObjects, maxBytes, fetch)
+}
+
+// VerifyWindow reads bounded payload of an already admitted generation. The
+// caller binds window to authenticated operation/target/scope. A new window
+// always starts fresh; replay preserves the oldest supporting read time.
+// It neither admits history nor fetches or repairs missing/corrupt objects.
+func (r *Replica) VerifyWindow(ctx context.Context, id, window string, maxObjects int, maxBytes int64) (BatchResult, error) {
+	if !validID(id) || !validID(window) || maxObjects < 1 || maxObjects > 256 || maxBytes < MaxObject || maxBytes > 256<<20 {
+		return BatchResult{}, ErrInvalid
+	}
+	return r.receiveBatch(ctx, id, window, maxObjects, maxBytes, nil)
+}
+func verificationTime(v verificationState) int64 {
+	oldest := v.CompletedAt
+	if v.Window != "" {
+		for _, checked := range v.Objects {
+			oldest = min(oldest, checked.CheckedUnix)
+		}
+	}
+	return oldest
+}
+func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObjects int, maxBytes int64, fetch func(Object) ([]byte, error)) (BatchResult, error) {
+	var result BatchResult
 	result.Generation = id
 	var todo []Object
-	e = r.locked(ctx, func(s *state) error {
+	e := r.locked(ctx, func(s *state) error {
 		_, refs, e := r.get(s, id, true)
 		if e != nil {
 			return e
 		}
 		result.TotalObjects = len(refs)
-		v, e := r.verification(id, refs)
+		v, e := r.verification(id, window, refs)
 		if e != nil {
 			return e
 		}
@@ -201,7 +237,7 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 		if len(todo) == 0 && len(v.Objects) == len(refs) && v.CompletedAt > 0 && s.Generations[id].Complete {
 			result.Complete = true
 			result.VerifiedObjects = len(refs)
-			result.VerifiedAt = v.CompletedAt
+			result.VerifiedAt = verificationTime(v)
 		}
 		return nil
 	})
@@ -211,6 +247,7 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 	verified := map[string]objectVerification{}
 	for _, ref := range todo {
 		var stamp catalogStamp
+		observed := time.Now().Unix()
 		e = r.locked(ctx, func(s *state) error {
 			var e error
 			_, refs, e := r.get(s, id, false)
@@ -224,6 +261,9 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 			return e
 		})
 		if errors.Is(e, os.ErrNotExist) {
+			if fetch == nil {
+				return result, ErrIncomplete
+			}
 			b, err := fetch(ref)
 			if err != nil {
 				return result, err
@@ -238,14 +278,14 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 			return result, e
 		}
 		result.ReadBytes += int64(ref.Bytes)
-		verified[ref.ID] = objectVerification{Stamp: stamp, CheckedUnix: time.Now().Unix()}
+		verified[ref.ID] = objectVerification{Stamp: stamp, CheckedUnix: observed}
 	}
 	e = r.locked(ctx, func(s *state) error {
 		c, refs, e := r.get(s, id, true)
 		if e != nil {
 			return e
 		}
-		v, e := r.verification(id, refs)
+		v, e := r.verification(id, window, refs)
 		if e != nil {
 			return e
 		}
@@ -283,7 +323,7 @@ func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, 
 			return e
 		}
 		result.Complete = true
-		result.VerifiedAt = v.CompletedAt
+		result.VerifiedAt = verificationTime(v)
 		return nil
 	})
 	return result, e

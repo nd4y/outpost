@@ -108,7 +108,7 @@ func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit 
 		}
 	}
 	if audit != nil {
-		_, _, e = audit.evidence()
+		_, _, e = audit.evidence(ctx)
 		return e
 	}
 	return nil
@@ -195,7 +195,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		if e = j.verifyComplete(ctx, b, audit); e == nil {
 			receipt := Receipt{b.Profile().ID(), j.plan.Generation, j.plan.Operation, j.worker, "full-target-readback", time.Now().Unix()}
 			if audit != nil {
-				receipt.Verification, receipt.ObservedUnix, e = audit.evidence()
+				receipt.Verification, receipt.ObservedUnix, e = audit.evidence(ctx)
 				if e != nil {
 					return result, e
 				}
@@ -226,6 +226,10 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		}
 		round, end := j.plan.round(time.Now())
 		for _, task := range tasks {
+			progress := state.Parts[task.Part.ID]
+			if progress.Complete || j.plan.owner(task.Part.ID, round) != j.worker {
+				continue
+			}
 			if audit != nil {
 				reuse, e := audit.reusable(ctx, task.Object.ID)
 				if e != nil {
@@ -235,13 +239,9 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 					continue
 				}
 			}
-			progress := state.Parts[task.Part.ID]
 			// Completion belongs to immutable bytes, not to an assignment slot.
 			// Rechecking every completed prefix on slot rotation can starve the
 			// remaining parts on slow links. Publication detects vanished parts.
-			if progress.Complete || j.plan.owner(task.Part.ID, round) != j.worker {
-				continue
-			}
 			if e = ctx.Err(); e != nil {
 				return result, e
 			}

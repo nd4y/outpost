@@ -286,6 +286,10 @@ func TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation(t *test
 		t.Fatal("expired evidence hid missing payload", e)
 	}
 	expired.close()
+	current, e := j.newAudit(ctx, b)
+	must(t, e)
+	ref = current.keys[blob.Object.ID]
+	current.close()
 	page := filepath.Join(dir, "readback-"+a.cache.Scope+"-"+ref.ID[:2]+".json")
 	must(t, os.WriteFile(page, []byte("{}"), 0600))
 	if _, e = j.newAudit(ctx, b); !errors.Is(e, readback.ErrInvalid) {

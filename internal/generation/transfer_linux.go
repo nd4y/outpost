@@ -34,6 +34,15 @@ func Dependencies(raw []byte, trust Trust) ([]Object, error) {
 // Missing reports absent objects of an accepted reception. Existing corrupt
 // objects fail closed rather than being silently overwritten by a transfer.
 func (r *Replica) Missing(ctx context.Context, id string) ([]Object, error) {
+	return r.missing(ctx, id, false)
+}
+
+// MissingMetadata reports presence only, for protocols that subsequently
+// require VerifyWindow. It never certifies hashes or publishes COMPLETE.
+func (r *Replica) MissingMetadata(ctx context.Context, id string) ([]Object, error) {
+	return r.missing(ctx, id, true)
+}
+func (r *Replica) missing(ctx context.Context, id string, metadataOnly bool) ([]Object, error) {
 	missing := []Object{}
 	err := r.locked(ctx, func(s *state) error {
 		_, refs, err := r.get(s, id, true)
@@ -44,7 +53,12 @@ func (r *Replica) Missing(ctx context.Context, id string) ([]Object, error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
-			if _, err = r.object(refs[key]); errors.Is(err, os.ErrNotExist) {
+			if metadataOnly {
+				_, err = r.objectStamp(refs[key])
+			} else {
+				_, err = r.object(refs[key])
+			}
+			if errors.Is(err, os.ErrNotExist) {
 				missing = append(missing, refs[key])
 			} else if err != nil {
 				return err

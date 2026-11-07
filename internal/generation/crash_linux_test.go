@@ -44,6 +44,8 @@ func TestReplicaCrashChild(t *testing.T) {
 		_, e = r.Receive(ctx, input.Raw, fetch(input.Objects))
 	case "complete":
 		e = r.Complete(ctx, input.ID)
+	case "window":
+		_, e = r.VerifyWindow(ctx, input.ID, Hash([]byte("crash-window")), 2, MaxObject)
 	case "maintain":
 		_, e = r.Maintain(ctx, input.Permit)
 	default:
@@ -53,7 +55,7 @@ func TestReplicaCrashChild(t *testing.T) {
 }
 
 func TestReplicaSIGKILLBoundaries(t *testing.T) {
-	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "retirement-authority-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}} {
+	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "retirement-authority-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}, {"window", "verification-batch-durable"}, {"window", "before-complete"}, {"window", "state-durable"}} {
 		t.Run(tc.action+"/"+tc.point, func(t *testing.T) {
 			base := temp(t)
 			trust, key, maintenance := trust(t)
@@ -103,6 +105,15 @@ func TestReplicaSIGKILLBoundaries(t *testing.T) {
 				}
 				_, e = r.Receive(ctx, b, fetch(newObjects))
 				ok(t, e)
+			} else if tc.action == "window" {
+				if tc.point != "state-durable" && state.LatestComplete != old {
+					t.Fatal("window published before durable boundary")
+				}
+				result, e := r.VerifyWindow(ctx, id, Hash([]byte("crash-window")), 2, MaxObject)
+				ok(t, e)
+				if !result.Complete || result.ReadBytes != 0 {
+					t.Fatal("durable window lost after SIGKILL", result)
+				}
 			} else if state.LatestComplete != id {
 				t.Fatal("durable complete root lost")
 			}

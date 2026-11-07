@@ -264,12 +264,33 @@ func (w *Worker) observeOne(ctx context.Context, v *view, raw []byte, g observat
 		return ErrDenied
 	}
 	proof, e := w.readObservation(ctx, raw, id, w.node)
-	if errors.Is(e, os.ErrNotExist) {
-		catalog, err := local.replica.Catalog(ctx, id)
+	missing := errors.Is(e, os.ErrNotExist)
+	if e != nil && !missing {
+		return e
+	}
+	now := time.Now()
+	if !g.Active(now) {
+		return observation.ErrDenied
+	}
+	stale := false
+	if !missing {
+		p, err := observation.VerifyProofDocument(proof, raw, w.owner, id)
+		if err != nil || p.ObservedUnix > now.Unix() {
+			return observation.ErrDenied
+		}
+		stale = now.Unix()-p.ObservedUnix > g.MaxAgeSeconds
+	}
+	if missing || stale {
+		// Observation is read-only with respect to admission/publication. Only
+		// a previously complete local catalog may enter a verification window.
+		if _, err := local.replica.Catalog(ctx, id); err != nil {
+			return err
+		}
+		window, err := w.observationWindow(ctx, raw, g, id, proof, now)
 		if err != nil {
 			return err
 		}
-		result, err := local.replica.ReceiveBatch(ctx, catalog, 16, 32<<20, func(generation.Object) ([]byte, error) { return nil, generation.ErrIncomplete })
+		result, err := local.replica.VerifyWindow(ctx, id, window, 8, generation.MaxObject)
 		if err != nil {
 			return err
 		}

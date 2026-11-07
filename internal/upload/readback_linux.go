@@ -25,15 +25,19 @@ type blobEvidence struct {
 	Reused bool
 }
 type cloudAudit struct {
-	backend     *storage.Backend
-	cache       readback.Cache
-	maxAge      int64
-	owned       *statefile.Store
-	blobs       map[string]storage.Blob
-	keys        map[string]generation.Object
-	proofs      map[string]blobEvidence
-	skipChecked map[string]bool
-	verified    map[string]bool
+	backend      *storage.Backend
+	cache        readback.Cache
+	maxAge       int64
+	owned        *statefile.Store
+	blobs        map[string]storage.Blob
+	keys         map[string]generation.Object
+	baseKeys     map[string]generation.Object
+	epochs       map[string]uint64
+	proofs       map[string]blobEvidence
+	skipChecked  map[string]bool
+	verified     map[string]bool
+	partialScope string
+	afterPart    func() error // local fault hook, never configured by a remote peer
 }
 
 func validVerification(level string) bool {
@@ -48,6 +52,8 @@ func (j *Journal) newAudit(ctx context.Context, b *storage.Backend) (*cloudAudit
 		return nil, nil
 	}
 	a := &cloudAudit{backend: b, maxAge: o.MaxAgeSeconds, blobs: map[string]storage.Blob{}, keys: map[string]generation.Object{}, proofs: map[string]blobEvidence{}, skipChecked: map[string]bool{}, verified: map[string]bool{}}
+	a.baseKeys = map[string]generation.Object{}
+	a.epochs = map[string]uint64{}
 	if o.Store == nil {
 		store, e := statefile.OpenAt(j.root, ".", readback.MaxPage, false)
 		if e != nil {
@@ -65,7 +71,7 @@ func (j *Journal) newAudit(ctx context.Context, b *storage.Backend) (*cloudAudit
 		return nil, e
 	}
 	a.cache = readback.Cache{Store: o.Store, Scope: storage.Hash(scope)}
-	refs := make([]generation.Object, 0, len(j.plan.Blobs))
+	a.partialScope = storage.Hash([]byte(a.cache.Scope + "/" + j.planID))
 	for _, blob := range j.plan.Blobs {
 		raw, e := json.Marshal(blob)
 		if e != nil {
@@ -73,7 +79,14 @@ func (j *Journal) newAudit(ctx context.Context, b *storage.Backend) (*cloudAudit
 			return nil, e
 		}
 		ref := generation.Object{ID: storage.Hash(raw), Bytes: blob.Object.Bytes}
-		a.blobs[blob.Object.ID], a.keys[blob.Object.ID] = blob, ref
+		a.blobs[blob.Object.ID], a.baseKeys[blob.Object.ID] = blob, ref
+	}
+	if e = a.initializeEpochs(ctx); e != nil {
+		a.close()
+		return nil, e
+	}
+	refs := make([]generation.Object, 0, len(a.keys))
+	for _, ref := range a.keys {
 		refs = append(refs, ref)
 	}
 	loaded, e := a.cache.Lookup(ctx, refs, time.Now(), a.maxAge)
@@ -94,6 +107,11 @@ func (a *cloudAudit) close() {
 	}
 }
 func (a *cloudAudit) invalidate(ctx context.Context, id string) error {
+	return a.invalidateProgress(ctx, id, true)
+}
+func (a *cloudAudit) invalidateProgress(ctx context.Context, id string, force bool) error {
+	_, hadProof := a.proofs[id]
+	oldKey := a.keys[id]
 	delete(a.proofs, id)
 	delete(a.skipChecked, id)
 	delete(a.verified, id)
@@ -101,7 +119,7 @@ func (a *cloudAudit) invalidate(ctx context.Context, id string) error {
 	// local-only write is joined before returning; failed persistence blocks work.
 	save, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 	defer cancel()
-	if e := a.cache.Invalidate(save, []generation.Object{a.keys[id]}, time.Now()); e != nil {
+	if e := a.cache.InvalidateChecked(save, []generation.Object{oldKey}, time.Now(), func() error { return a.invalidateEpochLocked(id, force, hadProof) }); e != nil {
 		return ErrConflict
 	}
 	return nil
@@ -122,7 +140,7 @@ func (a *cloudAudit) descriptor(ctx context.Context, id string) error {
 		}
 	}
 	if storage.Missing(e) || errors.Is(e, storage.ErrIntegrity) || errors.Is(e, storage.ErrConflict) {
-		if x := a.invalidate(ctx, id); x != nil {
+		if x := a.invalidateProgress(ctx, id, !storage.Missing(e)); x != nil {
 			return x
 		}
 	}
@@ -139,6 +157,9 @@ func (a *cloudAudit) reusable(ctx context.Context, id string) (bool, error) {
 	if a.skipChecked[id] {
 		return true, nil
 	}
+	if e := a.checkEpochs(ctx, id); e != nil {
+		return false, e
+	}
 	if e := a.descriptor(ctx, id); e != nil {
 		if storage.Missing(e) {
 			return false, nil
@@ -153,14 +174,17 @@ func (a *cloudAudit) verify(ctx context.Context, id string, seal bool) error {
 	if !ok {
 		return ErrDenied
 	}
+	if e := a.checkEpochs(ctx, id); e != nil {
+		return e
+	}
 	e := a.descriptor(ctx, id)
 	absent := storage.Missing(e)
 	if e != nil && !(seal && absent) {
 		return e
 	}
 	if !a.usable(id) {
-		observed := time.Now().Unix()
-		if _, e = a.backend.ReadDescribed(ctx, blob); e != nil {
+		progress, reused, readErr := a.readParts(ctx, id, !absent)
+		if e = readErr; e != nil {
 			if storage.Missing(e) || errors.Is(e, storage.ErrIntegrity) {
 				if x := a.invalidate(ctx, id); x != nil {
 					return x
@@ -178,16 +202,28 @@ func (a *cloudAudit) verify(ctx context.Context, id string, seal bool) error {
 				return e
 			}
 		}
-		r := readback.Record{Bytes: blob.Object.Bytes, ObservedUnix: observed}
-		if e = a.cache.Remember(ctx, map[string]readback.Record{a.keys[id].ID: r}, time.Now()); e != nil {
+		r := readback.Record{Bytes: progress.Bytes, ObservedUnix: progress.ObservedUnix}
+		if e = a.cache.RememberChecked(ctx, map[string]readback.Record{a.keys[id].ID: r}, time.Now(), func() error {
+			if e := a.checkEpoch(id); e != nil {
+				return e
+			}
+			return a.hashWindow(id).sealLocked(progress)
+		}); e != nil {
 			return e
 		}
-		a.proofs[id] = blobEvidence{r, false}
+		a.proofs[id] = blobEvidence{r, reused}
 	}
 	a.verified[id] = true
 	return nil
 }
-func (a *cloudAudit) evidence() (string, int64, error) {
+func (a *cloudAudit) evidence(ctx context.Context) (string, int64, error) {
+	ids := make([]string, 0, len(a.blobs))
+	for id := range a.blobs {
+		ids = append(ids, id)
+	}
+	if e := a.checkEpochs(ctx, ids...); e != nil {
+		return "", 0, e
+	}
 	oldest := time.Now().Unix()
 	level := "full-target-readback"
 	for id := range a.blobs {
@@ -220,7 +256,7 @@ func (a *cloudAudit) publish(ctx context.Context, raw []byte, trust generation.T
 				return e
 			}
 		}
-		_, _, e := a.evidence()
+		_, _, e := a.evidence(ctx)
 		return e
 	})
 }

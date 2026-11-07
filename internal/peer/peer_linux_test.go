@@ -209,7 +209,7 @@ func TestAsynchronousBridgeOnlyTransferAndRestore(t *testing.T) {
 	pull := f.client(t, f.c, f.a, server.URL, f.policy(f.c, f.a))
 	one, e := push.Push(testContext, generation.Hash([]byte("push one")), first, f.b.replica)
 	must(t, e)
-	if one.Receipt.Verification != "client-full-readback" || one.TargetReceipt.Verification != "target-full-read" {
+	if one.Receipt.Verification != "client-full-readback" || one.TargetReceipt.Verification != "target-window-read" {
 		t.Fatal(one)
 	}
 	_, e = pull.Pull(testContext, generation.Hash([]byte("pull one")), first, f.c.replica)
@@ -230,7 +230,7 @@ func TestAsynchronousBridgeOnlyTransferAndRestore(t *testing.T) {
 	must(t, os.Remove(f.input))
 	result, e := pull.Pull(testContext, generation.Hash([]byte("pull two")), second, f.c.replica)
 	must(t, e)
-	if result.Receipt.Target != f.c.id || result.Receipt.Verification != "local-full-read" {
+	if result.Receipt.Target != f.c.id || result.Receipt.Verification != "local-window-read" {
 		t.Fatal(result)
 	}
 	if _, e = NewClient(server.URL, f.b.id, f.c.cert, f.ca.roots, f.policy(f.c, f.a), f.c.journal, f.trust, testLimits); !errors.Is(e, ErrDenied) {

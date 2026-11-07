@@ -646,6 +646,30 @@
         {
           "path": "internal/upload/readback_linux_test.go",
           "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressEpochFencesStaleCommitAndReceipt"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowRestartsFreshPerOperationAndKeepsOriginalAge"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudEvidenceEpochFencesOtherOperationAndSurvivesPartialInvalidation"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -680,6 +704,10 @@
         {
           "path": "internal/worker/discovery_linux_test.go",
           "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
@@ -714,6 +742,10 @@
         {
           "path": "internal/generation/history_linux_test.go",
           "name": "TestHistoricalAdmissionKeepsHeadAndRejectsRetiredOrConflictingCatalog"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
@@ -866,6 +898,50 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressCorruptionIsPreserved"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressEpochFencesStaleCommitAndReceipt"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowRestartsFreshPerOperationAndKeepsOriginalAge"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowMetadataPresenceNeverCertifiesCorruption"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowAcceptsLegacyServerAndRejectsFalseProgress"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudEvidenceEpochFencesOtherOperationAndSurvivesPartialInvalidation"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -907,6 +983,18 @@
         {
           "path": "internal/peer/readback_linux_test.go",
           "name": "TestExplicitReadbackReuseTransfersOnlyNewObjectsAndPreservesAge"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowRestartsFreshPerOperationAndKeepsOriginalAge"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -1059,6 +1147,18 @@
         {
           "path": "internal/upload/readback_linux_test.go",
           "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudEvidenceEpochFencesOtherOperationAndSurvivesPartialInvalidation"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -1093,6 +1193,10 @@
         {
           "path": "internal/upload/readback_linux_test.go",
           "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
         }
       ],
       "acceptance": ["AT-16"],
@@ -1127,6 +1231,10 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -1178,6 +1286,10 @@
         {
           "path": "internal/upload/planning_cache_linux_test.go",
           "name": "TestMultipartPlanningResumesAfterDurableObjectWithoutRereadingIt"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
@@ -1249,7 +1361,16 @@
         "internal/storage",
         "cmd/outpost"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
+        }
+      ],
       "acceptance": ["AT-13"],
       "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, recovery-kit distribution, installation and dataset/directory recovery at admitted scale."
     },
@@ -1317,6 +1438,10 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
         }
       ],
       "acceptance": ["AT-24"],
@@ -1496,6 +1621,14 @@
         {
           "path": "internal/upload/planning_cache_linux_test.go",
           "name": "TestPlanningPagesEnforceQuotaAndRejectOversizedPlanBeforePayload"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressEpochFencesStaleCommitAndReceipt"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -1506,7 +1639,16 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowResumesAfterInterruptedProgressResponse"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowAcceptsLegacyServerAndRejectsFalseProgress"
+        }
+      ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
@@ -1617,6 +1759,42 @@
         {
           "path": "internal/upload/readback_linux_test.go",
           "name": "TestCloudReadbackRestartDescriptorBindingAndMissingDataInvalidation"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressCorruptionIsPreserved"
+        },
+        {
+          "path": "internal/upload/hash_progress_linux_test.go",
+          "name": "TestCloudHashProgressEpochFencesStaleCommitAndReceipt"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowCannotAdmitHistoryOrResurrectRetiredGeneration"
+        },
+        {
+          "path": "internal/generation/window_linux_test.go",
+          "name": "TestVerificationWindowMetadataPresenceNeverCertifiesCorruption"
+        },
+        {
+          "path": "internal/peer/window_linux_test.go",
+          "name": "TestPeerVerificationWindowAcceptsLegacyServerAndRejectsFalseProgress"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudEvidenceEpochFencesOtherOperationAndSurvivesPartialInvalidation"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
+        },
+        {
+          "path": "internal/upload/evidence_epoch_linux_test.go",
+          "name": "TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

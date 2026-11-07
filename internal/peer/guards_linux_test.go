@@ -51,7 +51,7 @@ func TestPrematurePublicationAndInvalidObject(t *testing.T) {
 	must(t, f.a.replica.VerifyComplete(testContext, id))
 	job, e := f.a.journal.Read(testContext, Binding{op, "receive", f.trust.Domain, f.trust.Repository, f.trust.Epoch, id, f.b.id, f.a.id, id})
 	must(t, e)
-	if job.Phase != "COMPLETE" || job.LastReceipt == nil || job.LastReceipt.Verification != "target-full-read" {
+	if job.Phase != "COMPLETE" || job.LastReceipt == nil || job.LastReceipt.Verification != "target-window-read" {
 		t.Fatal("missing persisted target evidence", job)
 	}
 }

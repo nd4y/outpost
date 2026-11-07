@@ -125,6 +125,12 @@ func (c Cache) Lookup(ctx context.Context, refs []generation.Object, now time.Ti
 // Records are scoped by the caller to exact target/protocol/reader/trust. Each
 // page is committed atomically; an interrupted batch only causes extra reads.
 func (c Cache) Remember(ctx context.Context, records map[string]Record, now time.Time) error {
+	return c.RememberChecked(ctx, records, now, nil)
+}
+
+// RememberChecked joins a local validation with the evidence update under the
+// same store lock. check must not reenter Store or perform network IO.
+func (c Cache) RememberChecked(ctx context.Context, records map[string]Record, now time.Time, check func() error) error {
 	if !c.valid() || len(records) > generation.MaxObjects || now.Unix() < 1 {
 		return ErrInvalid
 	}
@@ -140,6 +146,11 @@ func (c Cache) Remember(ctx context.Context, records map[string]Record, now time
 		return e
 	}
 	return c.Store.WithLock(ctx, func() error {
+		if check != nil {
+			if e := check(); e != nil {
+				return e
+			}
+		}
 		for prefix, objects := range parts {
 			if e := ctx.Err(); e != nil {
 				return e
@@ -190,6 +201,12 @@ func (c Cache) Remember(ctx context.Context, records map[string]Record, now time
 // corrupt. It never changes payload or protection pins. Malformed pages remain
 // preserved and block reuse rather than being silently replaced.
 func (c Cache) Invalidate(ctx context.Context, refs []generation.Object, now time.Time) error {
+	return c.InvalidateChecked(ctx, refs, now, nil)
+}
+
+// InvalidateChecked also fences local in-flight verification under this lock.
+// check has the same restrictions as RememberChecked; it runs before removal.
+func (c Cache) InvalidateChecked(ctx context.Context, refs []generation.Object, now time.Time, check func() error) error {
 	if !c.valid() || now.Unix() < 1 {
 		return ErrInvalid
 	}
@@ -198,6 +215,11 @@ func (c Cache) Invalidate(ctx context.Context, refs []generation.Object, now tim
 		return e
 	}
 	return c.Store.WithLock(ctx, func() error {
+		if check != nil {
+			if e := check(); e != nil {
+				return e
+			}
+		}
 		for prefix, objects := range parts {
 			p, e := c.load(prefix, now.Unix())
 			if e != nil {

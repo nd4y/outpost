@@ -337,5 +337,6 @@ func validReceipt(r Receipt, b Binding) bool {
 		target = b.Executor
 	}
 	level := r.Format == Format && (r.Verification == "target-full-read" || r.Verification == "client-full-readback" || r.Verification == "local-full-read") || r.Format == CachedReceiptFormat && r.Verification == "client-cached-readback" && b.Kind == "push"
+	level = level || r.Format == WindowReceiptFormat && (r.Verification == "target-window-read" && (b.Kind == "receive" || b.Kind == "push") || r.Verification == "local-window-read" && b.Kind == "pull")
 	return level && r.Target == target && r.Generation == b.Generation && r.CatalogDigest == b.Expected && r.Operation == b.Operation && r.ObservedUnix > 0
 }
