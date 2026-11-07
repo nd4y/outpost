@@ -17,7 +17,7 @@ type SealedKit struct {
 // WithSealedKits holds one shared maintenance lock across all selected versions
 // and their copying. No decryption key or plaintext metadata leaves this API.
 func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume func([]SealedKit, func(Object) ([]byte, error)) error) error {
-	if len(versions) == 0 || len(versions) > 64 || consume == nil {
+	if len(versions) == 0 || len(versions) > 4096 || consume == nil {
 		return ErrInvalid
 	}
 	unlock, err := s.lock(ctx, false)

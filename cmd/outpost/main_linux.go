@@ -56,9 +56,12 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY"}}, nil
 	}
 	if args[0] == "version" {
+		if len(args) != 1 {
+			return nil, errUsage
+		}
 		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format}, nil
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
@@ -70,6 +73,7 @@ func run(ctx context.Context, args []string) (any, error) {
 	store := flags.String("store", "", "file kit directory")
 	version := flags.String("version", "", "expected opaque version")
 	operation := flags.String("operation", "", "operation ID")
+	domain := flags.String("domain", "", "opaque domain ID")
 	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 {
 		return nil, errUsage
 	}
@@ -115,7 +119,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"version": *version, "file": d.File, "bytes": d.Size, "aliases": len(d.Names)}, nil
-	case "worker-init", "worker-run", "worker-status", "worker-retry", "config-apply":
+	case "worker-init", "worker-run", "worker-status", "worker-retry", "config-apply", "replica-migrate", "replica-rollback":
 		b, e := worker.LoadBootstrap(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -142,6 +146,9 @@ func run(ctx context.Context, args []string) (any, error) {
 			return map[string]any{"node": b.Node, "configurationAccepted": e == nil}, e
 		case "worker-run":
 			return map[string]any{"node": b.Node, "stopped": true}, serveWorker(ctx, b, w)
+		case "replica-migrate", "replica-rollback":
+			e = w.MigrateDomain(ctx, *domain, args[0] == "replica-rollback")
+			return map[string]any{"domain": *domain, "action": args[0], "completed": e == nil}, e
 		}
 	}
 	return nil, errUsage
@@ -191,6 +198,8 @@ func failure(e error) (string, int) {
 		return "CANCELED", 130
 	case errors.Is(e, errUsage):
 		return "INVALID_ARGUMENT", 2
+	case errors.Is(e, generation.ErrMigrationRequired):
+		return "MIGRATION_REQUIRED", 5
 	case errors.Is(e, worker.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied):
 		return "DENIED", 3
 	case errors.Is(e, generation.ErrIncomplete), errors.Is(e, filekit.ErrInvalid), errors.Is(e, storage.ErrIntegrity):

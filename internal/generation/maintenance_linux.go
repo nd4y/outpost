@@ -56,7 +56,7 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 			}
 		}
 		for id, item := range s.Generations {
-			_, refs, e := get(s, id, r.trust)
+			_, refs, e := r.get(s, id, true)
 			if e != nil {
 				return e
 			}
@@ -106,6 +106,26 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 				garbage = append(garbage, item.Name())
 			}
 		}
+		// Unknown files never become deletion candidates. Catalog GC uses the
+		// same permit and commit-before-delete boundary as object GC.
+		catalogDir, e := r.root.Open("catalogs")
+		if e != nil {
+			return e
+		}
+		catalogEntries, e := catalogDir.ReadDir(MaxGenerations*4 + 1)
+		catalogDir.Close()
+		if (e != nil && !errors.Is(e, io.EOF)) || len(catalogEntries) > MaxGenerations*4 {
+			return ErrInvalid
+		}
+		var catalogGarbage []string
+		for _, item := range catalogEntries {
+			if !item.Type().IsRegular() || !validID(item.Name()) {
+				return ErrInvalid
+			}
+			if _, exists := s.Generations[item.Name()]; !exists || retiring[item.Name()] {
+				catalogGarbage = append(catalogGarbage, item.Name())
+			}
+		}
 		if !replay {
 			for id := range retiring {
 				delete(s.Generations, id)
@@ -131,7 +151,18 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 				return e
 			}
 		}
-		return syncDir(r.root, "objects")
+		if e = syncDir(r.root, "objects"); e != nil {
+			return e
+		}
+		for _, id := range catalogGarbage {
+			if e = ctx.Err(); e != nil {
+				return e
+			}
+			if e = r.root.Remove("catalogs/" + id); e != nil {
+				return e
+			}
+		}
+		return syncDir(r.root, "catalogs")
 	})
 	return removed, e
 }
@@ -157,7 +188,7 @@ func (r *Replica) ExportKit(ctx context.Context, generation, version, destinatio
 		return ErrInvalid
 	}
 	return r.locked(ctx, func(s *state) error {
-		c, _, e := get(s, generation, r.trust)
+		c, _, e := r.get(s, generation, true)
 		if e != nil {
 			return e
 		}

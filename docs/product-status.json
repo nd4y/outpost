@@ -364,6 +364,10 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestReceiveRestartConflictAndPendingPin"
+        },
+        {
+          "path": "internal/generation/index_migration_linux_test.go",
+          "name": "TestCompactIndexSupportsHistoryBeyondFormerEmbeddedLimit"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
@@ -625,6 +629,10 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestReceiveRestartConflictAndPendingPin"
+        },
+        {
+          "path": "internal/generation/index_migration_linux_test.go",
+          "name": "TestCatalogCacheCannotHideTamperingFromCompletionOrMaintenance"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
@@ -793,7 +801,20 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/generation/index_migration_linux_test.go",
+          "name": "TestExplicitIndexMigrationPreservesHistoryAndGuardsRollback"
+        },
+        {
+          "path": "internal/generation/index_migration_linux_test.go",
+          "name": "TestIndexMigrationSIGKILLBeforeSwitchKeepsOldState"
+        },
+        {
+          "path": "internal/worker/migration_linux_test.go",
+          "name": "TestOperatorMigrationUsesWorkerLeaseDomainAndBudget"
+        }
+      ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
       "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
