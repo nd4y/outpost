@@ -137,16 +137,24 @@ func lock(ctx context.Context, root *os.Root, name string) (func(), error) {
 	}
 }
 func Open(dir string, raw []byte, worker string, a Authority, initialize bool) (*Journal, error) {
-	p, e := Verify(raw, a)
-	if e != nil {
-		return nil, e
-	}
-	if _, ok := p.worker(worker); !ok || !filepath.IsAbs(dir) {
+	if !filepath.IsAbs(dir) {
 		return nil, ErrDenied
 	}
 	r, e := os.OpenRoot(dir)
 	if e != nil {
 		return nil, e
+	}
+	return openJournalRoot(r, raw, worker, a, initialize)
+}
+func openJournalRoot(r *os.Root, raw []byte, worker string, a Authority, initialize bool) (*Journal, error) {
+	p, e := Verify(raw, a)
+	if e != nil {
+		r.Close()
+		return nil, e
+	}
+	if _, ok := p.worker(worker); !ok {
+		r.Close()
+		return nil, ErrDenied
 	}
 	a.Planner = append([]byte(nil), a.Planner...)
 	a.Generation.Writer = append([]byte(nil), a.Generation.Writer...)

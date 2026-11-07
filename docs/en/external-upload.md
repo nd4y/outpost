@@ -4,6 +4,8 @@
 
 The G3 candidate adds S3-compatible and WebDAV adapters in `internal/storage` and cached signed upload plans in `internal/upload`. Three independent Linux worker processes can upload different ciphertext parts of the same file, take over after a worker stops and publish a complete generation. No continuously available control plane or coordinator is required after plan delivery. This is a library implementation, not an installed worker service. Full G3 and M3 acceptance remain **NOT_VERIFIED**.
 
+The [durable upload queue](upload-queue.md) can admit and drain multiple signed plans with automatic retries, independent target progress and source protection across process restarts. Direct `Journal.Run` remains available for one operation.
+
 ## Placement and execution
 
 A planner selects one already policy-separated generation, an external target and eligible workers. `AllowExternal`, allowed node classes and the target namespace are checked before reading payloads or creating tasks. Every selected worker must already hold the complete encrypted generation and have an explicitly admitted route to that target. A denied target receives no plan. The per-file classification and policy compiler that produce these separated generations remain upstream work; the upload library does not decide where plaintext belongs.

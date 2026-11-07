@@ -16,6 +16,8 @@ The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signe
 
 The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push currently audits the entire target generation by reading it back. The [external-upload candidate](docs/en/external-upload.md) adds S3-compatible/WebDAV adapters, three independent workers, cached signed plans, failover and independently recoverable target generations. Real endpoint admission, full traffic accounting and heavy G3 acceptance remain open.
 
+The [durable upload queue](docs/en/upload-queue.md) now admits signed plans, pins sources and runs independent targets with bounded concurrency, automatic delayed retries and process-crash recovery. Expired or permanently blocked jobs remain explicit and protected.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.
