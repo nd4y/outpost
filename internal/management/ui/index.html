@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Outpost</title>
+    <link rel="stylesheet" href="/ui/app.css" />
+    <script type="module" src="/ui/app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+    <header>
+      <div>
+        <strong class="brand">Outpost</strong>
+        <p data-i18n="tagline">Know which backup you can recover.</p>
+      </div>
+      <label for="language"
+        ><span data-i18n="language">Language</span
+        ><select id="language">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+        </select></label
+      >
+    </header>
+    <main id="main" tabindex="-1">
+      <h1 data-i18n="title">Backup control</h1>
+      <p data-i18n="intro">
+        Choose a node and domain to inspect copies or request an authorized operation.
+      </p>
+      <p id="session" class="muted"></p>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <noscript
+        >This interface requires JavaScript. Use the authenticated management API or CLI. / Для
+        интерфейса нужен JavaScript. Используйте API или CLI.</noscript
+      >
+      <section aria-labelledby="scope-title">
+        <h2 id="scope-title" data-i18n="scope">Scope</h2>
+        <div class="fields">
+          <label for="tenant"
+            ><span data-i18n="tenant">Tenant</span
+            ><select id="tenant" disabled></select
+          ></label>
+          <label for="node"
+            ><span data-i18n="node">Node</span
+            ><select id="node" disabled></select
+          ></label>
+          <label for="domain"
+            ><span data-i18n="domain">Domain</span
+            ><select id="domain" disabled></select
+          ></label>
+        </div>
+        <div class="actions">
+          <button id="refresh" type="button" data-i18n="refresh">Refresh</button
+          ><button id="nodes-more" type="button" hidden data-i18n="moreNodes">More nodes</button>
+        </div>
+      </section>
+      <nav aria-label="Sections">
+        <a href="#coverage" data-i18n="coverage">Copies</a
+        ><a href="#placement" data-i18n="placement">Placement</a
+        ><a href="#commands" data-i18n="commands">Operations</a
+        ><a href="#configuration" data-i18n="configuration">Policy</a
+        ><a href="#activity" data-i18n="activity">Activity</a>
+      </nav>
+      <section id="coverage" aria-labelledby="coverage-title">
+        <h2 id="coverage-title" data-i18n="coverage">Copies</h2>
+        <p id="report-state"></p>
+        <p id="report-age" class="muted"></p>
+        <p data-i18n="evidenceHelp">
+          Backup creation, target readback and verified restore are separate observations. Unknown
+          values are not zero.
+        </p>
+        <div id="space"></div>
+        <h3 data-i18n="generations">Generations</h3>
+        <div id="generations"></div>
+        <h3 data-i18n="jobs">Queue</h3>
+        <div id="jobs"></div>
+        <h3 data-i18n="commandResults">Worker results</h3>
+        <div id="command-results"></div>
+      </section>
+      <section id="placement" aria-labelledby="placement-title">
+        <h2 id="placement-title" data-i18n="placement">Placement</h2>
+        <p id="policy-state"></p>
+        <div id="policy-details"></div>
+      </section>
+      <section id="commands" aria-labelledby="commands-title">
+        <h2 id="commands-title" data-i18n="commands">Operations</h2>
+        <p data-i18n="commandHelp">
+          Only current grants are offered. The worker checks its local policy again. Admission is
+          not completion.
+        </p>
+        <form id="command-form">
+          <fieldset id="command-fields" disabled>
+            <legend data-i18n="command">Request an operation</legend>
+            <div class="fields">
+              <label for="kind"
+                ><span data-i18n="kind">Operation</span
+                ><select id="kind" required></select
+              ></label>
+              <label for="generation"
+                ><span data-i18n="generation">Exact generation</span
+                ><input
+                  id="generation"
+                  maxlength="64"
+                  pattern="[a-f0-9]{64}"
+                  list="generation-list"
+                  autocomplete="off"
+              /></label>
+              <datalist id="generation-list"></datalist>
+              <label for="job"
+                ><span data-i18n="job">Job identifier</span
+                ><input id="job" maxlength="64" pattern="[a-f0-9]{64}" autocomplete="off"
+              /></label>
+              <label for="preset"
+                ><span data-i18n="preset">Local recovery preset</span
+                ><input id="preset" maxlength="64" pattern="[a-f0-9]{64}" autocomplete="off"
+              /></label>
+            </div>
+            <label for="versions"
+              ><span data-i18n="versions"
+                >File-version identifiers, one per line (empty: whole generation)</span
+              ><textarea id="versions" rows="3" maxlength="16639" autocomplete="off"></textarea>
+            </label>
+            <label for="permit"
+              ><span data-i18n="permit">Signed maintenance permit</span
+              ><input id="permit" type="file" accept="application/json,.json"
+            /></label>
+            <p id="command-consequence"></p>
+            <div class="actions">
+              <button type="submit" data-i18n="reviewCommand">Review operation</button
+              ><button id="new-command" type="button" data-i18n="newCommand">New operation</button>
+            </div>
+          </fieldset>
+        </form>
+        <div id="command-review" hidden>
+          <h3 data-i18n="review">Review</h3>
+          <pre id="command-summary"></pre>
+          <p data-i18n="reviewHelp">
+            Check the exact scope and identifiers. A maintenance permit can authorize deletion; its
+            signed limits and identifiers are shown below.
+          </p>
+          <div class="actions">
+            <button id="send-command" type="button" data-i18n="send">
+              Submit reviewed operation</button
+            ><button id="cancel-review" type="button" data-i18n="cancelReview">
+              Return to editing
+            </button>
+          </div>
+        </div>
+      </section>
+      <section id="configuration" aria-labelledby="configuration-title">
+        <h2 id="configuration-title" data-i18n="configuration">Policy</h2>
+        <p data-i18n="configHelp">
+          Owners can preview an already signed configuration. Signing keys stay outside the browser.
+          Changes may cover other domains only if your owner scope permits them.
+        </p>
+        <form id="config-form">
+          <fieldset id="config-fields" disabled>
+            <legend data-i18n="signedConfig">Signed configuration</legend>
+            <label for="config-file"
+              ><span data-i18n="configFile">Configuration file (up to 32 MiB)</span
+              ><input
+                id="config-file"
+                type="file"
+                accept="application/json,.json"
+                required /></label
+            ><button type="submit" data-i18n="preview">Preview changes</button>
+          </fieldset>
+        </form>
+        <div id="config-preview" hidden>
+          <h3 data-i18n="preview">Preview changes</h3>
+          <div id="config-changes"></div>
+          <button id="apply-config" type="button" data-i18n="apply">Apply this preview</button>
+        </div>
+      </section>
+      <section id="activity" aria-labelledby="activity-title">
+        <h2 id="activity-title" data-i18n="activity">Activity</h2>
+        <p data-i18n="receiptHelp">
+          Keep the operation identifier. A lost reply does not mean failure. Read the receipt or
+          retry the same request; do not create a replacement operation.
+        </p>
+        <div id="operations"></div>
+        <form id="receipt-form">
+          <label for="operation-id"
+            ><span data-i18n="operationId">Operation identifier</span
+            ><input
+              id="operation-id"
+              maxlength="64"
+              pattern="[a-f0-9]{64}"
+              required
+              autocomplete="off" /></label
+          ><button type="submit" data-i18n="readReceipt">Read receipt</button>
+        </form>
+        <pre id="receipt-result" aria-live="polite"></pre>
+        <h3 data-i18n="audit">Audit</h3>
+        <div class="actions">
+          <button id="audit-refresh" type="button" data-i18n="loadAudit">Load audit</button
+          ><button id="audit-more" type="button" hidden data-i18n="more">Next page</button>
+        </div>
+        <div id="audit"></div>
+      </section>
+    </main>
+    <footer>
+      <span data-i18n="privacy"
+        >No backup content or decryption keys are sent to this interface.</span
+      >
+    </footer>
+  </body>
+</html>

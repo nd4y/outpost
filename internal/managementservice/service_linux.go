@@ -318,7 +318,9 @@ func (s *Service) Run(ctx context.Context) error {
 		defer listener.Close()
 		run, cancel := context.WithCancelCause(ctx)
 		defer cancel(context.Canceled)
+		requests := &drainingHandler{handler: handler}
 		server := &http.Server{Handler: handler, ReadHeaderTimeout: 3 * time.Second, ReadTimeout: time.Duration(s.p.TimeoutMillis)*time.Millisecond + time.Second, WriteTimeout: time.Duration(s.p.TimeoutMillis)*time.Millisecond + time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10, TLSConfig: s.tls, ErrorLog: log.New(io.Discard, "", 0), BaseContext: func(net.Listener) context.Context { return run }}
+		server.Handler = requests
 		done := make(chan error, 1)
 		limited := &limitedListener{Listener: listener, slots: make(chan struct{}, s.p.Concurrency*8+8)}
 		go func() { done <- server.Serve(tls.NewListener(limited, s.tls)) }()
@@ -352,6 +354,9 @@ func (s *Service) Run(ctx context.Context) error {
 				if e != nil {
 					if run.Err() != nil {
 						result = context.Cause(run)
+						if e != run.Err() && e != context.DeadlineExceeded {
+							result = e
+						}
 						break loop
 					}
 					if !errors.Is(e, context.DeadlineExceeded) {
@@ -365,16 +370,25 @@ func (s *Service) Run(ctx context.Context) error {
 			}
 		}
 		cancel(result)
+		requests.drain()
 		shutdown, stop := context.WithTimeout(context.Background(), 3*time.Second)
 		defer stop()
 		e = server.Shutdown(shutdown)
 		if e != nil {
-			_ = server.Close()
+			closed := server.Close()
+			if e == shutdown.Err() {
+				// A silent TLS client can outlive graceful draining. Closing it
+				// is part of normal bounded stop, not a failed backup operation.
+				e = closed
+			} else {
+				e = errors.Join(e, closed)
+			}
 		}
+		requests.active.Wait()
 		if done != nil {
 			<-done
 		}
-		if ctx.Err() != nil && errors.Is(result, ctx.Err()) {
+		if ctx.Err() != nil && result == ctx.Err() {
 			result = nil
 		}
 		return errors.Join(result, e)

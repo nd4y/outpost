@@ -51,6 +51,14 @@ for (const item of product.requirements) {
     assert(fs.existsSync(path.join(root, file)), `Missing implementation: ${item.id} ${file}`);
   }
   for (const check of item.checks) {
+    if (check.path === "scripts/browser/check.mjs") {
+      assert(/^[A-Za-z0-9][A-Za-z0-9 ,%-]{10,160}$/.test(check.name));
+      assert(
+        new RegExp(`await test\\(\\s*${JSON.stringify(check.name)},`).test(read(check.path)),
+        `Stale browser scenario: ${item.id} ${check.name}`,
+      );
+      continue;
+    }
     assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z_]+_test\.go$/.test(check.path));
     assert(/^Test[A-Za-z0-9]+$/.test(check.name));
     assert(

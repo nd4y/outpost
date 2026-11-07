@@ -2068,6 +2068,121 @@
           }
         }
       }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/policy": {
+      "get": {
+        "operationId": "domainPolicy",
+        "summary": "Read only the selected domain policy and currently usable command grants",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3545,6 +3660,249 @@
         },
         "required": ["format", "operation", "binding", "preset", "verifiedUnix", "restored"],
         "description": "Historical opaque trusted recovery receipt. Binding must equal the command envelope digest; operation, generation and original verification time must match the observation. No paths or keys."
+      },
+      "DomainPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-domain-policy-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "writerEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "configurationRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "configurationDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "configurationState": {
+            "enum": ["ACTIVE", "INACTIVE"]
+          },
+          "expiresUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "placement": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "allowedClasses": {
+                "type": "array",
+                "items": {
+                  "enum": ["trusted", "untrusted", "external"]
+                },
+                "maxItems": 3
+              },
+              "holders": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "maxItems": 128
+              },
+              "transit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "maxItems": 128
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "maxItems": 128
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "to": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "mode": {
+                      "enum": ["push", "pull"]
+                    }
+                  },
+                  "required": ["from", "to", "mode"]
+                },
+                "maxItems": 512
+              },
+              "cloudEdges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "node": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "target": {
+                      "$ref": "#/components/schemas/ID"
+                    }
+                  },
+                  "required": ["node", "target"]
+                },
+                "maxItems": 512
+              }
+            },
+            "required": [
+              "domain",
+              "allowedClasses",
+              "holders",
+              "transit",
+              "targets",
+              "edges",
+              "cloudEdges"
+            ]
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "class": {
+                  "enum": ["trusted", "untrusted"]
+                }
+              },
+              "required": ["id", "class"]
+            },
+            "maxItems": 128
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "kind": {
+                  "enum": ["s3", "webdav"]
+                },
+                "maxObjectBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["id", "kind", "maxObjectBytes"]
+            },
+            "maxItems": 128
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "profile": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "ingress": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expiresUnix": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1099511627776
+                },
+                "state": {
+                  "enum": ["ACTIVE", "INACTIVE"]
+                }
+              },
+              "required": ["node", "profile", "ingress", "revision", "expiresUnix", "state"]
+            },
+            "maxItems": 128
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "authority": {
+                  "type": "string",
+                  "contentEncoding": "base64",
+                  "maxLength": 87384
+                },
+                "kinds": {
+                  "type": "array",
+                  "items": {
+                    "enum": ["pause", "resume", "retry", "scrub", "restore", "maintenance"]
+                  },
+                  "maxItems": 6
+                },
+                "expiresUnix": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1099511627776
+                }
+              },
+              "required": ["authority", "kinds", "expiresUnix"]
+            },
+            "maxItems": 128
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "node",
+          "domain",
+          "repository",
+          "writerEpoch",
+          "configurationRevision",
+          "configurationDigest",
+          "configurationState",
+          "expiresUnix",
+          "placement",
+          "nodes",
+          "targets",
+          "sources",
+          "capabilities"
+        ],
+        "description": "At most 2 MiB encoded JSON. Opaque selected-domain assignments only, without endpoints, credentials, private paths or other-domain configuration. Historical inactive policy is not an active route. Grants are filtered by current actor role, current enrollment/policy and signer. Every mutation is authorized again. This view is not a signed configuration or proof of backup coverage."
       }
     }
   }

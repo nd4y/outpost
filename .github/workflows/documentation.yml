@@ -37,6 +37,7 @@ jobs:
         run: |
           node .standards/check.mjs structure
           node scripts/check-docs.mjs
+          node scripts/check-test-links.mjs
           node scripts/check-format.mjs
       - name: Verify adoption rejection cases
         run: node scripts/check-standard-adoption.mjs

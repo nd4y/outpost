@@ -657,6 +657,10 @@
         {
           "path": "internal/management/reconcile_linux_test.go",
           "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyExpiredGrantAndPendingRevocationOfferNoCommands"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1119,6 +1123,22 @@
         {
           "path": "internal/managementservice/crash_linux_test.go",
           "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "internal/worker/command_cancel_linux_test.go",
+          "name": "TestWorkerCommandPollCancellationPreservesIndependentGuardFailure"
+        },
+        {
+          "path": "internal/managementservice/shutdown_linux_test.go",
+          "name": "TestManagementServiceDrainingJoinsAdmittedHandlersAndRejectsNewOnes"
+        },
+        {
+          "path": "internal/managementservice/shutdown_linux_test.go",
+          "name": "TestManagementServiceStopClosesSilentTLSWithoutReportingGraceDeadline"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt storage failure after admission preserves original request and truthful status"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2485,10 +2505,86 @@
         {
           "path": "internal/managementservice/service_linux_test.go",
           "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyHTTPSIsScopedAndGrantsCurrentRoles"
+        },
+        {
+          "path": "internal/management/ui_linux_test.go",
+          "name": "TestManagementUIUsesAuthenticatedExactRoutesAndRestrictiveBrowserHeaders"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "authenticated coverage retains original report age and unknown space"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "bounded table pages preserve measured unknown progress"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "English keyboard navigation and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "Russian narrow-screen layout and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "320px reflow and 200 percent text size retain operable controls"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "scope change clears previous report and missing is not empty coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "offline refresh retains explicitly last-known report and disables commands"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "forbidden response removes previously displayed coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "restore uses exact generation and preset, lost reply reuses original operation"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "owner signed policy preview and lost apply reply survive reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt lookup and audit expose actual admission without claiming restore"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "stale owner preview cannot overwrite a concurrent signed policy"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "viewer has no mutation controls or cross-scope API access"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "unknown certificate cannot receive interface or session"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "empty node list explains the next step instead of requesting an impossible selection"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "session-storage failure blocks a new mutation before transmission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt storage failure after admission preserves original request and truthful status"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-38",
@@ -2609,10 +2705,90 @@
         {
           "path": "cmd/outpost/management_service_linux_test.go",
           "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyHTTPSIsScopedAndGrantsCurrentRoles"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyExpiredGrantAndPendingRevocationOfferNoCommands"
+        },
+        {
+          "path": "internal/management/ui_linux_test.go",
+          "name": "TestManagementUIUsesAuthenticatedExactRoutesAndRestrictiveBrowserHeaders"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "authenticated coverage retains original report age and unknown space"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "bounded table pages preserve measured unknown progress"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "English keyboard navigation and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "Russian narrow-screen layout and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "320px reflow and 200 percent text size retain operable controls"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "scope change clears previous report and missing is not empty coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "offline refresh retains explicitly last-known report and disables commands"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "forbidden response removes previously displayed coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "restore uses exact generation and preset, lost reply reuses original operation"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "owner signed policy preview and lost apply reply survive reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt lookup and audit expose actual admission without claiming restore"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "stale owner preview cannot overwrite a concurrent signed policy"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "viewer has no mutation controls or cross-scope API access"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "unknown certificate cannot receive interface or session"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "empty node list explains the next step instead of requesting an impossible selection"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "session-storage failure blocks a new mutation before transmission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt storage failure after admission preserves original request and truthful status"
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-39",
@@ -2804,7 +2980,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -3003,6 +3179,22 @@
         {
           "path": "internal/managementservice/crash_linux_test.go",
           "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyExpiredGrantAndPendingRevocationOfferNoCommands"
+        },
+        {
+          "path": "internal/worker/command_cancel_linux_test.go",
+          "name": "TestWorkerCommandPollCancellationPreservesIndependentGuardFailure"
+        },
+        {
+          "path": "internal/managementservice/shutdown_linux_test.go",
+          "name": "TestManagementServiceDrainingJoinsAdmittedHandlersAndRejectsNewOnes"
+        },
+        {
+          "path": "internal/managementservice/shutdown_linux_test.go",
+          "name": "TestManagementServiceStopClosesSilentTLSWithoutReportingGraceDeadline"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -3090,7 +3282,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-42",
@@ -3105,7 +3297,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-43",
@@ -3237,7 +3429,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-44",
@@ -3413,7 +3605,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-45",
@@ -3554,10 +3746,86 @@
         {
           "path": "internal/management/reconcile_linux_test.go",
           "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyHTTPSIsScopedAndGrantsCurrentRoles"
+        },
+        {
+          "path": "internal/management/ui_linux_test.go",
+          "name": "TestManagementUIUsesAuthenticatedExactRoutesAndRestrictiveBrowserHeaders"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "authenticated coverage retains original report age and unknown space"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "bounded table pages preserve measured unknown progress"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "English keyboard navigation and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "Russian narrow-screen layout and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "320px reflow and 200 percent text size retain operable controls"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "scope change clears previous report and missing is not empty coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "offline refresh retains explicitly last-known report and disables commands"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "forbidden response removes previously displayed coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "restore uses exact generation and preset, lost reply reuses original operation"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "owner signed policy preview and lost apply reply survive reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt lookup and audit expose actual admission without claiming restore"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "stale owner preview cannot overwrite a concurrent signed policy"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "viewer has no mutation controls or cross-scope API access"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "unknown certificate cannot receive interface or session"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "empty node list explains the next step instead of requesting an impossible selection"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "session-storage failure blocks a new mutation before transmission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt storage failure after admission preserves original request and truthful status"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-46",
@@ -4008,6 +4276,30 @@
         {
           "path": "cmd/outpost/management_service_linux_test.go",
           "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyHTTPSIsScopedAndGrantsCurrentRoles"
+        },
+        {
+          "path": "internal/management/domain_policy_linux_test.go",
+          "name": "TestManagementDomainPolicyExpiredGrantAndPendingRevocationOfferNoCommands"
+        },
+        {
+          "path": "internal/management/ui_linux_test.go",
+          "name": "TestManagementUIUsesAuthenticatedExactRoutesAndRestrictiveBrowserHeaders"
+        },
+        {
+          "path": "internal/worker/command_cancel_linux_test.go",
+          "name": "TestWorkerCommandPollCancellationPreservesIndependentGuardFailure"
+        },
+        {
+          "path": "internal/managementservice/shutdown_linux_test.go",
+          "name": "TestManagementServiceDrainingJoinsAdmittedHandlersAndRejectsNewOnes"
+        },
+        {
+          "path": "internal/managementservice/shutdown_linux_test.go",
+          "name": "TestManagementServiceStopClosesSilentTLSWithoutReportingGraceDeadline"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -4064,10 +4356,82 @@
         {
           "path": "cmd/outpost/management_service_linux_test.go",
           "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
+        },
+        {
+          "path": "internal/management/ui_linux_test.go",
+          "name": "TestManagementUIUsesAuthenticatedExactRoutesAndRestrictiveBrowserHeaders"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "authenticated coverage retains original report age and unknown space"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "bounded table pages preserve measured unknown progress"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "English keyboard navigation and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "Russian narrow-screen layout and automated accessibility"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "320px reflow and 200 percent text size retain operable controls"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "scope change clears previous report and missing is not empty coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "offline refresh retains explicitly last-known report and disables commands"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "forbidden response removes previously displayed coverage"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "restore uses exact generation and preset, lost reply reuses original operation"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "owner signed policy preview and lost apply reply survive reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt lookup and audit expose actual admission without claiming restore"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "stale owner preview cannot overwrite a concurrent signed policy"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "viewer has no mutation controls or cross-scope API access"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "unknown certificate cannot receive interface or session"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "empty node list explains the next step instead of requesting an impossible selection"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "session-storage failure blocks a new mutation before transmission"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "receipt storage failure after admission preserves original request and truthful status"
         }
       ],
       "acceptance": ["AT-31"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-50",
@@ -4091,7 +4455,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-51",
@@ -4106,7 +4470,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-34"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-52",
@@ -4121,7 +4485,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],
-      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Per-target external coverage UI, closed-tab operation tracking, manual accessibility, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-53",

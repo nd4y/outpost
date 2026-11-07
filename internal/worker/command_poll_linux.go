@@ -142,7 +142,7 @@ func (w *Worker) RunCommands(ctx context.Context, profile CommandProfile, enroll
 		return e
 	}
 	defer lease.Close()
-	return lease.WithLock(ctx, func() error {
+	e = lease.WithLock(ctx, func() error {
 		state, _, close, e := w.commandSession(ctx)
 		if e != nil {
 			return e
@@ -220,4 +220,11 @@ func (w *Worker) RunCommands(ctx context.Context, profile CommandProfile, enroll
 			}
 		}
 	})
+	// Cancellation can arrive during a journal read, admission or fsync, not
+	// only at the explicit wait points. Preserve every independent failure in
+	// a joined error while treating a parent-only cancellation as normal stop.
+	if ctx.Err() != nil && cancellationOnly(e) {
+		return nil
+	}
+	return e
 }

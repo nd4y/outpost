@@ -287,6 +287,9 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		failHTTP(w, e)
 		return
 	}
+	if h.serveUI(w, r, p) {
+		return
+	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	if len(parts) == 3 && parts[0] == "v1" && parts[1] == "config" && storage.ID(parts[2]) && r.Method == http.MethodGet && r.URL.RawQuery == "" {
 		node := parts[2]
@@ -459,6 +462,15 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(parts) == 9 && action == "domains" && storage.ID(parts[7]) && r.Method == http.MethodGet {
 		domain, kind := parts[7], parts[8]
+		if kind == "policy" && r.URL.RawQuery == "" {
+			out, e := h.registry.DomainPolicy(ctx, p, tenant, node, domain)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
 		if kind != "report" && kind != "generations" && kind != "jobs" && kind != "command-status" {
 			failHTTP(w, ErrUnavailable)
 			return
