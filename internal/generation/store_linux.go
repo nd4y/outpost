@@ -7,17 +7,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"syscall"
 	"time"
+
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 type entry struct {
-	Catalog  json.RawMessage `json:"catalog"`
-	Complete bool            `json:"complete"`
+	Sequence uint64 `json:"sequence"`
+	Bytes    int    `json:"bytes"`
+	Complete bool   `json:"complete"`
 }
 type Pin struct {
 	Generation string `json:"generation"`
@@ -47,18 +51,22 @@ type Replica struct {
 	trust Trust
 	// Fault is a development-test hook; production callers leave it nil.
 	Fault func(string) error
+	Admit statefile.Admission
 }
 
 // Open requires an existing directory on an independently admitted filesystem.
 // First enrollment is explicit and requires an empty directory. It does not
 // implement volume/sentinel admission or an epoch transition procedure.
 func Open(dir string, t Trust, initialize bool) (*Replica, error) {
-	if !filepath.IsAbs(dir) || !t.valid() {
+	return OpenAt(nil, dir, t, initialize)
+}
+func OpenAt(parent *os.Root, dir string, t Trust, initialize bool) (*Replica, error) {
+	if !t.valid() {
 		return nil, ErrInvalid
 	}
 	t.Writer = append([]byte(nil), t.Writer...)
 	t.Maintenance = append([]byte(nil), t.Maintenance...)
-	r, err := os.OpenRoot(dir)
+	r, err := localfs.Directory(parent, dir, false)
 	if err != nil {
 		return nil, err
 	}
@@ -75,19 +83,26 @@ func Open(dir string, t Trust, initialize bool) (*Replica, error) {
 			r.Close()
 			return nil, ErrInvalid
 		}
-		for _, name := range []string{"objects", ".txn"} {
+		for _, name := range []string{"objects", ".txn", "catalogs"} {
 			if e = r.Mkdir(name, 0700); e != nil {
 				r.Close()
 				return nil, e
 			}
 		}
-		s := state{Format: Format, Trust: t, Generations: map[string]entry{}, Pins: map[string]Pin{}, Receipts: map[string]string{}}
+		s := state{Format: StateFormat, Trust: t, Generations: map[string]entry{}, Pins: map[string]Pin{}, Receipts: map[string]string{}}
 		if e = p.save(s); e != nil {
 			r.Close()
 			return nil, e
 		}
 	}
-	if _, err = p.load(); err != nil {
+	if err = p.locked(context.Background(), func(s *state) error {
+		for id := range s.Generations {
+			if _, _, e := p.get(s, id, true); e != nil {
+				return e
+			}
+		}
+		return nil
+	}); err != nil {
 		r.Close()
 		return nil, err
 	}
@@ -109,7 +124,7 @@ func syncDir(root *os.Root, name string) error {
 	return f.Sync()
 }
 func read(root *os.Root, name string, limit int) ([]byte, error) {
-	f, e := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -141,7 +156,7 @@ func atomic(root *os.Root, name string, b []byte) error {
 		return e
 	}
 	temp := ".txn/" + id
-	f, e := root.OpenFile(temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, e := localfs.OpenFile(root, temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if e != nil {
 		return e
 	}
@@ -162,15 +177,18 @@ func atomic(root *os.Root, name string, b []byte) error {
 	}
 	return syncDir(root, filepath.Dir(name))
 }
+func (r *Replica) write(name string, b []byte) error {
+	return statefile.Guard(r.Admit, name, len(b), func() error { return atomic(r.root, name, b) })
+}
 func (r *Replica) save(s state) error {
 	b, e := json.Marshal(s)
 	if e != nil {
 		return e
 	}
 	if len(b) > MaxState {
-		return ErrInvalid
+		return statefile.ErrCapacity
 	}
-	if e = atomic(r.root, "state.json", b); e != nil {
+	if e = r.write("state.json", b); e != nil {
 		return e
 	}
 	return r.point("state-durable")
@@ -181,12 +199,21 @@ func (r *Replica) load() (state, error) {
 	if e != nil {
 		return s, e
 	}
+	var header struct {
+		Format string `json:"format"`
+	}
+	if json.Unmarshal(b, &header) == nil && header.Format == Format {
+		return s, ErrMigrationRequired
+	}
 	if e = canonical(b, &s, MaxState); e != nil {
 		return s, e
 	}
+	return r.validateState(s)
+}
+func (r *Replica) validateState(s state) (state, error) {
 	t, _ := json.Marshal(r.trust)
 	u, _ := json.Marshal(s.Trust)
-	if s.Format != Format || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
+	if s.Format != StateFormat || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
 		return s, ErrInvalid
 	}
 	for id, digest := range s.Receipts {
@@ -201,19 +228,18 @@ func (r *Replica) load() (state, error) {
 	latestSequence := uint64(0)
 	latestID := ""
 	for id, item := range s.Generations {
-		c, e := VerifyCatalog(item.Catalog, r.trust)
-		if e != nil || id != Hash(item.Catalog) || c.Sequence > s.HighestSequence {
+		if !validID(id) || item.Sequence == 0 || item.Sequence > s.HighestSequence || item.Bytes < 1 || item.Bytes > MaxCatalog {
 			return s, ErrInvalid
 		}
-		if old, ok := sequences[c.Sequence]; ok && old != id {
+		if old, ok := sequences[item.Sequence]; ok && old != id {
 			return s, ErrConflict
 		}
-		sequences[c.Sequence] = id
-		if c.Sequence == s.HighestSequence && id != s.HighestID {
+		sequences[item.Sequence] = id
+		if item.Sequence == s.HighestSequence && id != s.HighestID {
 			return s, ErrConflict
 		}
-		if item.Complete && c.Sequence > latestSequence {
-			latestSequence = c.Sequence
+		if item.Complete && item.Sequence > latestSequence {
+			latestSequence = item.Sequence
 			latestID = id
 		}
 	}
@@ -232,10 +258,19 @@ func (r *Replica) load() (state, error) {
 }
 func pinKind(k string) bool { return k == "generation" || k == "kit" || k == "restore" }
 func (r *Replica) locked(ctx context.Context, fn func(*state) error) error {
+	return r.exclusive(ctx, func() error {
+		s, e := r.load()
+		if e != nil {
+			return e
+		}
+		return fn(&s)
+	})
+}
+func (r *Replica) exclusive(ctx context.Context, fn func() error) error {
 	if e := ctx.Err(); e != nil {
 		return e
 	}
-	f, e := r.root.OpenFile(".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(r.root, ".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return e
 	}
@@ -262,11 +297,7 @@ func (r *Replica) locked(ctx context.Context, fn func(*state) error) error {
 		}
 	}
 	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-	s, e := r.load()
-	if e != nil {
-		return e
-	}
-	return fn(&s)
+	return fn()
 }
 func (r *Replica) object(ref Object) ([]byte, error) {
 	b, e := read(r.root, "objects/"+ref.ID, MaxObject)
@@ -278,17 +309,12 @@ func (r *Replica) object(ref Object) ([]byte, error) {
 	}
 	return b, nil
 }
-func get(s *state, id string, t Trust) (Catalog, map[string]Object, error) {
+func (r *Replica) get(s *state, id string, fresh bool) (Catalog, map[string]Object, error) {
 	item, ok := s.Generations[id]
 	if !ok {
 		return Catalog{}, nil, ErrInvalid
 	}
-	c, e := VerifyCatalog(item.Catalog, t)
-	if e != nil {
-		return c, nil, e
-	}
-	refs, e := closure(c)
-	return c, refs, e
+	return r.catalogEntry(id, item, fresh)
 }
 func (r *Replica) Begin(ctx context.Context, raw []byte) (string, error) {
 	c, e := VerifyCatalog(raw, r.trust)
@@ -297,11 +323,9 @@ func (r *Replica) Begin(ctx context.Context, raw []byte) (string, error) {
 	}
 	id := Hash(raw)
 	e = r.locked(ctx, func(s *state) error {
-		if item, ok := s.Generations[id]; ok {
-			if !bytes.Equal(item.Catalog, raw) {
-				return ErrConflict
-			}
-			return nil
+		if _, ok := s.Generations[id]; ok {
+			_, _, e := r.get(s, id, true)
+			return e
 		}
 		if c.Sequence == s.HighestSequence && id != s.HighestID {
 			return ErrConflict
@@ -310,9 +334,12 @@ func (r *Replica) Begin(ctx context.Context, raw []byte) (string, error) {
 			return ErrRollback
 		}
 		if len(s.Generations) >= MaxGenerations {
-			return ErrInvalid
+			return statefile.ErrCapacity
 		}
-		s.Generations[id] = entry{Catalog: append([]byte(nil), raw...)}
+		if e := r.putCatalog(id, raw); e != nil {
+			return e
+		}
+		s.Generations[id] = entry{Sequence: c.Sequence, Bytes: len(raw)}
 		s.HighestID = id
 		s.HighestSequence = c.Sequence
 		s.Revision++
@@ -325,7 +352,7 @@ func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) erro
 		return ErrInvalid
 	}
 	return r.locked(ctx, func(s *state) error {
-		_, refs, e := get(s, generation, r.trust)
+		_, refs, e := r.get(s, generation, false)
 		if e != nil {
 			return e
 		}
@@ -338,7 +365,7 @@ func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) erro
 		} else if !errors.Is(e, os.ErrNotExist) {
 			return e
 		}
-		if e = atomic(r.root, "objects/"+id, b); e != nil {
+		if e = r.write("objects/"+id, b); e != nil {
 			return e
 		}
 		return r.point("object-durable")
@@ -346,7 +373,7 @@ func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) erro
 }
 func (r *Replica) Complete(ctx context.Context, id string) error {
 	return r.locked(ctx, func(s *state) error {
-		c, refs, e := get(s, id, r.trust)
+		c, refs, e := r.get(s, id, true)
 		if e != nil {
 			return e
 		}
@@ -370,7 +397,7 @@ func (r *Replica) Complete(ctx context.Context, id string) error {
 		if s.Latest == "" {
 			s.Latest = id
 		} else {
-			latest, _, e := get(s, s.Latest, r.trust)
+			latest, _, e := r.get(s, s.Latest, false)
 			if e != nil {
 				return e
 			}
@@ -395,7 +422,7 @@ func (r *Replica) Receive(ctx context.Context, raw []byte, fetch func(Object) ([
 	}
 	var missing []Object
 	e = r.locked(ctx, func(s *state) error {
-		_, refs, e := get(s, id, r.trust)
+		_, refs, e := r.get(s, id, false)
 		if e != nil {
 			return e
 		}
@@ -432,7 +459,7 @@ func (r *Replica) Receive(ctx context.Context, raw []byte, fetch func(Object) ([
 func (r *Replica) ReadObject(ctx context.Context, id string, ref Object) ([]byte, error) {
 	var b []byte
 	e := r.locked(ctx, func(s *state) error {
-		_, refs, e := get(s, id, r.trust)
+		_, refs, e := r.get(s, id, false)
 		if e != nil {
 			return e
 		}
@@ -452,8 +479,9 @@ func (r *Replica) Catalog(ctx context.Context, id string) ([]byte, error) {
 		if !ok || !item.Complete {
 			return ErrIncomplete
 		}
-		b = append([]byte(nil), item.Catalog...)
-		return nil
+		raw, err := r.catalogRaw(id, item)
+		b = raw
+		return err
 	})
 	return b, e
 }

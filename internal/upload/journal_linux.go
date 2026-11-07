@@ -6,12 +6,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -46,10 +48,12 @@ type Journal struct {
 	planID, worker string
 	authority      Authority
 	tasks          map[string]bool
+	Admit          statefile.Admission
+	Readback       ReadbackOptions
 }
 
 func regular(root *os.Root, name string, max int) ([]byte, error) {
-	f, e := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -84,7 +88,7 @@ func atomicFile(root *os.Root, name string, data []byte) error {
 		return e
 	}
 	temp := ".pending-" + hex.EncodeToString(nonce[:])
-	f, e := root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, e := localfs.OpenFile(root, temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
 		return e
 	}
@@ -106,7 +110,7 @@ func atomicFile(root *os.Root, name string, data []byte) error {
 	return syncDir(root)
 }
 func lock(ctx context.Context, root *os.Root, name string) (func(), error) {
-	f, e := root.OpenFile(name, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(root, name, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -205,7 +209,7 @@ func (j *Journal) save(s State) error {
 	if len(raw) > maxJournal {
 		return ErrDenied
 	}
-	return atomicFile(j.root, "state.json", raw)
+	return statefile.Guard(j.Admit, "state.json", len(raw), func() error { return atomicFile(j.root, "state.json", raw) })
 }
 func (j *Journal) load() (State, error) {
 	var s State
@@ -226,7 +230,7 @@ func (j *Journal) load() (State, error) {
 	}
 	if s.Receipt != nil {
 		r := s.Receipt
-		if r.Target != j.plan.Profile.ID() || r.Generation != j.plan.Generation || r.Operation != j.plan.Operation || r.Executor != j.worker || r.Verification != "full-target-readback" || r.ObservedUnix < 1 {
+		if r.Target != j.plan.Profile.ID() || r.Generation != j.plan.Generation || r.Operation != j.plan.Operation || r.Executor != j.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
 			return s, ErrDenied
 		}
 	}

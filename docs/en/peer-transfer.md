@@ -33,7 +33,7 @@ An asynchronous bridge holds complete generations durably. A source may push to 
 
 ## Retry, durability and resource limits
 
-The journal binds a stable operation ID to kind, domain/repository/epoch, generation, peer, executor and expected catalog digest. Attempts, phase, last receipt and counters survive reopening. A changed binding under the same peer/operation conflicts. Per-operation local locks prevent concurrent execution of the same job; immutable writes tolerate duplicate remote deliveries. Repeating the same API call resumes from verified present objects. Automatic job scheduling and distributed executor leases are not implemented.
+The journal binds a stable operation ID to kind, domain/repository/epoch, generation, peer, executor and expected catalog digest. Attempts, phase, last receipt and counters survive reopening. A changed binding under the same peer/operation conflicts. Per-operation local locks prevent concurrent execution of the same job; immutable writes tolerate duplicate remote deliveries. Repeating the same API call resumes from verified present objects. The integrating worker provides [owner-authorized discovery](autonomous-replication.md); the library does not create routes or grant distributed executor leases.
 
 Journal updates use file flush, atomic rename and directory flush under a process lock. Incomplete scratch files are never authoritative. A crash between replica commit and journal/response can leave a complete target with a retryable sender; replay verifies it again. Interrupted source pins remain, conservatively preventing collection. Successful transfer with failed pin release returns `CleanupPending`; it does not roll back verified publication. Expired/abandoned lease recovery and bounded journal/pin retention need a separately authorized maintenance design before unattended operation.
 
@@ -42,7 +42,7 @@ Journal updates use file flush, atomic rename and directory flush under a proces
 - Objects/catalogs inherit G2's 8 MiB bounds; a journal holds at most 1024 jobs and 4 MiB. Capacity exhaustion rejects new work. There is no claim of months of continuous scheduling within this fixed journal.
 - `objectBytesSubmitted` sums full object request bodies per attempt, not actual socket bytes. `objectBytesReceived` counts verified payloads fetched by pull. `readbackBytes` counts successful catalog/object audit reads in the last attempt. These omit failed partial responses, protocol overhead and metadata requests.
 
-Missing-object transfer avoids resending valid ciphertext, but **push currently rereads the entire generation in the reverse direction**, even on a duplicate. The counters expose that cost separately. This is not acceptance of the 100 GiB delta-bandwidth target; a cheaper evidence protocol needs its own threat model and measurement.
+By default, push independently rereads the full generation in reverse. An explicit owner [readback-reuse policy](readback-reuse.md) permits previous immutable-object evidence for the exact reader, endpoint, target and trust scope. The new `client-cached-readback` receipt retains the oldest supporting read time; it is distinct from a fresh full read and from the target's claim. An unchanged retry then reads only the catalog, while a changed generation reads new objects. Short 16 MiB checks measure endpoint response payloads and recover both versions independently. Full wire cost, local scans, scheduled fresh verification and the 100 GiB target remain unaccepted.
 
 ## Bounded verification and remaining acceptance
 

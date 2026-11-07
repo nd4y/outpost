@@ -31,6 +31,44 @@ for (const id of testIds)
     catalog.requirements.some((item) => item.acceptance.includes(id)),
     `Unmapped ${id}`,
   );
+// The completion map must retain the entire contract, including unfinished work.
+// Existing source symbols establish traceability, never runtime acceptance.
+const product = JSON.parse(read("docs/product-status.json"));
+assert.equal(product.schemaVersion, 1);
+assert.equal(product.specVersion, catalog.specVersion);
+assert.deepEqual(product.requirements.map((r) => r.id).sort(), requireIds);
+assert.deepEqual(product.acceptance.map((a) => a.id).sort(), testIds);
+for (const item of product.requirements) {
+  const requirement = catalog.requirements.find((r) => r.id === item.id);
+  assert(
+    item.workstream &&
+      item.remaining &&
+      ["IN_DEVELOPMENT", "SEPARATE_PROFILE"].includes(item.state),
+  );
+  assert.deepEqual([...item.acceptance].sort(), [...requirement.acceptance].sort());
+  for (const file of item.implementation) {
+    assert(!path.isAbsolute(file) && !file.split("/").includes(".."));
+    assert(fs.existsSync(path.join(root, file)), `Missing implementation: ${item.id} ${file}`);
+  }
+  for (const check of item.checks) {
+    assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z_]+_test\.go$/.test(check.path));
+    assert(/^Test[A-Za-z0-9]+$/.test(check.name));
+    assert(
+      read(check.path).includes(`func ${check.name}(t *testing.T)`),
+      `Stale product check: ${item.id} ${check.name}`,
+    );
+  }
+}
+for (const item of product.acceptance) {
+  assert.equal(item.state, "NOT_VERIFIED");
+  assert.deepEqual(
+    [...item.requirements].sort(),
+    catalog.requirements
+      .filter((r) => r.acceptance.includes(item.id))
+      .map((r) => r.id)
+      .sort(),
+  );
+}
 // Keep the G1 trace attached to existing checks. Existence is not execution.
 const g1Trace = JSON.parse(read("docs/g1-trace.json"));
 assert.equal(g1Trace.schemaVersion, 1);

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,6 +29,7 @@ type Client struct {
 	certificate *x509.Certificate
 }
 type Result struct {
+	CachedObjects  int      `json:"cachedObjects,omitempty"`
 	Receipt        Receipt  `json:"receipt"`
 	TargetReceipt  *Receipt `json:"targetReceipt,omitempty"`
 	Counters       Counters `json:"counters"`
@@ -96,7 +98,13 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			return result, ErrProtocol
 		}
 		req.Header.Set("Outpost-Operation", op)
+		if c.policy.RequiredRevision != 0 {
+			req.Header.Set("Outpost-Required-Revision", strconv.FormatUint(c.policy.RequiredRevision, 10))
+		}
 		req.Header.Set("Outpost-Mode", mode)
+		if mode == "push" && method == http.MethodPut && resource == "catalog" && c.policy.Peers[c.peer].History {
+			req.Header.Set("Outpost-History", "1")
+		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Accept-Encoding", "identity")
 		if submitted != nil {
@@ -136,6 +144,8 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 					return result, ErrDenied
 				case http.StatusConflict:
 					return result, ErrConflict
+				case http.StatusInsufficientStorage:
+					return result, ErrCapacity
 				default:
 					return result, ErrProtocol
 				}
@@ -275,7 +285,11 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if _, err = generation.VerifyCatalog(raw, c.trust); err != nil {
 			return result, err
 		}
-		if _, err = local.Begin(ctx, raw); err != nil {
+		_, err = local.Begin(ctx, raw)
+		if errors.Is(err, generation.ErrRollback) && c.policy.Peers[c.peer].History {
+			_, err = local.BeginHistorical(ctx, raw)
+		}
+		if err != nil {
 			return result, err
 		}
 	}
@@ -350,17 +364,17 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			return result, ErrProtocol
 		}
 		readback.Add(int64(len(r.data)))
-		err = parallel(ctx, refs, c.limits.Concurrency, func(ctx context.Context, ref generation.Object) error {
-			b, e := c.getObject(ctx, operation, id, kind, ref)
-			if e == nil {
-				readback.Add(int64(len(b)))
-			}
-			return e
-		})
+		var oldest int64
+		result.CachedObjects, oldest, err = c.auditObjects(ctx, operation, id, refs, &readback)
 		if err != nil {
 			return result, err
 		}
 		result.Receipt = Receipt{Format, c.peer, id, id, operation, "client-full-readback", time.Now().Unix()}
+		if result.CachedObjects > 0 {
+			result.Receipt.Format = CachedReceiptFormat
+			result.Receipt.Verification = "client-cached-readback"
+			result.Receipt.ObservedUnix = oldest
+		}
 	} else {
 		missing, e := local.Missing(ctx, id)
 		if e != nil {

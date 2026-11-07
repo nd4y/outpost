@@ -14,22 +14,25 @@ import (
 
 const (
 	Format         = "outpost-generation-1"
+	StateFormat    = "outpost-replica-state-2"
 	KitFormat      = "outpost-filekit-1"
+	TypedKitFormat = "outpost-filekit-2"
 	MaxObject      = 8 << 20
 	MaxCatalog     = 8 << 20
 	MaxObjects     = 32768
-	MaxKits        = 64
+	MaxKits        = 4096
 	MaxGenerations = 256
 	MaxPins        = 1024
 	MaxState       = 32 << 20
 )
 
 var (
-	ErrInvalid    = errors.New("invalid generation or replica state")
-	ErrConflict   = errors.New("conflicting signed generation")
-	ErrRollback   = errors.New("stale generation or authority")
-	ErrProtected  = errors.New("generation is locally protected")
-	ErrIncomplete = errors.New("generation dependencies unavailable or corrupt")
+	ErrInvalid           = errors.New("invalid generation or replica state")
+	ErrConflict          = errors.New("conflicting signed generation")
+	ErrRollback          = errors.New("stale generation or authority")
+	ErrProtected         = errors.New("generation is locally protected")
+	ErrIncomplete        = errors.New("generation dependencies unavailable or corrupt")
+	ErrMigrationRequired = errors.New("explicit local replica migration required")
 )
 
 type Object struct {
@@ -90,7 +93,7 @@ func canonical(raw []byte, v any, maximum int) error {
 	return nil
 }
 func closure(c Catalog) (map[string]Object, error) {
-	if c.Format != Format || c.KitFormat != KitFormat || !validID(c.Domain) || !validID(c.Repository) || c.Epoch == 0 || c.Sequence == 0 || c.SnapshotUnix <= 0 || c.Policy == 0 || (c.Parent != "" && !validID(c.Parent)) || (c.Sequence == 1 && c.Parent != "") || (c.Sequence > 1 && c.Parent == "") || len(c.Kits) == 0 || len(c.Kits) > MaxKits {
+	if c.Format != Format || (c.KitFormat != KitFormat && c.KitFormat != TypedKitFormat) || !validID(c.Domain) || !validID(c.Repository) || c.Epoch == 0 || c.Sequence == 0 || c.SnapshotUnix <= 0 || c.Policy == 0 || (c.Parent != "" && !validID(c.Parent)) || (c.Sequence == 1 && c.Parent != "") || (c.Sequence > 1 && c.Parent == "") || len(c.Kits) == 0 || len(c.Kits) > MaxKits {
 		return nil, ErrInvalid
 	}
 	refs := map[string]Object{}
@@ -229,7 +232,7 @@ func verifyPermit(raw []byte, t Trust) (Permit, error) {
 	}
 	return p, nil
 }
-func sortedIDs(refs map[string]Object) []string {
+func sortedIDs[T any](refs map[string]T) []string {
 	ids := make([]string, 0, len(refs))
 	for id := range refs {
 		ids = append(ids, id)

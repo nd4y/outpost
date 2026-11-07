@@ -36,7 +36,7 @@ func Dependencies(raw []byte, trust Trust) ([]Object, error) {
 func (r *Replica) Missing(ctx context.Context, id string) ([]Object, error) {
 	missing := []Object{}
 	err := r.locked(ctx, func(s *state) error {
-		_, refs, err := get(s, id, r.trust)
+		_, refs, err := r.get(s, id, true)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func (r *Replica) VerifyComplete(ctx context.Context, id string) error {
 		if !s.Generations[id].Complete {
 			return ErrIncomplete
 		}
-		_, refs, err := get(s, id, r.trust)
+		_, refs, err := r.get(s, id, true)
 		if err != nil {
 			return err
 		}

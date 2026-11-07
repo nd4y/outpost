@@ -118,7 +118,7 @@ func safeName(s string) bool {
 }
 
 func validateDescriptor(d Descriptor) error {
-	if d.Format != Format || !validID(d.Domain) || !validID(d.File) || !validID(d.SHA256) || d.Size < 0 || d.Size > MaxFileBytes || len(d.Names) == 0 || len(d.Names) > 256 || len(d.Blocks) > MaxBlocks {
+	if (d.Format != Format && d.Format != TypedFormat) || !validID(d.Domain) || !validID(d.File) || !validID(d.SHA256) || d.Size < 0 || d.Size > MaxFileBytes || len(d.Names) == 0 || len(d.Names) > 256 || len(d.Blocks) > MaxBlocks {
 		return ErrInvalid
 	}
 	seen := map[string]bool{}
@@ -137,6 +137,27 @@ func validateDescriptor(d Descriptor) error {
 	}
 	if err := validateMetadata(d.Metadata); err != nil {
 		return err
+	}
+	if d.Format == TypedFormat {
+		if len(d.Names) != 1 || len(d.Blocks) != 0 {
+			return ErrInvalid
+		}
+		switch d.Kind {
+		case "directory":
+			if d.Size != 0 || d.LinkTarget != "" || d.SHA256 != digest(nil) {
+				return ErrInvalid
+			}
+		case "symlink":
+			if len(d.LinkTarget) == 0 || len(d.LinkTarget) > 4095 || !utf8.ValidString(d.LinkTarget) || strings.ContainsRune(d.LinkTarget, 0) || d.Size != int64(len(d.LinkTarget)) || d.SHA256 != digest([]byte(d.LinkTarget)) || d.Metadata.Mode != 0777 {
+				return ErrInvalid
+			}
+		default:
+			return ErrInvalid
+		}
+		return nil
+	}
+	if d.Kind != "" || d.LinkTarget != "" {
+		return ErrInvalid
 	}
 	var size int64
 	for _, b := range d.Blocks {
@@ -199,7 +220,7 @@ func (o Owner) verifyEnvelope(e Envelope, expected string) error {
 	if err := o.validate(); err != nil {
 		return err
 	}
-	if e.Format != Format || e.Domain != o.Domain || !validID(e.File) || !validID(e.Version) || e.Version != expected || len(e.Parts) == 0 || len(e.Parts) > (MaxDescriptor+28+DescriptorPart-1)/DescriptorPart {
+	if (e.Format != Format && e.Format != TypedFormat) || e.Domain != o.Domain || !validID(e.File) || !validID(e.Version) || e.Version != expected || len(e.Parts) == 0 || len(e.Parts) > (MaxDescriptor+28+DescriptorPart-1)/DescriptorPart {
 		return ErrInvalid
 	}
 	var n int

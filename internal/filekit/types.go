@@ -6,12 +6,14 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"github.com/nd4y/outpost/internal/statefile"
 	"io"
 	"os"
 )
 
 const (
 	Format               = "outpost-filekit-1"
+	TypedFormat          = "outpost-filekit-2"
 	MaxFileBytes   int64 = 128 << 30
 	MaxChunk             = 4 << 20
 	MaxObject            = 8 << 20
@@ -53,14 +55,16 @@ type Block struct {
 }
 
 type Descriptor struct {
-	Format   string   `json:"format"`
-	Domain   string   `json:"domain"`
-	File     string   `json:"file"`
-	Names    []string `json:"names"`
-	Size     int64    `json:"size"`
-	SHA256   string   `json:"sha256"`
-	Metadata Metadata `json:"metadata"`
-	Blocks   []Block  `json:"blocks"`
+	Format     string   `json:"format"`
+	Domain     string   `json:"domain"`
+	File       string   `json:"file"`
+	Names      []string `json:"names"`
+	Size       int64    `json:"size"`
+	SHA256     string   `json:"sha256"`
+	Metadata   Metadata `json:"metadata"`
+	Blocks     []Block  `json:"blocks"`
+	Kind       string   `json:"kind,omitempty"`
+	LinkTarget string   `json:"linkTarget,omitempty"`
 }
 
 // Envelope is signed and contains every descriptor part. It reveals opaque
@@ -90,6 +94,10 @@ type BackupOptions struct {
 	File     string
 	Previous string
 	Names    []string
+	Expected *SourceIdentity
+	// Progress is an opaque capture operation ID. A stable explicit File is
+	// required; partial progress is available only for metadata-only stores.
+	Progress string
 }
 
 // Fault is an optional test hook. A caller may inject a failure or stop its own
@@ -97,13 +105,27 @@ type BackupOptions struct {
 type Fault func(string) error
 
 type Store struct {
-	root  *os.Root
-	Owner Owner
-	Fault Fault
-	Stats Stats
+	root    *os.Root
+	Owner   Owner
+	Fault   Fault
+	Stats   Stats
+	backend ObjectBackend
+	Admit   statefile.Admission
+}
+
+// ObjectBackend receives ciphertext only. Write must reject conflicting bytes
+// and acknowledge verified durable acceptance; false means an identical object
+// was already accepted. Check proves presence/length, not a full content scrub.
+// Implementations must honor context cancellation and bound their requests.
+type ObjectBackend interface {
+	Read(context.Context, Object) ([]byte, error)
+	Write(context.Context, Object, []byte) (bool, error)
+	Check(context.Context, Object) error
 }
 
 var ErrInvalid = errors.New("invalid or unsupported file kit")
+
+var ErrRemoteMaintenance = errors.New("object maintenance is owned by the receiving replica")
 
 type contextReader struct {
 	ctx context.Context

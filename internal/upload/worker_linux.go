@@ -79,7 +79,7 @@ func VerifyClaim(raw []byte, p Plan, planID string) error {
 	}
 	return nil
 }
-func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend) error {
+func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit *cloudAudit) error {
 	raw, e := b.Catalog(ctx, j.plan.Generation, j.authority.Generation)
 	if e != nil {
 		return e
@@ -88,9 +88,28 @@ func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend) error 
 		return storage.ErrIntegrity
 	}
 	for _, blob := range j.plan.Blobs {
-		if _, e = b.ReadBlob(ctx, blob.Object); e != nil {
+		if audit != nil {
+			e = audit.verify(ctx, blob.Object.ID, false)
+		} else {
+			var actual storage.Blob
+			actual, e = b.Descriptor(ctx, blob.Object)
+			if e == nil {
+				expectedRaw, _ := json.Marshal(blob)
+				actualRaw, _ := json.Marshal(actual)
+				if !bytes.Equal(expectedRaw, actualRaw) {
+					e = storage.ErrConflict
+				} else {
+					_, e = b.ReadDescribed(ctx, actual)
+				}
+			}
+		}
+		if e != nil {
 			return e
 		}
+	}
+	if audit != nil {
+		_, _, e = audit.evidence()
+		return e
 	}
 	return nil
 }
@@ -121,20 +140,15 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 	}
-	if e = b.Probe(ctx); e != nil {
+	// Require the exact recorded complete catalog and protect it before IO.
+	// Payloads are verified when read or when auditing the target. A separate
+	// full source scrub cannot be a prerequisite for every bounded retry.
+	catalog, e := source.Catalog(ctx, j.plan.Generation)
+	if e != nil {
 		return result, e
 	}
-	binding, _ := json.Marshal(struct {
-		Plan       string `json:"plan"`
-		Operation  string `json:"operation"`
-		Generation string `json:"generation"`
-		Target     string `json:"target"`
-	}{j.planID, j.plan.Operation, j.plan.Generation, j.plan.Profile.ID()})
-	if e = b.Put(ctx, "plan-"+j.plan.Operation, binding); e != nil {
-		return result, e
-	}
-	if e = source.VerifyComplete(ctx, j.plan.Generation); e != nil {
-		return result, e
+	if !bytes.Equal(catalog, j.plan.Catalog) {
+		return result, storage.ErrIntegrity
 	}
 	pin := storage.Hash([]byte(Format + "/pin/" + j.planID + "/" + j.worker))
 	if e = source.Pin(ctx, pin, j.plan.Generation, "generation"); e != nil {
@@ -147,6 +161,23 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			_ = j.edit(short, func(s *State) error { s.Phase = "RETRYABLE"; return nil })
 		}
 	}()
+	if e = b.Probe(ctx); e != nil {
+		return result, e
+	}
+	binding, _ := json.Marshal(struct {
+		Plan       string `json:"plan"`
+		Operation  string `json:"operation"`
+		Generation string `json:"generation"`
+		Target     string `json:"target"`
+	}{j.planID, j.plan.Operation, j.plan.Generation, j.plan.Profile.ID()})
+	if e = b.Put(ctx, "plan-"+j.plan.Operation, binding); e != nil {
+		return result, e
+	}
+	audit, e := j.newAudit(ctx, b)
+	if e != nil {
+		return result, e
+	}
+	defer audit.close()
 	tasks, e := j.plan.Tasks()
 	if e != nil {
 		return result, e
@@ -161,9 +192,26 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 		// A target marker is only a hint until the whole generation is read back.
-		if e = j.verifyComplete(ctx, b); e == nil {
+		if e = j.verifyComplete(ctx, b, audit); e == nil {
 			receipt := Receipt{b.Profile().ID(), j.plan.Generation, j.plan.Operation, j.worker, "full-target-readback", time.Now().Unix()}
-			if e = j.edit(ctx, func(s *State) error { s.Phase = "COMPLETE"; s.Receipt = &receipt; return nil }); e != nil {
+			if audit != nil {
+				receipt.Verification, receipt.ObservedUnix, e = audit.evidence()
+				if e != nil {
+					return result, e
+				}
+			}
+			if e = j.edit(ctx, func(s *State) error {
+				// A PUT/readback may succeed just as its slot expires before the
+				// local acknowledgment is saved. Exact-map whole-target evidence
+				// resolves those attempts without inventing submitted byte counts.
+				for id, p := range s.Parts {
+					p.Complete = true
+					s.Parts[id] = p
+				}
+				s.Phase = "COMPLETE"
+				s.Receipt = &receipt
+				return nil
+			}); e != nil {
 				return result, e
 			}
 			result.Receipt = receipt
@@ -178,8 +226,20 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		}
 		round, end := j.plan.round(time.Now())
 		for _, task := range tasks {
+			if audit != nil {
+				reuse, e := audit.reusable(ctx, task.Object.ID)
+				if e != nil {
+					return result, e
+				}
+				if reuse {
+					continue
+				}
+			}
 			progress := state.Parts[task.Part.ID]
-			if progress.Complete && progress.Round == round || j.plan.owner(task.Part.ID, round) != j.worker {
+			// Completion belongs to immutable bytes, not to an assignment slot.
+			// Rechecking every completed prefix on slot rotation can starve the
+			// remaining parts on slow links. Publication detects vanished parts.
+			if progress.Complete || j.plan.owner(task.Part.ID, round) != j.worker {
 				continue
 			}
 			if e = ctx.Err(); e != nil {
@@ -231,17 +291,22 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		if j.plan.owner("publication", round) == j.worker {
 			// Full-generation audit may outlive a part slot. A successor can
 			// audit concurrently; immutable publication makes the duplicate safe.
-			e = j.publish(ctx, b)
+			if audit != nil {
+				e = audit.publish(ctx, j.plan.Catalog, j.authority.Generation)
+			} else {
+				e = j.publish(ctx, b)
+			}
 			if e != nil && !storage.Missing(e) && !errors.Is(e, storage.ErrUnavailable) && !errors.Is(e, context.DeadlineExceeded) && !errors.Is(e, context.Canceled) {
 				return result, e
 			}
 			// If previously acknowledged parts disappeared, retrying their immutable
 			// uploads is safe. Never clear source pins or claim COMPLETE on this path.
-			if storage.Missing(e) {
+			var absent *storage.MissingPart
+			if errors.As(e, &absent) {
 				if e = j.edit(ctx, func(s *State) error {
-					for id, p := range s.Parts {
+					if p, ok := s.Parts[absent.Part.ID]; ok {
 						p.Complete = false
-						s.Parts[id] = p
+						s.Parts[absent.Part.ID] = p
 					}
 					return nil
 				}); e != nil {

@@ -6,17 +6,19 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 const maxJobs = 1024
 const maxJournal = 4 << 20
+const CachedReceiptFormat = "outpost-peer-readback-2"
 
 type Binding struct {
 	Operation  string `json:"operationId"`
@@ -62,6 +64,7 @@ type journalState struct {
 type Journal struct {
 	root     *os.Root
 	identity journalState
+	Admit    statefile.Admission
 }
 
 func decode(raw []byte, v any, limit int) error {
@@ -79,7 +82,7 @@ func decode(raw []byte, v any, limit int) error {
 	return nil
 }
 func regularRead(root *os.Root, name string, limit int) ([]byte, error) {
-	f, e := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
@@ -116,12 +119,15 @@ func (j *Journal) save(s journalState) error {
 	if len(b) > maxJournal {
 		return ErrProtocol
 	}
+	return statefile.Guard(j.Admit, "jobs.json", len(b), func() error { return j.writeState(b) })
+}
+func (j *Journal) writeState(b []byte) error {
 	var nonce [16]byte
-	if _, e = rand.Read(nonce[:]); e != nil {
+	if _, e := rand.Read(nonce[:]); e != nil {
 		return e
 	}
 	temp := ".pending-" + hex.EncodeToString(nonce[:])
-	f, e := j.root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, e := localfs.OpenFile(j.root, temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
 		return e
 	}
@@ -178,10 +184,13 @@ func (j *Journal) load() (journalState, error) {
 	return s, nil
 }
 func OpenJournal(dir, self string, trust generation.Trust, initialize bool) (*Journal, error) {
-	if !filepath.IsAbs(dir) || !validID(self) || !validID(trust.Domain) || !validID(trust.Repository) || trust.Epoch == 0 {
+	return OpenJournalAt(nil, dir, self, trust, initialize)
+}
+func OpenJournalAt(parent *os.Root, dir, self string, trust generation.Trust, initialize bool) (*Journal, error) {
+	if !validID(self) || !validID(trust.Domain) || !validID(trust.Repository) || trust.Epoch == 0 {
 		return nil, ErrDenied
 	}
-	r, e := os.OpenRoot(dir)
+	r, e := localfs.Directory(parent, dir, false)
 	if e != nil {
 		return nil, e
 	}
@@ -213,7 +222,7 @@ func OpenJournal(dir, self string, trust generation.Trust, initialize bool) (*Jo
 }
 func (j *Journal) Close() error { return j.root.Close() }
 func lockFile(ctx context.Context, root *os.Root, name string) (func(), error) {
-	f, e := root.OpenFile(name, os.O_CREATE|os.O_RDWR|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0600)
+	f, e := localfs.OpenFile(root, name, os.O_CREATE|os.O_RDWR|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -327,5 +336,6 @@ func validReceipt(r Receipt, b Binding) bool {
 	if b.Kind == "receive" || b.Kind == "pull" {
 		target = b.Executor
 	}
-	return r.Format == Format && r.Target == target && r.Generation == b.Generation && r.CatalogDigest == b.Expected && r.Operation == b.Operation && r.ObservedUnix > 0 && (r.Verification == "target-full-read" || r.Verification == "client-full-readback" || r.Verification == "local-full-read")
+	level := r.Format == Format && (r.Verification == "target-full-read" || r.Verification == "client-full-readback" || r.Verification == "local-full-read") || r.Format == CachedReceiptFormat && r.Verification == "client-cached-readback" && b.Kind == "push"
+	return level && r.Target == target && r.Generation == b.Generation && r.CatalogDigest == b.Expected && r.Operation == b.Operation && r.ObservedUnix > 0
 }

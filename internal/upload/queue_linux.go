@@ -7,14 +7,15 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -58,13 +59,21 @@ type Queue struct {
 	authority        Authority
 	limits           QueueLimits
 	// Fault is a development-test hook; production callers leave it nil.
-	Fault func(string) error
+	Fault    func(string) error
+	Admit    statefile.Admission
+	Readback ReadbackOptions
 }
 
 // OpenQueue requires a caller-admitted persistent Linux directory. No credentials
 // or worker private keys are serialized. Authority and resource bounds are pinned.
 func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize bool) (*Queue, error) {
-	if !filepath.IsAbs(dir) || !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
+	return OpenQueueAdmitted(dir, worker, a, limits, initialize, nil)
+}
+func OpenQueueAdmitted(dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
+	return OpenQueueAt(nil, dir, worker, a, limits, initialize, admit)
+}
+func OpenQueueAt(parent *os.Root, dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
+	if !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
 		return nil, ErrDenied
 	}
 	raw, _ := json.Marshal(struct {
@@ -75,11 +84,11 @@ func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize b
 	a.Planner = append([]byte(nil), a.Planner...)
 	a.Generation.Writer = append([]byte(nil), a.Generation.Writer...)
 	a.Generation.Maintenance = append([]byte(nil), a.Generation.Maintenance...)
-	r, e := os.OpenRoot(dir)
+	r, e := localfs.Directory(parent, dir, false)
 	if e != nil {
 		return nil, e
 	}
-	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits}
+	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits, Admit: admit}
 	if initialize {
 		f, e := r.Open(".")
 		if e != nil {
@@ -150,7 +159,7 @@ func (q *Queue) load() (QueueState, error) {
 		}
 		if j.Receipt != nil {
 			r := j.Receipt
-			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || r.Verification != "full-target-readback" || r.ObservedUnix < 1 {
+			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
 				return s, ErrDenied
 			}
 		}
@@ -165,7 +174,7 @@ func (q *Queue) save(s QueueState) error {
 	if len(raw) > maxQueueBytes {
 		return storage.ErrCapacity
 	}
-	return atomicFile(q.root, "queue.json", raw)
+	return statefile.Guard(q.Admit, "queue.json", len(raw), func() error { return atomicFile(q.root, "queue.json", raw) })
 }
 func (q *Queue) edit(ctx context.Context, fn func(*QueueState) error) error {
 	unlock, e := lock(ctx, q.root, "queue.lock")
@@ -268,30 +277,15 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 	if e != nil {
 		return nil, e
 	}
-	// Root-relative opens keep journal access inside the originally opened queue.
-	if e = q.root.Mkdir("jobs", 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return nil, e
-	}
-	info, e := q.root.Lstat("jobs")
-	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, ErrDenied
-	}
 	name := "jobs/" + p.Operation
-	if e = q.root.Mkdir(name, 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return nil, e
-	}
-	info, e = q.root.Lstat(name)
-	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, ErrDenied
-	}
-	r, e := q.root.OpenRoot(name)
+	r, e := localfs.OpenAt(q.root, name, true)
 	if e != nil {
 		return nil, e
 	}
 	if _, e = regular(r, "state.json", maxJournal); errors.Is(e, os.ErrNotExist) && resumeAdmission && job.Phase == "ADMITTING" {
 		saved, e := regular(r, "plan.json", MaxPlan)
 		if errors.Is(e, os.ErrNotExist) {
-			e = atomicFile(r, "plan.json", job.Plan)
+			e = statefile.Guard(q.Admit, name+"/plan.json", len(job.Plan), func() error { return atomicFile(r, "plan.json", job.Plan) })
 		} else if e == nil && !bytes.Equal(saved, job.Plan) {
 			e = ErrConflict
 		}
@@ -300,12 +294,19 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 			return nil, e
 		}
 		initial, _ := json.Marshal(State{Format: Format, Plan: storage.Hash(job.Plan), Worker: q.worker, Phase: "PENDING", Parts: map[string]Progress{}})
-		if e = atomicFile(r, "state.json", initial); e != nil {
+		if e = statefile.Guard(q.Admit, name+"/state.json", len(initial), func() error { return atomicFile(r, "state.json", initial) }); e != nil {
 			r.Close()
 			return nil, e
 		}
 	}
-	return openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	j, e := openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	if e == nil {
+		j.Readback = q.Readback
+	}
+	if e == nil && q.Admit != nil {
+		j.Admit = func(child string, size int) (func(bool) error, error) { return q.Admit(name+"/"+child, size) }
+	}
+	return j, e
 }
 
 // Retry is an explicit local operator action after correcting a blocked cause.
@@ -410,7 +411,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 			p, _ := Verify(j.Plan, q.authority)
 			if r.err == nil {
 				receipt := r.result.Receipt
-				if receipt.Target != p.Profile.ID() || receipt.Generation != p.Generation || receipt.Operation != p.Operation || receipt.Executor != q.worker || receipt.Verification != "full-target-readback" || receipt.ObservedUnix < 1 {
+				if receipt.Target != p.Profile.ID() || receipt.Generation != p.Generation || receipt.Operation != p.Operation || receipt.Executor != q.worker || !validVerification(receipt.Verification) || receipt.ObservedUnix < 1 {
 					return ErrDenied
 				}
 				j.Phase = "COMPLETE"

@@ -1,0 +1,15 @@
+# Runtime volume admission
+
+[Русский](../ru/runtime-volume.md)
+
+An installable worker must bind its private runtime directory to an explicitly enrolled local filesystem before initialization. A missing, replaced, locked or read-only volume must not cause creation of replacement state on an underlying directory. Enrollment is a separate local owner operation; remote configuration cannot select a new volume.
+
+The local binding records the approved absolute volume root, filesystem type and filesystem ID, root inode and digest of a private random sentinel. These identify the observed filesystem/directory; a filesystem ID is not presented as a universally available UUID. Enrollment compares a supplied probe with a fresh observation before writing the sentinel. Paths are opened component by component without symbolic links. The worker directory must be a strict descendant, with no symlink or nested mount in existing components. The runtime filesystem must support the admitted local locking/fsync model; the first profile allows ext4, Btrfs and XFS only.
+
+Bootstrap, each active loop/request and write admission recheck the binding. Mount identities are current observations, not persistent values assumed to survive reboot. A failed check stops new work and preserves retained data. Removing a sentinel or changing the binding is not a cleanup or migration command. Recovery from an available materialized replica remains a separate read-only input workflow.
+
+Bootstrap format `outpost-bootstrap-2` requires the `volume` binding, with its scope equal to the node identity and a nonzero admission epoch. State, control cache, capacity ledger, replicas, peer journals, ingress sessions, upload queues and explicit index migration open relative to the retained worker directory descriptor. A path replacement cannot redirect their writes. A joined monitor cancels active work on identity loss; write admission checks the binding before writes and again before reporting success. This does not make an unresponsive kernel I/O syscall cancellable.
+
+Local enrollment uses `volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE`, then `volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE`. Keep both files private. First enrollment requires an empty selected directory. Existing state with a missing marker blocks enrollment. Repeating enrollment with the same valid scope/epoch is idempotent; changing either is refused. Enrollment creates no source snapshot and changes no host mount, unlock or network configuration.
+
+The old unbound bootstrap is refused. A supported migration of an existing bound volume requires a separate fenced identity-transition procedure; deleting the sentinel or editing JSON is not such a procedure. Initialization durably creates owned directory entries and syncs their parents. Missing mandatory identity or an unsupported filesystem fails closed. Synthetic tests can prove rejection and absence of fallback writes; cold boot, real unlock ordering and volume loss during I/O still require the owner's separate infrastructure acceptance.
