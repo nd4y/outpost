@@ -128,6 +128,14 @@ func New(p Profile, c Credentials, roots *x509.CertPool) (*Backend, error) {
 }
 func (b *Backend) Profile() Profile { return b.profile }
 func (b *Backend) Close()           { b.client.CloseIdleConnections() }
+
+// NextRequest preserves an observed throttle deadline when a scheduler persists a retry.
+// It does not include another worker's account-wide traffic.
+func (b *Backend) NextRequest() time.Time {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.next
+}
 func pause(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a durable multi-target upload queue: signed admission, per-instance source pins, bounded concurrency and automatic persisted retries/cooldown without a live control plane.
+- Verify independent-target progress, actual queue SIGKILL/restart, expiry/capacity blocking and interrupted admission/completion cleanup. Retain real endpoint, heavy and production acceptance holds.
+
 - Add S3-compatible/WebDAV immutable multipart storage and signed cached upload plans with durable worker journals.
 - Verify three independent upload processes, takeover after actual SIGKILL and old/new independent recovery after source loss. Reject false completeness, expired authority, policy violations and unsupported storage semantics.
 - Document per-target readback, resource/traffic limits and remaining actual-endpoint/heavy acceptance; no working services change.
@@ -27,6 +30,9 @@ The repository contains development file-kit code and a native restic comparison
 # Изменения
 
 ## Не выпущено
+
+- Добавлена постоянная очередь нескольких целей: подписанный приём, закрепления отдельных экземпляров, ограниченный параллелизм и автоматические сохранённые повторы/задержки без доступного control plane.
+- Проверены независимое продвижение целей, настоящий SIGKILL/рестарт очереди, блокировка по сроку/ёмкости и прерывание приёма/снятия закреплений после завершения. Допуск реальных целей, тяжёлая и производственная приёмка сохраняются открытыми.
 
 - Добавлены S3-совместимое/WebDAV-хранилище неизменяемых частей и сохранённые подписанные планы загрузки с постоянными журналами воркеров.
 - Проверены три независимых процесса, подхват после настоящего SIGKILL и самостоятельное восстановление старой/новой версий после потери источника. Ложная полнота, истёкшие полномочия, запреты размещения и неподдерживаемая семантика хранилища приводят к отказу.
