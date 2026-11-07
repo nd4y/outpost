@@ -50,6 +50,7 @@ These commands validate documentation and the standard toolkit. They do not star
 - [Project passport and workflows](docs/en/project.md)
 - [Technical specification 1.4](docs/en/specification.md)
 - [Milestones and open acceptance](docs/en/roadmap.md)
+- [Product completion and signed configuration](docs/en/product-development.md)
 - [Development standard and commands](docs/en/development-standard.md)
 - [Audit against all 45 rules](docs/en/standard-review.md)
 - [G1 executable experiment and limits](docs/en/g1-prototype.md)

@@ -74,6 +74,8 @@ func fail(w http.ResponseWriter, e error) {
 	switch {
 	case errors.Is(e, ErrDenied):
 		status = http.StatusForbidden
+	case errors.Is(e, ErrCapacity):
+		status = http.StatusInsufficientStorage
 	case errors.Is(e, ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, generation.ErrRollback):
 		status = http.StatusConflict
 	case errors.Is(e, generation.ErrIncomplete):

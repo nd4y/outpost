@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -59,11 +60,15 @@ type Queue struct {
 	limits           QueueLimits
 	// Fault is a development-test hook; production callers leave it nil.
 	Fault func(string) error
+	Admit statefile.Admission
 }
 
 // OpenQueue requires a caller-admitted persistent Linux directory. No credentials
 // or worker private keys are serialized. Authority and resource bounds are pinned.
 func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize bool) (*Queue, error) {
+	return OpenQueueAdmitted(dir, worker, a, limits, initialize, nil)
+}
+func OpenQueueAdmitted(dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
 	if !filepath.IsAbs(dir) || !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
 		return nil, ErrDenied
 	}
@@ -79,7 +84,7 @@ func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize b
 	if e != nil {
 		return nil, e
 	}
-	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits}
+	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits, Admit: admit}
 	if initialize {
 		f, e := r.Open(".")
 		if e != nil {
@@ -165,7 +170,7 @@ func (q *Queue) save(s QueueState) error {
 	if len(raw) > maxQueueBytes {
 		return storage.ErrCapacity
 	}
-	return atomicFile(q.root, "queue.json", raw)
+	return statefile.Guard(q.Admit, "queue.json", len(raw), func() error { return atomicFile(q.root, "queue.json", raw) })
 }
 func (q *Queue) edit(ctx context.Context, fn func(*QueueState) error) error {
 	unlock, e := lock(ctx, q.root, "queue.lock")
@@ -291,7 +296,7 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 	if _, e = regular(r, "state.json", maxJournal); errors.Is(e, os.ErrNotExist) && resumeAdmission && job.Phase == "ADMITTING" {
 		saved, e := regular(r, "plan.json", MaxPlan)
 		if errors.Is(e, os.ErrNotExist) {
-			e = atomicFile(r, "plan.json", job.Plan)
+			e = statefile.Guard(q.Admit, name+"/plan.json", len(job.Plan), func() error { return atomicFile(r, "plan.json", job.Plan) })
 		} else if e == nil && !bytes.Equal(saved, job.Plan) {
 			e = ErrConflict
 		}
@@ -300,12 +305,16 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 			return nil, e
 		}
 		initial, _ := json.Marshal(State{Format: Format, Plan: storage.Hash(job.Plan), Worker: q.worker, Phase: "PENDING", Parts: map[string]Progress{}})
-		if e = atomicFile(r, "state.json", initial); e != nil {
+		if e = statefile.Guard(q.Admit, name+"/state.json", len(initial), func() error { return atomicFile(r, "state.json", initial) }); e != nil {
 			r.Close()
 			return nil, e
 		}
 	}
-	return openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	j, e := openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	if e == nil && q.Admit != nil {
+		j.Admit = func(child string, size int) (func(bool) error, error) { return q.Admit(name+"/"+child, size) }
+	}
+	return j, e
 }
 
 // Retry is an explicit local operator action after correcting a blocked cause.

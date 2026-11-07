@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 const maxJobs = 1024
@@ -62,6 +63,7 @@ type journalState struct {
 type Journal struct {
 	root     *os.Root
 	identity journalState
+	Admit    statefile.Admission
 }
 
 func decode(raw []byte, v any, limit int) error {
@@ -116,8 +118,11 @@ func (j *Journal) save(s journalState) error {
 	if len(b) > maxJournal {
 		return ErrProtocol
 	}
+	return statefile.Guard(j.Admit, "jobs.json", len(b), func() error { return j.writeState(b) })
+}
+func (j *Journal) writeState(b []byte) error {
 	var nonce [16]byte
-	if _, e = rand.Read(nonce[:]); e != nil {
+	if _, e := rand.Read(nonce[:]); e != nil {
 		return e
 	}
 	temp := ".pending-" + hex.EncodeToString(nonce[:])

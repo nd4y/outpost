@@ -50,6 +50,7 @@ node scripts/check-format.mjs
 - [Паспорт и сценарии](docs/ru/project.md)
 - [Техническое задание 1.4](docs/ru/specification.md)
 - [Этапы и незакрытая приёмка](docs/ru/roadmap.md)
+- [Завершение продукта и подписанная конфигурация](docs/ru/product-development.md)
 - [Стандарт разработки и команды](docs/ru/development-standard.md)
 - [Аудит по всем 45 правилам](docs/ru/standard-review.md)
 - [Исполняемый эксперимент G1 и ограничения](docs/ru/g1-prototype.md)

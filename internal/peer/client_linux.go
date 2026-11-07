@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -96,6 +97,9 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			return result, ErrProtocol
 		}
 		req.Header.Set("Outpost-Operation", op)
+		if c.policy.RequiredRevision != 0 {
+			req.Header.Set("Outpost-Required-Revision", strconv.FormatUint(c.policy.RequiredRevision, 10))
+		}
 		req.Header.Set("Outpost-Mode", mode)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Accept-Encoding", "identity")
@@ -136,6 +140,8 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 					return result, ErrDenied
 				case http.StatusConflict:
 					return result, ErrConflict
+				case http.StatusInsufficientStorage:
+					return result, ErrCapacity
 				default:
 					return result, ErrProtocol
 				}

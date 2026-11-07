@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 const Format = "outpost-peer-1"
@@ -20,6 +21,7 @@ var (
 	ErrProtocol    = errors.New("invalid peer protocol response")
 	ErrUnavailable = errors.New("peer unavailable or retry required")
 	ErrConflict    = errors.New("operation binding conflict")
+	ErrCapacity    = statefile.ErrCapacity
 )
 
 type Grant struct {
@@ -32,13 +34,14 @@ type Grant struct {
 // Policy is an explicit domain-specific edge list, supplied out of band. A
 // trusted worker is still keyless; category membership never grants an edge.
 type Policy struct {
-	Self           string           `json:"self"`
-	Class          string           `json:"class"`
-	Domain         string           `json:"domain"`
-	Repository     string           `json:"repository"`
-	Epoch          uint64           `json:"epoch"`
-	AllowedClasses []string         `json:"allowedClasses"`
-	Peers          map[string]Grant `json:"peers"`
+	RequiredRevision uint64           `json:"requiredRevision,omitempty"`
+	Self             string           `json:"self"`
+	Class            string           `json:"class"`
+	Domain           string           `json:"domain"`
+	Repository       string           `json:"repository"`
+	Epoch            uint64           `json:"epoch"`
+	AllowedClasses   []string         `json:"allowedClasses"`
+	Peers            map[string]Grant `json:"peers"`
 }
 
 type Limits struct {

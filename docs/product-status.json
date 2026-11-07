@@ -1,0 +1,1157 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "1.4",
+  "status": "IN_DEVELOPMENT",
+  "evidenceRule": "A source symbol or passing component test is not full acceptance. Exact-source execution records and environment admission are separate.",
+  "requirements": [
+    {
+      "id": "REQ-01",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-24", "AT-25"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-02",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-02", "AT-23", "AT-30"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-03",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-02", "AT-23"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-04",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-01", "AT-02", "AT-29"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-05",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-06",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-07",
+      "workstream": "crypto",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [],
+      "acceptance": ["AT-01", "AT-06", "AT-20", "AT-21", "AT-27"],
+      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+    },
+    {
+      "id": "REQ-08",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [],
+      "acceptance": ["AT-01", "AT-24"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-09",
+      "workstream": "crypto",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestIndependentVersionsAndAttributes"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestCrossFileCiphertextAndVersionSubstitution"
+        }
+      ],
+      "acceptance": ["AT-02", "AT-03"],
+      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+    },
+    {
+      "id": "REQ-10",
+      "workstream": "crypto",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestIndependentVersionsAndAttributes"
+        },
+        {
+          "path": "internal/filekit/gc_linux_test.go",
+          "name": "TestConfidentialNamesAndFileDomainIsolation"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestMultipartDescriptorIsSelfContained"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestTamperedKitNeverPublishesOutput"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestSpecialSourceAndOwnerInputsRejectWithoutBlocking"
+        },
+        {
+          "path": "internal/filekit/tamper_linux_test.go",
+          "name": "TestNamesRespectLinuxFilesystemBounds"
+        }
+      ],
+      "acceptance": ["AT-04", "AT-05", "AT-06", "AT-12", "AT-26"],
+      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+    },
+    {
+      "id": "REQ-11",
+      "workstream": "crypto",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestRepackAndRetirePreserveKits"
+        },
+        {
+          "path": "internal/filekit/crash_linux_test.go",
+          "name": "TestSIGKILLCommitBoundaries"
+        },
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestReaderBlocksRetirement"
+        },
+        {
+          "path": "internal/filekit/gc_linux_test.go",
+          "name": "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency"
+        }
+      ],
+      "acceptance": ["AT-04", "AT-05", "AT-12"],
+      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+    },
+    {
+      "id": "REQ-12",
+      "workstream": "crypto",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [],
+      "acceptance": ["AT-05", "AT-16"],
+      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+    },
+    {
+      "id": "REQ-13",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestPrematurePublicationAndInvalidObject"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestPartialVisibilityAndCorruptionPreservePreviousComplete"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolMultipartAndImmutableReadback"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolRetriesAndLostReply"
+        }
+      ],
+      "acceptance": ["AT-05", "AT-16"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-14",
+      "workstream": "source",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/policy"],
+      "checks": [
+        {
+          "path": "internal/policy/rules_test.go",
+          "name": "TestSelectAliases"
+        }
+      ],
+      "acceptance": ["AT-06", "AT-19", "AT-27"],
+      "remaining": "Source scan, declared consistency providers, alias-safe capture, bounded remote ingress and recovery-kit orchestration."
+    },
+    {
+      "id": "REQ-15",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/policy/placement_test.go",
+          "name": "TestPlacementPushThenPullRoute"
+        }
+      ],
+      "acceptance": ["AT-06", "AT-07", "AT-08", "AT-19", "AT-27"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-16",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/worker/worker_linux_test.go",
+          "name": "TestNewPolicyCancelsInFlightTransferBeforeStartingNextRevision"
+        },
+        {
+          "path": "internal/worker/revisions_linux_test.go",
+          "name": "TestChangedOperationIsRejectedWithoutStoppingIndependentJob"
+        },
+        {
+          "path": "internal/worker/revisions_linux_test.go",
+          "name": "TestReceiverPolicyLagRetriesWithoutExpandingAuthority"
+        }
+      ],
+      "acceptance": ["AT-06", "AT-19", "AT-27"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-17",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/control/control_linux_test.go",
+          "name": "TestHTTPSRelayPreservesSignatureAndOfflineRecipientCache"
+        }
+      ],
+      "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-18",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/control/control_linux_test.go",
+          "name": "TestCachedPolicySurvivesRestartWithoutRollbackOrExpiredFallback"
+        }
+      ],
+      "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-19",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestLostReplyRestartAndDuplicateTransfer"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestRetryBudgetAndCancellation"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestJournalBoundsAndInterruptedSave"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolLongThrottlePersistsAcrossCalls"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueAdmissionBoundsBindingAndBlockedRetry"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueInterruptedAdmissionExpiryAndCompletionCleanup"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueActualSIGKILLAndRestart"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueThrottleDeadlineSurvivesReopen"
+        }
+      ],
+      "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-20",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestCatalogAuthenticationAndBounds"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestReceiveRestartConflictAndPendingPin"
+        }
+      ],
+      "acceptance": ["AT-17", "AT-18", "AT-20"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-21",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestCatalogAuthenticationAndBounds"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestReceiveRestartConflictAndPendingPin"
+        },
+        {
+          "path": "internal/control/control_linux_test.go",
+          "name": "TestAuthorityHistorySurvivesDomainRemoval"
+        }
+      ],
+      "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-22",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/filekit/view_linux_test.go",
+          "name": "TestSealedViewExcludesMaintenance"
+        },
+        {
+          "path": "internal/generation/crash_linux_test.go",
+          "name": "TestReplicaSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestPrematurePublicationAndInvalidObject"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestLostReplyRestartAndDuplicateTransfer"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestPartialVisibilityAndCorruptionPreservePreviousComplete"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueActualSIGKILLAndRestart"
+        }
+      ],
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-23",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestFalseAcknowledgementCannotCompleteSenderJob"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAsynchronousBridgeOnlyTransferAndRestore"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueTargetIsolationAndAutomaticRetry"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueInterruptedAdmissionExpiryAndCompletionCleanup"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueInstancesKeepIndependentPins"
+        }
+      ],
+      "acceptance": ["AT-01", "AT-24"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-24",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/worker/worker_linux_test.go",
+          "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
+        }
+      ],
+      "acceptance": ["AT-01", "AT-07", "AT-24"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-25",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAsynchronousBridgeOnlyTransferAndRestore"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAuthorizationTLSScopesAndNoRedirect"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestTLSClientCertificateAndOperationGrants"
+        }
+      ],
+      "acceptance": ["AT-01", "AT-07", "AT-08"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-26",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [],
+      "acceptance": ["AT-09", "AT-11", "AT-18"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-27",
+      "workstream": "external",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/storage", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestParallelObjectTransferIsBounded"
+        },
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestLostReplyRestartAndDuplicateTransfer"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueTargetIsolationAndAutomaticRetry"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueSlowResolverAndCancellation"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
+        }
+      ],
+      "acceptance": ["AT-14", "AT-15"],
+      "remaining": "Capability admission and conditional-write fallback, account-wide budgets, adaptive assignment, integrated configuration/planning and full wire costs."
+    },
+    {
+      "id": "REQ-28",
+      "workstream": "external",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/storage", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
+        }
+      ],
+      "acceptance": ["AT-16"],
+      "remaining": "Capability admission and conditional-write fallback, account-wide budgets, adaptive assignment, integrated configuration/planning and full wire costs."
+    },
+    {
+      "id": "REQ-29",
+      "workstream": "external",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/storage", "internal/upload"],
+      "checks": [],
+      "acceptance": ["AT-14", "AT-15"],
+      "remaining": "Capability admission and conditional-write fallback, account-wide budgets, adaptive assignment, integrated configuration/planning and full wire costs."
+    },
+    {
+      "id": "REQ-30",
+      "workstream": "archive",
+      "state": "SEPARATE_PROFILE",
+      "implementation": [],
+      "checks": [],
+      "acceptance": ["AT-28"],
+      "remaining": "Separate delayed-archive profile M5; unavailable until its distinct restore, GC and latency acceptance."
+    },
+    {
+      "id": "REQ-31",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestMaintenanceAuthorityPinsAndReplay"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestReceiveRestartConflictAndPendingPin"
+        }
+      ],
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-32",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestMaintenanceAuthorityPinsAndReplay"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestCatalogAuthenticationAndBounds"
+        }
+      ],
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-33",
+      "workstream": "generations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "checks": [
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestMaintenanceAuthorityPinsAndReplay"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestIncompleteAndCorruptNeverPublishOrGC"
+        },
+        {
+          "path": "internal/generation/crash_linux_test.go",
+          "name": "TestReplicaSIGKILLBoundaries"
+        },
+        {
+          "path": "internal/generation/generation_linux_test.go",
+          "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        }
+      ],
+      "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
+      "remaining": "Operator-authorized maintenance/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+    },
+    {
+      "id": "REQ-34",
+      "workstream": "recovery",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [],
+      "acceptance": ["AT-13"],
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+    },
+    {
+      "id": "REQ-35",
+      "workstream": "recovery",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [],
+      "acceptance": ["AT-13"],
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+    },
+    {
+      "id": "REQ-36",
+      "workstream": "recovery",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [],
+      "acceptance": ["AT-24"],
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+    },
+    {
+      "id": "REQ-37",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-17", "AT-19", "AT-30"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-38",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-27"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-39",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [
+        {
+          "path": "internal/worker/capacity_linux_test.go",
+          "name": "TestCapacityBlockedNewGenerationPreservesCompleteHistory"
+        },
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestSIGKILLReservationReconcilesWithoutDiscardingPayload"
+        },
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestConcurrentReservationsShareQuotaAndKeepSeparateSpool"
+        }
+      ],
+      "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-40",
+      "workstream": "control",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "internal/policy",
+        "internal/control",
+        "internal/worker",
+        "internal/peer",
+        "cmd/outpost"
+      ],
+      "checks": [
+        {
+          "path": "internal/worker/worker_linux_test.go",
+          "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
+        }
+      ],
+      "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
+      "remaining": "Autonomous discovery/planning of new generations, source-to-worker orchestration, installation and complete process-level acceptance."
+    },
+    {
+      "id": "REQ-41",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-42",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-22", "AT-25", "AT-26"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-43",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-44",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-45",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-46",
+      "workstream": "recovery",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "checks": [],
+      "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
+      "remaining": "Scheduled scrub/decrypt verification, quarantine/repair, dataset/directory recovery and offline recovery distribution."
+    },
+    {
+      "id": "REQ-47",
+      "workstream": "validation",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "docs/requirements.json",
+        "scripts/check-docs.mjs",
+        "internal/control",
+        "internal/policy"
+      ],
+      "checks": [],
+      "acceptance": ["AT-30", "AT-34"],
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements."
+    },
+    {
+      "id": "REQ-48",
+      "workstream": "validation",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "docs/requirements.json",
+        "scripts/check-docs.mjs",
+        "internal/control",
+        "internal/policy"
+      ],
+      "checks": [
+        {
+          "path": "internal/control/control_linux_test.go",
+          "name": "TestOwnerConfigurationRejectsExpansionAndAmbiguousIdentity"
+        }
+      ],
+      "acceptance": ["AT-21", "AT-22", "AT-32"],
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements."
+    },
+    {
+      "id": "REQ-49",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-31"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-50",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-24", "AT-25", "AT-33"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-51",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-34"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-52",
+      "workstream": "operations",
+      "state": "IN_DEVELOPMENT",
+      "implementation": ["internal/worker", "internal/diskbudget", "cmd/outpost"],
+      "checks": [],
+      "acceptance": ["AT-26", "AT-35"],
+      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+    },
+    {
+      "id": "REQ-53",
+      "workstream": "validation",
+      "state": "IN_DEVELOPMENT",
+      "implementation": [
+        "docs/requirements.json",
+        "scripts/check-docs.mjs",
+        "internal/control",
+        "internal/policy"
+      ],
+      "checks": [],
+      "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements."
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "AT-01",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "REQ-07",
+        "REQ-08",
+        "REQ-23",
+        "REQ-24",
+        "REQ-25"
+      ]
+    },
+    {
+      "id": "AT-02",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-02", "REQ-03", "REQ-04", "REQ-05", "REQ-09", "REQ-44", "REQ-53"]
+    },
+    {
+      "id": "AT-03",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-09", "REQ-44"]
+    },
+    {
+      "id": "AT-04",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-10", "REQ-11", "REQ-46"]
+    },
+    {
+      "id": "AT-05",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-06", "REQ-10", "REQ-11", "REQ-12", "REQ-13", "REQ-43", "REQ-46"]
+    },
+    {
+      "id": "AT-06",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-05",
+        "REQ-06",
+        "REQ-07",
+        "REQ-10",
+        "REQ-14",
+        "REQ-15",
+        "REQ-16",
+        "REQ-43"
+      ]
+    },
+    {
+      "id": "AT-07",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-05", "REQ-15", "REQ-24", "REQ-25", "REQ-40"]
+    },
+    {
+      "id": "AT-08",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-15", "REQ-25", "REQ-40"]
+    },
+    {
+      "id": "AT-09",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-21", "REQ-22", "REQ-26", "REQ-31", "REQ-32", "REQ-33"]
+    },
+    {
+      "id": "AT-10",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-22", "REQ-31", "REQ-32", "REQ-33"]
+    },
+    {
+      "id": "AT-11",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-21", "REQ-22", "REQ-26", "REQ-31", "REQ-32", "REQ-33"]
+    },
+    {
+      "id": "AT-12",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-10", "REQ-11", "REQ-22", "REQ-31", "REQ-32", "REQ-33", "REQ-46"]
+    },
+    {
+      "id": "AT-13",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-34", "REQ-35"]
+    },
+    {
+      "id": "AT-14",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-19", "REQ-27", "REQ-29", "REQ-53"]
+    },
+    {
+      "id": "AT-15",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-19", "REQ-27", "REQ-29"]
+    },
+    {
+      "id": "AT-16",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-12", "REQ-13", "REQ-28", "REQ-40"]
+    },
+    {
+      "id": "AT-17",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-17", "REQ-18", "REQ-19", "REQ-20", "REQ-37", "REQ-45"]
+    },
+    {
+      "id": "AT-18",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-17", "REQ-18", "REQ-19", "REQ-20", "REQ-21", "REQ-26", "REQ-31"]
+    },
+    {
+      "id": "AT-19",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-14", "REQ-15", "REQ-16", "REQ-17", "REQ-18", "REQ-37", "REQ-45"]
+    },
+    {
+      "id": "AT-20",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-07",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19",
+        "REQ-20",
+        "REQ-21",
+        "REQ-32",
+        "REQ-33"
+      ]
+    },
+    {
+      "id": "AT-21",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-07", "REQ-21", "REQ-32", "REQ-33", "REQ-48"]
+    },
+    {
+      "id": "AT-22",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-19",
+        "REQ-39",
+        "REQ-40",
+        "REQ-41",
+        "REQ-42",
+        "REQ-43",
+        "REQ-44",
+        "REQ-48",
+        "REQ-53"
+      ]
+    },
+    {
+      "id": "AT-23",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-02", "REQ-03", "REQ-05", "REQ-44"]
+    },
+    {
+      "id": "AT-24",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-01",
+        "REQ-08",
+        "REQ-23",
+        "REQ-24",
+        "REQ-36",
+        "REQ-41",
+        "REQ-45",
+        "REQ-46",
+        "REQ-50"
+      ]
+    },
+    {
+      "id": "AT-25",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-01",
+        "REQ-39",
+        "REQ-40",
+        "REQ-41",
+        "REQ-42",
+        "REQ-43",
+        "REQ-45",
+        "REQ-46",
+        "REQ-50",
+        "REQ-53"
+      ]
+    },
+    {
+      "id": "AT-26",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-06",
+        "REQ-10",
+        "REQ-39",
+        "REQ-40",
+        "REQ-41",
+        "REQ-42",
+        "REQ-43",
+        "REQ-52"
+      ]
+    },
+    {
+      "id": "AT-27",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-07", "REQ-14", "REQ-15", "REQ-16", "REQ-38"]
+    },
+    {
+      "id": "AT-28",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-30"]
+    },
+    {
+      "id": "AT-29",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-04", "REQ-05", "REQ-44", "REQ-53"]
+    },
+    {
+      "id": "AT-30",
+      "state": "NOT_VERIFIED",
+      "requirements": [
+        "REQ-02",
+        "REQ-17",
+        "REQ-18",
+        "REQ-37",
+        "REQ-39",
+        "REQ-40",
+        "REQ-44",
+        "REQ-45",
+        "REQ-47",
+        "REQ-53"
+      ]
+    },
+    {
+      "id": "AT-31",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-49"]
+    },
+    {
+      "id": "AT-32",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-48"]
+    },
+    {
+      "id": "AT-33",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-50"]
+    },
+    {
+      "id": "AT-34",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-47", "REQ-51"]
+    },
+    {
+      "id": "AT-35",
+      "state": "NOT_VERIFIED",
+      "requirements": ["REQ-52"]
+    }
+  ]
+}

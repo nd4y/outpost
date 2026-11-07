@@ -13,6 +13,8 @@ import (
 	"sort"
 	"syscall"
 	"time"
+
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 type entry struct {
@@ -47,6 +49,7 @@ type Replica struct {
 	trust Trust
 	// Fault is a development-test hook; production callers leave it nil.
 	Fault func(string) error
+	Admit statefile.Admission
 }
 
 // Open requires an existing directory on an independently admitted filesystem.
@@ -162,6 +165,9 @@ func atomic(root *os.Root, name string, b []byte) error {
 	}
 	return syncDir(root, filepath.Dir(name))
 }
+func (r *Replica) write(name string, b []byte) error {
+	return statefile.Guard(r.Admit, name, len(b), func() error { return atomic(r.root, name, b) })
+}
 func (r *Replica) save(s state) error {
 	b, e := json.Marshal(s)
 	if e != nil {
@@ -170,7 +176,7 @@ func (r *Replica) save(s state) error {
 	if len(b) > MaxState {
 		return ErrInvalid
 	}
-	if e = atomic(r.root, "state.json", b); e != nil {
+	if e = r.write("state.json", b); e != nil {
 		return e
 	}
 	return r.point("state-durable")
@@ -338,7 +344,7 @@ func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) erro
 		} else if !errors.Is(e, os.ErrNotExist) {
 			return e
 		}
-		if e = atomic(r.root, "objects/"+id, b); e != nil {
+		if e = r.write("objects/"+id, b); e != nil {
 			return e
 		}
 		return r.point("object-durable")

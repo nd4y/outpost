@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -46,6 +47,7 @@ type Journal struct {
 	planID, worker string
 	authority      Authority
 	tasks          map[string]bool
+	Admit          statefile.Admission
 }
 
 func regular(root *os.Root, name string, max int) ([]byte, error) {
@@ -205,7 +207,7 @@ func (j *Journal) save(s State) error {
 	if len(raw) > maxJournal {
 		return ErrDenied
 	}
-	return atomicFile(j.root, "state.json", raw)
+	return statefile.Guard(j.Admit, "state.json", len(raw), func() error { return atomicFile(j.root, "state.json", raw) })
 }
 func (j *Journal) load() (State, error) {
 	var s State
