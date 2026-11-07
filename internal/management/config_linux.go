@@ -318,6 +318,29 @@ func (r *Registry) PreviewConfiguration(ctx context.Context, p Principal, tenant
 	})
 	return out, e
 }
+func configurationRequestDigest(p Principal, tenant, node string, input SignedMutation) string {
+	request, _ := json.Marshal(struct {
+		Actor, Tenant, Node string
+		Input               SignedMutation
+	}{p.Actor, tenant, node, input})
+	return storage.Hash(request)
+}
+
+func (r *Registry) finishConfiguration(s *registryState, op configOperation, revision uint64) error {
+	s.Configurations[op.Node] = configPointer{revision, op.Candidate}
+	op.Receipt.State = "COMPLETE"
+	op.Receipt.ObservedUnix = time.Now().Unix()
+	op.Receipt.ResultDigest = op.Candidate
+	op.Audit.State = "COMPLETE"
+	op.Audit.ObservedUnix = op.Receipt.ObservedUnix
+	op.Audit.ResultDigest = op.Candidate
+	s.ConfigOperations[op.Receipt.Operation] = op
+	if e := r.save(*s); e != nil {
+		return e
+	}
+	return r.point("management-config-result-durable")
+}
+
 func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation) (Receipt, error) {
 	var out Receipt
 	if p.Validate() != nil || !p.Role("owner") || !storage.ID(tenant) || !storage.ID(node) || !storage.ID(input.Operation) || input.Reason != "POLICY_CHANGE" || input.PreviewDigest != storage.Hash(input.Document) || !safe(input.Expected) {
@@ -327,11 +350,7 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 	if e != nil {
 		return out, e
 	}
-	request, _ := json.Marshal(struct {
-		Actor, Tenant, Node string
-		Input               SignedMutation
-	}{p.Actor, tenant, node, input})
-	requestDigest := storage.Hash(request)
+	requestDigest := configurationRequestDigest(p, tenant, node, input)
 	candidate := storage.Hash(input.Document)
 	e = r.store.WithLock(ctx, func() error {
 		if e := r.check(ctx); e != nil {
@@ -465,21 +484,10 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 		if e := r.point("management-config-cache-durable"); e != nil {
 			return e
 		}
-		s.Configurations[node] = configPointer{next.Revision, candidate}
-		op.Receipt.State = "COMPLETE"
-		op.Receipt.ObservedUnix = time.Now().Unix()
-		op.Receipt.ResultDigest = candidate
-		op.Audit.State = "COMPLETE"
-		op.Audit.ObservedUnix = op.Receipt.ObservedUnix
-		op.Audit.ResultDigest = candidate
-		s.ConfigOperations[input.Operation] = op
-		if e := r.save(s); e != nil {
+		if e := r.finishConfiguration(&s, op, next.Revision); e != nil {
 			return e
 		}
-		if e := r.point("management-config-result-durable"); e != nil {
-			return e
-		}
-		out = op.Receipt
+		out = s.ConfigOperations[input.Operation].Receipt
 		return nil
 	})
 	return out, e

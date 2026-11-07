@@ -637,6 +637,26 @@
         {
           "path": "internal/worker/scrub_linux_test.go",
           "name": "TestScheduledScrubWithdrawalJoinsAndRetainsPendingEvidence"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1055,6 +1075,50 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2304,6 +2368,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -2404,10 +2469,26 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-38",
@@ -2415,6 +2496,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -2479,10 +2561,58 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "cmd/outpost/management_service_linux_test.go",
+          "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-39",
@@ -2490,6 +2620,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -2650,10 +2781,30 @@
         {
           "path": "internal/worker/catalog_reporting_linux_test.go",
           "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "cmd/outpost/management_service_linux_test.go",
+          "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -2808,6 +2959,50 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -2819,6 +3014,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -2871,10 +3067,30 @@
         {
           "path": "cmd/outpost/recovery_linux_test.go",
           "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "cmd/outpost/management_service_linux_test.go",
+          "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-42",
@@ -2882,13 +3098,14 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
       ],
       "checks": [],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-43",
@@ -2896,6 +3113,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -2988,10 +3206,38 @@
         {
           "path": "internal/generation/catalog_integrity_linux_test.go",
           "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-44",
@@ -2999,6 +3245,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -3139,10 +3386,34 @@
         {
           "path": "internal/worker/catalog_reporting_linux_test.go",
           "name": "TestCatalogReportingKeepsHealthyGenerationAndRespectsForeignQuota"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-45",
@@ -3150,6 +3421,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -3262,10 +3534,30 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestRecoveryReportVersionAndOriginalTimeOverHTTPS"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-46",
@@ -3668,6 +3960,54 @@
         {
           "path": "internal/management/command_observation_linux_test.go",
           "name": "TestCatalogMetadataReportVersionAndHealthyInventoryOverHTTPS"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileEnrollmentCurrentACLQuotaAndOriginalReceipt"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileConfigurationDistinguishesAppliedEffectFromNewAuthority"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileCommandPagingNeverClaimsExecution"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileRejectsChangedCandidateAndCancelledContext"
+        },
+        {
+          "path": "internal/management/reconcile_linux_test.go",
+          "name": "TestManagementReconcileAfterActualSIGKILLWithoutClientReplay"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "cmd/outpost/management_service_linux_test.go",
+          "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -3679,6 +4019,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -3695,10 +4036,38 @@
         {
           "path": "cmd/outpost/recovery_linux_test.go",
           "name": "TestCLIRecoveryInitializationIsExplicitPrivateAndNoOverwrite"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRealTLSAutomaticallyReconcilesSavedIntent"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceProfileChangeRequiresStoppedLeaseAndFencesOldReaders"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceStatusPreservesForeignReservationAndVolumeLossStopsListener"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceRejectsUnsafeProfileAndTamperedEnrollment"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSIGKILLRestartCompletesOriginalHTTPSIntent"
+        },
+        {
+          "path": "internal/managementservice/crash_linux_test.go",
+          "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "cmd/outpost/management_service_linux_test.go",
+          "name": "TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun"
         }
       ],
       "acceptance": ["AT-31"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-50",
@@ -3706,6 +4075,7 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
@@ -3721,7 +4091,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-51",
@@ -3729,13 +4099,14 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
       ],
       "checks": [],
       "acceptance": ["AT-34"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-52",
@@ -3743,13 +4114,14 @@
       "state": "IN_DEVELOPMENT",
       "implementation": [
         "internal/management",
+        "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost"
       ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],
-      "remaining": "Operator API/UI and authorization, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Operator UI, blocked-intent resolution and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-53",

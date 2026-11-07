@@ -41,6 +41,14 @@ type Limits struct {
 func (l Limits) valid() bool {
 	return l.Capacity >= 16<<20 && l.Capacity <= 1<<60 && l.Reserve >= 1<<20 && l.Spool >= 4<<20 && l.Telemetry >= 65536 && l.Reserve < l.Capacity && l.Spool < l.Capacity-l.Reserve && l.Telemetry < l.Capacity-l.Reserve-l.Spool
 }
+
+// Validate permits bootstrap admission before creating a runtime directory.
+func (l Limits) Validate() error {
+	if !l.valid() {
+		return ErrInvalid
+	}
+	return nil
+}
 func (l Limits) maximum(class string) int64 {
 	switch class {
 	case "data":
