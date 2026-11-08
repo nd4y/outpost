@@ -38,7 +38,7 @@ func (w *Worker) AuditExternal(ctx context.Context, operation string, p External
 	err := w.lease.WithLock(acquire, func() error {
 		cancel()
 		var err error
-		result, err = w.auditRetainedUpload(ctx, operation, p, initialize, nil)
+		result, err = w.auditRetainedUpload(ctx, operation, p, initialize, nil, 0)
 		return err
 	})
 	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil && result.Format == "" && acquire.Err() == context.DeadlineExceeded {
@@ -47,7 +47,7 @@ func (w *Worker) AuditExternal(ctx context.Context, operation string, p External
 	return result, err
 }
 
-func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p ExternalAuditProfile, initialize bool, gate *storage.RequestGate) (upload.TargetAuditReceipt, error) {
+func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p ExternalAuditProfile, initialize bool, gate *storage.RequestGate, revision uint64) (upload.TargetAuditReceipt, error) {
 	var result upload.TargetAuditReceipt
 	if err := w.check(ctx); err != nil {
 		return result, err
@@ -62,6 +62,9 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 	}
 	if err = c.Active(time.Now()); err != nil {
 		return result, err
+	}
+	if gate != nil && c.Revision != revision {
+		return result, control.ErrInactive
 	}
 	active, expire := context.WithDeadline(ctx, time.Unix(c.ExpiresUnix, 0))
 	defer expire()
@@ -190,13 +193,10 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 	if cause := context.Cause(work); cause != nil {
 		return upload.TargetAuditReceipt{}, cause
 	}
-	if err != nil {
-		return upload.TargetAuditReceipt{}, err
+	if guard := current(work); guard != nil {
+		return upload.TargetAuditReceipt{}, guard
 	}
-	if err = current(work); err != nil {
-		return upload.TargetAuditReceipt{}, err
-	}
-	return result, nil
+	return result, err
 }
 
 func externalAuditDirectory(operation, window string) string {

@@ -303,7 +303,7 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 	initialize := !record.Ready && errors.Is(directoryError, os.ErrNotExist)
 	ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
 	defer cancel()
-	proof, err := w.auditRetainedUpload(ctx, record.Operation, window, initialize, v.requestGates[record.Target])
+	proof, err := w.auditRetainedUpload(ctx, record.Operation, window, initialize, v.requestGates[record.Target], v.cfg.Revision)
 	if _, e := w.root.Stat(relative + "/scope.json"); e == nil {
 		record.Ready = true
 	}
@@ -339,7 +339,21 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 	if record.FinishedUnix > 0 && record.FinishedUnix < v.cfg.ExpiresUnix {
 		record.PolicyExpiresUnix = v.cfg.ExpiresUnix
 	}
-	bounded, stop := context.WithTimeout(context.WithoutCancel(v.ctx), time.Second)
+	bounded, stop := context.WithTimeout(context.WithoutCancel(v.ctx), 5*time.Second)
 	defer stop()
-	_ = write(bounded)
+	// Fence the result write against policy replacement, including missing and
+	// integrity results. No network request is made while holding this lock.
+	_ = w.cache.WithCurrent(bounded, time.Now(), func(current control.Config, _ []byte) error {
+		if current.Revision != v.cfg.Revision {
+			return control.ErrInactive
+		}
+		status, err := w.Status(bounded)
+		if err != nil {
+			return err
+		}
+		if status.Controls.paused(selected.job.Domain, record.Operation) {
+			return ErrDenied
+		}
+		return write(bounded)
+	})
 }

@@ -128,6 +128,8 @@ The owner can set `externalAuditIntervalSeconds` from 2 to 2592000 in a signed d
 
 Set `externalAuditGenerations` from 1 to 16 to verify that many of the newest locally retained complete generations. The default is one. Older generations in this window receive read-only verification. Narrowing the window retains earlier observations; the local status command still accepts a retained upload operation. Management reports and automatic repair use the newest generation.
 
+A scheduled audit starts under a specific signed policy revision. Its final observation is committed only while that revision and the operation's controls still authorize the audit. A response that arrives after policy replacement leaves the earlier observation available, including when the response says a part is missing.
+
 The schedule retains one window identity for the same upload operation and interval. A completed cycle waits the interval before the next pass. Its supporting evidence expires before that pass, so the next cycle reads the ciphertext again. Interrupted work can resume within the same age limit. The latest scheduled outcome uses the telemetry allocation. Scope changes retain old records, and a full allocation can prevent new audit evidence.
 
 ```sh

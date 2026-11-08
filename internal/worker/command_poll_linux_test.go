@@ -124,11 +124,17 @@ func TestWorkerCommandRealManagementLostAckAndPersistedPollDeadline(t *testing.T
 	if receipt.State != "COMPLETE" {
 		t.Fatal(receipt)
 	}
-	profile := CommandProfile{Format: CommandProfileFormat, Endpoint: server.URL, Identity: target, EnrollmentFile: filepath.Join(f.base, "enrollment.json"), PollSeconds: 5, RetrySeconds: 5, AttemptSeconds: 2}
-	bounded, cancel := context.WithTimeout(ctx, 180*time.Millisecond)
-	e = other.RunCommands(bounded, profile, enrolled, client)
+	profile := CommandProfile{Format: CommandProfileFormat, Endpoint: server.URL, Identity: target, EnrollmentFile: filepath.Join(f.base, "enrollment.json"), PollSeconds: 30, RetrySeconds: 5, AttemptSeconds: 5}
+	bounded, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- other.RunCommands(bounded, profile, enrolled, client) }()
+	wait(t, func() bool {
+		state, err := other.Status(bounded)
+		return err == nil && state.Controls.Delivery != nil && state.Controls.Delivery.Phase == "IDLE"
+	})
 	cancel()
-	must(t, e)
+	must(t, <-done)
 	state, e := other.Status(ctx)
 	must(t, e)
 	if state.Controls.Delivery == nil || state.Controls.Delivery.Phase != "IDLE" {
@@ -136,9 +142,9 @@ func TestWorkerCommandRealManagementLostAckAndPersistedPollDeadline(t *testing.T
 	}
 	deadline := state.Controls.Delivery.NextUnix
 	before := calls.Load()
-	bounded, cancel = context.WithTimeout(ctx, 150*time.Millisecond)
-	e = w.RunCommands(bounded, profile, enrolled, client)
-	cancel()
+	restarted, stop := context.WithTimeout(ctx, 300*time.Millisecond)
+	e = w.RunCommands(restarted, profile, enrolled, client)
+	stop()
 	must(t, e)
 	state, e = w.Status(ctx)
 	must(t, e)

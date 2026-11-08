@@ -186,7 +186,12 @@ func start(t *testing.T, w *Worker) func() {
 }
 func wait(t *testing.T, fn func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(12 * time.Second)
+	waitFor(t, 12*time.Second, fn)
+}
+
+func waitFor(t *testing.T, timeout time.Duration, fn func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if fn() {
 			return

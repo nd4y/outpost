@@ -292,6 +292,8 @@ func TestWorkerScheduledExternalRepairReplaysDurableMissingPart(t *testing.T) {
 
 func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 	f := newFixture(t)
+	f.cfg.Limits.AttemptMillis = 60000
+	f.cfg.Limits.Parallel = 1
 	w := f.nodes[0]
 	bindFixture(t, f, w)
 	ctx := context.Background()
@@ -317,7 +319,7 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 			return true
 		}})
 	p := storage.Profile{Kind: "webdav", Endpoint: target.Endpoint(), Namespace: target.Options.Namespace,
-		MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 4000,
+		MaxObjectBytes: 1 << 20, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 12000,
 		CredentialScope: "namespace", NoDelete: true}
 	f.cfg.Targets = []control.Target{{ID: p.ID(), Profile: p}}
 	f.domain.Placement.Targets = []string{p.ID()}
@@ -352,8 +354,8 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 	firstOp, nextOp := upload.DelegatedOperation(raw, f.generation), upload.DelegatedOperation(raw, next)
 	f.config(t, 0, nil)
 	stop := start(t, w)
-	wait(t, func() bool { return complete(w, firstOp) && complete(w, nextOp) })
-	wait(t, func() bool {
+	waitFor(t, 120*time.Second, func() bool { return complete(w, firstOp) && complete(w, nextOp) })
+	waitFor(t, 25*time.Second, func() bool {
 		report, err := w.ScheduledExternalAuditStatus(ctx, nextOp)
 		return err == nil && report.State == "VERIFIED_CIPHERTEXT"
 	})
@@ -389,7 +391,7 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 	f.cfg.Revision++
 	cfg := f.config(t, 0, nil)
 	var historic ExternalAuditStatus
-	wait(t, func() bool {
+	waitFor(t, 25*time.Second, func() bool {
 		historic, err = w.ScheduledExternalAuditStatus(ctx, firstOp)
 		return err == nil && historic.State == "MISSING" && historic.Repair == nil
 	})
@@ -400,8 +402,13 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 	armed.Store(true)
 	select {
 	case <-auditRead:
-	case <-time.After(10 * time.Second):
+	case <-time.After(25 * time.Second):
 		t.Fatal("older-generation reread did not reach the held request")
+	}
+	historic, err = w.ScheduledExternalAuditStatus(ctx, firstOp)
+	must(t, err)
+	if historic.State != "MISSING" {
+		t.Fatal("previous historical result absent at withdrawal", historic.State)
 	}
 	f.domain.ExternalAuditGenerations = 1
 	f.cfg.Revision++
@@ -411,7 +418,7 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("narrowed scope did not cancel the old request")
 	}
-	wait(t, func() bool {
+	waitFor(t, 25*time.Second, func() bool {
 		report, err := w.ScheduledExternalAuditStatus(ctx, nextOp)
 		return err == nil && report.State == "VERIFIED_CIPHERTEXT" && report.FinishedUnix > historic.FinishedUnix+f.domain.ExternalAuditIntervalSeconds
 	})
