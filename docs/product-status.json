@@ -1747,6 +1747,10 @@
         {
           "path": "internal/worker/external_repair_linux_test.go",
           "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
+        },
+        {
+          "path": "internal/upload/target_audit_linux_test.go",
+          "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -3036,6 +3040,10 @@
         {
           "path": "internal/worker/external_repair_linux_test.go",
           "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
+        },
+        {
+          "path": "internal/upload/target_audit_linux_test.go",
+          "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
         }
       ],
       "acceptance": ["AT-13"],
@@ -4887,6 +4895,10 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "internal/upload/target_audit_linux_test.go",
+          "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
@@ -5429,6 +5441,10 @@
         {
           "path": "internal/storage/body_budget_test.go",
           "name": "TestHTTPBodyBudgetCloseCancelsReplayWaitingForAllowance"
+        },
+        {
+          "path": "internal/upload/target_audit_linux_test.go",
+          "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6749,6 +6765,10 @@
         {
           "path": "internal/worker/external_repair_linux_test.go",
           "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
+        },
+        {
+          "path": "internal/upload/target_audit_linux_test.go",
+          "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

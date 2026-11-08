@@ -109,6 +109,19 @@ The audit uses the same read-only profile and public trust. It verifies the exac
 
 The optional `--output` saves that typed report even when the verification fails. Choose a new path. The output excludes private names, credentials and remote diagnostic text. The audit grants no repair authority. Verify plaintext by restoring with the owner kit.
 
+### Resume an audit of a retained upload
+
+For a retained complete upload, the stopped worker can reopen a verification window from its queue. Use a private `outpost-worker-external-audit-1` JSON file containing `format`, a fresh opaque 64-character hexadecimal `window` and `maxAgeSeconds` from 1 to 31622400. Use the existing enrolled worker bootstrap and original upload operation ID.
+
+```sh
+outpost worker-external-audit-init --bootstrap /private/worker.json \
+  --operation UPLOAD_ID --input /private/window.json
+outpost worker-external-audit --bootstrap /private/worker.json \
+  --operation UPLOAD_ID --input /private/window.json
+```
+
+Initialize once. The second command resumes the exact same window with its durable partial hash progress. A missing or changed scope prevents resumption. Both commands require the exclusive worker lease, current placement, the original complete queue receipt and the admitted local volume. Audit progress uses the telemetry allowance and remote reads stop on observed policy withdrawal. The report's `observedUnix` is the oldest supporting read. `finishedUnix` is the end of this invocation. A new window reads the data again. The original upload receipt remains historical.
+
 ## Repair a selected external copy
 
 Build a fresh plan from a retained healthy holder's materialized ciphertext. The planner needs its private signing key, public generation trust and a private `outpost-upload-plan-request-1` JSON document. The document contains `format`, the expected public `planner` key and a `plan` template in `outpost-external-plan-1` format. Set the new `operationId`, exact `profile`, `allowExternal`, `allowedClasses`, eligible `workers` and the signed `startMillis`, `expiresUnix` and `slotMillis`. The builder supplies the catalog, blob map and signature.

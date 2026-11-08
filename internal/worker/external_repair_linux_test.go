@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,14 +24,24 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 	f := newFixture(t)
 	ctx := context.Background()
 	w := f.nodes[0]
+	bindFixture(t, f, w)
 	pub, planner := key(t)
 	f.domain.Planner = pub
 	f.domain.Placement.Edges = nil
 	f.domain.Placement.AllowedClasses = append(f.domain.Placement.AllowedClasses, "external")
 	targets := map[string]*teststore.Server{}
+	var holdAudit atomic.Bool
+	auditRead := make(chan struct{})
 	profile := func(kind string) storage.Profile {
 		server := teststore.New(t, teststore.Options{Kind: kind, Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)),
-			Logins: map[string]teststore.Login{w.node: {Secret: "isolated-cloud-secret"}}})
+			Logins: map[string]teststore.Login{w.node: {Secret: "isolated-cloud-secret"}}, Before: func(_ http.ResponseWriter, r *http.Request, _, _ string, _ []byte) bool {
+				if r.Method == http.MethodGet && holdAudit.CompareAndSwap(true, false) {
+					close(auditRead)
+					<-r.Context().Done()
+					return true
+				}
+				return false
+			}})
 		p := storage.Profile{Kind: kind, Endpoint: server.Endpoint(), Namespace: server.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 2000, CredentialScope: "namespace", NoDelete: true}
 		if kind == "s3" {
 			p.Region = server.Options.Region
@@ -71,6 +83,11 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 	f.config(t, 0, []control.Job{first})
 	stop := start(t, w)
 	wait(t, func() bool { return complete(w, first.Operation) })
+	window := ExternalAuditProfile{Format: ExternalAuditProfileFormat, Window: storage.Hash([]byte("retained-external-window")), MaxAgeSeconds: 3600}
+	requests := targets[old.ID()].Snapshot().Requests
+	if _, err := w.AuditExternal(ctx, first.Operation, window, true); !errors.Is(err, storage.ErrConflict) || targets[old.ID()].Snapshot().Requests != requests {
+		t.Fatal("maintenance bypassed active execution lease", err)
+	}
 	status, err := w.Status(ctx)
 	must(t, err)
 	originalReceipt := bytes.Clone(status.Jobs[first.Operation].Receipt)
@@ -147,5 +164,61 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 	must(t, err)
 	if !receipt.CheckpointMatch || !bytes.Equal(got, f.content) {
 		t.Fatal("replacement cannot independently restore expected content")
+	}
+	reopened, err := Open(Options{Directory: w.dir, Node: w.node, Owner: w.owner, Certificate: w.cert, Roots: w.roots, Resolve: w.resolve, Guard: w.guard})
+	must(t, err)
+	defer reopened.Close()
+	requests = targets[replacement.ID()].Snapshot().Requests
+	if _, err := reopened.AuditExternal(ctx, next.Operation, window, false); !errors.Is(err, os.ErrNotExist) || targets[replacement.ID()].Snapshot().Requests != requests {
+		t.Fatal("missing audit window initialized without consent", err)
+	}
+	checked, err := reopened.AuditExternal(ctx, next.Operation, window, true)
+	must(t, err)
+	if checked.Generation != f.generation || checked.Target != replacement.ID() || checked.Window != window.Window {
+		t.Fatal("audit lost exact retained binding", checked)
+	}
+	replayed, err := reopened.AuditExternal(ctx, next.Operation, window, false)
+	must(t, err)
+	if replayed.ObservedUnix != checked.ObservedUnix {
+		t.Fatal("replayed window refreshed verification age", checked, replayed)
+	}
+	changed := window
+	changed.MaxAgeSeconds--
+	requests = targets[replacement.ID()].Snapshot().Requests
+	if _, err := reopened.AuditExternal(ctx, next.Operation, changed, false); !errors.Is(err, storage.ErrConflict) || targets[replacement.ID()].Snapshot().Requests != requests {
+		t.Fatal("changed audit binding reached target", err)
+	}
+	interrupted := window
+	interrupted.Window = storage.Hash([]byte("revoked-audit-window"))
+	holdAudit.Store(true)
+	ended := make(chan error, 1)
+	go func() {
+		bounded, cancel := context.WithTimeout(ctx, 6*time.Second)
+		defer cancel()
+		proof, err := reopened.AuditExternal(bounded, next.Operation, interrupted, true)
+		if proof.Format != "" {
+			err = errors.New("withdrawn audit published a proof")
+		}
+		ended <- err
+	}()
+	select {
+	case <-auditRead:
+	case <-time.After(6 * time.Second):
+		t.Fatal("replacement audit did not reach network")
+	}
+	f.domain.Placement.CloudEdges = []policy.CloudEdge{{Node: w.node, Target: old.ID()}}
+	f.cfg.Revision++
+	f.config(t, 0, nil)
+	select {
+	case err := <-ended:
+		if !errors.Is(err, control.ErrInactive) {
+			t.Fatal("policy replacement did not cancel audit", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("withdrawn audit did not join")
+	}
+	requests = targets[replacement.ID()].Snapshot().Requests
+	if _, err := reopened.AuditExternal(ctx, next.Operation, window, false); !errors.Is(err, ErrDenied) || targets[replacement.ID()].Snapshot().Requests != requests {
+		t.Fatal("withdrawn target allowed new audit", err)
 	}
 }

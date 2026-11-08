@@ -50,6 +50,9 @@ type domainState struct {
 	handler http.Handler
 	ingress *ingress.Registry
 }
+
+var externalQueueLimits = upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}
+
 type view struct {
 	cfg           control.Config
 	autonomy      *control.Autonomy
@@ -879,7 +882,7 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		if err != nil || w.budget == nil {
 			return ErrDenied
 		}
-		queue, e = upload.OpenQueueAt(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, init, w.admission(filepath.ToSlash(relative)))
+		queue, e = upload.OpenQueueAt(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, externalQueueLimits, init, w.admission(filepath.ToSlash(relative)))
 		return e
 	})
 	if e != nil {

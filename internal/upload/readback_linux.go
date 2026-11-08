@@ -44,6 +44,10 @@ func validVerification(level string) bool {
 	return level == "full-target-readback" || level == "cached-target-readback"
 }
 func (j *Journal) newAudit(ctx context.Context, b *storage.Backend) (*cloudAudit, error) {
+	return j.newScopedAudit(ctx, b, "")
+}
+
+func (j *Journal) newScopedAudit(ctx context.Context, b *storage.Backend, window string) (*cloudAudit, error) {
 	o := j.Readback
 	if o.MaxAgeSeconds < 0 || o.MaxAgeSeconds > readback.MaxAgeSeconds {
 		return nil, ErrDenied
@@ -62,10 +66,20 @@ func (j *Journal) newAudit(ctx context.Context, b *storage.Backend) (*cloudAudit
 		store.Admit = j.Admit
 		a.owned, o.Store = store, store
 	}
-	scope, e := json.Marshal(struct {
+	scopeInput := struct {
 		Protocol, Profile, Reader string
 		Trust                     generation.Trust
-	}{"outpost-cloud-readback-1", b.Profile().ID(), j.worker, j.authority.Generation})
+		Window                    string `json:",omitempty"`
+		Plan                      string `json:",omitempty"`
+		AgeSeconds                int64  `json:",omitempty"`
+	}{
+		Protocol: "outpost-cloud-readback-1", Profile: b.Profile().ID(), Reader: j.worker,
+		Trust: j.authority.Generation,
+	}
+	if window != "" {
+		scopeInput.Window, scopeInput.Plan, scopeInput.AgeSeconds = window, j.planID, o.MaxAgeSeconds
+	}
+	scope, e := json.Marshal(scopeInput)
 	if e != nil {
 		a.close()
 		return nil, e
@@ -101,6 +115,7 @@ func (j *Journal) newAudit(ctx context.Context, b *storage.Backend) (*cloudAudit
 	}
 	return a, nil
 }
+
 func (a *cloudAudit) close() {
 	if a != nil && a.owned != nil {
 		a.owned.Close()

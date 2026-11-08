@@ -165,5 +165,5 @@ jobs:
           export OUTPOST_TEST_ROOT="$TMPDIR"
           export OUTPOST_EXTERNAL_RECOVERY_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
           "$OUTPOST_EXTERNAL_RECOVERY_CLI" version
-          go test -count=1 -timeout=75s -run 'CLIExternalRestore|CLIUploadPlan|WorkerOwnerAdmitsMissingRepair' \
-            -v ./cmd/outpost ./internal/worker
+          go test -count=1 -timeout=75s -run 'CLIExternalRestore|CLIUploadPlan|WorkerOwnerAdmitsMissingRepair|TargetAuditWindowResumesAfterSIGKILL' \
+            -v ./cmd/outpost ./internal/worker ./internal/upload

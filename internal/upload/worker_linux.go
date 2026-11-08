@@ -80,6 +80,17 @@ func VerifyClaim(raw []byte, p Plan, planID string) error {
 	return nil
 }
 func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit *cloudAudit) error {
+	if err := j.readTargetClosure(ctx, b, audit); err != nil {
+		return err
+	}
+	if audit != nil {
+		_, _, err := audit.evidence(ctx)
+		return err
+	}
+	return nil
+}
+
+func (j *Journal) readTargetClosure(ctx context.Context, b *storage.Backend, audit *cloudAudit) error {
 	raw, e := b.Catalog(ctx, j.plan.Generation, j.authority.Generation)
 	if e != nil {
 		return e
@@ -106,10 +117,6 @@ func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit 
 		if e != nil {
 			return e
 		}
-	}
-	if audit != nil {
-		_, _, e = audit.evidence(ctx)
-		return e
 	}
 	return nil
 }
