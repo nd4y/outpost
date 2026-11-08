@@ -46,13 +46,30 @@ func (a *Agent) loadCompanion() error {
 	if e != nil {
 		return e
 	}
-	anchor := a.anchor
-	anchor.Ingress = companion.Ingress
-	if companion.Ingress == a.anchor.Ingress || !ingress.SameAuthorityScope(anchor, companion) ||
-		anchor.Revision != companion.Revision || anchor.NotBefore != companion.NotBefore || anchor.ExpiresUnix != companion.ExpiresUnix {
+	if !sameReceiverPair(a.anchor, companion) {
 		return ErrInvalid
 	}
 	a.companion, a.companionAuthority = companion, raw
+	return nil
+}
+
+func sameReceiverPair(primary, companion ingress.Authority) bool {
+	if primary.Ingress == companion.Ingress {
+		return false
+	}
+	primary.Ingress = companion.Ingress
+	return ingress.SameAuthorityScope(primary, companion) && primary.Revision == companion.Revision &&
+		primary.NotBefore == companion.NotBefore && primary.ExpiresUnix == companion.ExpiresUnix
+}
+
+func (a *Agent) verifyCompanionAuthority(primary ingress.Authority, raw []byte) error {
+	companion, e := ingress.VerifyAuthorityDocument(raw, a.b.Local.Owner)
+	if e != nil {
+		return e
+	}
+	if companion.Ingress != a.companion.Ingress || !sameReceiverPair(primary, companion) {
+		return ingress.ErrDenied
+	}
 	return nil
 }
 
@@ -79,8 +96,7 @@ type parallelSink struct {
 	next      atomic.Uint64
 }
 
-func (a *Agent) openParallelSink(i ingress.Intent, prefix string, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool) (*parallelSink, error) {
-	authority := a.companionAuthority
+func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []byte, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool) (*parallelSink, error) {
 	i.Ingress = a.companion.Ingress
 	i.Authority = storage.Hash(authority)
 	raw, e := ingress.SignIntent(i, authority, a.b.Local.Owner, a.writer, time.Unix(i.NotBefore, 0))
@@ -190,6 +206,36 @@ func (s *parallelSink) loadReceipt(generation string) (ingress.Receipt, error) {
 }
 
 func (s *parallelSink) FinishStep(ctx context.Context, catalog []byte) (generation.BatchResult, *ingress.Receipt, error) {
+	for attempt := 0; ; attempt++ {
+		progress, receipt, e := s.finishStep(ctx, catalog)
+		if e == nil || attempt == 2 || ctx.Err() != nil || !retryablePublication(e) {
+			return progress, receipt, e
+		}
+		// The catalog is immutable and the receiver persists its verification
+		// cursor. A lost reply can be replayed without sending source payload.
+		timer := time.NewTimer(time.Duration(attempt+1) * 250 * time.Millisecond)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+			return progress, nil, ctx.Err()
+		}
+	}
+}
+
+func retryablePublication(e error) bool {
+	if joined, ok := e.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			if !retryablePublication(child) {
+				return false
+			}
+		}
+		return true
+	}
+	return errors.Is(e, ingress.ErrUnavailable) || errors.Is(e, context.DeadlineExceeded)
+}
+
+func (s *parallelSink) finishStep(ctx context.Context, catalog []byte) (generation.BatchResult, *ingress.Receipt, error) {
 	_, e := s.loadReceipt(storage.Hash(catalog))
 	if e == nil {
 		return s.Client.FinishStep(ctx, catalog)

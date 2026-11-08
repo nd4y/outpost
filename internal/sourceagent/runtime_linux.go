@@ -66,21 +66,23 @@ func Load(path string) (Bootstrap, error) {
 }
 
 type state struct {
-	Format          string            `json:"format"`
-	Binding         string            `json:"binding"`
-	Phase           string            `json:"phase"`
-	ObservedUnix    int64             `json:"observedUnix"`
-	Sequence        uint64            `json:"sequence"`
-	Generation      string            `json:"generation,omitempty"`
-	Intent          []byte            `json:"intent,omitempty"`
-	Previous        map[string]string `json:"previous"`
-	Checkpoint      []byte            `json:"checkpoint,omitempty"`
-	Signature       []byte            `json:"signature,omitempty"`
-	Authority       []byte            `json:"authority,omitempty"`
-	Observation     []byte            `json:"observation,omitempty"`
-	IntentAuthority []byte            `json:"intentAuthority,omitempty"`
-	LegacyDigest    string            `json:"legacyDigest,omitempty"`
-	Retirement      string            `json:"retirement,omitempty"`
+	Format                   string            `json:"format"`
+	Binding                  string            `json:"binding"`
+	Phase                    string            `json:"phase"`
+	ObservedUnix             int64             `json:"observedUnix"`
+	Sequence                 uint64            `json:"sequence"`
+	Generation               string            `json:"generation,omitempty"`
+	Intent                   []byte            `json:"intent,omitempty"`
+	Previous                 map[string]string `json:"previous"`
+	Checkpoint               []byte            `json:"checkpoint,omitempty"`
+	Signature                []byte            `json:"signature,omitempty"`
+	Authority                []byte            `json:"authority,omitempty"`
+	Observation              []byte            `json:"observation,omitempty"`
+	IntentAuthority          []byte            `json:"intentAuthority,omitempty"`
+	CompanionAuthority       []byte            `json:"companionAuthority,omitempty"`
+	IntentCompanionAuthority []byte            `json:"intentCompanionAuthority,omitempty"`
+	LegacyDigest             string            `json:"legacyDigest,omitempty"`
+	Retirement               string            `json:"retirement,omitempty"`
 }
 
 type Status struct {
@@ -451,6 +453,7 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 	}
 	if adopt && s.Format == renewedFormat {
 		a.authority = bytes.Clone(s.Authority)
+		a.companionAuthority = bytes.Clone(s.CompanionAuthority)
 		a.observation = bytes.Clone(s.Observation)
 		a.grant = current
 	}
@@ -560,6 +563,7 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 		s.Retirement = ""
 		if s.Format == renewedFormat {
 			s.IntentAuthority = bytes.Clone(a.authority)
+			s.IntentCompanionAuthority = bytes.Clone(a.companionAuthority)
 		}
 		if e = a.save(s); e != nil {
 			return e
@@ -620,7 +624,11 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	var sink capture.Sink = client
 	closeSink := client.Close
 	if a.b.Companion != nil {
-		group, err := a.openParallelSink(i, prefix, client, limits, initialize, cleanup)
+		companionAuthority := a.companionAuthority
+		if s.Format == renewedFormat {
+			companionAuthority = s.IntentCompanionAuthority
+		}
+		group, err := a.openParallelSink(i, prefix, companionAuthority, client, limits, initialize, cleanup)
 		if err != nil {
 			provider.Close()
 			client.Close()

@@ -149,7 +149,7 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 				fail(w, ErrProtocol)
 				return
 			}
-			result, e := s.Acknowledge(ctx, receipt, 256)
+			result, e := s.Acknowledge(ctx, receipt, batchObjects)
 			if e != nil {
 				fail(w, e)
 				return

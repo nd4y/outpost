@@ -36,7 +36,7 @@ func sameObservationScope(a, b observation.Grant) bool {
 }
 func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	if s.Format == Format {
-		if len(s.Authority)+len(s.Observation)+len(s.IntentAuthority) != 0 || s.LegacyDigest != "" {
+		if len(s.Authority)+len(s.Observation)+len(s.IntentAuthority)+len(s.CompanionAuthority)+len(s.IntentCompanionAuthority) != 0 || s.LegacyDigest != "" {
 			return ingress.Authority{}, ErrInvalid
 		}
 		return a.grant, nil
@@ -72,8 +72,9 @@ func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	if !ed25519.Verify(a.anchor.Trust.Writer, append([]byte(Format+"\x00"), unsigned...), sig) {
 		return current, ErrInvalid
 	}
+	var prior ingress.Authority
 	if s.Phase != "IDLE" {
-		prior, e := ingress.VerifyAuthorityDocument(s.IntentAuthority, a.b.Local.Owner)
+		prior, e = ingress.VerifyAuthorityDocument(s.IntentAuthority, a.b.Local.Owner)
 		if e != nil || !sameAuthorityScope(current, prior) || prior.Revision > current.Revision {
 			return current, ErrInvalid
 		}
@@ -83,10 +84,36 @@ func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	} else if len(s.IntentAuthority) != 0 {
 		return current, ErrInvalid
 	}
-	if !adopt && (!bytes.Equal(a.authority, s.Authority) || !bytes.Equal(a.observation, s.Observation)) {
+	if e = a.verifyCompanionState(s, current, prior); e != nil {
+		return current, e
+	}
+	if !adopt && (!bytes.Equal(a.authority, s.Authority) || !bytes.Equal(a.observation, s.Observation) ||
+		!bytes.Equal(a.companionAuthority, s.CompanionAuthority)) {
 		return current, ErrAuthorityChanged
 	}
 	return current, nil
+}
+
+func (a *Agent) verifyCompanionState(s state, current, prior ingress.Authority) error {
+	if a.b.Companion == nil {
+		if len(s.CompanionAuthority)+len(s.IntentCompanionAuthority) != 0 {
+			return ErrInvalid
+		}
+		return nil
+	}
+	if e := a.verifyCompanionAuthority(current, s.CompanionAuthority); e != nil {
+		return e
+	}
+	if s.Phase == "IDLE" {
+		if len(s.IntentCompanionAuthority) != 0 {
+			return ErrInvalid
+		}
+		return nil
+	}
+	if prior.Revision == current.Revision && !bytes.Equal(s.IntentCompanionAuthority, s.CompanionAuthority) {
+		return ErrInvalid
+	}
+	return a.verifyCompanionAuthority(prior, s.IntentCompanionAuthority)
 }
 func (a *Agent) intentAuthority(s state) []byte {
 	if s.Format == renewedFormat {
@@ -118,8 +145,14 @@ type Renewal struct {
 // changes source selection or drops an unfinished capture to make progress.
 // Original private grant files remain bootstrap anchors; new inputs are separate.
 func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal, error) {
+	return a.RenewPair(ctx, authority, nil, observed)
+}
+
+// RenewPair commits both matching owner grants in the same signed source
+// journal. The receiver registries are renewed separately before new capture.
+func (a *Agent) RenewPair(ctx context.Context, authority, companion, observed []byte) (Renewal, error) {
 	var out Renewal
-	if a.b.Companion != nil {
+	if (a.b.Companion != nil) != (len(companion) != 0) {
 		return out, ErrUnsupported
 	}
 	next, e := ingress.VerifyAuthority(authority, a.b.Local.Owner, time.Now())
@@ -128,6 +161,11 @@ func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal,
 	}
 	if !sameAuthorityScope(next, a.anchor) {
 		return out, ingress.ErrDenied
+	}
+	if len(companion) != 0 {
+		if e = a.verifyCompanionAuthority(next, companion); e != nil {
+			return out, e
+		}
 	}
 	if observed == nil {
 		observed = bytes.Clone(a.observation)
@@ -165,10 +203,11 @@ func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal,
 		if e != nil {
 			return e
 		}
-		if next.Revision < a.grant.Revision || next.Revision == a.grant.Revision && (!bytes.Equal(authority, a.authority) || !bytes.Equal(observed, a.observation)) {
+		same := bytes.Equal(authority, a.authority) && bytes.Equal(observed, a.observation) && bytes.Equal(companion, a.companionAuthority)
+		if next.Revision < a.grant.Revision || next.Revision == a.grant.Revision && !same {
 			return ingress.ErrConflict
 		}
-		if s.Format == renewedFormat && bytes.Equal(authority, a.authority) && bytes.Equal(observed, a.observation) {
+		if s.Format == renewedFormat && same {
 			out = Renewal{renewedFormat, a.b.Profile.ID, next.Revision, s.Sequence, s.Generation, s.LegacyDigest, true}
 			return nil
 		}
@@ -196,10 +235,12 @@ func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal,
 			}
 			if len(s.Intent) > 0 {
 				s.IntentAuthority = bytes.Clone(a.authority)
+				s.IntentCompanionAuthority = bytes.Clone(a.companionAuthority)
 			}
 		}
 		s.Format = renewedFormat
 		s.Authority = bytes.Clone(authority)
+		s.CompanionAuthority = bytes.Clone(companion)
 		s.Observation = bytes.Clone(observed)
 		if e = a.save(s); e != nil {
 			return e

@@ -321,6 +321,10 @@
         {
           "path": "internal/sourceagent/parallel_linux_test.go",
           "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestParallelIngressRenewsBothAuthoritiesAtomically"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],

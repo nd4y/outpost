@@ -69,6 +69,11 @@ func newFixture(t *testing.T) *fixture {
 }
 func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 	t.Helper()
+	return newFixtureWithPeer(t, seconds, nil)
+}
+
+func newFixtureWithPeer(t *testing.T, seconds int64, extra *tls.Certificate) *fixture {
+	t.Helper()
 	ctx := context.Background()
 	f := &fixture{base: teststore.Root(t)}
 	write := func(name string, raw []byte) string {
@@ -103,6 +108,9 @@ func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 	dst, _, _ := newCert(3)
 	f.destination = dst
 	f.replicaCertificate, _, _ = newCert(4)
+	if extra != nil {
+		*extra, _, _ = newCert(5)
+	}
 	f.roots = roots
 	id := func(c tls.Certificate) string {
 		leaf, e := x509.ParseCertificate(c.Certificate[0])

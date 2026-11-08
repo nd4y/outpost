@@ -12,19 +12,19 @@ import (
 
 func captureStagingRoutes(c control.Config, domain string) *ingress.StagingRoutes {
 	d, ok := c.DomainByID(domain)
-	if !ok || !d.CaptureStaging {
+	if !ok || len(d.CaptureStagingPeers) == 0 {
 		return nil
 	}
 	routes := &ingress.StagingRoutes{Origins: map[string]string{}, Readers: map[string]bool{}}
 	for _, edge := range d.Placement.Edges {
-		if edge.Mode != "pull" || !slices.Contains(d.Placement.Holders, edge.From) || !slices.Contains(d.Placement.Holders, edge.To) {
+		if edge.Mode != "pull" {
 			continue
 		}
-		if edge.To == c.Node {
+		if edge.To == c.Node && slices.Contains(d.CaptureStagingPeers, edge.From) {
 			node, _ := c.NodeByID(edge.From)
 			routes.Origins[edge.From] = node.Endpoint
 		}
-		if edge.From == c.Node {
+		if edge.From == c.Node && slices.Contains(d.CaptureStagingPeers, edge.To) {
 			routes.Readers[edge.To] = true
 		}
 	}

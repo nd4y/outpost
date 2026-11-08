@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/policy"
+	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/worker"
 )
 
@@ -31,9 +34,18 @@ type captureTraffic struct {
 	mu       sync.Mutex
 	initial  map[string]int
 	payload  map[string]bool
+	object   string
+	length   string
 	relayed  int
 	together chan struct{}
 }
+
+type droppedCaptureReply struct {
+	*httptest.ResponseRecorder
+	wire http.ResponseWriter
+}
+
+func (r droppedCaptureReply) Unwrap() http.ResponseWriter { return r.wire }
 
 func (c *captureTraffic) watch(node string, next http.Handler) http.HandlerFunc {
 	return func(out http.ResponseWriter, r *http.Request) {
@@ -43,6 +55,10 @@ func (c *captureTraffic) watch(node string, next http.Handler) http.HandlerFunc 
 			case r.Method == http.MethodPut && parts[8] == "objects":
 				c.mu.Lock()
 				c.initial[parts[9]]++
+				if c.object == "" {
+					c.object = parts[9]
+					c.length = r.Header.Get("Outpost-Bytes")
+				}
 				first := r.ContentLength > 1<<20 && !c.payload[node]
 				if first {
 					c.payload[node] = true
@@ -101,13 +117,17 @@ func runCaptureWorker(t *testing.T, ctx context.Context, w *worker.Worker) func(
 }
 
 func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
-	f := newFixture(t)
-	ctx, cancel := context.WithTimeout(t.Context(), 220*time.Second)
+	var followerCert tls.Certificate
+	f := newFixtureWithPeer(t, 1800, &followerCert)
+	ctx, cancel := context.WithTimeout(t.Context(), 240*time.Second)
 	defer cancel()
 	leaf, e := x509.ParseCertificate(f.replicaCertificate.Certificate[0])
 	must(t, e)
 	bID := peer.Identity(leaf)
 	aID := f.grant.Ingress
+	leaf, e = x509.ParseCertificate(followerCert.Certificate[0])
+	must(t, e)
+	cID := peer.Identity(leaf)
 	companionGrant := f.grant
 	companionGrant.Ingress = bID
 	companion, e := ingress.SignAuthority(companionGrant, f.ownerSigner)
@@ -119,9 +139,33 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	bWorker, e := worker.Open(worker.Options{Directory: bDir, Node: bID, Owner: f.b.Local.Owner, Certificate: f.replicaCertificate, Roots: f.roots, Initialize: true})
 	must(t, e)
 	t.Cleanup(func() { bWorker.Close() })
+	cDir := filepath.Join(f.base, "outbound-follower")
+	cWorker, e := worker.Open(worker.Options{Directory: cDir, Node: cID, Owner: f.b.Local.Owner, Certificate: followerCert, Roots: f.roots, Initialize: true})
+	must(t, e)
+	t.Cleanup(func() { cWorker.Close() })
 	traffic := &captureTraffic{initial: map[string]int{}, payload: map[string]bool{}, together: make(chan struct{})}
 	aHandler := traffic.watch(aID, aWorker)
-	f.intercept = func(out http.ResponseWriter, r *http.Request) bool { aHandler(out, r); return true }
+	var attemptedDrop, dropped atomic.Bool
+	f.intercept = func(out http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/catalog") && attemptedDrop.CompareAndSwap(false, true) {
+			rec := httptest.NewRecorder()
+			aHandler(droppedCaptureReply{ResponseRecorder: rec, wire: out}, r)
+			if rec.Code == http.StatusAccepted || rec.Code == http.StatusOK {
+				dropped.Store(true)
+				http.Error(out, "lost catalog reply after durable processing", http.StatusServiceUnavailable)
+				return true
+			}
+			attemptedDrop.Store(false)
+			for name, values := range rec.Header() {
+				out.Header()[name] = values
+			}
+			out.WriteHeader(rec.Code)
+			_, _ = out.Write(rec.Body.Bytes())
+			return true
+		}
+		aHandler(out, r)
+		return true
+	}
 	bServer := httptest.NewUnstartedServer(traffic.watch(bID, bWorker))
 	bServer.TLS, e = peer.AuthenticatedServerTLS(f.replicaCertificate, f.roots, bID)
 	must(t, e)
@@ -132,18 +176,22 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	must(t, e)
 	planner, _, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
-	domain := control.Domain{CaptureStaging: true, Trust: f.grant.Trust, Planner: planner, Placement: policy.Placement{
-		Domain: f.grant.Trust.Domain, AllowedClasses: []string{"trusted"}, Holders: []string{aID, bID}, Transit: []string{f.grant.Source},
+	domain := control.Domain{CaptureStagingPeers: []string{bID}, Trust: f.grant.Trust, Planner: planner, Placement: policy.Placement{
+		Domain: f.grant.Trust.Domain, AllowedClasses: []string{"trusted"}, Holders: []string{aID, bID, cID}, Transit: []string{f.grant.Source},
 		Edges: []policy.Edge{
 			{From: f.grant.Source, To: aID, Mode: "push"}, {From: f.grant.Source, To: bID, Mode: "push"},
 			{From: aID, To: bID, Mode: "pull"}, {From: bID, To: aID, Mode: "pull"},
+			{From: aID, To: cID, Mode: "pull"},
 		},
 	}}
+	follow := control.Replication{Domain: f.grant.Trust.Domain, From: aID, To: cID, Mode: "pull", Epoch: 1, PeerRevision: 1}
 	cfg := control.Config{
 		Format: control.SettlementConfigFormat, Node: aID, Revision: 1, NotBefore: f.grant.NotBefore, ExpiresUnix: f.grant.ExpiresUnix,
-		Limits:  control.Limits{Parallel: 2, AttemptMillis: 30000, PollSeconds: 1, CapacityBytes: 256 << 20, ReserveBytes: 16 << 20, SpoolBytes: 64 << 20, TelemetryBytes: 1 << 20},
-		Nodes:   []policy.Node{{ID: f.grant.Source, Class: "trusted"}, {ID: aID, Class: "trusted", Endpoint: f.server.URL}, {ID: bID, Class: "trusted", Endpoint: bServer.URL}},
+		Limits: control.Limits{Parallel: 2, AttemptMillis: 30000, PollSeconds: 1, CapacityBytes: 256 << 20, ReserveBytes: 16 << 20, SpoolBytes: 64 << 20, TelemetryBytes: 1 << 20},
+		Nodes: []policy.Node{{ID: f.grant.Source, Class: "trusted"}, {ID: aID, Class: "trusted", Endpoint: f.server.URL},
+			{ID: bID, Class: "trusted", Endpoint: bServer.URL}, {ID: cID, Class: "trusted"}},
 		Domains: []control.Domain{domain}, Observations: []json.RawMessage{proofGrant}, Ingress: []json.RawMessage{f.authority},
+		Replication: []control.Replication{follow},
 	}
 	legacy := cfg
 	legacy.Format = control.Format
@@ -154,11 +202,20 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	must(t, e)
 	must(t, aWorker.Accept(ctx, raw))
 	cfg.Node, cfg.Ingress = bID, []json.RawMessage{companion}
+	cfg.Replication = nil
+	cfg.Domains[0].CaptureStagingPeers = []string{aID}
 	raw, e = control.Sign(cfg, f.ownerSigner)
 	must(t, e)
 	must(t, bWorker.Accept(ctx, raw))
-	stopA := runCaptureWorker(t, ctx, aWorker)
-	stopB := runCaptureWorker(t, ctx, bWorker)
+	cfg.Node, cfg.Ingress, cfg.Observations = cID, nil, nil
+	cfg.Limits.AttemptMillis = 60000
+	cfg.Domains[0].CaptureStagingPeers = nil
+	cfg.Replication = []control.Replication{follow}
+	raw, e = control.Sign(cfg, f.ownerSigner)
+	must(t, e)
+	must(t, cWorker.Accept(ctx, raw))
+	stopA := runCaptureWorker(t, t.Context(), aWorker)
+	stopB := runCaptureWorker(t, t.Context(), bWorker)
 
 	must(t, f.a.Close())
 	f.a = nil
@@ -212,6 +269,7 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	initial := len(traffic.initial)
 	both := len(traffic.payload) == 2
 	relayed := traffic.relayed
+	object, length := traffic.object, traffic.length
 	for _, count := range traffic.initial {
 		if count != 1 {
 			traffic.mu.Unlock()
@@ -222,22 +280,42 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	if !both || initial < 3 || relayed != initial {
 		t.Fatal("distinct initial uploads or pre-publication pulls missing", both, initial, relayed)
 	}
+	client, _, e := peer.AuthenticatedHTTP(f.server.URL, followerCert, f.roots, cID, aID, sourceFixtureLimits)
+	must(t, e)
+	defer client.CloseIdleConnections()
+	req, e := http.NewRequestWithContext(ctx, http.MethodGet, f.server.URL+"/v1/tenants/"+f.grant.Tenant+
+		"/domains/"+f.grant.Trust.Domain+"/captures/"+s.Operation+"/staged/"+object, nil)
+	must(t, e)
+	req.Header.Set("Outpost-Authority", storage.Hash(f.authority))
+	req.Header.Set("Outpost-Bytes", length)
+	response, e := client.Do(req)
+	must(t, e)
+	must(t, response.Body.Close())
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatal("ordinary follower route admitted a staged read", response.StatusCode)
+	}
 	t.Logf("sealed after %s with %d initial sends and %d peer reads", time.Since(started), initial, relayed)
 	must(t, os.Remove(input))
 	f.reopen(t)
+	finishCtx, stopFinish := context.WithTimeout(t.Context(), 180*time.Second)
+	defer stopFinish()
 	for {
-		e = f.a.Run(ctx)
+		e = f.a.Run(finishCtx)
 		if !errors.Is(e, capture.ErrCopies) && !errors.Is(e, observation.ErrPending) {
 			break
 		}
 		select {
 		case <-time.After(100 * time.Millisecond):
-		case <-ctx.Done():
-			t.Fatal(ctx.Err())
+		case <-finishCtx.Done():
+			t.Fatal(finishCtx.Err())
 		}
 	}
 	must(t, e)
-	checkpoint, e := f.a.Checkpoint(ctx)
+	if !dropped.Load() {
+		t.Fatal("no durable catalog response was withheld")
+	}
+	t.Log("source resumed publication after a lost durable catalog reply")
+	checkpoint, e := f.a.Checkpoint(finishCtx)
 	must(t, e)
 	c, e := capture.VerifyCheckpoint(checkpoint, f.grant.Trust)
 	must(t, e)
@@ -245,11 +323,33 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 		t.Fatal("expected two verified full copies", c)
 	}
 	t.Logf("two-copy checkpoint and acknowledgement after %s", time.Since(started))
+	must(t, f.a.Close())
+	f.a = nil
 	stopB()
+	// The third node has no listener and never ran during source capture.
+	// It obtains the complete generation from A after the source is gone.
+	followCtx, stopFollow := context.WithTimeout(t.Context(), 140*time.Second)
+	defer stopFollow()
+	stopC := runCaptureWorker(t, followCtx, cWorker)
+	operation := follow.Job(f.grant.Trust, c.Generation).Operation
+	for {
+		state, e := cWorker.Status(followCtx)
+		must(t, e)
+		if state.Jobs[operation].Phase == "COMPLETE" {
+			break
+		}
+		select {
+		case <-time.After(100 * time.Millisecond):
+		case <-followCtx.Done():
+			t.Fatal("outbound follower did not complete after source release", followCtx.Err(), state.Jobs[operation].Phase, state.Jobs[operation].ErrorCode)
+		}
+	}
+	stopC()
 	stopA()
+	paths = append(paths, filepath.Join(worker.DomainDirectory(cDir, f.grant.Trust), "replica"))
 	for idx, dir := range paths {
 		out := filepath.Join(f.base, "restore-"+string(rune('a'+idx)))
-		_, e = generation.RecoverMaterialized(ctx, dir, c.Generation, f.grant.Trust, f.owner, generation.RecoverySelection{}, out)
+		_, e = generation.RecoverMaterialized(followCtx, dir, c.Generation, f.grant.Trust, f.owner, generation.RecoverySelection{}, out)
 		must(t, e)
 		data, e := os.ReadFile(filepath.Join(out, "private.bin"))
 		must(t, e)
@@ -257,5 +357,90 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 			t.Fatal("independent restore differs", idx)
 		}
 	}
-	t.Logf("concurrent source uploads, %d single initial sends, %d pre-seal peer reads, two independent restores after restart", initial, relayed)
+	t.Logf("concurrent source uploads, %d single initial sends, %d pre-seal peer reads, three independent restores with the outbound follower admitted after source release", initial, relayed)
+}
+
+func TestParallelIngressRenewsBothAuthoritiesAtomically(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	leaf, e := x509.ParseCertificate(f.replicaCertificate.Certificate[0])
+	must(t, e)
+	bID := peer.Identity(leaf)
+	pair := f.grant
+	pair.Ingress = bID
+	originalCompanion, e := ingress.SignAuthority(pair, f.ownerSigner)
+	must(t, e)
+	g := observation.Grant{Format: observation.GrantFormat, Trust: f.grant.Trust, Reader: f.grant.Source,
+		Collector: f.grant.Ingress, Targets: []string{bID}, Epoch: 1, NotBefore: f.grant.NotBefore,
+		ExpiresUnix: f.grant.ExpiresUnix, MaxAgeSeconds: 3600}
+	observed, e := observation.SignGrant(g, f.ownerSigner)
+	must(t, e)
+	must(t, f.a.Close())
+	f.a = nil
+	f.b.Local.Directory = filepath.Join(filepath.Dir(f.b.Local.Directory), "renewable-pair")
+	f.b.Profile.MinimumCopies = 2
+	f.b.Profile.CopyTargets = []string{f.grant.Ingress, bID}
+	f.b.ObservationFile = filepath.Join(f.base, "pair-observation.json")
+	f.b.Companion = &CompanionIngress{Endpoint: "https://127.0.0.1:1", AuthorityFile: filepath.Join(f.base, "pair-authority.json")}
+	must(t, os.WriteFile(f.b.ObservationFile, observed, 0600))
+	must(t, os.WriteFile(f.b.Companion.AuthorityFile, originalCompanion, 0600))
+	f.a, e = Open(ctx, f.b, true)
+	must(t, e)
+
+	primary := f.grant
+	primary.Revision++
+	pair.Revision = primary.Revision
+	a, e := ingress.SignAuthority(primary, f.ownerSigner)
+	must(t, e)
+	b, e := ingress.SignAuthority(pair, f.ownerSigner)
+	must(t, e)
+	if _, e = f.a.Renew(ctx, a, nil); !errors.Is(e, ErrUnsupported) {
+		t.Fatal("one half of pair was admitted", e)
+	}
+	if _, e = f.a.RenewPair(ctx, a, originalCompanion, nil); !errors.Is(e, ingress.ErrDenied) {
+		t.Fatal("mismatched grant revisions admitted", e)
+	}
+	interrupted := errors.New("lost paired renewal reply")
+	before, e := f.a.store.Read("agent.json")
+	must(t, e)
+	f.a.Fault = func(point string) error {
+		if point == "source-renewal-checkpoint-durable" {
+			return interrupted
+		}
+		return nil
+	}
+	if _, e = f.a.RenewPair(ctx, a, b, nil); !errors.Is(e, interrupted) {
+		t.Fatal("legacy checkpoint interruption missing", e)
+	}
+	after, e := f.a.store.Read("agent.json")
+	must(t, e)
+	if !bytes.Equal(before, after) {
+		t.Fatal("the signed source journal changed before the atomic update")
+	}
+	f.a.Fault = func(point string) error {
+		if point == "source-renewal-committed" {
+			return interrupted
+		}
+		return nil
+	}
+	if _, e = f.a.RenewPair(ctx, a, b, nil); !errors.Is(e, interrupted) {
+		t.Fatal("paired renewal reply interruption missing", e)
+	}
+	if _, e = f.a.Status(ctx); !errors.Is(e, ErrAuthorityChanged) {
+		t.Fatal("stale agent used old authority", e)
+	}
+	f.reopen(t)
+	r, e := f.a.RenewPair(ctx, a, b, nil)
+	must(t, e)
+	if r.Revision != 2 || !r.Reopen {
+		t.Fatal("wrong resumed renewal", r)
+	}
+	must(t, f.a.Next(ctx))
+	pending, e := f.a.load()
+	must(t, e)
+	if pending.Phase != "PREPARING" || !bytes.Equal(pending.IntentAuthority, a) ||
+		!bytes.Equal(pending.IntentCompanionAuthority, b) || len(pending.Checkpoint) != 0 {
+		t.Fatal("new capture did not bind both current grants")
+	}
+	t.Log("paired authorities survive interrupted migration and bind the next signed operation")
 }

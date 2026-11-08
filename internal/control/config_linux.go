@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
@@ -44,7 +45,7 @@ func (l Limits) Validate() error {
 }
 
 type Domain struct {
-	CaptureStaging               bool              `json:"captureStaging,omitempty"`
+	CaptureStagingPeers          []string          `json:"captureStagingPeers,omitempty"`
 	ScrubIntervalSeconds         int64             `json:"scrubIntervalSeconds,omitempty"`
 	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
@@ -155,8 +156,15 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	domains := map[string]Domain{}
 	for _, d := range c.Domains {
-		if d.CaptureStaging && c.Format != SettlementConfigFormat {
+		if len(d.CaptureStagingPeers) > 4 || len(d.CaptureStagingPeers) != 0 &&
+			(c.Format != SettlementConfigFormat || !slices.Contains(d.Placement.Holders, c.Node)) {
 			return ErrDenied
+		}
+		for i, id := range d.CaptureStagingPeers {
+			if id == c.Node || !slices.Contains(d.Placement.Holders, id) || slices.Contains(d.CaptureStagingPeers[:i], id) ||
+				(!d.Placement.HasEdge(id, c.Node, "pull") && !d.Placement.HasEdge(c.Node, id, "pull")) {
+				return ErrDenied
+			}
 		}
 		if d.ScrubIntervalSeconds < 0 || d.ScrubIntervalSeconds > 30*24*3600 {
 			return ErrDenied
