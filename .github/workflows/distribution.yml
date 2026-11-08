@@ -156,7 +156,7 @@ jobs:
           "$OUTPOST_MOVE_CURRENT_CLI" version
           go test -count=1 -timeout=130s -run 'WebDAVMove|MoveBook|CLIMoveProfile' \
             -v ./internal/storage ./internal/upload ./internal/worker ./cmd/outpost
-      - name: Restore external generations with the selected native CLI
+      - name: Audit and restore external generations with the selected native CLI
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
         run: |

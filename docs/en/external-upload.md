@@ -97,6 +97,18 @@ Omit `--version` to restore the selected generation. Use `--input` with the exis
 
 A successful selection proves the restored versions match the specified checkpoint. Directory selection reads the candidate file metadata to resolve paths. An explicit version selects its metadata directly. Missing or corrupt required data prevents publication. Other versions and current target health require their own evidence. The CLI receipt contains opaque identities and restored counts.
 
+## Verify an external generation
+
+```sh
+outpost audit-external --bootstrap /private/external-reader.json \
+  --trust /private/generation-trust.json --generation EXPECTED_CHECKPOINT \
+  --output /private/new-external-audit.json
+```
+
+The audit uses the same read-only profile and public trust. It verifies the exact marker, signed catalog and every ciphertext dependency with fresh reads. `VERIFIED_CIPHERTEXT` means the complete closure was checked. If a dependency cannot be verified, the audit stops and returns a failure status. A private report records the original time window, verified count and first failed stage. The expected count is unknown until the catalog is authenticated. The outcome distinguishes missing content, invalid content, denied access, cancellation and an unavailable target.
+
+The optional `--output` saves that typed report even when the verification fails. Choose a new path. The output excludes private names, credentials and remote diagnostic text. The audit grants no repair authority. Verify plaintext by restoring with the owner kit.
+
 ## Evidence and remaining costs
 
 Run `go test -count=1 ./...` and `go vet ./...` in the admitted Linux test environment. Point `TMPDIR` and `OUTPOST_TEST_ROOT` to its data volume; executable Go scratch may use a separate bounded tmpfs. The tests use ephemeral credentials, real loopback TLS and disk-backed independent S3-signature/WebDAV authentication handlers. No real storage account is contacted.

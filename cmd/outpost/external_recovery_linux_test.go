@@ -52,6 +52,7 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 			namespace := storage.Hash([]byte(trust.Domain + "/" + trust.Repository))
 			var invalidWrite atomic.Bool
 			var raceArmed atomic.Bool
+			var temporaryFault atomic.Bool
 			stageReady := make(chan struct{})
 			resume := make(chan struct{})
 			server := teststore.New(t, teststore.Options{Kind: protocol, Namespace: namespace, Logins: map[string]teststore.Login{
@@ -61,6 +62,10 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 				if actor == "fixture-reader" && r.Method != http.MethodGet {
 					invalidWrite.Store(true)
 					w.WriteHeader(http.StatusForbidden)
+					return true
+				}
+				if actor == "fixture-reader" && temporaryFault.Load() {
+					w.WriteHeader(http.StatusServiceUnavailable)
 					return true
 				}
 				if actor == "fixture-reader" && raceArmed.Load() {
@@ -202,6 +207,65 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 					t.Fatal("external recovery changed bytes, mode or hardlink")
 				}
 			}
+			audit := func(id, suffix, state string, wantCode int) storage.GenerationAudit {
+				t.Helper()
+				path := filepath.Join(root, "audit-"+suffix+".json")
+				args := []string{"audit-external", "--bootstrap", readerFile, "--trust", trustFile, "--generation", id, "--output", path}
+				code := 0
+				if current == "" {
+					if _, err := run(ctx, args); err != nil {
+						_, code = failure(err)
+					}
+				} else {
+					cmd := exec.CommandContext(ctx, current, args...)
+					if _, err := cmd.Output(); err != nil {
+						var exit *exec.ExitError
+						if !errors.As(err, &exit) {
+							t.Fatal(err)
+						}
+						code = exit.ExitCode()
+					}
+				}
+				if code != wantCode {
+					t.Fatal("audit exit code differs", state, code, wantCode)
+				}
+				info, err := os.Stat(path)
+				must(err)
+				raw, err := os.ReadFile(path)
+				must(err)
+				var report storage.GenerationAudit
+				must(json.Unmarshal(raw, &report))
+				if info.Mode().Perm() != 0600 || report.Format != storage.GenerationAuditFormat || report.Generation != id ||
+					report.Target != profile.ID() || report.State != state || report.FinishedUnix < report.StartedUnix ||
+					bytes.Contains(raw, []byte(server.Endpoint())) || bytes.Contains(raw, []byte("synthetic-read-secret")) {
+					t.Fatal("invalid or private audit evidence", report)
+				}
+				return report
+			}
+			healthy := audit(checkpoints[1], "healthy", "VERIFIED_CIPHERTEXT", 0)
+			if healthy.ExpectedObjects == nil || *healthy.ExpectedObjects == 0 || healthy.VerifiedObjects != *healthy.ExpectedObjects || healthy.FailureStage != "" {
+				t.Fatal("complete audit lacked full closure", healthy)
+			}
+			healthPath := filepath.Join(root, "audit-healthy.json")
+			originalReport, err := os.ReadFile(healthPath)
+			must(err)
+			beforeAudit := server.Snapshot().Requests
+			audit(checkpoints[1], "healthy", "VERIFIED_CIPHERTEXT", 5)
+			retainedReport, err := os.ReadFile(healthPath)
+			must(err)
+			if server.Snapshot().Requests != beforeAudit || !bytes.Equal(originalReport, retainedReport) {
+				t.Fatal("audit replay changed the accepted local report")
+			}
+			unknown := audit(storage.Hash([]byte("unknown checkpoint")), "missing-marker", "MISSING", 4)
+			if unknown.ExpectedObjects != nil || unknown.VerifiedObjects != 0 || unknown.FailureStage != "CATALOG" {
+				t.Fatal("missing marker produced catalog evidence", unknown)
+			}
+			temporaryFault.Store(true)
+			unavailable := audit(checkpoints[1], "unavailable", "UNAVAILABLE", 7)
+			temporaryFault.Store(false)
+			if unavailable.ExpectedObjects != nil || unavailable.VerifiedObjects != 0 {
+				t.Fatal("transient error produced verified bytes", unavailable)
+			}
 			full := filepath.Join(root, "full")
 			result, code := invoke(checkpoints[1], full)
 			if code != 0 || !result.CheckpointMatch || result.Restored.Files != 2 || result.Generation != checkpoints[1] {
@@ -256,7 +320,14 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 			if _, err = os.Stat(filepath.Join(directory, "outside-alias")); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("directory selection escaped into another alias", err)
 			}
-			must(os.Remove(server.Path("blob-" + unrelatedRoot)))
+			unrelatedDescriptor := server.Path("blob-" + unrelatedRoot)
+			descriptorBytes, err := os.ReadFile(unrelatedDescriptor)
+			must(err)
+			must(os.Remove(unrelatedDescriptor))
+			missing := audit(checkpoints[1], "missing-dependency", "MISSING", 4)
+			if missing.ExpectedObjects == nil || missing.VerifiedObjects >= *missing.ExpectedObjects || missing.FailedObject != unrelatedRoot || missing.FailureStage != "DEPENDENCY" {
+				t.Fatal("audit did not isolate the missing dependency", missing)
+			}
 			for i, id := range checkpoints {
 				dest := filepath.Join(root, "selected-"+id)
 				result, code = invoke(id, dest, "--version", versions[i])
@@ -265,6 +336,7 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 				}
 				verify(dest, i)
 			}
+			must(os.WriteFile(unrelatedDescriptor, descriptorBytes, 0600))
 			failed := filepath.Join(root, "unpublished")
 			if _, code = invoke(storage.Hash([]byte("unknown checkpoint")), failed); code != 4 {
 				t.Fatal("unknown checkpoint did not fail closed", code)
@@ -282,6 +354,10 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 			changed := bytes.Clone(original)
 			changed[0] ^= 1
 			must(os.WriteFile(part, changed, 0600))
+			corrupt := audit(checkpoints[1], "corrupt", "INVALID_CONTENT", 4)
+			if corrupt.ExpectedObjects == nil || corrupt.VerifiedObjects >= *corrupt.ExpectedObjects || corrupt.FailedObject != requiredRoot {
+				t.Fatal("audit failed to bind corrupt required data", corrupt)
+			}
 			if _, code = invoke(checkpoints[1], failed, "--version", versions[1]); code != 4 {
 				t.Fatal("corrupt required part did not fail closed", code)
 			}
@@ -294,6 +370,10 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 				t.Fatal("incomplete output was published", err)
 			}
 			write("credential.json", map[string]any{"access": "fixture-reader", "secret": "synthetic-wrong-secret", "expiresUnix": time.Now().Add(time.Minute).Unix()})
+			denied := audit(checkpoints[0], "denied", "DENIED", 3)
+			if denied.ExpectedObjects != nil || denied.VerifiedObjects != 0 {
+				t.Fatal("denial produced verified bytes", denied)
+			}
 			if _, code = invoke(checkpoints[0], failed, "--version", versions[0]); code != 3 {
 				t.Fatal("wrong credentials did not fail closed", code)
 			}
@@ -309,6 +389,7 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 			}
 			if current != "" {
 				t.Log("EXTERNAL_RESTORE_CLI_PASS: native read-only CLI restored whole and selected old/new versions without the source or a temporary replica")
+				t.Log("EXTERNAL_AUDIT_CLI_PASS: native CLI authenticated ciphertext closure and distinguished missing, corrupt, denied and unavailable observations")
 			}
 		})
 	}

@@ -2988,6 +2988,14 @@
         {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "internal/storage/audit_linux_test.go",
+          "name": "TestExternalAuditRefusesForeignScopeAndCanceledReads"
         }
       ],
       "acceptance": ["AT-13"],
@@ -4823,6 +4831,10 @@
         {
           "path": "internal/worker/link_budget_linux_test.go",
           "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
@@ -5068,6 +5080,10 @@
         {
           "path": "internal/worker/external_traffic_linux_test.go",
           "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -6657,6 +6673,10 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "internal/storage/audit_linux_test.go",
+          "name": "TestExternalAuditRefusesForeignScopeAndCanceledReads"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
