@@ -18,8 +18,8 @@ func moveTemporary(key string) bool {
 	return false
 }
 
-func (b *Backend) stage(ctx context.Context, key string, data []byte) error {
-	_, _, err := b.requestWith(ctx, http.MethodPut, key, data, requestOptions{stage: true})
+func (b *Backend) stage(ctx context.Context, key string, data []byte, objectPart bool) error {
+	_, _, err := b.requestWith(ctx, http.MethodPut, key, data, requestOptions{stage: true, objectStage: objectPart})
 	return err
 }
 
@@ -96,7 +96,7 @@ func (b *Backend) putMove(ctx context.Context, key string, data []byte) error {
 		if err = tx.Transition(attempt.Nonce, "WRITING"); err != nil {
 			return err
 		}
-		if err = b.stage(ctx, temporary, data); err != nil {
+		if err = b.stage(ctx, temporary, data, strings.HasPrefix(key, "part-")); err != nil {
 			return err
 		}
 		if err = b.exact(ctx, temporary, data); err != nil {
@@ -152,7 +152,7 @@ func (b *Backend) probeMove(ctx context.Context) error {
 		if !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		if err = b.stage(ctx, temporary, other); err != nil {
+		if err = b.stage(ctx, temporary, other, false); err != nil {
 			return err
 		}
 		if err = b.exact(ctx, temporary, other); err != nil {

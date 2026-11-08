@@ -53,6 +53,10 @@ var metricNames = map[string]bool{
 	"space_physical_bytes": true, "space_free_bytes": true, "space_accounted_bytes": true, "space_reserved_bytes": true,
 	"inventory_available": true, "complete_generations": true, "latest_generation_sequence": true,
 	"copy_verified_timestamp_seconds": true,
+	"external_http_targets_in_scope":  true, "external_http_targets_selected": true,
+	"external_http_attempt_requests": true, "external_http_attempt_request_body_bytes": true,
+	"external_http_attempt_response_body_bytes": true, "external_http_attempt_replayed_body_bytes": true,
+	"external_http_attempt_observed_timestamp_seconds": true,
 }
 
 func member(value string, choices ...string) bool {

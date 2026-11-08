@@ -46,11 +46,19 @@ Successful acceptance requires a valid response. Partial acceptance records its 
 
 ## Truthful observations and quiet events
 
-Original generation verification time is never replaced by report or export time. Missing measurements remain unknown; absence of a fresh sample is not zero load or health. Initial coverage uses the existing scoped worker observations. Required source-read, unique-byte, wire/duplicate-byte and route-throughput measurements need their own instrumentation and acceptance before they can be advertised.
+Generation verification keeps its original time through reporting and export. Missing measurements remain unknown. Source reads, unique physical occupancy, network traffic, throughput and billing require additional measurements.
 
 Local inventory state logs use a retained transition identity. An unchanged state does not generate another log. Metrics have a heartbeat interval. Alert coverage, recovery notices and independent monitoring-failure detection still require implementation and acceptance; external notices remain limited to explicitly authorized test destinations.
 
-Current worker projection covers configuration revision, bounded job-state counts, volume accounting, complete local generation count/sequence and original ciphertext-verification time for the latest complete local generation. Initial logs describe changes in that local inventory state. Unknown numeric values have a separate `_known` gauge and no fabricated measured zero. Metrics do not use operation IDs as labels. Per-operation audit/alert transitions, all external-copy measurements and source/wire counters remain separate work.
+Current worker projection covers configuration revision, bounded job-state counts, volume accounting, complete local generation count/sequence and original ciphertext-verification time for the latest complete local generation. Initial logs describe changes in that local inventory state. Unknown numeric values have a separate `_known` gauge. Metrics do not use operation IDs as labels. Per-operation audit and alert transitions remain open.
+
+### External upload attempts
+
+The worker observes each admitted external upload attempt with a meter scoped to its target profile. It counts submissions to the HTTP client, bytes the transport actually reads from request bodies, and bytes the backend reads from bounded response bodies. These include retries by Outpost and verification reads. The replay metric counts overlapping offsets read again from the same immutable request body within a logical request, including transport body replays. Internal transport retries do not increment the request count. The measurements exclude HTTP headers, unread response bytes and TLS/TCP/IP overhead. Aggregate traffic, duplicates across workers or separate attempts, and storage-provider billing remain open.
+
+A signed local record retains the latest attempt for each node, domain and target, with its operation binding, outcome and original observation time. The record uses the existing telemetry budget. A missing, invalid or unfinished observation reports unknown values. A recorded attempt with incomplete counters retains its original observation timestamp and reports unknown counts. A failed or interrupted observation has no authority over upload completion, source pins or recovery.
+
+The separate telemetry process selects up to eight opaque target IDs from the admitted domain's external-copy observations per sample. Selection rotates by the configured interval. `external_http_targets_in_scope` and `external_http_targets_selected` describe that sample's coverage. Per-target gauges report requests, request and response body bytes, known replay bytes and the original attempt observation timestamp. Sample the gauges with that timestamp and their `_known` companions. Adding consecutive samples can count the same attempt multiple times.
 
 ## Required checks
 

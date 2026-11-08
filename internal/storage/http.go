@@ -179,6 +179,7 @@ func (b *Backend) cooldown(delay time.Duration) {
 
 type requestOptions struct {
 	stage       bool
+	objectStage bool
 	destination string
 }
 
@@ -231,6 +232,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 	ctx, cancel := context.WithDeadline(ctx, time.Unix(b.credentials.ExpiresUnix, 0))
 	defer cancel()
 	var last int
+	traffic := b.requestTraffic(ctx, method, key, options)
 	for attempt := 0; attempt < attempts; attempt++ {
 		if time.Now().Unix() >= b.credentials.ExpiresUnix {
 			return nil, 0, ErrDenied
@@ -265,6 +267,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		} else {
 			req.SetBasicAuth(b.credentials.Access, b.credentials.Secret)
 		}
+		traffic.begin(req)
 		res, e := b.client.Do(req)
 		delay := time.Duration(attempt+1) * 50 * time.Millisecond
 		if e == nil {
@@ -274,7 +277,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 					res.Body.Close()
 					return nil, last, ErrIntegrity
 				}
-				data, readErr := io.ReadAll(io.LimitReader(res.Body, int64(b.profile.MaxObjectBytes)+1))
+				data, readErr := io.ReadAll(io.LimitReader(traffic.response(res.Body), int64(b.profile.MaxObjectBytes)+1))
 				res.Body.Close()
 				if len(data) > b.profile.MaxObjectBytes {
 					return nil, last, ErrCapacity

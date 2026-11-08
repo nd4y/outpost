@@ -4747,6 +4747,34 @@
         {
           "path": "cmd/outpost/telemetry_linux_test.go",
           "name": "TestCLITelemetryInitStatusPauseRenewAndBinding"
+        },
+        {
+          "path": "internal/storage/traffic_linux_test.go",
+          "name": "TestHTTPMeterCountsRetriesAndDoesNotMixOperations"
+        },
+        {
+          "path": "internal/storage/traffic_linux_test.go",
+          "name": "TestHTTPMeterDistinguishesWebDAVStagingAndFinalReadback"
+        },
+        {
+          "path": "internal/storage/traffic_linux_test.go",
+          "name": "TestHTTPMeterMeasuresPartialReadsAndTransportBodyReplays"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueActualSIGKILLAndRestart"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestHTTPAttemptObservationReopensAndRejectsForeignEvidence"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
@@ -4984,6 +5012,14 @@
         {
           "path": "internal/worker/receipt_recovery_linux_test.go",
           "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestHTTPAttemptObservationReopensAndRejectsForeignEvidence"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -5241,6 +5277,10 @@
         {
           "path": "internal/storage/move_book_linux_test.go",
           "name": "TestMoveBookInitializationFaultsPreserveIntentAndQuotaRefusal"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6890,6 +6930,34 @@
         {
           "path": "internal/upload/readback_linux_test.go",
           "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/storage/traffic_linux_test.go",
+          "name": "TestHTTPMeterCountsRetriesAndDoesNotMixOperations"
+        },
+        {
+          "path": "internal/storage/traffic_linux_test.go",
+          "name": "TestHTTPMeterDistinguishesWebDAVStagingAndFinalReadback"
+        },
+        {
+          "path": "internal/storage/traffic_linux_test.go",
+          "name": "TestHTTPMeterMeasuresPartialReadsAndTransportBodyReplays"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueActualSIGKILLAndRestart"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestHTTPAttemptObservationReopensAndRejectsForeignEvidence"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

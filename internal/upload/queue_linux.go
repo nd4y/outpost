@@ -68,10 +68,11 @@ type Queue struct {
 	authority        Authority
 	limits           QueueLimits
 	// Fault is a development-test hook; production callers leave it nil.
-	Fault    func(string) error
-	Admit    statefile.Admission
-	Readback ReadbackOptions
-	Guard    func(context.Context) error
+	Fault              func(string) error
+	Admit              statefile.Admission
+	Readback           ReadbackOptions
+	Guard              func(context.Context) error
+	ObserveHTTPAttempt func(context.Context, HTTPAttempt)
 }
 
 // OpenQueue requires a caller-admitted persistent Linux directory. No credentials
@@ -587,6 +588,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 			go func(op string, job QueueJob, profile storage.Profile, attempt context.Context, stop context.CancelFunc) {
 				defer stop()
 				r := queueResult{op: op}
+				attempt, observe := q.startHTTPAttempt(attempt, op, job, profile)
 				backendMu.Lock()
 				b := backends[profile.ID()]
 				backendMu.Unlock()
@@ -600,6 +602,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 							fresh.Close()
 						}
 						r.err = err
+						observe(err)
 						results <- r
 						return
 					}
@@ -620,6 +623,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 				}
 				r.err = err
 				r.retryAt = b.NextRequest()
+				observe(err)
 				results <- r
 			}(op, j, p.Profile, attempt, stop)
 		}

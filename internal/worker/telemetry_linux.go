@@ -206,6 +206,7 @@ func (w *Worker) TelemetryOnce(ctx context.Context, p TelemetryProfile, q *Telem
 	if e != nil {
 		return out, e
 	}
+	w.addExternalHTTPMetrics(ctx, p.Domain, p.IntervalSeconds, snapshot, &record)
 	sampled, e := q.Observe(ctx, record, time.Duration(p.IntervalSeconds)*time.Second)
 	out.Sample = "UNCHANGED"
 	if sampled {

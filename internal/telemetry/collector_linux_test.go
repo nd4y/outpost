@@ -135,7 +135,15 @@ func TestTelemetryRealCollectorAcceptsBothSignals(t *testing.T) {
 	record := fixtureRecord()
 	record.ObservedUnix -= 600
 	value := int64(3)
-	record.Metrics = []Metric{{Name: "jobs_running", Value: &value}, {Name: "space_free_bytes"}}
+	target := storage.Hash([]byte("collector-fixture-target"))
+	observed := record.ObservedUnix - 60
+	record.Metrics = []Metric{
+		{Name: "jobs_running", Value: &value},
+		{Name: "space_free_bytes"},
+		{Name: "external_http_attempt_request_body_bytes", Target: target, Value: &value},
+		{Name: "external_http_attempt_response_body_bytes", Target: target},
+		{Name: "external_http_attempt_observed_timestamp_seconds", Target: target, Value: &observed},
+	}
 	messages, e := Encode(peer.Identity(cert.Leaf), storage.Hash([]byte("domain")), record)
 	if e != nil {
 		t.Fatal(e)
@@ -156,10 +164,18 @@ func TestTelemetryRealCollectorAcceptsBothSignals(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for _, expected := range []string{"resourceMetrics", "resourceLogs", "outpost_jobs_running", "outpost_space_free_bytes_known", "STATE_CHANGED", strconv.FormatInt(record.ObservedUnix*1000000000, 10)} {
+	for _, expected := range []string{
+		"resourceMetrics", "resourceLogs", "outpost_jobs_running", "outpost_space_free_bytes_known",
+		"outpost_external_http_attempt_request_body_bytes", "outpost_external_http_attempt_response_body_bytes_known",
+		"outpost_external_http_attempt_observed_timestamp_seconds", target, strconv.FormatInt(observed, 10),
+		"STATE_CHANGED", strconv.FormatInt(record.ObservedUnix*1000000000, 10),
+	} {
 		if !bytes.Contains(raw, []byte(expected)) {
 			t.Fatalf("collector output missing %s", expected)
 		}
+	}
+	if bytes.Contains(raw, []byte(`"outpost_external_http_attempt_response_body_bytes"`)) {
+		t.Fatal("collector exported unknown body bytes as a measurement")
 	}
 	t.Log("COLLECTOR_PASS: mutually authenticated logs and metrics accepted; original timestamp and unknown marker exported")
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,13 +15,27 @@ import (
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/policy"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/telemetry"
 	"github.com/nd4y/outpost/internal/teststore"
 	"github.com/nd4y/outpost/internal/upload"
 )
 
 func TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery(t *testing.T) {
+	testWorkerCloudTargets(t, false)
+}
+
+func TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery(t *testing.T) {
+	testWorkerCloudTargets(t, true)
+}
+
+func testWorkerCloudTargets(t *testing.T, exhaustTelemetry bool) {
+	t.Helper()
 	f := newFixture(t)
+	if exhaustTelemetry {
+		f.cfg.Limits.TelemetryBytes = 64 << 10
+	}
 	ctx := context.Background()
 	pub, planner := key(t)
 	f.domain.Planner = pub
@@ -106,6 +121,31 @@ func TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery(t *testing.T) {
 			}
 		}
 	}
+	snapshot, e := w.ManagementSnapshot(ctx, workerEnrollment(t, f, 0), f.domain.Trust.Domain)
+	must(t, e)
+	record, e := TelemetryRecord(snapshot, w.node)
+	must(t, e)
+	w.addExternalHTTPMetrics(ctx, f.domain.Trust.Domain, 1, snapshot, &record)
+	metrics := map[string]*int64{}
+	for _, metric := range record.Metrics {
+		if metric.Name == "external_http_attempt_requests" {
+			metrics[metric.Target] = metric.Value
+		}
+	}
+	for _, job := range jobs {
+		value, ok := metrics[job.Target]
+		if !ok || (exhaustTelemetry && value != nil) || (!exhaustTelemetry && (value == nil || *value <= 0)) {
+			t.Fatal("unexpected scoped HTTP measurement", job.Target, ok, value)
+		}
+		if exhaustTelemetry {
+			attempt := upload.HTTPAttempt{Node: w.node, Domain: job.Domain, Target: job.Target, Operation: job.Operation, Plan: storage.Hash(job.Plan), Attempt: 99, StartedMillis: time.Now().UnixMilli(), Outcome: "STARTED"}
+			if e = w.writeExternalHTTPAttempt(ctx, attempt); !errors.Is(e, statefile.ErrCapacity) {
+				t.Fatal("fixture did not reach the separate telemetry budget", e)
+			}
+		}
+	}
+	_, e = telemetry.Encode(w.node, f.domain.Trust.Domain, record)
+	must(t, e)
 	stop()
 	for _, j := range jobs {
 		backend, e := w.resolve(ctx, profiles[j.Target])

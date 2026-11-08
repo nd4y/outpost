@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 )
@@ -399,6 +400,17 @@ func TestUploadQueueProcess(t *testing.T) {
 	q, e := OpenQueue(cfg.Directory, cfg.Worker, cfg.Authority, queueLimits(), false)
 	must(t, e)
 	defer q.Close()
+	if cfg.Result != "" {
+		observations, e := statefile.Open(cfg.Directory, 4096, false)
+		must(t, e)
+		defer observations.Close()
+		q.ObserveHTTPAttempt = func(ctx context.Context, attempt HTTPAttempt) {
+			raw, e := json.Marshal(attempt)
+			if e == nil {
+				_ = observations.WithLock(ctx, func() error { return observations.Write(cfg.Result, raw) })
+			}
+		}
+	}
 	source, e := generation.Open(cfg.Replica, cfg.Authority.Generation, false)
 	must(t, e)
 	defer source.Close()
@@ -433,7 +445,7 @@ func TestQueueActualSIGKILLAndRestart(t *testing.T) {
 			raw := f.plan(t, target, 1, 1000)
 			op := planOperation(t, raw, f.authority)
 			must(t, q.Enqueue(context.Background(), f.replicas[0], raw))
-			cfg := childConfig{Directory: dir, Replica: f.dirs[0], Worker: f.workers[0].ID, Key: f.keys[0], Authority: f.authority, Profile: profile(target), CA: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: target.HTTP.Certificate().Raw}), Access: f.workers[0].ID, Secret: target.Options.Logins[f.workers[0].ID].Secret, ExpiresUnix: time.Now().Add(time.Minute).Unix()}
+			cfg := childConfig{Directory: dir, Replica: f.dirs[0], Worker: f.workers[0].ID, Key: f.keys[0], Authority: f.authority, Profile: profile(target), CA: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: target.HTTP.Certificate().Raw}), Access: f.workers[0].ID, Secret: target.Options.Logins[f.workers[0].ID].Secret, ExpiresUnix: time.Now().Add(time.Minute).Unix(), Result: "last-http-attempt.json"}
 			config := filepath.Join(f.base, "queue-child.json")
 			data, e := json.Marshal(cfg)
 			must(t, e)
@@ -467,6 +479,21 @@ func TestQueueActualSIGKILLAndRestart(t *testing.T) {
 			if e = <-done; e == nil {
 				t.Fatal("SIGKILL unexpectedly succeeded")
 			}
+			readAttempt := func() HTTPAttempt {
+				t.Helper()
+				data, e := os.ReadFile(filepath.Join(dir, cfg.Result))
+				must(t, e)
+				var observation HTTPAttempt
+				must(t, storage.Decode(data, &observation, 4096))
+				if !observation.Valid(time.Now()) || observation.Operation != op || observation.Target != cfg.Profile.ID() || observation.Node != cfg.Worker {
+					t.Fatal("unbound observation", observation)
+				}
+				return observation
+			}
+			interrupted := readAttempt()
+			if interrupted.Outcome != "STARTED" || interrupted.Counts != nil || interrupted.Attempt != 1 {
+				t.Fatal("interrupted attempt acquired measured counters", interrupted)
+			}
 			block.Store(false)
 			_, done, log := start()
 			select {
@@ -481,6 +508,10 @@ func TestQueueActualSIGKILLAndRestart(t *testing.T) {
 			must(t, e)
 			if state.Jobs[op].Phase != "COMPLETE" || state.Jobs[op].Attempts < 2 {
 				t.Fatal("restart did not reconcile incomplete attempt")
+			}
+			completed := readAttempt()
+			if completed.Outcome != "SUCCEEDED" || completed.Counts == nil || completed.Counts.Requests == 0 || completed.Attempt != state.Jobs[op].Attempts {
+				t.Fatal("resumed attempt missing independent measurement", completed)
 			}
 			recoverBytes(t, f, target, f.id, f.version, f.data)
 		})

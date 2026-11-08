@@ -71,3 +71,5 @@ A [private management snapshot](management-snapshots.md) now preserves administr
 Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.
 
 [Prepared application exports](prepared-exports.md) bind a native producer's signed closed inventory to an immutable source operation, preserving original age and file history. Current/previous CLI and actual SIGKILL checks include independent restoration and reopening of two native SQLite exports. Native filesystem snapshot acquisition, other applications and full-scale acceptance remain open.
+
+[External upload telemetry](telemetry.md#external-upload-attempts) measures HTTP body traffic, including verification reads and known replay bytes. Signed local observations preserve the original time across restart. Tests cover an interrupted attempt, scoped reporting and recovery from S3-compatible storage and WebDAV with exhausted telemetry capacity. Aggregate network traffic and cost remain open.
