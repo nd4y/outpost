@@ -202,7 +202,7 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 			return out, errors.Join(re, ce)
 		}
 		out.InventoryState = "OBSERVED"
-		w.addExternalAuditObservations(ctx, cfg, d, status, latestRecordedComplete(recorded), out.ExternalCopies)
+		w.addExternalAuditObservations(ctx, cfg, d, status, recentRecordedComplete(recorded, 1), out.ExternalCopies)
 		for _, g := range recorded {
 			state := "INCOMPLETE"
 			if g.Complete {
@@ -391,9 +391,9 @@ func externalCopyObservations(status Status, domain, node string) ([]management.
 	return out, nil
 }
 
-func (w *Worker) addExternalAuditObservations(ctx context.Context, cfg control.Config, d control.Domain, status Status, latest string, copies []management.ExternalCopy) {
+func (w *Worker) addExternalAuditObservations(ctx context.Context, cfg control.Config, d control.Domain, status Status, latest []string, copies []management.ExternalCopy) {
 	interval := d.ExternalAuditIntervalSeconds
-	if interval == 0 || latest == "" || cfg.Active(time.Now()) != nil || w.check(ctx) != nil {
+	if interval == 0 || len(latest) == 0 || cfg.Active(time.Now()) != nil || w.check(ctx) != nil {
 		return
 	}
 	selected := scheduledExternalCopies(status, d, latest, w.node)
@@ -407,7 +407,7 @@ func (w *Worker) addExternalAuditObservations(ctx context.Context, cfg control.C
 	defer store.Close()
 	for i := range copies {
 		copy := &copies[i]
-		item := selected[copy.Target]
+		item := selected[externalAuditCopy{copy.Target, copy.Generation}]
 		if item.Job.Operation != copy.Operation || copy.State != "OBSERVED_COMPLETE" {
 			continue
 		}

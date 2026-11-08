@@ -1766,6 +1766,10 @@
         },
         {
           "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalRepairReplaysDurableMissingPart"
         },
         {
@@ -2805,6 +2809,10 @@
           "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         },
         {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
+        },
+        {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
         }
@@ -2914,6 +2922,10 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
@@ -3108,6 +3120,10 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
         },
         {
           "path": "internal/worker/external_schedule_linux_test.go",
@@ -5259,6 +5275,10 @@
         },
         {
           "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalRepairReplaysDurableMissingPart"
         }
       ],
@@ -6897,6 +6917,10 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
         },
         {
           "path": "internal/worker/external_schedule_linux_test.go",

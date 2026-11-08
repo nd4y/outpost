@@ -48,6 +48,7 @@ type Domain struct {
 	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
 	ExternalAuditIntervalSeconds int64             `json:"externalAuditIntervalSeconds,omitempty"`
+	ExternalAuditGenerations     int               `json:"externalAuditGenerations,omitempty"`
 	ExternalRepairMissing        bool              `json:"externalRepairMissing,omitempty"`
 	Trust                        generation.Trust  `json:"trust"`
 	Planner                      ed25519.PublicKey `json:"planner"`
@@ -159,7 +160,8 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		if d.ExternalAuditIntervalSeconds != 0 && (d.ExternalAuditIntervalSeconds < 2 || d.ExternalAuditIntervalSeconds > 30*24*3600) {
 			return ErrDenied
 		}
-		if d.ExternalRepairMissing && d.ExternalAuditIntervalSeconds == 0 {
+		if d.ExternalAuditGenerations < 0 || d.ExternalAuditGenerations > 16 ||
+			(d.ExternalRepairMissing || d.ExternalAuditGenerations != 0) && d.ExternalAuditIntervalSeconds == 0 {
 			return ErrDenied
 		}
 		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds || d.CloudReadbackMaxAgeSeconds < 0 || d.CloudReadbackMaxAgeSeconds > readback.MaxAgeSeconds {

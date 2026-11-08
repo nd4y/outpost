@@ -6,14 +6,17 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
@@ -284,5 +287,141 @@ func TestWorkerScheduledExternalRepairReplaysDurableMissingPart(t *testing.T) {
 				t.Fatal("catalog loss or corruption authorized writes or modified historical evidence")
 			}
 		})
+	}
+}
+
+func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
+	f := newFixture(t)
+	w := f.nodes[0]
+	bindFixture(t, f, w)
+	ctx := context.Background()
+	pub, planner := key(t)
+	f.domain.Planner = pub
+	f.domain.ExternalAuditIntervalSeconds = 3
+	f.domain.ExternalRepairMissing = true
+	f.domain.Placement.Edges = nil
+	f.domain.Placement.AllowedClasses = append(f.domain.Placement.AllowedClasses, "external")
+	var oldPart string
+	var armed atomic.Bool
+	auditRead, auditCanceled := make(chan struct{}), make(chan struct{})
+	target := teststore.New(t, teststore.Options{Kind: "webdav",
+		Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)),
+		Logins:    map[string]teststore.Login{w.node: {Secret: "isolated-history-secret"}},
+		Before: func(_ http.ResponseWriter, r *http.Request, _, key string, _ []byte) bool {
+			if r.Method != http.MethodGet || !armed.Load() || key != oldPart || !armed.CompareAndSwap(true, false) {
+				return false
+			}
+			close(auditRead)
+			<-r.Context().Done()
+			close(auditCanceled)
+			return true
+		}})
+	p := storage.Profile{Kind: "webdav", Endpoint: target.Endpoint(), Namespace: target.Options.Namespace,
+		MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 4000,
+		CredentialScope: "namespace", NoDelete: true}
+	f.cfg.Targets = []control.Target{{ID: p.ID(), Profile: p}}
+	f.domain.Placement.Targets = []string{p.ID()}
+	f.domain.Placement.CloudEdges = []policy.CloudEdge{{Node: w.node, Target: p.ID()}}
+	w.resolve = func(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return storage.New(p, storage.Credentials{Access: w.node, Secret: target.Options.Logins[w.node].Secret, ExpiresUnix: f.cfg.ExpiresUnix}, target.Roots)
+	}
+	executor := upload.Worker{ID: w.node, Class: "trusted", PublicKey: w.cert.PrivateKey.(ed25519.PrivateKey).Public().(ed25519.PublicKey)}
+	raw, err := upload.SignDelegation(upload.Delegation{Format: upload.DelegationFormat, Trust: f.domain.Trust, Epoch: 1,
+		Profile: p, AllowMissingRepair: true, AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{executor},
+		StartMillis: f.cfg.NotBefore * 1000, ExpiresUnix: f.cfg.ExpiresUnix, SlotMillis: 1000}, planner)
+	must(t, err)
+	f.cfg.Uploads = []json.RawMessage{raw}
+	replica, err := generation.Open(filepath.Join(DomainDirectory(w.dir, f.domain.Trust), "replica"), f.domain.Trust, false)
+	must(t, err)
+	defer replica.Close()
+	store, err := filekit.OpenStore(filepath.Join(f.base, "source-kit"), f.dataOwner, false)
+	must(t, err)
+	defer store.Close()
+	path := filepath.Join(f.base, "changed-input")
+	must(t, os.WriteFile(path, bytes.Repeat([]byte("next retained generation"), 4096), 0600))
+	version, err := store.Backup(ctx, path, filekit.BackupOptions{Names: []string{"dataset/данные.bin"}})
+	must(t, err)
+	trust := f.domain.Trust
+	next, err := generation.Seal(ctx, store, []string{version.Version}, replica, generation.Catalog{
+		Format: generation.Format, Domain: trust.Domain, Repository: trust.Repository, Epoch: trust.Epoch, Sequence: 2,
+		Parent: f.generation, SnapshotUnix: time.Now().Unix(), Policy: 1, KitFormat: generation.KitFormat}, f.writer)
+	must(t, err)
+	firstOp, nextOp := upload.DelegatedOperation(raw, f.generation), upload.DelegatedOperation(raw, next)
+	f.config(t, 0, nil)
+	stop := start(t, w)
+	wait(t, func() bool { return complete(w, firstOp) && complete(w, nextOp) })
+	wait(t, func() bool {
+		report, err := w.ScheduledExternalAuditStatus(ctx, nextOp)
+		return err == nil && report.State == "VERIFIED_CIPHERTEXT"
+	})
+	if _, err = w.ScheduledExternalAuditStatus(ctx, firstOp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("default schedule audited older generation", err)
+	}
+	parts := func(operation string) []upload.Task {
+		t.Helper()
+		raw, err := w.state.Read("upload-plan-" + operation + ".json")
+		must(t, err)
+		plan, err := upload.Verify(raw, upload.Authority{Generation: trust, Planner: pub})
+		must(t, err)
+		tasks, err := plan.Tasks()
+		must(t, err)
+		return tasks
+	}
+	current := map[string]bool{}
+	for _, task := range parts(nextOp) {
+		current[task.Part.ID] = true
+	}
+	for _, task := range parts(firstOp) {
+		if !current[task.Part.ID] {
+			oldPart = "part-" + task.Part.ID
+			break
+		}
+	}
+	if oldPart == "" {
+		t.Fatal("older generation has no independent payload")
+	}
+	writes := target.Snapshot().Writes
+	must(t, os.Remove(target.Path(oldPart)))
+	f.domain.ExternalAuditGenerations = 2
+	f.cfg.Revision++
+	cfg := f.config(t, 0, nil)
+	var historic ExternalAuditStatus
+	wait(t, func() bool {
+		historic, err = w.ScheduledExternalAuditStatus(ctx, firstOp)
+		return err == nil && historic.State == "MISSING" && historic.Repair == nil
+	})
+	cfg.Domains[0].ExternalAuditGenerations = 17
+	if _, err = control.Sign(cfg, f.owner); !errors.Is(err, control.ErrDenied) {
+		t.Fatal("unbounded historical scope admitted", err)
+	}
+	armed.Store(true)
+	select {
+	case <-auditRead:
+	case <-time.After(10 * time.Second):
+		t.Fatal("older-generation reread did not reach the held request")
+	}
+	f.domain.ExternalAuditGenerations = 1
+	f.cfg.Revision++
+	f.config(t, 0, nil)
+	select {
+	case <-auditCanceled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("narrowed scope did not cancel the old request")
+	}
+	wait(t, func() bool {
+		report, err := w.ScheduledExternalAuditStatus(ctx, nextOp)
+		return err == nil && report.State == "VERIFIED_CIPHERTEXT" && report.FinishedUnix > historic.FinishedUnix+f.domain.ExternalAuditIntervalSeconds
+	})
+	stop()
+	final, err := w.ScheduledExternalAuditStatus(ctx, firstOp)
+	must(t, err)
+	status, err := w.Status(ctx)
+	must(t, err)
+	if final.FinishedUnix != historic.FinishedUnix || final.State != "MISSING" || len(status.Jobs) != 2 ||
+		!reflect.DeepEqual(writes, target.Snapshot().Writes) {
+		t.Fatal("history refreshed after withdrawal or authorized a write", historic, final)
 	}
 }

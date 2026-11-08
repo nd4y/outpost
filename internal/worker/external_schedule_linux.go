@@ -139,30 +139,37 @@ type externalAuditCandidate struct {
 	interval int64
 	record   ExternalAuditStatus
 	new      bool
+	latest   bool
 }
 
-func latestRecordedComplete(entries []generation.RecordedGeneration) string {
-	var latest string
-	var sequence uint64
-	for _, entry := range entries {
-		if entry.Complete && entry.Sequence > sequence {
-			latest, sequence = entry.Generation, entry.Sequence
+func recentRecordedComplete(entries []generation.RecordedGeneration, limit int) []string {
+	recent := make([]string, 0, limit)
+	for i := len(entries) - 1; i >= 0 && len(recent) < limit; i-- {
+		if entries[i].Complete {
+			recent = append(recent, entries[i].Generation)
 		}
 	}
-	return latest
+	return recent
 }
 
-func scheduledExternalCopies(status Status, d control.Domain, latest, node string) map[string]JobState {
-	copies := map[string]JobState{}
+type externalAuditCopy struct{ target, generation string }
+
+func scheduledExternalCopies(status Status, d control.Domain, recent []string, node string) map[externalAuditCopy]JobState {
+	generations := map[string]bool{}
+	for _, id := range recent {
+		generations[id] = true
+	}
+	copies := map[externalAuditCopy]JobState{}
 	for _, item := range status.Jobs {
 		j := item.Job
 		if item.Phase != "COMPLETE" || j.Kind != "upload" || j.MissingRepair != nil || j.Domain != d.Trust.Domain ||
-			j.Generation != latest || j.Executor != node || !d.Placement.PermitsCloud(node, j.Target) {
+			!generations[j.Generation] || j.Executor != node || !d.Placement.PermitsCloud(node, j.Target) {
 			continue
 		}
-		old := copies[j.Target]
+		key := externalAuditCopy{j.Target, j.Generation}
+		old := copies[key]
 		if item.UpdatedUnix > old.UpdatedUnix || (item.UpdatedUnix == old.UpdatedUnix && j.Operation > old.Job.Operation) {
-			copies[j.Target] = item
+			copies[key] = item
 		}
 	}
 	return copies
@@ -186,9 +193,14 @@ func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[strin
 		if err != nil {
 			continue
 		}
-		copies := scheduledExternalCopies(status, d, latestRecordedComplete(entries), w.node)
+		recent := recentRecordedComplete(entries, max(1, d.ExternalAuditGenerations))
+		if len(recent) == 0 {
+			continue
+		}
+		copies := scheduledExternalCopies(status, d, recent, w.node)
 		for _, copy := range copies {
 			j := copy.Job
+			latest := j.Generation == recent[0]
 			if v.requestGates[j.Target] == nil || running["external-audit/"+j.Operation] || v.paused(j.Domain, j.Operation) || status.Controls.paused(j.Domain, j.Operation) {
 				continue
 			}
@@ -211,14 +223,14 @@ func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[strin
 				continue
 			}
 			if record.FinishedUnix > 0 && now.Unix()-record.FinishedUnix < interval {
-				if record.Repair != nil && record.FinishedUnix <= now.Unix() {
+				if latest && record.Repair != nil && record.FinishedUnix <= now.Unix() {
 					w.admitExternalRepair(v, status, j, *record.Repair)
 				}
 				continue
 			}
 			if selected == nil || record.FinishedUnix < selected.record.FinishedUnix ||
 				(record.FinishedUnix == selected.record.FinishedUnix && j.Operation < selected.job.Operation) {
-				selected = &externalAuditCandidate{job: j, interval: interval, record: record, new: initialize}
+				selected = &externalAuditCandidate{job: j, interval: interval, record: record, new: initialize, latest: latest}
 			}
 		}
 	}
@@ -305,12 +317,15 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 		record.FinishedUnix = proof.FinishedUnix
 		record.Receipt = &proof
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled), errors.Is(err, control.ErrInactive):
+		if selected.record.FinishedUnix > 0 {
+			return // interrupted reread cannot replace the last recorded outcome
+		}
 		record.State = "PENDING"
 		record.FinishedUnix = 0
 	case storage.Missing(err):
 		record.State = "MISSING"
 		var absent *storage.MissingPart
-		if record.Ready && errors.As(err, &absent) {
+		if selected.latest && record.Ready && errors.As(err, &absent) {
 			repair := upload.MissingRepair{Part: absent.Part.ID, ObservedUnix: record.FinishedUnix}
 			if _, allowed := w.externalRepairJob(v, selected.job, repair); allowed {
 				record.Repair = &repair

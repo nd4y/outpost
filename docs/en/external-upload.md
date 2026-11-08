@@ -126,6 +126,8 @@ Initialize once. The second command resumes the exact same window with its durab
 
 The owner can set `externalAuditIntervalSeconds` from 2 to 2592000 in a signed domain policy. Omit the field or set it to zero to disable scheduling. The worker checks the latest locally recorded complete generation and each admitted target for which it has a complete upload receipt. Audits use available worker slots after ordinary jobs and share the existing target request and link limits.
 
+Set `externalAuditGenerations` from 1 to 16 to verify that many of the newest locally retained complete generations. The default is one. Older generations in this window receive read-only verification. Narrowing the window retains earlier observations; the local status command still accepts a retained upload operation. Management reports and automatic repair use the newest generation.
+
 The schedule retains one window identity for the same upload operation and interval. A completed cycle waits the interval before the next pass. Its supporting evidence expires before that pass, so the next cycle reads the ciphertext again. Interrupted work can resume within the same age limit. The latest scheduled outcome uses the telemetry allocation. Scope changes retain old records, and a full allocation can prevent new audit evidence.
 
 ```sh
