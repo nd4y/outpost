@@ -949,6 +949,10 @@
         {
           "path": "internal/sourceagent/prepared_linux_test.go",
           "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1735,6 +1739,14 @@
         {
           "path": "internal/storage/move_book_linux_test.go",
           "name": "TestMoveBookInitializationFaultsPreserveIntentAndQuotaRefusal"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2575,6 +2587,14 @@
         {
           "path": "internal/worker/link_budget_linux_test.go",
           "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -2657,6 +2677,10 @@
         {
           "path": "internal/worker/planning_linux_test.go",
           "name": "TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
         }
       ],
       "acceptance": ["AT-16"],
@@ -2719,6 +2743,14 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -2996,6 +3028,14 @@
         {
           "path": "internal/storage/audit_linux_test.go",
           "name": "TestExternalAuditRefusesForeignScopeAndCanceledReads"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-13"],
@@ -3066,6 +3106,14 @@
         {
           "path": "internal/peer/repair_linux_test.go",
           "name": "TestIntegrityRepairRejectsMalformedMissingBeforeSourceRead"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-13"],
@@ -4706,6 +4754,10 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -5084,6 +5136,14 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -5780,6 +5840,10 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -6677,6 +6741,14 @@
         {
           "path": "internal/storage/audit_linux_test.go",
           "name": "TestExternalAuditRefusesForeignScopeAndCanceledReads"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -6890,6 +6962,10 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "cmd/outpost/upload_plan_linux_test.go",
+          "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
         }
       ],
       "acceptance": ["AT-31"],

@@ -127,7 +127,15 @@ func ReadPrivate(path string, limit int) ([]byte, error) {
 		return nil, e
 	}
 	defer r.Close()
-	f, e := localfs.OpenFile(r, filepath.Base(path), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	return ReadPrivateAt(r, filepath.Base(path), limit)
+}
+
+// ReadPrivateAt uses an already held root and the same private-file contract.
+func ReadPrivateAt(r *os.Root, relative string, limit int) ([]byte, error) {
+	if r == nil || limit < 1 || limit > 64<<20 {
+		return nil, ErrDenied
+	}
+	f, e := localfs.OpenFile(r, relative, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}

@@ -134,20 +134,40 @@ func (p Plan) validate(a Authority) error {
 }
 func Build(ctx context.Context, source *generation.Replica, id string, p Plan, planner ed25519.PrivateKey) ([]byte, error) {
 	// Policy is checked before reading or describing source payloads.
-	if source == nil || p.Format != Format || p.policy() != nil || len(planner) != ed25519.PrivateKeySize {
+	if source == nil || !buildAllowed(source.Trust(), p, planner) {
 		return nil, ErrDenied
 	}
-	if p.Profile.Namespace != storage.Hash([]byte(source.Trust().Domain+"/"+source.Trust().Repository)) {
-		return nil, ErrDenied
-	}
-	p.Generation = id
-	p.Signature = nil
 	raw, e := source.Catalog(ctx, id)
 	if e != nil {
 		return nil, e
 	}
+	return buildCatalogPlan(ctx, source.Trust(), id, raw, p, planner, func(ctx context.Context, ref generation.Object) ([]byte, error) {
+		return source.ReadObject(ctx, id, ref)
+	})
+}
+
+// BuildFromCatalog signs a selected materialized catalog without opening a
+// mutable replica index. A plan is not evidence that a worker holds its closure.
+func BuildFromCatalog(ctx context.Context, trust generation.Trust, id string, raw []byte, p Plan, planner ed25519.PrivateKey, fetch func(context.Context, generation.Object) ([]byte, error)) ([]byte, error) {
+	if !buildAllowed(trust, p, planner) || fetch == nil {
+		return nil, ErrDenied
+	}
+	return buildCatalogPlan(ctx, trust, id, raw, p, planner, fetch)
+}
+
+func buildAllowed(trust generation.Trust, p Plan, planner ed25519.PrivateKey) bool {
+	return p.Format == Format && p.policy() == nil && len(planner) == ed25519.PrivateKeySize &&
+		p.Profile.Namespace == storage.Hash([]byte(trust.Domain+"/"+trust.Repository))
+}
+
+func buildCatalogPlan(ctx context.Context, trust generation.Trust, id string, raw []byte, p Plan, planner ed25519.PrivateKey, fetch func(context.Context, generation.Object) ([]byte, error)) ([]byte, error) {
+	if !storage.ID(id) || storage.Hash(raw) != id {
+		return nil, ErrDenied
+	}
+	p.Generation = id
+	p.Signature = nil
 	p.Catalog = raw
-	refs, e := generation.Dependencies(raw, source.Trust())
+	refs, e := generation.Dependencies(raw, trust)
 	if e != nil {
 		return nil, e
 	}
@@ -156,13 +176,13 @@ func Build(ctx context.Context, source *generation.Replica, id string, p Plan, p
 	}
 	p.Blobs = make([]storage.Blob, 0, len(refs))
 	for _, ref := range refs {
-		blob, e := describeReference(ctx, source, id, ref, p.Profile.MaxObjectBytes)
+		blob, e := describeObject(ctx, ref, p.Profile.MaxObjectBytes, fetch)
 		if e != nil {
 			return nil, e
 		}
 		p.Blobs = append(p.Blobs, blob)
 	}
-	a := Authority{source.Trust(), planner.Public().(ed25519.PublicKey)}
+	a := Authority{trust, planner.Public().(ed25519.PublicKey)}
 	if e = p.validate(a); e != nil {
 		return nil, e
 	}
@@ -178,13 +198,19 @@ func Build(ctx context.Context, source *generation.Replica, id string, p Plan, p
 // authenticated catalog. Planning is not a fresh source integrity observation.
 // Multipart maps still require actual bytes to determine each part digest.
 func describeReference(ctx context.Context, source *generation.Replica, id string, ref generation.Object, limit int) (storage.Blob, error) {
+	return describeObject(ctx, ref, limit, func(ctx context.Context, ref generation.Object) ([]byte, error) {
+		return source.ReadObject(ctx, id, ref)
+	})
+}
+
+func describeObject(ctx context.Context, ref generation.Object, limit int, fetch func(context.Context, generation.Object) ([]byte, error)) (storage.Blob, error) {
 	if e := ctx.Err(); e != nil {
 		return storage.Blob{}, e
 	}
 	if ref.Bytes <= limit {
 		return storage.Blob{Format: storage.BlobFormat, Object: ref, Parts: []generation.Object{ref}}, nil
 	}
-	data, e := source.ReadObject(ctx, id, ref)
+	data, e := fetch(ctx, ref)
 	if e != nil {
 		return storage.Blob{}, e
 	}

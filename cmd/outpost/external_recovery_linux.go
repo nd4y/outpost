@@ -9,7 +9,6 @@ import (
 
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
-	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/worker"
 )
@@ -44,21 +43,14 @@ func openExternalReader(ctx context.Context, profileFile string, trust generatio
 
 func restoreExternal(ctx context.Context, profileFile, expected, dest string, trust generation.Trust, owner filekit.Owner, selection generation.RecoverySelection) (generation.RecoveryReceipt, error) {
 	var result generation.RecoveryReceipt
-	if !storage.ID(expected) || !filepath.IsAbs(dest) || filepath.Clean(dest) != dest || filepath.Base(dest) == "/" || owner.Domain != trust.Domain {
+	if !storage.ID(expected) || owner.Domain != trust.Domain {
 		return result, errUsage
 	}
-	parent, err := localfs.OpenRoot(filepath.Dir(dest))
+	parent, name, err := openNewDestination(dest)
 	if err != nil {
 		return result, err
 	}
 	defer parent.Close()
-	name := filepath.Base(dest)
-	if _, err = parent.Lstat(name); !errors.Is(err, os.ErrNotExist) {
-		if err == nil {
-			err = os.ErrExist
-		}
-		return result, err
-	}
 	backend, err := openExternalReader(ctx, profileFile, trust)
 	if err != nil {
 		return result, err
@@ -78,22 +70,14 @@ func auditExternal(ctx context.Context, profileFile, trustFile, expected, output
 		return report, errUsage
 	}
 	var parent *os.Root
+	var name string
 	if output != "" {
-		if !filepath.IsAbs(output) || filepath.Clean(output) != output || filepath.Base(output) == "/" {
-			return report, errUsage
-		}
 		var err error
-		parent, err = localfs.OpenRoot(filepath.Dir(output))
+		parent, name, err = openNewDestination(output)
 		if err != nil {
 			return report, err
 		}
 		defer parent.Close()
-		if _, err = parent.Lstat(filepath.Base(output)); !errors.Is(err, os.ErrNotExist) {
-			if err == nil {
-				err = os.ErrExist
-			}
-			return report, err
-		}
 	}
 	raw, err := worker.ReadPrivate(trustFile, 65536)
 	if err != nil {
@@ -114,7 +98,7 @@ func auditExternal(ctx context.Context, profileFile, trustFile, expected, output
 		if err != nil {
 			return report, err
 		}
-		if err = writeNewAt(parent, filepath.Base(output), encoded); err != nil {
+		if err = writeNewAt(parent, name, encoded); err != nil {
 			return report, err
 		}
 	}

@@ -109,6 +109,21 @@ The audit uses the same read-only profile and public trust. It verifies the exac
 
 The optional `--output` saves that typed report even when the verification fails. Choose a new path. The output excludes private names, credentials and remote diagnostic text. The audit grants no repair authority. Verify plaintext by restoring with the owner kit.
 
+## Repair a selected external copy
+
+Build a fresh plan from a retained healthy holder's materialized ciphertext. The planner needs its private signing key, public generation trust and a private `outpost-upload-plan-request-1` JSON document. The document contains `format`, the expected public `planner` key and a `plan` template in `outpost-external-plan-1` format. Set the new `operationId`, exact `profile`, `allowExternal`, `allowedClasses`, eligible `workers` and the signed `startMillis`, `expiresUnix` and `slotMillis`. The builder supplies the catalog, blob map and signature.
+
+```sh
+outpost upload-plan-build --key /private/upload-planner.json \
+  --trust /private/generation-trust.json --store /recovery/materialized-holder \
+  --generation EXPECTED_CHECKPOINT --input /private/plan-request.json \
+  --output /private/new-signed-plan.json
+```
+
+The command reads the selected signed catalog from `catalogs` and the ciphertext needed to describe multipart objects from `objects`. Keep these files private. It needs no mutable replica index or remote credentials. The plan binds exact object references. The worker checks that it holds a complete admitted source before execution.
+
+The owner admits the signed plan as a fresh `upload` job in the current configuration. Use fresh target readback for repair by setting `cloudReadbackMaxAgeSeconds` to zero. Missing immutable data can be added with the existing create-only writes and checked again. A conflicting canonical object blocks completion and keeps its bytes. To replace that copy, authorize a separately provisioned target profile and verify independent restoration there before considering retirement. Original receipts retain their operation and observation time. Periodic external repair remains open.
+
 ## Evidence and remaining costs
 
 Run `go test -count=1 ./...` and `go vet ./...` in the admitted Linux test environment. Point `TMPDIR` and `OUTPOST_TEST_ROOT` to its data volume; executable Go scratch may use a separate bounded tmpfs. The tests use ephemeral credentials, real loopback TLS and disk-backed independent S3-signature/WebDAV authentication handlers. No real storage account is contacted.
