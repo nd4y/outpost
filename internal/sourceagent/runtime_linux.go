@@ -92,6 +92,13 @@ type Status struct {
 	Job               *capture.State  `json:"job,omitempty"`
 	AuthorityRevision uint64          `json:"authorityRevision,omitempty"`
 	Prepared          *PreparedStatus `json:"prepared,omitempty"`
+	Pending           *PendingStatus  `json:"pending,omitempty"`
+}
+
+// PendingStatus describes the local intent fence and the applicable recovery path.
+type PendingStatus struct {
+	IntentExpiresUnix int64  `json:"intentExpiresUnix"`
+	Action            string `json:"action"`
 }
 
 type Agent struct {
@@ -760,6 +767,16 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 				return e
 			}
 			out.Operation = i.Operation
+			if s.Phase == "PREPARING" || s.Phase == "ACTIVE" {
+				action := "RESUME"
+				if time.Now().Unix() >= i.ExpiresUnix {
+					action = "RECONCILE_RECEIVER"
+					if s.Phase == "PREPARING" {
+						action = "RETIRE_UNSTARTED"
+					}
+				}
+				out.Pending = &PendingStatus{IntentExpiresUnix: i.ExpiresUnix, Action: action}
+			}
 			if a.b.Prepared != nil {
 				m, _, e := a.readPrepared(ctx, i.Operation)
 				if e != nil {

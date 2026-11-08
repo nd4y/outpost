@@ -59,6 +59,8 @@ The [expired-operation settlement workflow](source-settlement.md) retrieves only
 
 An expired intent still in `PREPARING` can use [owner-authorized retirement](source-settlement.md#retire-an-expired-unstarted-intent). A later capture starts under renewed authority from the previous completed checkpoint.
 
+For a pending intent, `source-status` reports its signed expiry as `result.pending.intentExpiresUnix` and an action in `result.pending.action`. `RESUME` identifies an intent still within its validity window. `RETIRE_UNSTARTED` identifies expired `PREPARING` work that requires the owner's retirement permit. `RECONCILE_RECEIVER` identifies expired `ACTIVE` work. Check the receiver for a durable receipt or publication proof before choosing settlement or receipt recovery. A missing receipt alone gives no assurance about publication. The action describes local state and carries no execution authority.
+
 The [receiver renewal workflow](receiver-renewal.md) admits a fresh same-scope grant in the existing registry after explicit quiescent maintenance. It preserves historical receipts and generations, fences previous readers and uses the current receiver policy and disk budget.
 
 [Missing receipt recovery](receipt-recovery.md) uses separate fresh owner permission and current receiver policy to reconstruct a receipt only from an already complete generation and unchanged original publication proof. It preserves the original verification age and signed audit; ordinary settlement remains a separate step. Truly unpublished operations and lost journals remain pending.

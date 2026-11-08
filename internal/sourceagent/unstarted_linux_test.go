@@ -50,8 +50,18 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 	if _, err = f.a.UnstartedRetirementPreview(ctx); !errors.Is(err, ErrInvalid) {
 		t.Fatal("current intent accepted for expiry", err)
 	}
+	status, err := f.a.Status(ctx)
+	must(t, err)
+	if status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RESUME"}) {
+		t.Fatal("current intent has the wrong recovery action", status.Pending)
+	}
 	f.waitForIntentExpiry(t, intent, expiry)
 	f.reopen(t)
+	status, err = f.a.Status(ctx)
+	must(t, err)
+	if status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RETIRE_UNSTARTED"}) {
+		t.Fatal("expired unstarted intent has the wrong recovery action", status.Pending)
+	}
 	preview, err := f.a.UnstartedRetirementPreview(ctx)
 	must(t, err)
 	if preview.Operation == first.Operation || preview.Checkpoint != storage.Hash(oldCheckpoint) {
@@ -73,6 +83,12 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 	must(t, err)
 	cli := os.Getenv("OUTPOST_SETTLEMENT_CURRENT_CLI")
 	if cli != "" {
+		help := runUnstartedCLI(t, cli, "help")
+		for _, command := range []string{"source-unstarted-preview", "source-unstarted-sign", "source-unstarted-retire"} {
+			if !bytes.Contains(help, []byte("\""+command+" ")) {
+				t.Fatal("CLI help omits", command)
+			}
+		}
 		bootstrap, err := json.Marshal(f.b)
 		must(t, err)
 		owner, err := json.Marshal(map[string]any{"privateKey": f.ownerSigner})
@@ -81,6 +97,14 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 		unsigned, signed := filepath.Join(f.base, "retirement.json"), filepath.Join(f.base, "signed-retirement.json")
 		must(t, os.WriteFile(boot, bootstrap, 0600))
 		must(t, os.WriteFile(ownerFile, owner, 0600))
+		var cliStatus struct {
+			Result Status `json:"result"`
+		}
+		must(t, json.Unmarshal(runUnstartedCLI(t, cli, "source-status", "--bootstrap", boot), &cliStatus))
+		if cliStatus.Result.Pending == nil || *cliStatus.Result.Pending != *status.Pending {
+			t.Fatal("CLI did not expose the pending recovery action", cliStatus.Result.Pending)
+		}
+		t.Log("native CLI lists the retirement commands and reports the pending recovery action")
 		runUnstartedCLI(t, cli, "source-unstarted-preview", "--bootstrap", boot, "--output", unsigned)
 		runUnstartedCLI(t, cli, "source-unstarted-sign", "--key", ownerFile, "--input", unsigned, "--output", signed)
 		grant, err = os.ReadFile(signed)
@@ -164,7 +188,7 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 	checkpoint, err := f.a.Checkpoint(ctx)
 	must(t, err)
 	if current.Phase != "ABANDONED" || current.Operation != preview.Operation || current.Generation != first.Generation ||
-		current.Sequence != first.Sequence || !bytes.Equal(checkpoint, oldCheckpoint) {
+		current.Sequence != first.Sequence || current.Pending != nil || !bytes.Equal(checkpoint, oldCheckpoint) {
 		t.Fatal("retirement altered completed history", current)
 	}
 	fresh := renewedAuthority(t, f, 2)
@@ -212,7 +236,7 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 	t.Log("actual SIGKILL, zero retirement requests, same receiver renewal and two independent restores")
 }
 
-func runUnstartedCLI(t *testing.T, binary string, args ...string) {
+func runUnstartedCLI(t *testing.T, binary string, args ...string) []byte {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -220,6 +244,7 @@ func runUnstartedCLI(t *testing.T, binary string, args ...string) {
 	if err != nil {
 		t.Fatalf("%s: %v %s", args[0], err, output)
 	}
+	return output
 }
 
 func TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt(t *testing.T) {
@@ -229,6 +254,11 @@ func TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt(t *testing
 	intent := f.intentUntil(t, 1, "", expiry)
 	must(t, f.a.Prepare(ctx, intent))
 	f.waitForIntentExpiry(t, intent, expiry)
+	status, err := f.a.Status(ctx)
+	must(t, err)
+	if status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RECONCILE_RECEIVER"}) {
+		t.Fatal("expired active intent has the wrong recovery action", status.Pending)
+	}
 	if _, err := f.a.UnstartedRetirementPreview(ctx); !errors.Is(err, ErrInvalid) {
 		t.Fatal("ACTIVE intent can be classified as unstarted", err)
 	}
