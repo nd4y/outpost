@@ -244,8 +244,8 @@ def test_cached_start_upgrade_stop_and_rollback(s):
 def test_compose_profile_preserves_runtime_constraints(s):
     env = dict(os.environ, OUTPOST_IMAGE=s.image, OUTPOST_UID=str(s.uid), OUTPOST_GID=str(s.gid),
                OUTPOST_DATA=str(s.fixture / "data"), OUTPOST_PRIVATE=str(s.fixture / "private"))
-    config = json.loads(command(["docker", "compose", "-f", str(s.args.root / "compose.yaml"), "--profile", "commands", "--profile", "reports", "config", "--format", "json"], env=env))
-    assert set(config["services"]) == {"worker", "commands", "reports"}
+    config = json.loads(command(["docker", "compose", "-f", str(s.args.root / "compose.yaml"), "--profile", "commands", "--profile", "reports", "--profile", "telemetry", "config", "--format", "json"], env=env))
+    assert set(config["services"]) == {"worker", "commands", "reports", "telemetry"}
     for service in config["services"].values():
         assert service["image"] == s.image and service["pull_policy"] == "never"
         assert service["user"] == str(s.uid) + ":" + str(s.gid) and service["read_only"]
@@ -257,7 +257,8 @@ def test_compose_profile_preserves_runtime_constraints(s):
         assert {(m["target"], bool(m.get("read_only"))) for m in service["volumes"]} == {("/var/lib/outpost", False), ("/run/outpost", True)}
         assert all(m["type"] == "bind" and not m["bind"].get("create_host_path", False) for m in service["volumes"])
     # Configuration expansion is separate from host admission and never starts a service.
-    s.result("compose_profile_preserves_runtime_constraints", services=3)
+    assert config["services"]["telemetry"]["command"][0] == "worker-telemetry-loop"
+    s.result("compose_profile_preserves_runtime_constraints", services=4)
 
 
 def test_missing_or_readonly_volume_fails_without_fallback(s):

@@ -2537,6 +2537,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -2820,7 +2821,7 @@
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-38",
@@ -2833,6 +2834,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -3108,7 +3110,7 @@
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-39",
@@ -3121,6 +3123,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -3372,7 +3375,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -3603,6 +3606,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -3770,7 +3774,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-42",
@@ -3783,13 +3787,87 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryTypedPayloadPrivacyAndUnknown"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryJournalAtomicCursorQuotaAndRestart"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryUncertainAckAndExplicitRejection"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetrySignedBindingsCorruptionAndMissingState"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetrySlowDeliveryDoesNotLockProducer"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryPersistedRetryGuardAndByteLimit"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryFullByteQueueRetainsOutcomeHeadroom"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryOwnerScopeRevocationRenewalAndNoReplay"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryQuietEventsHeartbeatAndRejectedSample"
+        },
+        {
+          "path": "internal/telemetry/crash_linux_test.go",
+          "name": "TestTelemetrySIGKILLPreservesCursorAndUnknownAck"
+        },
+        {
+          "path": "internal/telemetry/http_test.go",
+          "name": "TestTelemetryHTTPOutcomesAndBoundedResponses"
+        },
+        {
+          "path": "internal/telemetry/http_test.go",
+          "name": "TestTelemetryTLSIdentityRedirectAndRetryAfter"
+        },
+        {
+          "path": "internal/telemetry/response_test.go",
+          "name": "TestTelemetryPermanentStatusCannotBecomeRetryOnBrokenBody"
+        },
+        {
+          "path": "internal/telemetry/collector_linux_test.go",
+          "name": "TestTelemetryRealCollectorAcceptsBothSignals"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetryProjectionKeepsOriginalAgeAndDomainScope"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetrySharedQuotaRefusesSendWithoutLosingQueue"
+        },
+        {
+          "path": "cmd/outpost/telemetry_linux_test.go",
+          "name": "TestCLITelemetryInitStatusPauseRenewAndBinding"
+        }
+      ],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-43",
@@ -3802,6 +3880,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -3962,10 +4041,18 @@
         {
           "path": "internal/managementservice/snapshot_linux_test.go",
           "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryOwnerScopeRevocationRenewalAndNoReplay"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryQuietEventsHeartbeatAndRejectedSample"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-44",
@@ -3978,6 +4065,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -4142,10 +4230,34 @@
         {
           "path": "internal/managementservice/crash_linux_test.go",
           "name": "TestManagementServiceSocketLimitRejectsBeforeTLSAndReleasesOnce"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetrySlowDeliveryDoesNotLockProducer"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryPersistedRetryGuardAndByteLimit"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryFullByteQueueRetainsOutcomeHeadroom"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetryProjectionKeepsOriginalAgeAndDomainScope"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetrySharedQuotaRefusesSendWithoutLosingQueue"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-45",
@@ -4158,6 +4270,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -4454,10 +4567,14 @@
         {
           "path": "cmd/outpost/isolation_linux_test.go",
           "name": "TestCLIIsolationObservationAndAdmissionPrecedePrivateState"
+        },
+        {
+          "path": "cmd/outpost/telemetry_linux_test.go",
+          "name": "TestCLITelemetryInitStatusPauseRenewAndBinding"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-46",
@@ -5080,6 +5197,58 @@
         {
           "path": "scripts/check-container.py",
           "name": "test_compose_profile_preserves_runtime_constraints"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryTypedPayloadPrivacyAndUnknown"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryJournalAtomicCursorQuotaAndRestart"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetryUncertainAckAndExplicitRejection"
+        },
+        {
+          "path": "internal/telemetry/outbox_linux_test.go",
+          "name": "TestTelemetrySignedBindingsCorruptionAndMissingState"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryOwnerScopeRevocationRenewalAndNoReplay"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryQuietEventsHeartbeatAndRejectedSample"
+        },
+        {
+          "path": "internal/telemetry/http_test.go",
+          "name": "TestTelemetryHTTPOutcomesAndBoundedResponses"
+        },
+        {
+          "path": "internal/telemetry/http_test.go",
+          "name": "TestTelemetryTLSIdentityRedirectAndRetryAfter"
+        },
+        {
+          "path": "internal/telemetry/response_test.go",
+          "name": "TestTelemetryPermanentStatusCannotBecomeRetryOnBrokenBody"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetryProjectionKeepsOriginalAgeAndDomainScope"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetrySharedQuotaRefusesSendWithoutLosingQueue"
+        },
+        {
+          "path": "cmd/outpost/telemetry_linux_test.go",
+          "name": "TestCLITelemetryInitStatusPauseRenewAndBinding"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -5096,6 +5265,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -5252,10 +5422,14 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "cmd/outpost/telemetry_linux_test.go",
+          "name": "TestCLITelemetryInitStatusPauseRenewAndBinding"
         }
       ],
       "acceptance": ["AT-31"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-50",
@@ -5268,6 +5442,7 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
@@ -5327,7 +5502,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-51",
@@ -5340,13 +5515,14 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
       ],
       "checks": [],
       "acceptance": ["AT-34"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-52",
@@ -5359,13 +5535,14 @@
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
+        "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py"
       ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, durable telemetry/audit, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-53",

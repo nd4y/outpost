@@ -100,3 +100,5 @@ The [private management snapshot](docs/en/management-snapshots.md) preserves adm
 The interface now shows [external-copy observations](docs/en/external-copy-reporting.md) with their original verification time and explicit unknown state.
 
 The [Linux distribution candidate](docs/en/distribution.md) builds source-bound amd64/arm64 archives and a shellless container input; installation and runtime acceptance remain explicit gates.
+
+The [durable telemetry process](docs/en/telemetry.md) provides a signed bounded OTLP queue, retained source positions, explicit scope renewal and independent delivery. Short checks include a real collector and backup/restore during a slow sink; complete instrumentation and operational acceptance remain open.
