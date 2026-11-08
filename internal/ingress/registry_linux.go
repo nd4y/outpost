@@ -264,7 +264,7 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	}
 	// A fence may have committed just before a crash. Only an acknowledged old
 	// slot can be reused, and it is cleaned before replacing its compact record.
-	meta, e := statefile.OpenAt(g.root, "current/state", generation.MaxCatalog+2*MaxDocument+4096, false)
+	meta, e := statefile.OpenAt(g.root, "current/state", maxSessionDocument, false)
 	if e != nil {
 		return nil, e
 	}
@@ -274,7 +274,7 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 		return nil, e
 	}
 	var state sessionState
-	if storage.Decode(prior, &state, generation.MaxCatalog+2*MaxDocument+4096) != nil || !state.Acknowledged {
+	if storage.Decode(prior, &state, maxSessionDocument) != nil || !state.Acknowledged {
 		return nil, ErrConflict
 	}
 	oldOptions := o
@@ -533,8 +533,8 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(parts) == 2 && parts[1] == "coverage" && r.Method == http.MethodPut {
-		g.serveCoverage(w, r.WithContext(ctx), i, remote.NotAfter)
+	if len(parts) == 2 && (parts[1] == "coverage" || parts[1] == "partition") && r.Method == http.MethodPut {
+		g.serveCoverage(w, r.WithContext(ctx), i, remote.NotAfter, parts[1] == "partition")
 		return
 	}
 	g.handler.ServeHTTP(w, r.WithContext(ctx))

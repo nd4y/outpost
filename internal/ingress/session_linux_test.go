@@ -176,14 +176,14 @@ func TestStagedCoverageRejectsMissingDependencyAndNeverPublishes(t *testing.T) {
 	v, err := f.source.Backup(ctx, f.input, filekit.BackupOptions{Names: []string{"private/data"}})
 	must(t, err)
 	raw, roots := f.catalog(t, []string{v.Version})
-	if _, err = f.session.stageCoverage(ctx, raw); !errors.Is(err, ErrIncomplete) {
+	if _, err = f.session.stageCoverage(ctx, raw, nil, ""); !errors.Is(err, ErrIncomplete) {
 		t.Fatal("coverage accepted without catalog roots", err)
 	}
 	f.roots(t, roots)
-	proof, err := f.session.stageCoverage(ctx, raw)
+	proof, err := f.session.stageCoverage(ctx, raw, nil, "")
 	must(t, err)
 	f.reopen(t)
-	replayed, err := f.session.stageCoverage(ctx, raw)
+	replayed, err := f.session.stageCoverage(ctx, raw, nil, "")
 	must(t, err)
 	if replayed != proof || proof.Generation != storage.Hash(raw) {
 		t.Fatal("durable coverage replay changed", proof, replayed)
@@ -195,7 +195,7 @@ func TestStagedCoverageRejectsMissingDependencyAndNeverPublishes(t *testing.T) {
 		must(t, f.session.objectRoot.Remove(id))
 		break
 	}
-	if _, err = f.session.stageCoverage(ctx, raw); !errors.Is(err, ErrIncomplete) {
+	if _, err = f.session.stageCoverage(ctx, raw, nil, ""); !errors.Is(err, ErrIncomplete) {
 		t.Fatal("coverage replay ignored a missing staged part", err)
 	}
 	inventory, err := f.options.Replica.Inventory(ctx)

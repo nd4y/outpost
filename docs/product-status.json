@@ -331,12 +331,16 @@
           "name": "TestSourceCoverageReleasesBeforePublicationAndWorkersResume"
         },
         {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourcePartitionCoverageAssemblesFromPeersAfterRelease"
+        },
+        {
           "path": "internal/ingress/session_linux_test.go",
           "name": "TestStagedCoverageRejectsMissingDependencyAndNeverPublishes"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding and optional release on durable coverage of every dependency at both holders. Adaptive weighting, automatic substitution, coverage with different holders per dependency, cross-expiry staged publication and measured asymmetric 500/500/100 acceptance remain open."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Adaptive weighting, automatic substitution, cross-expiry staged publication and measured asymmetric 500/500/100 acceptance remain open."
     },
     {
       "id": "REQ-06",

@@ -12,7 +12,10 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-const TwoHolderCoverage = "two-holder-coverage"
+const (
+	TwoHolderCoverage   = "two-holder-coverage"
+	PairedSplitCoverage = "paired-split-coverage"
+)
 
 type coverageSink interface {
 	Coverage(context.Context, []byte) ([]ingress.CoverageReceipt, error)
@@ -28,19 +31,27 @@ type coverageCheckpoint struct {
 }
 
 func (j *Job) verifyCoverage(raw []byte, c coverageCheckpoint) error {
-	if c.Policy != TwoHolderCoverage || c.Binding != j.binding || c.Generation != storage.Hash(raw) || len(c.Holders) != 2 {
+	if c.Policy != j.options.Profile.ReleasePolicy || c.Binding != j.binding || c.Generation != storage.Hash(raw) || len(c.Holders) != 2 {
 		return ErrInvalid
 	}
 	refs, err := generation.Dependencies(raw, j.authority.Trust)
 	if err != nil {
 		return err
 	}
-	digest := ingress.DependencyDigest(refs)
 	bindings := j.options.Sink.(coverageSink).CoverageBindings()
 	seen := map[string]bool{}
 	for _, holder := range c.Holders {
+		var other string
+		if c.Policy == PairedSplitCoverage {
+			for target := range bindings {
+				if target != holder.Holder {
+					other = target
+				}
+			}
+		}
+		assigned := ingress.CoverageDependencies(refs, holder.Holder, other)
 		if holder.Intent == "" || bindings[holder.Holder] != holder.Intent || seen[holder.Holder] ||
-			holder.Generation != c.Generation || holder.Dependencies != digest || holder.Objects != len(refs) ||
+			holder.Generation != c.Generation || holder.Dependencies != ingress.DependencyDigest(assigned) || holder.Objects != len(assigned) ||
 			holder.AcceptedUnix < j.intent.NotBefore || holder.AcceptedUnix >= j.intent.ExpiresUnix || holder.AcceptedUnix > time.Now().Unix() {
 			return ErrInvalid
 		}
@@ -78,7 +89,7 @@ func (j *Job) releaseWithCoverage(ctx context.Context, s *State, raw []byte) err
 		if err != nil {
 			return err
 		}
-		c := coverageCheckpoint{Policy: TwoHolderCoverage, Binding: j.binding, Generation: s.Generation, Holders: holders}
+		c := coverageCheckpoint{Policy: j.options.Profile.ReleasePolicy, Binding: j.binding, Generation: s.Generation, Holders: holders}
 		if err = j.verifyCoverage(raw, c); err != nil {
 			return err
 		}

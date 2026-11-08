@@ -35,7 +35,7 @@ On a new two-copy installation, add `companionIngress` to the private bootstrap 
 
 Apply `outpost-control-2` to both receivers with the other receiver's ID in `captureStagingPeers` on the domain. Admit each receiver's own ingress grant and the source-to-receiver push edges. Both receivers need a signed HTTPS endpoint and explicit pull edges in both directions between the two holders. The receiving worker selects the endpoint from that signed policy and verifies the origin's signed intent and receiver grant. Keep optional holders on ordinary replication routes for complete generations.
 
-The source keeps at most two payload packs in flight and alternates initial recipients. A receiver reads an accepted object directly from its peer over mTLS. The object is durable before the destination confirms it. The source records pack progress after both writes and seals the generation only after all required packs and metadata are available. An accepted exact ciphertext object can be reused on retry. The two holders verify the complete catalog independently in bounded steps. After a transient publication timeout the source replays the same catalog with a limited number of attempts. By default, snapshot release waits for the verified two-copy checkpoint.
+The source keeps at most two payload packs in flight. With the default full-copy policy and the two-holder coverage policy, it alternates initial recipients. A receiver reads an accepted object directly from its peer over mTLS. The object is durable before the destination confirms it. The source records pack progress after both writes and seals the generation only after all required packs and metadata are available. An accepted exact ciphertext object can be reused on retry. The two holders verify the complete catalog independently in bounded steps. After a transient publication timeout the source replays the same catalog with a limited number of attempts. By default, snapshot release waits for the verified two-copy checkpoint.
 
 The bootstrap anchors and signed companion receipt are private installation state. Preserve them and both receiver histories across restart. This candidate requires the two configured holders. Automatic receiver substitution remains open.
 
@@ -45,7 +45,13 @@ Set `profile.releasePolicy` to `two-holder-coverage` in a new paired installatio
 
 During early release, `source-status` shows the pending job's `stagedRelease` separately from its publication phase. The source still needs the two complete, verified copies for `source-checkpoint`, receiver cleanup and advancement of the generation head. Workers can continue bounded full verification and publication after a restart with the source offline, while the signed capture intent and worker policy are valid. Staged data and predecessor pins remain protected until safe acknowledgement. Coverage relies on the holders' durable staging and the pinned, previously accepted predecessor. Full publication reads and verifies the ciphertext.
 
-This policy requires two holders for every dependency. A one-holder-per-object policy with different holders for different objects, cross-expiry continuation of unfinished receiver publication and throughput acceptance remain open.
+The `two-holder-coverage` policy requires two holders for every dependency.
+
+Set `profile.releasePolicy` to `paired-split-coverage` to accept one staged copy per dependency before release. New object ownership is stable across retries and derived from its opaque ID and the two holder identities. Both holders retain the final catalog. The source validates the union by recomputing the assigned dependency list for each holder. A required dependency cannot be covered by an unrelated holder or intent.
+
+After seal, each worker pulls missing dependencies only from its configured peer and verifies the entire generation before publication. Protect both holders until assembly completes. Failure of a holder can lose a newly captured object during the interval with only one staged copy. Automatic receiver substitution, publication after intent expiry, adaptive weighting and throughput acceptance remain open.
+
+Keep the source and workers on a version that understands the pending coverage journal until both complete receipts have been acknowledged. Pausing preserves the staged data and generation pins.
 
 ## Renewing source authority
 

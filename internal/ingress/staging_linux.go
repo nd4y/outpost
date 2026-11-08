@@ -177,7 +177,7 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		fail(w, ErrDenied)
 		return true
 	}
-	if e = g.importStaged(ctx, i, raw, origin, ref); e != nil {
+	if e = g.importStaged(ctx, i, raw, origin, ref, false); e != nil {
 		fail(w, e)
 		return true
 	}
@@ -185,14 +185,21 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []byte, origin stagingOrigin, ref filekit.Object) error {
-	now := time.Now()
-	i, authority, e := VerifyIntent(origin.Intent, origin.Authority, g.options.Owner, now)
+func (g *Registry) stagingPeer(target Intent, origin stagingOrigin) (Intent, string, error) {
+	i, authority, e := VerifyIntent(origin.Intent, origin.Authority, g.options.Owner, time.Now())
 	endpoint := g.options.Staging.Origins[i.Ingress]
 	authority.Ingress = target.Ingress
 	if e != nil || endpoint == "" || i.Ingress == target.Ingress || !sameCapture(i, target) ||
 		!SameAuthorityScope(authority, g.authority) {
-		return ErrDenied
+		return Intent{}, "", ErrDenied
+	}
+	return i, endpoint, nil
+}
+
+func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []byte, origin stagingOrigin, ref filekit.Object, assembling bool) error {
+	i, endpoint, e := g.stagingPeer(target, origin)
+	if e != nil {
+		return e
 	}
 	g.mu.Lock()
 	e = g.withStagingSession(ctx, targetRaw, func(s *Session) error {
@@ -219,7 +226,16 @@ func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.withStagingSession(ctx, targetRaw, func(s *Session) error {
-		_, e := s.Write(ctx, ref, b)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if assembling {
+			peer := s.state.CoveragePeer
+			// Only AdvanceCoverage selects an object from this frozen catalog.
+			if peer == nil || !bytes.Equal(peer.Intent, origin.Intent) || !bytes.Equal(peer.Authority, origin.Authority) {
+				return ErrConflict
+			}
+		}
+		_, e := s.write(ctx, ref, b, assembling)
 		return e
 	})
 }

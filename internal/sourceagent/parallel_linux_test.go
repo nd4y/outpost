@@ -117,15 +117,21 @@ func runCaptureWorker(t *testing.T, ctx context.Context, w *worker.Worker) func(
 }
 
 func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
-	testPairedCapture(t, false)
+	testPairedCapture(t, "")
 }
 
 func TestSourceCoverageReleasesBeforePublicationAndWorkersResume(t *testing.T) {
-	testPairedCapture(t, true)
+	testPairedCapture(t, capture.TwoHolderCoverage)
 }
 
-func testPairedCapture(t *testing.T, coverage bool) {
+func TestSourcePartitionCoverageAssemblesFromPeersAfterRelease(t *testing.T) {
+	testPairedCapture(t, capture.PairedSplitCoverage)
+}
+
+func testPairedCapture(t *testing.T, releasePolicy string) {
 	t.Helper()
+	coverage := releasePolicy != ""
+	split := releasePolicy == capture.PairedSplitCoverage
 	var followerCert tls.Certificate
 	f := newFixtureWithPeer(t, 1800, &followerCert)
 	ctx, cancel := context.WithTimeout(t.Context(), 240*time.Second)
@@ -156,6 +162,7 @@ func testPairedCapture(t *testing.T, coverage bool) {
 	aHandler := traffic.watch(aID, aWorker)
 	var attemptedDrop, dropped atomic.Bool
 	var allowCoverage, allowPublication atomic.Bool
+	var peerImports atomic.Int64
 	allowCoverage.Store(!coverage)
 	allowPublication.Store(!coverage)
 	for _, node := range []*worker.Worker{aWorker, bWorker} {
@@ -166,7 +173,22 @@ func testPairedCapture(t *testing.T, coverage bool) {
 			return nil
 		}
 	}
+	peerRead := func(out http.ResponseWriter, r *http.Request) bool {
+		if !split || r.Method != http.MethodGet || !strings.Contains(r.URL.Path, "/staged/") ||
+			r.TLS == nil || len(r.TLS.PeerCertificates) == 0 || peer.Identity(r.TLS.PeerCertificates[0]) == cID {
+			return false
+		}
+		if !allowPublication.Load() {
+			http.Error(out, "peer import paused", http.StatusServiceUnavailable)
+			return true
+		}
+		peerImports.Add(1)
+		return false
+	}
 	f.intercept = func(out http.ResponseWriter, r *http.Request) bool {
+		if peerRead(out, r) {
+			return true
+		}
 		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/catalog") && attemptedDrop.CompareAndSwap(false, true) {
 			rec := httptest.NewRecorder()
 			aHandler(droppedCaptureReply{ResponseRecorder: rec, wire: out}, r)
@@ -188,7 +210,10 @@ func testPairedCapture(t *testing.T, coverage bool) {
 	}
 	bHandler := traffic.watch(bID, bWorker)
 	bServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !allowCoverage.Load() && strings.HasSuffix(r.URL.Path, "/coverage") {
+		if peerRead(w, r) {
+			return
+		}
+		if !allowCoverage.Load() && (strings.HasSuffix(r.URL.Path, "/coverage") || strings.HasSuffix(r.URL.Path, "/partition")) {
 			http.Error(w, "required coverage unavailable", http.StatusPreconditionFailed)
 			return
 		}
@@ -256,7 +281,7 @@ func testPairedCapture(t *testing.T, coverage bool) {
 	// Two payload packs are enough to force concurrent durable writes.
 	size := 9 << 20
 	if coverage {
-		f.b.Profile.ReleasePolicy = capture.TwoHolderCoverage
+		f.b.Profile.ReleasePolicy = releasePolicy
 		size = 32 << 10
 	}
 	payload := make([]byte, size)
@@ -309,7 +334,11 @@ func testPairedCapture(t *testing.T, coverage bool) {
 		}
 	}
 	traffic.mu.Unlock()
-	if (!coverage && (!both || initial < 3)) || initial == 0 || relayed != initial {
+	wantRelay := initial
+	if split {
+		wantRelay = 0
+	}
+	if (!coverage && (!both || initial < 3)) || initial == 0 || relayed != wantRelay {
 		t.Fatal("distinct initial uploads or pre-publication pulls missing", both, initial, relayed)
 	}
 	client, _, e := peer.AuthenticatedHTTP(f.server.URL, followerCert, f.roots, cID, aID, sourceFixtureLimits)
@@ -408,7 +437,10 @@ func testPairedCapture(t *testing.T, coverage bool) {
 				t.Fatal("coverage restore differs", idx)
 			}
 		}
-		t.Log("withheld coverage blocked release; signed checkpoint survived source restart; both restarted workers restored independently with the source offline")
+		if split && peerImports.Load() < int64(initial) {
+			t.Fatal("split coverage did not retrieve all initially disjoint objects from the peer", peerImports.Load(), initial)
+		}
+		t.Logf("withheld coverage blocked release; signed checkpoint survived source restart; both restarted workers restored independently with the source offline (%d background peer reads)", peerImports.Load())
 		return
 	}
 	must(t, os.Remove(input))

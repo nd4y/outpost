@@ -50,7 +50,7 @@ func (a *Agent) loadCompanion() error {
 	if !sameReceiverPair(a.anchor, companion) {
 		return ErrInvalid
 	}
-	if a.b.Profile.ReleasePolicy == capture.TwoHolderCoverage {
+	if a.b.Profile.ReleasePolicy != "" {
 		targets := a.b.Profile.CopyTargets
 		if len(targets) != 2 ||
 			!(targets[0] == a.anchor.Ingress && targets[1] == companion.Ingress ||
@@ -102,6 +102,7 @@ type parallelSink struct {
 	binding                 string
 	records                 *statefile.Store
 	writer                  ed25519.PrivateKey
+	split                   bool
 	replaying               bool
 	next                    atomic.Uint64
 }
@@ -130,7 +131,7 @@ func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []by
 		return nil, e
 	}
 	store.Admit = a.admission(dir)
-	return &parallelSink{Client: primary, companion: companion, intention: i, primary: primaryID, primaryBinding: primary.IntentID(), binding: storage.Hash(raw), records: store, writer: a.writer, replaying: !initialize}, nil
+	return &parallelSink{Client: primary, companion: companion, intention: i, primary: primaryID, primaryBinding: primary.IntentID(), binding: storage.Hash(raw), records: store, writer: a.writer, split: a.b.Profile.ReleasePolicy == capture.PairedSplitCoverage, replaying: !initialize}, nil
 }
 
 func (s *parallelSink) Close() {
@@ -150,12 +151,16 @@ func (s *parallelSink) Coverage(ctx context.Context, raw []byte) ([]ingress.Cove
 		receipt ingress.CoverageReceipt
 		err     error
 	}
+	var primaryPeer, companionPeer *ingress.Client
+	if s.split {
+		primaryPeer, companionPeer = s.companion, s.Client
+	}
 	done := make(chan result, 1)
 	go func() {
-		receipt, err := s.companion.StageCoverage(ctx, raw)
+		receipt, err := s.companion.StageCoverage(ctx, raw, companionPeer)
 		done <- result{receipt, err}
 	}()
-	primary, err := s.Client.StageCoverage(ctx, raw)
+	primary, err := s.Client.StageCoverage(ctx, raw, primaryPeer)
 	other := <-done
 	if err != nil || other.err != nil {
 		return nil, errors.Join(err, other.err)
@@ -170,7 +175,24 @@ func (s *parallelSink) Begin(ctx context.Context) error {
 	return s.companion.Begin(ctx)
 }
 
+func (s *parallelSink) selected(ref filekit.Object) *ingress.Client {
+	if ingress.CoverageHolder(ref.ID, s.primary, s.intention.Ingress) == s.primary {
+		return s.Client
+	}
+	return s.companion
+}
+
+func (s *parallelSink) Read(ctx context.Context, ref filekit.Object) ([]byte, error) {
+	if s.split {
+		return s.selected(ref).Read(ctx, ref)
+	}
+	return s.Client.Read(ctx, ref)
+}
+
 func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
+	if s.split {
+		return s.selected(ref).Check(ctx, ref)
+	}
 	if e := s.Client.Check(ctx, ref); e != nil {
 		return e
 	}
@@ -178,6 +200,17 @@ func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
 }
 
 func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []byte) (bool, error) {
+	if s.split {
+		client := s.selected(ref)
+		e := client.Check(ctx, ref)
+		if e == nil {
+			return false, nil
+		}
+		if !errors.Is(e, os.ErrNotExist) {
+			return false, e
+		}
+		return client.Write(ctx, ref, payload)
+	}
 	origin, destination := s.Client, s.companion
 	if s.next.Add(1)%2 == 0 {
 		origin, destination = destination, origin
@@ -241,6 +274,16 @@ func (s *parallelSink) loadReceipt(generation string) (ingress.Receipt, error) {
 func (s *parallelSink) FinishStep(ctx context.Context, catalog []byte) (generation.BatchResult, *ingress.Receipt, error) {
 	for attempt := 0; ; attempt++ {
 		progress, receipt, e := s.finishStep(ctx, catalog)
+		if s.split && partitionPending(e) {
+			timer := time.NewTimer(250 * time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				return progress, nil, nil
+			case <-ctx.Done():
+				return progress, nil, ctx.Err()
+			}
+		}
 		if e == nil || attempt == 2 || ctx.Err() != nil || !retryablePublication(e) {
 			return progress, receipt, e
 		}
@@ -254,6 +297,18 @@ func (s *parallelSink) FinishStep(ctx context.Context, catalog []byte) (generati
 			return progress, nil, ctx.Err()
 		}
 	}
+}
+
+func partitionPending(e error) bool {
+	if joined, ok := e.(interface{ Unwrap() []error }); ok {
+		for _, child := range joined.Unwrap() {
+			if !partitionPending(child) {
+				return false
+			}
+		}
+		return true
+	}
+	return errors.Is(e, ingress.ErrIncomplete)
 }
 
 func retryablePublication(e error) bool {

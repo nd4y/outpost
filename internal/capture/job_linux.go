@@ -189,7 +189,7 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 	}
 	switch p.ReleasePolicy {
 	case "":
-	case TwoHolderCoverage:
+	case TwoHolderCoverage, PairedSplitCoverage:
 		sink, ok := o.Sink.(coverageSink)
 		if !ok || p.MinimumCopies != 2 || len(seen) != 2 {
 			return nil, ErrInvalid
@@ -364,7 +364,7 @@ func (j *Job) decodeState(raw []byte) (State, error) {
 	if storage.Decode(raw, &s, maxPlan) != nil || s.Format != Format || s.Binding != j.binding || !storage.ID(s.Plan) || phase(s.Phase) < 0 || s.ObservedUnix < 1 || s.ObservedUnix > time.Now().Unix() || s.CompletedFiles < 0 || s.CompletedFiles > generation.MaxKits {
 		return s, ErrInvalid
 	}
-	if s.StagedRelease != "" && (j.options.Profile.ReleasePolicy != TwoHolderCoverage ||
+	if s.StagedRelease != "" && (j.options.Profile.ReleasePolicy == "" ||
 		phase(s.Phase) < phase("SEALED") ||
 		s.StagedRelease != "CHECKPOINTED" && s.StagedRelease != "RELEASING" && s.StagedRelease != "RELEASED" ||
 		phase(s.Phase) >= phase("RELEASED") && s.StagedRelease != "RELEASED") {
@@ -557,7 +557,7 @@ func (j *Job) Run(ctx context.Context) error {
 			if storage.Hash(raw) != s.Generation {
 				return ErrInvalid
 			}
-			if j.options.Profile.ReleasePolicy == TwoHolderCoverage {
+			if j.options.Profile.ReleasePolicy != "" {
 				if e = j.releaseWithCoverage(ctx, &s, raw); e != nil {
 					return e
 				}

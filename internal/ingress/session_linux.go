@@ -32,12 +32,16 @@ type SessionOptions struct {
 	AdmitState, AdmitObject statefile.Admission
 	RemoveObject            func(context.Context, string, int64) error
 }
+
+const maxSessionDocument = generation.MaxCatalog + 4*MaxDocument + 4096
+
 type sessionState struct {
 	Format       string           `json:"format"`
 	Intent       json.RawMessage  `json:"intent"`
 	Authority    json.RawMessage  `json:"authority"`
 	LastObserved int64            `json:"lastObserved"`
 	Catalog      json.RawMessage  `json:"catalog,omitempty"`
+	CoveragePeer *stagingOrigin   `json:"coveragePeer,omitempty"`
 	Coverage     *CoverageReceipt `json:"coverage,omitempty"`
 	Complete     bool             `json:"complete"`
 	CompletedAt  int64            `json:"completedAt,omitempty"`
@@ -65,6 +69,8 @@ type Session struct {
 	lease         *os.File
 	replica       *generation.Replica
 	refs, base    map[string]generation.Object
+	catalogRefs   []generation.Object
+	assemblyNext  int
 	baseID        string
 	bytes         int64
 	poisoned      bool
@@ -226,7 +232,7 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 	owned = true
 	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, inspection: inspection}
 	fail := func(e error) (*Session, error) { s.Close(); return nil, e }
-	s.meta, e = statefile.OpenAt(r, "state", generation.MaxCatalog+2*MaxDocument+4096, o.Initialize)
+	s.meta, e = statefile.OpenAt(r, "state", maxSessionDocument, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
@@ -278,6 +284,14 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		}
 	} else if s.state.Complete && !s.state.Acknowledged {
 		return fail(ErrConflict)
+	}
+	if s.state.CoveragePeer != nil {
+		origin := s.state.CoveragePeer
+		var peer Intent
+		if s.state.Coverage == nil || canonicalIntent(origin.Intent, origin.Authority, o.Owner, &peer) != nil ||
+			peer.Ingress == i.Ingress || !sameCapture(peer, i) {
+			return fail(ErrConflict)
+		}
 	}
 	if s.state.Coverage != nil {
 		c := s.state.Coverage
@@ -460,6 +474,10 @@ func (s *Session) Check(ctx context.Context, ref filekit.Object) error {
 func (s *Session) Write(ctx context.Context, ref filekit.Object, b []byte) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.write(ctx, ref, b, false)
+}
+
+func (s *Session) write(ctx context.Context, ref filekit.Object, b []byte, assembling bool) (bool, error) {
 	if e := s.guard(ctx); e != nil {
 		return false, e
 	}
@@ -489,7 +507,7 @@ func (s *Session) Write(ctx context.Context, ref filekit.Object, b []byte) (bool
 		}
 		return false, nil
 	}
-	if len(s.state.Catalog) > 0 || s.state.Complete {
+	if len(s.state.Catalog) > 0 && !assembling || s.state.Complete {
 		return false, ErrConflict
 	}
 	if len(s.refs) >= s.intent.MaxObjects || s.bytes+int64(len(b)) > s.intent.MaxBytes {
@@ -502,26 +520,43 @@ func (s *Session) Write(ctx context.Context, ref filekit.Object, b []byte) (bool
 	s.bytes += int64(ref.Bytes)
 	return true, s.point("capture-object-durable")
 }
-func (s *Session) prepare(ctx context.Context, raw []byte) ([]generation.Object, error) {
+func (s *Session) catalogDependencies(ctx context.Context, raw []byte) ([]generation.Object, error) {
 	if e := s.guard(ctx); e != nil {
 		return nil, e
 	}
 	if s.state.Acknowledged {
 		return nil, ErrConflict
 	}
+	if len(s.state.Catalog) > 0 {
+		if !bytes.Equal(s.state.Catalog, raw) {
+			return nil, ErrConflict
+		}
+		if s.catalogRefs != nil {
+			return s.catalogRefs, nil
+		}
+	}
 	c, e := generation.VerifyCatalog(raw, s.replica.Trust())
 	if e != nil || !s.intent.matches(c) {
 		return nil, ErrDenied
 	}
-	if len(s.state.Catalog) > 0 && !bytes.Equal(s.state.Catalog, raw) {
-		return nil, ErrConflict
-	}
 	refs, e := generation.Dependencies(raw, s.replica.Trust())
+	if e == nil && len(s.state.Catalog) > 0 {
+		s.catalogRefs = refs
+	}
+	return refs, e
+}
+
+func (s *Session) has(ref generation.Object) bool {
+	return s.refs[ref.ID] == ref || s.base[ref.ID] == ref
+}
+
+func (s *Session) prepare(ctx context.Context, raw []byte) ([]generation.Object, error) {
+	refs, e := s.catalogDependencies(ctx, raw)
 	if e != nil {
 		return nil, e
 	}
 	for _, ref := range refs {
-		if s.refs[ref.ID] != ref && s.base[ref.ID] != ref {
+		if !s.has(ref) {
 			return nil, ErrIncomplete
 		}
 	}
