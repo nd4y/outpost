@@ -249,19 +249,23 @@ func (s *Store) putObjectContext(ctx context.Context, b []byte, metadata bool) (
 		if e != nil {
 			return ref, e
 		}
-		if created {
-			s.Stats.NewObjects++
-			if metadata {
-				s.Stats.NewMetadataBytes += int64(len(b))
-			} else {
-				s.Stats.NewPayloadBytes += int64(len(b))
-			}
-		}
-		return ref, s.checkpoint("object-durable")
+		return ref, s.recordRemoteWrite(ref, metadata, created)
 	}
 	var result Object
 	e := statefile.Guard(s.Admit, objectPath(ref.ID), len(b), func() error { var err error; result, err = s.putLocalObject(b, metadata); return err })
 	return result, e
+}
+
+func (s *Store) recordRemoteWrite(ref Object, metadata, created bool) error {
+	if created {
+		s.Stats.NewObjects++
+		if metadata {
+			s.Stats.NewMetadataBytes += int64(ref.Bytes)
+		} else {
+			s.Stats.NewPayloadBytes += int64(ref.Bytes)
+		}
+	}
+	return s.checkpoint("object-durable")
 }
 func (s *Store) putLocalObject(b []byte, metadata bool) (Object, error) {
 	ref := Object{ID: digest(b), Bytes: len(b)}

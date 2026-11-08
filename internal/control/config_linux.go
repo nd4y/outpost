@@ -44,6 +44,7 @@ func (l Limits) Validate() error {
 }
 
 type Domain struct {
+	CaptureStaging               bool              `json:"captureStaging,omitempty"`
 	ScrubIntervalSeconds         int64             `json:"scrubIntervalSeconds,omitempty"`
 	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
@@ -154,6 +155,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	domains := map[string]Domain{}
 	for _, d := range c.Domains {
+		if d.CaptureStaging && c.Format != SettlementConfigFormat {
+			return ErrDenied
+		}
 		if d.ScrubIntervalSeconds < 0 || d.ScrubIntervalSeconds > 30*24*3600 {
 			return ErrDenied
 		}

@@ -119,6 +119,9 @@ type Renewal struct {
 // Original private grant files remain bootstrap anchors; new inputs are separate.
 func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal, error) {
 	var out Renewal
+	if a.b.Companion != nil {
+		return out, ErrUnsupported
+	}
 	next, e := ingress.VerifyAuthority(authority, a.b.Local.Owner, time.Now())
 	if e != nil {
 		return out, e

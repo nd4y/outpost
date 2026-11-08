@@ -29,6 +29,16 @@ Signed agent state fences the operation before provider preparation. Signed file
 
 Status exposes opaque identities, phases and copy observations without source names or keys. SIGINT/SIGTERM preserve durable progress. A joined volume monitor cancels outstanding HTTPS requests after identity loss; forcibly interrupting a filesystem call stuck inside the kernel is not promised. Checkpoint output uses a new private file without overwrite. Independent recovery also needs the file-kit recovery owner, public generation trust and complete ciphertext; a checkpoint or source cache alone is not a backup.
 
+## Parallel capture to two required holders
+
+On a new two-copy installation, add `companionIngress` to the private bootstrap with an HTTPS `endpoint` and an `authorityFile`. Keep the primary `endpoint` and `authorityFile`. Sign both receiver grants with the owner key. They bind different ingress identities and use the same source, profile, tenant, repository, writer epoch, revision, validity and object limits. Include the companion in `profile.copyTargets` and in the primary collector's signed observation grant.
+
+Apply `outpost-control-2` to both receivers with `captureStaging: true` on the domain. Admit each receiver's own ingress grant and the source-to-receiver push edges. Both receivers need a signed HTTPS endpoint and explicit pull edges in both directions between the two holders. The receiving worker selects the endpoint from that signed policy and verifies the origin's signed intent and receiver grant. Holders reached later through the ordinary replication graph use complete generations.
+
+The source keeps at most two payload packs in flight and alternates initial recipients. A receiver reads an accepted object directly from its peer over mTLS. The object is durable before the destination confirms it. The source records pack progress after both writes and seals the generation only after all required packs and metadata are available. An accepted exact ciphertext object can be reused on retry. The two holders verify the complete catalog independently. Snapshot release still requires the existing verified two-copy checkpoint.
+
+The bootstrap anchors and signed companion receipt are private installation state. Preserve them and both receiver histories across restart. This candidate requires the two configured holders and supports only the full-copy release policy. Automatic receiver substitution, distributed release and coordinated renewal of the pair remain open. The single-receiver `source-renew` command refuses a paired installation.
+
 ## Renewing source authority
 
 `source-renew` accepts a separately owner-signed grant with a higher revision and current validity. Pause the foreground scheduler first. Renewal accepts `IDLE`, `COMPLETE` and an owner-authorized `ABANDONED` operation. The command holds the same execution lease as capture, preserves the generation head and schedule, and refuses a pending `PREPARING` or `ACTIVE` operation. It does not extend an immutable intent or discard work whose grant has expired.

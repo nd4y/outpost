@@ -50,6 +50,7 @@ type Bootstrap struct {
 	Endpoint        string              `json:"endpoint"`
 	Limits          diskbudget.Limits   `json:"limits"`
 	Prepared        *PreparedSource     `json:"prepared,omitempty"`
+	Companion       *CompanionIngress   `json:"companionIngress,omitempty"`
 }
 
 func Load(path string) (Bootstrap, error) {
@@ -113,6 +114,8 @@ type Agent struct {
 	observation        []byte
 	initialObservation []byte
 	grant              ingress.Authority
+	companion          ingress.Authority
+	companionAuthority []byte
 	anchor             ingress.Authority
 	cert               tls.Certificate
 	roots              *x509.CertPool
@@ -161,6 +164,9 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		return nil, ErrInvalid
 	}
 	a.anchor = a.grant
+	if e = a.loadCompanion(); e != nil {
+		return nil, e
+	}
 	if b.ObservationFile != "" {
 		if b.Profile.MinimumCopies != 2 {
 			return nil, ErrInvalid
@@ -171,6 +177,9 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		}
 		g, e := observation.VerifyGrant(a.observation, b.Local.Owner)
 		if e != nil || g.Reader != b.Local.Node || g.Collector != a.grant.Ingress || !observation.SameTrust(g.Trust, a.grant.Trust) || g.Target(g.Collector) {
+			return nil, ErrInvalid
+		}
+		if b.Companion != nil && !g.Target(a.companion.Ingress) {
 			return nil, ErrInvalid
 		}
 		for _, target := range g.Targets {
@@ -213,11 +222,12 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 	}
 	a.initialObservation = bytes.Clone(a.observation)
 	identity, _ := json.Marshal(struct {
-		Bootstrap   Bootstrap
-		Authority   []byte
-		Observation []byte `json:",omitempty"`
-		Data        filekit.Owner
-	}{b, a.authority, a.observation, a.owner})
+		Bootstrap          Bootstrap
+		Authority          []byte
+		Observation        []byte `json:",omitempty"`
+		Data               filekit.Owner
+		CompanionAuthority []byte `json:",omitempty"`
+	}{b, a.authority, a.observation, a.owner, a.companionAuthority})
 	a.binding = storage.Hash(identity)
 	if initialize {
 		// The parent must already exist. Checking it by held identities rejects
@@ -585,6 +595,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	limits := peer.Limits{Concurrency: 1, Timeout: 30 * time.Second, Attempts: 1}
 	authority := a.intentAuthority(s)
 	var client *ingress.Client
+	cleanup := inspect || len(settlement) != 0
 	if len(settlement) != 0 {
 		client, e = ingress.NewSettlementClient(a.b.Endpoint, authority, s.Intent, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
 	} else if inspect {
@@ -593,6 +604,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		client, e = ingress.NewClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
 		if e != nil && s.Phase != "PREPARING" {
 			client, e = ingress.NewCleanupClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+			cleanup = true
 		}
 	}
 	if e != nil {
@@ -605,10 +617,21 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		client.Close()
 		return nil, nil, e
 	}
-	cache, e := filekit.OpenStreamingStoreAt(a.root, "cache", a.owner, initialize, client)
+	var sink capture.Sink = client
+	closeSink := client.Close
+	if a.b.Companion != nil {
+		group, err := a.openParallelSink(i, prefix, client, limits, initialize, cleanup)
+		if err != nil {
+			provider.Close()
+			client.Close()
+			return nil, nil, err
+		}
+		sink, closeSink = group, group.Close
+	}
+	cache, e := filekit.OpenStreamingStoreAt(a.root, "cache", a.owner, initialize, sink)
 	if e != nil {
 		provider.Close()
-		client.Close()
+		closeSink()
 		return nil, nil, e
 	}
 	cache.Admit = a.admission("cache")
@@ -621,7 +644,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	if e != nil {
 		cache.Close()
 		provider.Close()
-		client.Close()
+		closeSink()
 		return nil, nil, e
 	}
 	inputs.Admit = a.admission(prefix + "/input")
@@ -651,22 +674,22 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	if e != nil {
 		cache.Close()
 		provider.Close()
-		client.Close()
+		closeSink()
 		return nil, nil, e
 	}
 	var copies func(context.Context, string) ([]capture.CopyReceipt, error)
 	if len(a.observation) > 0 {
 		copies = a.copies
 	}
-	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, ReadOnly: inspect, Settlement: settlement, Profile: p, Authority: authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: client, Cache: cache, Previous: previous, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
+	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, ReadOnly: inspect, Settlement: settlement, Profile: p, Authority: authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: sink, Cache: cache, Previous: previous, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
 	if e != nil {
 		cache.Close()
 		provider.Close()
-		client.Close()
+		closeSink()
 		return nil, nil, e
 	}
 	job.Fault = a.Fault
-	return job, func() { job.Close(); cache.Close(); provider.Close(); client.Close() }, nil
+	return job, func() { job.Close(); cache.Close(); provider.Close(); closeSink() }, nil
 }
 
 func (a *Agent) Run(ctx context.Context) error {

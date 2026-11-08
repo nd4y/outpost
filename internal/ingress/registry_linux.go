@@ -37,6 +37,7 @@ type RegistryOptions struct {
 	Roots       *x509.CertPool
 	Limits      peer.Limits
 	Initialize  bool
+	Staging     *StagingRoutes
 	// Settlement reopens only the exact existing historical slot. It cannot
 	// initialize a registry or authorize any payload route.
 	Settlement, SettlementIntent []byte
@@ -56,19 +57,20 @@ type registryState struct {
 	LegacyDigest      string          `json:"legacyDigest,omitempty"`
 }
 type Registry struct {
-	root      *os.Root
-	mu        sync.Mutex
-	options   RegistryOptions
-	authority Authority
-	store     *statefile.Store
-	lease     *os.File
-	state     registryState
-	session   *Session
-	handler   http.Handler
-	leaf      *x509.Certificate
-	poisoned  bool
-	gate      chan struct{}
-	Fault     func(string) error
+	root                     *os.Root
+	mu                       sync.Mutex
+	options                  RegistryOptions
+	authority                Authority
+	store                    *statefile.Store
+	lease                    *os.File
+	state                    registryState
+	session                  *Session
+	handler                  http.Handler
+	leaf                     *x509.Certificate
+	poisoned                 bool
+	gate                     chan struct{}
+	stageReads, stageImports chan struct{}
+	Fault                    func(string) error
 }
 
 func (g *Registry) point(name string) error {
@@ -172,6 +174,10 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 	o.SettlementIntent = bytes.Clone(o.SettlementIntent)
 	owned = true
 	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
+	if o.Staging != nil {
+		g.stageReads = make(chan struct{}, o.Limits.Concurrency)
+		g.stageImports = make(chan struct{}, o.Limits.Concurrency)
+	}
 	fail := func(e error) (*Registry, error) { g.Close(); return nil, e }
 	g.store, e = statefile.OpenAt(r, "state", maxRegistryState, o.Initialize)
 	if e != nil {
@@ -236,6 +242,16 @@ func (g *Registry) sessionOptions(raw []byte) SessionOptions {
 		authority = g.intentAuthority()
 	}
 	return SessionOptions{Parent: g.root, Directory: "current", Authority: authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject}
+}
+
+func (g *Registry) sessionServer() (*http.Server, error) {
+	o := g.options
+	if o.Staging == nil {
+		return NewServer(g.session, o.Certificate, o.Roots, o.Limits)
+	}
+	// Materialization uses the existing durable verification cursor. Keep
+	// each staged-capture request small even on synchronous receiver disks.
+	return newServer(g.session, o.Certificate, o.Roots, o.Limits, 1, generation.MaxObject)
 }
 func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	o := g.sessionOptions(raw)
@@ -388,7 +404,7 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 		}
 	}
 	if g.handler == nil {
-		s, e := NewServer(g.session, g.options.Certificate, g.options.Roots, g.options.Limits)
+		s, e := g.sessionServer()
 		if e != nil {
 			g.session.Close()
 			g.session = nil
@@ -399,6 +415,9 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	return i, nil
 }
 func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if g.options.Staging != nil && len(g.options.Settlement) == 0 && g.serveStaging(w, r) {
+		return
+	}
 	select {
 	case g.gate <- struct{}{}:
 		defer func() { <-g.gate }()
@@ -501,7 +520,7 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if g.handler == nil {
-			s, e := NewServer(g.session, g.options.Certificate, g.options.Roots, g.options.Limits)
+			s, e := g.sessionServer()
 			if e != nil {
 				fail(w, e)
 				return

@@ -123,6 +123,14 @@ type ObjectBackend interface {
 	Check(context.Context, Object) error
 }
 
+// ConcurrentObjectBackend opts a streaming backend into a bounded number of
+// immutable payload writes. Implementations must support concurrent Write and
+// Check calls. Descriptor publication still waits for every verified write.
+type ConcurrentObjectBackend interface {
+	ObjectBackend
+	ParallelWrites() int
+}
+
 var ErrInvalid = errors.New("invalid or unsupported file kit")
 
 var ErrRemoteMaintenance = errors.New("object maintenance is owned by the receiving replica")

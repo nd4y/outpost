@@ -135,13 +135,72 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	pending := map[string]Block{}
 	positions := map[string][]int{}
 	existing := map[string]bool{}
+	width := 1
+	if backend, ok := s.backend.(ConcurrentObjectBackend); ok {
+		width = backend.ParallelWrites()
+		if width < 1 || width > 4 {
+			return s.Stats, ErrInvalid
+		}
+	}
+	type acceptance struct {
+		created bool
+		err     error
+	}
+	type pendingPack struct {
+		ref        Object
+		checkpoint []Block
+		result     <-chan acceptance
+	}
+	var writes []pendingPack
+	writeCtx := ctx
+	if width > 1 {
+		var cancel context.CancelFunc
+		writeCtx, cancel = context.WithCancel(ctx)
+		defer func() {
+			cancel()
+			for _, write := range writes {
+				<-write.result
+			}
+		}()
+	}
+	commitFirst := func() error {
+		write := writes[0]
+		writes[0] = pendingPack{}
+		writes = writes[1:]
+		result := <-write.result
+		if result.err != nil {
+			return result.err
+		}
+		if e := s.recordRemoteWrite(write.ref, false, result.created); e != nil {
+			return e
+		}
+		if progress != nil {
+			return progress.append(ctx, write.checkpoint)
+		}
+		return nil
+	}
 	flush := func() error {
 		if len(pack) == 0 {
 			return nil
 		}
-		ref, e := s.putObjectContext(ctx, pack, false)
-		if e != nil {
-			return e
+		var ref Object
+		if width == 1 {
+			var e error
+			ref, e = s.putObjectContext(ctx, pack, false)
+			if e != nil {
+				return e
+			}
+		} else {
+			if len(writes) == width {
+				if e := commitFirst(); e != nil {
+					return e
+				}
+			}
+			ref = Object{ID: digest(pack), Bytes: len(pack)}
+			// The producer owns this reference until acceptance. Later
+			// chunks may refer to it, but no descriptor or progress record
+			// is committed until its actual durable write returns.
+			existing[ref.ID] = true
 		}
 		checkpoint := make([]Block, 0, len(pending))
 		for hash, b := range pending {
@@ -152,12 +211,22 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 				d.Blocks[i] = b
 			}
 		}
-		if progress != nil {
-			if e = progress.append(ctx, checkpoint); e != nil {
-				return e
+		if width > 1 {
+			result := make(chan acceptance, 1)
+			writes = append(writes, pendingPack{ref: ref, checkpoint: checkpoint, result: result})
+			go func(payload []byte) {
+				created, e := s.backend.Write(writeCtx, ref, payload)
+				result <- acceptance{created: created, err: e}
+			}(pack)
+			pack = make([]byte, 0, MaxObject)
+		} else {
+			if progress != nil {
+				if e := progress.append(ctx, checkpoint); e != nil {
+					return e
+				}
 			}
+			pack = pack[:0]
 		}
-		pack = pack[:0]
 		clear(pending)
 		clear(positions)
 		return nil
@@ -212,6 +281,11 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	if err = flush(); err != nil {
 		return s.Stats, err
 	}
+	for len(writes) != 0 {
+		if err = commitFirst(); err != nil {
+			return s.Stats, err
+		}
+	}
 	d.SHA256 = hex.EncodeToString(h.Sum(nil))
 	after, err := f.Stat()
 	if err != nil {
@@ -232,6 +306,9 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	s.Stats.File = opt.File
 	s.Stats.Blocks = len(d.Blocks)
 	s.Stats.PeakBufferBytes = MaxChunk + MaxObject + 2*MaxDescriptor
+	if width > 1 {
+		s.Stats.PeakBufferBytes += int64(width * MaxObject)
+	}
 	if _, _, e := s.LoadVersionContext(ctx, version); e == nil {
 		return s.Stats, nil
 	} else if !errors.Is(e, os.ErrNotExist) {

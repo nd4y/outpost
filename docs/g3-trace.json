@@ -159,7 +159,7 @@
       "id": "REQ-25",
       "acceptanceSubset": ["AT-07", "AT-08"],
       "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss",
-      "remaining": "Global graph validation, real host egress enforcement, long partitions and forwarding durably accepted objects before generation sealing",
+      "remaining": "Global graph validation, real host egress enforcement, long partitions and general multi-hop staging. The paired source check is tracked in product-status.json.",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",

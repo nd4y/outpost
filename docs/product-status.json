@@ -317,10 +317,14 @@
         {
           "path": "internal/sourceagent/unstarted_linux_test.go",
           "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. Parallel initial admission to authorized ingress nodes, durable per-object confirmation, explicit distributed release and asymmetric-path measurements remain open."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. Parallel initial admission to authorized ingress nodes, durable per-object confirmation, explicit distributed release and asymmetric-path measurements remain open. Adaptive weighting, automatic substitution, distributed snapshot release and the asymmetric 500/500/100 profile remain open."
     },
     {
       "id": "REQ-06",
@@ -2034,7 +2038,12 @@
       "id": "REQ-23",
       "workstream": "generations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "implementation": [
+        "internal/generation",
+        "internal/peer",
+        "internal/upload",
+        "internal/sourceagent"
+      ],
       "checks": [
         {
           "path": "internal/peer/peer_linux_test.go",
@@ -2359,10 +2368,14 @@
         {
           "path": "internal/sourceagent/unstarted_linux_test.go",
           "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting. Paired capture keeps independent readiness and the existing signed two-copy release threshold. Distributed coverage and full timing acceptance remain open."
     },
     {
       "id": "REQ-24",
@@ -2465,7 +2478,8 @@
         "internal/worker",
         "internal/peer",
         "internal/observation",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/ingress"
       ],
       "checks": [
         {
@@ -2495,10 +2509,14 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
-      "remaining": "Installation, long-outage and complete process-level acceptance. Forwarding staged objects before seal, reconciliation against the signed closure and crash/failover acceptance remain open."
+      "remaining": "Installation, long-outage and complete process-level acceptance. Forwarding staged objects before seal, reconciliation against the signed closure and crash/failover acceptance remain open. Pre-seal mTLS pulls work for an explicitly configured pair. General multi-hop staging and full topology acceptance remain open."
     },
     {
       "id": "REQ-26",

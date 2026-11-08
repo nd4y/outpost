@@ -79,6 +79,10 @@ func jsonReply(w http.ResponseWriter, status int, v any) {
 // NewServer serves one admitted session. It never listens itself or grants a
 // new session; a worker registry must admit and route dynamic capture intents.
 func NewServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*http.Server, error) {
+	return newServer(s, cert, roots, limits, 256, 256<<20)
+}
+
+func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits, batchObjects int, batchBytes int64) (*http.Server, error) {
 	if s == nil || !limitsOK(limits) {
 		return nil, ErrDenied
 	}
@@ -159,7 +163,7 @@ func NewServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 				fail(w, e)
 				return
 			}
-			progress, receipt, e := s.FinishBatch(ctx, raw, 256, 256<<20)
+			progress, receipt, e := s.FinishBatch(ctx, raw, batchObjects, batchBytes)
 			if e != nil {
 				fail(w, e)
 				return
@@ -251,6 +255,7 @@ type Client struct {
 	authority, intentRaw         []byte
 	owner                        ed25519.PublicKey
 	cleanup                      bool
+	stagingReader                bool
 	settlement                   []byte
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
@@ -292,7 +297,11 @@ func newClient(endpoint string, authority, intent []byte, owner ed25519.PublicKe
 	if e != nil {
 		return nil, e
 	}
-	h, u, e := peer.AuthenticatedHTTP(endpoint, cert, roots, i.Source, i.Ingress, limits)
+	return clientWithIdentity(endpoint, i.Source, i, authority, intent, owner, cert, roots, limits, cleanup)
+}
+
+func clientWithIdentity(endpoint, self string, i Intent, authority, intent []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits, cleanup bool) (*Client, error) {
+	h, u, e := peer.AuthenticatedHTTP(endpoint, cert, roots, self, i.Ingress, limits)
 	if e != nil {
 		return nil, e
 	}
@@ -308,6 +317,9 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 	now := time.Now()
 	ack := resource == "ack" && method == http.MethodPut
 	settling := len(c.settlement) != 0
+	if c.stagingReader && (method != http.MethodGet || !strings.HasPrefix(resource, "staged/")) {
+		return 0, nil, nil, ErrDenied
+	}
 	if (c.cleanup || settling) && !ack && !(settling && resource == "receipt" && method == http.MethodGet) {
 		return 0, nil, nil, ErrDenied
 	}
@@ -422,10 +434,14 @@ func decodeReply(raw []byte, v any) error {
 	return nil
 }
 func (c *Client) Read(ctx context.Context, ref filekit.Object) ([]byte, error) {
+	return c.readObjectResource(ctx, ref, "objects/")
+}
+
+func (c *Client) readObjectResource(ctx context.Context, ref filekit.Object, prefix string) ([]byte, error) {
 	if !validObject(ref) {
 		return nil, ErrDenied
 	}
-	status, _, b, e := c.request(ctx, http.MethodGet, "objects/"+ref.ID, &ref, nil, ref.Bytes)
+	status, _, b, e := c.request(ctx, http.MethodGet, prefix+ref.ID, &ref, nil, ref.Bytes)
 	if e != nil {
 		return nil, e
 	}

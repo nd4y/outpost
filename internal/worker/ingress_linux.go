@@ -3,8 +3,33 @@ package worker
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
+
+	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/ingress"
 )
+
+func captureStagingRoutes(c control.Config, domain string) *ingress.StagingRoutes {
+	d, ok := c.DomainByID(domain)
+	if !ok || !d.CaptureStaging {
+		return nil
+	}
+	routes := &ingress.StagingRoutes{Origins: map[string]string{}, Readers: map[string]bool{}}
+	for _, edge := range d.Placement.Edges {
+		if edge.Mode != "pull" || !slices.Contains(d.Placement.Holders, edge.From) || !slices.Contains(d.Placement.Holders, edge.To) {
+			continue
+		}
+		if edge.To == c.Node {
+			node, _ := c.NodeByID(edge.From)
+			routes.Origins[edge.From] = node.Endpoint
+		}
+		if edge.From == c.Node {
+			routes.Readers[edge.To] = true
+		}
+	}
+	return routes
+}
 
 // The view owns admission, lifetime and cancellation. Registry capabilities
 // never outlive the current accepted placement, even on reused TLS connections.
