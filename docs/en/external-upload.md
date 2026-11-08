@@ -132,7 +132,13 @@ The schedule retains one window identity for the same upload operation and inter
 outpost worker-external-audit-status --bootstrap /private/worker.json --operation UPLOAD_ID
 ```
 
-The status command reads local evidence only. A successful audit whose oldest supporting read has aged beyond the interval is reported as `STALE`. A missing or invalid dependency changes the scheduled observation without modifying the original upload receipt. Scheduled reads have no repair authority.
+The status command reads local evidence only. A successful audit whose oldest supporting read has aged beyond the interval is reported as `STALE`. A missing or invalid dependency changes the scheduled observation without modifying the original upload receipt.
+
+### Enable repair of missing parts
+
+Set `externalRepairMissing` in the signed domain policy and `allowMissingRepair` in the exact active planner delegation. Both flags must be true, and the schedule must be active. The worker persists a confirmed missing part before admitting a separate repair operation. Restart can replay the same observation within the schedule interval. Use `worker-external-audit-status` to see the observation and `worker-status` to track the repair job.
+
+The repair reuses the retained part map and checks the existing completion marker, catalog and exact part. It can create that part from its complete local copy and publishes a new receipt only after fresh verification of the full target closure. Each additional missing part needs its own observation. A missing marker or descriptor, unavailable target or corrupt bytes do not authorize automatic writes. The original marker and upload receipt are retained.
 
 ## Repair a selected external copy
 
@@ -147,7 +153,7 @@ outpost upload-plan-build --key /private/upload-planner.json \
 
 The command reads the selected signed catalog from `catalogs` and the ciphertext needed to describe multipart objects from `objects`. Keep these files private. It needs no mutable replica index or remote credentials. The plan binds exact object references. The worker checks that it holds a complete admitted source before execution.
 
-The owner admits the signed plan as a fresh `upload` job in the current configuration. Use fresh target readback for repair by setting `cloudReadbackMaxAgeSeconds` to zero. Missing immutable data can be added with the existing create-only writes and checked again. A conflicting canonical object blocks completion and keeps its bytes. To replace that copy, authorize a separately provisioned target profile and verify independent restoration there before considering retirement. Original receipts retain their operation and observation time. Periodic external repair remains open.
+The owner admits the signed plan as a fresh `upload` job in the current configuration. Use fresh target readback for repair by setting `cloudReadbackMaxAgeSeconds` to zero. Missing immutable data can be added with the existing create-only writes and checked again. A conflicting canonical object blocks completion and keeps its bytes. To replace that copy, authorize a separately provisioned target profile and verify independent restoration there before considering retirement. Original receipts retain their operation and observation time.
 
 ## Evidence and remaining costs
 

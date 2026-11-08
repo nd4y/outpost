@@ -86,6 +86,10 @@ func (w *Worker) load() (Status, error) {
 		if id != j.Job.Operation || !storage.ID(id) || !storage.ID(j.Binding) || !storage.ID(j.Job.Generation) || !storage.ID(j.Job.Domain) || j.Job.Executor != w.node || len(j.Job.Plan) != 0 || len(j.Receipt) > 1<<20 {
 			return s, ErrDenied
 		}
+		if r := j.Job.MissingRepair; r != nil && (j.Job.Kind != "upload" || !storage.ID(j.Job.Delegation) || !storage.ID(j.Job.Target) ||
+			!r.Valid(1, 1<<40) || id != upload.RepairOperation(j.Job.Delegation, j.Job.Generation, *r) || j.Binding != binding(j.Job)) {
+			return s, ErrDenied
+		}
 		switch j.Phase {
 		case "QUEUED", "RUNNING", "RETRY_WAIT", "BLOCKED", "COMPLETE", "WITHDRAWN":
 		default:

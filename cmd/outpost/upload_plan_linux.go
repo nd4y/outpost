@@ -51,7 +51,7 @@ func buildUploadPlan(ctx context.Context, replica, trustFile, keyFile, input, id
 	}
 	p := request.Plan
 	suppliedCatalog := len(p.Catalog) != 0 && !bytes.Equal(bytes.TrimSpace(p.Catalog), []byte("null"))
-	if (p.Generation != "" && p.Generation != id) || suppliedCatalog || len(p.Blobs) != 0 || len(p.Signature) != 0 || len(p.Delegation) != 0 {
+	if (p.Generation != "" && p.Generation != id) || suppliedCatalog || len(p.Blobs) != 0 || len(p.Signature) != 0 || len(p.Delegation) != 0 || p.MissingRepair != nil {
 		return nil, errUsage
 	}
 	raw, err = worker.ReadPrivate(keyFile, 4096)

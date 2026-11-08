@@ -894,7 +894,9 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 	queue.ObserveHTTPAttempt = func(ctx context.Context, attempt upload.HTTPAttempt) {
 		_ = w.writeExternalHTTPAttempt(ctx, attempt)
 	}
-	queue.Readback = upload.ReadbackOptions{MaxAgeSeconds: d.CloudReadbackMaxAgeSeconds, Store: w.state}
+	if j.MissingRepair == nil {
+		queue.Readback = upload.ReadbackOptions{MaxAgeSeconds: d.CloudReadbackMaxAgeSeconds, Store: w.state}
+	}
 	if e = queue.Enqueue(ctx, local.replica, j.Plan); e != nil {
 		return nil, e
 	}

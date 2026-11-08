@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"strconv"
 
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/storage"
@@ -17,16 +18,17 @@ const MaxDelegation = 32 << 10
 // Delegation grants no storage credentials or deletion rights. The owner must
 // independently admit the exact delegation under current placement policy.
 type Delegation struct {
-	Format         string           `json:"format"`
-	Trust          generation.Trust `json:"trust"`
-	Epoch          uint64           `json:"epoch"`
-	Profile        storage.Profile  `json:"profile"`
-	AllowedClasses []string         `json:"allowedClasses"`
-	Workers        []Worker         `json:"workers"`
-	StartMillis    int64            `json:"startMillis"`
-	ExpiresUnix    int64            `json:"expiresUnix"`
-	SlotMillis     int64            `json:"slotMillis"`
-	Signature      []byte           `json:"signature,omitempty"`
+	Format             string           `json:"format"`
+	Trust              generation.Trust `json:"trust"`
+	Epoch              uint64           `json:"epoch"`
+	Profile            storage.Profile  `json:"profile"`
+	AllowedClasses     []string         `json:"allowedClasses"`
+	Workers            []Worker         `json:"workers"`
+	StartMillis        int64            `json:"startMillis"`
+	ExpiresUnix        int64            `json:"expiresUnix"`
+	SlotMillis         int64            `json:"slotMillis"`
+	AllowMissingRepair bool             `json:"allowMissingRepair,omitempty"`
+	Signature          []byte           `json:"signature,omitempty"`
 }
 
 func (d Delegation) template() Plan {
@@ -75,13 +77,34 @@ func VerifyDelegation(raw []byte, a Authority) (Delegation, error) {
 func DelegatedOperation(raw []byte, id string) string {
 	return storage.Hash([]byte(storage.Hash(raw) + "/" + id))
 }
-func derivedTemplate(raw []byte, d Delegation, id string) Plan {
+
+type MissingRepair struct {
+	Part         string `json:"part"`
+	ObservedUnix int64  `json:"observedUnix"`
+}
+
+func (r MissingRepair) Valid(notBefore, expires int64) bool {
+	return storage.ID(r.Part) && r.ObservedUnix > 0 && r.ObservedUnix >= notBefore && r.ObservedUnix < expires
+}
+
+func RepairOperation(delegation, generation string, r MissingRepair) string {
+	return storage.Hash([]byte(delegation + "/" + generation + "/missing-repair/" + r.Part + "/" + strconv.FormatInt(r.ObservedUnix, 10)))
+}
+
+func derivedTemplate(raw []byte, d Delegation, id string, repair *MissingRepair) (Plan, error) {
 	p := d.template()
 	p.Format = DerivedFormat
 	p.Operation = DelegatedOperation(raw, id)
 	p.Generation = id
 	p.Delegation = bytes.Clone(raw)
-	return p
+	if repair != nil {
+		if !d.AllowMissingRepair || !repair.Valid(d.StartMillis/1000, d.ExpiresUnix) {
+			return Plan{}, ErrDenied
+		}
+		p.MissingRepair = repair
+		p.Operation = RepairOperation(storage.Hash(raw), id, *repair)
+	}
+	return p, nil
 }
 
 // BuildDerived needs a complete local replica and public delegation only.
@@ -98,7 +121,10 @@ func BuildDerivedCached(ctx context.Context, source *generation.Replica, id stri
 	if e != nil || source == nil || !sameTrust(source.Trust(), a.Generation) || !storage.ID(id) {
 		return nil, ErrDenied
 	}
-	p := derivedTemplate(raw, d, id)
+	p, e := derivedTemplate(raw, d, id, nil)
+	if e != nil {
+		return nil, e
+	}
 	p.Catalog, e = source.Catalog(ctx, id)
 	if e != nil {
 		return nil, e
@@ -141,12 +167,34 @@ func BuildDerivedCached(ctx context.Context, source *generation.Replica, id stri
 	}
 	return result, ctx.Err()
 }
+
+// DeriveMissingRepair reuses the complete upload's part map. Execution still
+// verifies the source bytes for the selected part and rereads the target closure.
+func DeriveMissingRepair(raw []byte, a Authority, repair MissingRepair) ([]byte, error) {
+	p, err := Verify(raw, a)
+	if err != nil || p.Format != DerivedFormat || p.MissingRepair != nil {
+		return nil, ErrDenied
+	}
+	p.Operation = RepairOperation(storage.Hash(p.Delegation), p.Generation, repair)
+	p.MissingRepair = &repair
+	result, err := json.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = Verify(result, a); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
 func verifyDerived(raw []byte, p Plan, a Authority) error {
 	d, e := VerifyDelegation(p.Delegation, a)
 	if e != nil {
 		return e
 	}
-	expected := derivedTemplate(p.Delegation, d, p.Generation)
+	expected, e := derivedTemplate(p.Delegation, d, p.Generation, p.MissingRepair)
+	if e != nil {
+		return e
+	}
 	expected.Catalog = p.Catalog
 	expected.Blobs = p.Blobs
 	canonical, e := json.Marshal(expected)

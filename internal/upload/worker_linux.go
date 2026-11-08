@@ -53,6 +53,9 @@ func VerifyClaim(raw []byte, p Plan, planID string) error {
 	if storage.Decode(raw, &c, 4096) != nil || c.Format != Format || c.Plan != planID || !storage.ID(c.Object) || c.Round < 0 || c.Round > (p.ExpiresUnix*1000-p.StartMillis)/p.SlotMillis || c.Worker != p.owner(c.Object, c.Round) || c.ExpiresMillis != p.StartMillis+(c.Round+1)*p.SlotMillis {
 		return ErrDenied
 	}
+	if p.MissingRepair != nil && c.Object != p.MissingRepair.Part {
+		return ErrDenied
+	}
 	tasks, e := p.Tasks()
 	if e != nil {
 		return e
@@ -92,6 +95,10 @@ func (j *Journal) verifyComplete(ctx context.Context, b *storage.Backend, audit 
 
 func (j *Journal) readTargetClosure(ctx context.Context, b *storage.Backend, audit *cloudAudit) error {
 	raw, e := b.Catalog(ctx, j.plan.Generation, j.authority.Generation)
+	if storage.Missing(e) {
+		// Catalog parts are outside the payload task map and cannot authorize its repair.
+		return storage.ErrNotFound
+	}
 	if e != nil {
 		return e
 	}
@@ -197,6 +204,12 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			_ = j.edit(short, func(s *State) error { s.Phase = "RETRYABLE"; return nil })
 		}
 	}()
+	if j.plan.MissingRepair != nil {
+		if e = j.repairMissingPart(ctx, source, b, key); e != nil {
+			return result, e
+		}
+		return j.completeTarget(ctx, source, b, pin, nil)
+	}
 	if e = b.Probe(ctx); e != nil {
 		return result, e
 	}
@@ -228,30 +241,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		}
 		// A target marker is only a hint until the whole generation is read back.
 		if e = j.verifyComplete(ctx, b, audit); e == nil {
-			receipt := Receipt{b.Profile().ID(), j.plan.Generation, j.plan.Operation, j.worker, "full-target-readback", time.Now().Unix()}
-			if audit != nil {
-				receipt.Verification, receipt.ObservedUnix, e = audit.evidence(ctx)
-				if e != nil {
-					return result, e
-				}
-			}
-			if e = j.edit(ctx, func(s *State) error {
-				// A PUT/readback may succeed just as its slot expires before the
-				// local acknowledgment is saved. Exact-map whole-target evidence
-				// resolves those attempts without inventing submitted byte counts.
-				for id, p := range s.Parts {
-					p.Complete = true
-					s.Parts[id] = p
-				}
-				s.Phase = "COMPLETE"
-				s.Receipt = &receipt
-				return nil
-			}); e != nil {
-				return result, e
-			}
-			result.Receipt = receipt
-			result.CleanupPending = source.ReleasePin(ctx, pin) != nil
-			return result, nil
+			return j.completeTarget(ctx, source, b, pin, audit)
 		} else if !storage.Missing(e) && !errors.Is(e, storage.ErrUnavailable) {
 			return result, e
 		}
@@ -349,4 +339,28 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 	}
+}
+
+func (j *Journal) completeTarget(ctx context.Context, source *generation.Replica, b *storage.Backend, pin string, audit *cloudAudit) (Result, error) {
+	receipt := Receipt{b.Profile().ID(), j.plan.Generation, j.plan.Operation, j.worker, "full-target-readback", time.Now().Unix()}
+	if audit != nil {
+		var err error
+		receipt.Verification, receipt.ObservedUnix, err = audit.evidence(ctx)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+	if err := j.edit(ctx, func(s *State) error {
+		// Whole-target evidence resolves parts whose acknowledgment missed the slot.
+		for id, p := range s.Parts {
+			p.Complete = true
+			s.Parts[id] = p
+		}
+		s.Phase = "COMPLETE"
+		s.Receipt = &receipt
+		return nil
+	}); err != nil {
+		return Result{}, err
+	}
+	return Result{Receipt: receipt, CleanupPending: source.ReleasePin(ctx, pin) != nil}, nil
 }

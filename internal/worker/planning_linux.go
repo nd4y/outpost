@@ -38,7 +38,19 @@ func (w *Worker) planUpload(ctx context.Context, v *view, j control.Job, source 
 	var raw []byte
 	e := w.state.WithLock(ctx, func() error { var e error; raw, e = w.state.Read(name); return e })
 	if errors.Is(e, os.ErrNotExist) {
-		raw, e = upload.BuildDerivedCached(ctx, source, j.Generation, grant, a, &upload.PlanningCache{Store: w.state, Fault: w.point})
+		if j.MissingRepair == nil {
+			raw, e = upload.BuildDerivedCached(ctx, source, j.Generation, grant, a, &upload.PlanningCache{Store: w.state, Fault: w.point})
+		} else {
+			original := "upload-plan-" + upload.DelegatedOperation(grant, j.Generation) + ".json"
+			var retained []byte
+			e = w.state.WithLock(ctx, func() error { var e error; retained, e = w.state.Read(original); return e })
+			if errors.Is(e, os.ErrNotExist) {
+				return nil, ErrDenied
+			}
+			if e == nil {
+				raw, e = upload.DeriveMissingRepair(retained, a, *j.MissingRepair)
+			}
+		}
 		if e != nil {
 			return nil, e
 		}

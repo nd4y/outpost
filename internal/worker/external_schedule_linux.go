@@ -28,6 +28,7 @@ type ExternalAuditStatus struct {
 	State        string                     `json:"state"`
 	FinishedUnix int64                      `json:"finishedUnix,omitempty"`
 	Receipt      *upload.TargetAuditReceipt `json:"receipt,omitempty"`
+	Repair       *upload.MissingRepair      `json:"repair,omitempty"`
 }
 
 func scheduledExternalProfile(operation string, interval int64) ExternalAuditProfile {
@@ -46,6 +47,10 @@ func readScheduledExternalAudit(store *statefile.Store, scope ExternalAuditStatu
 	if storage.Decode(raw, &record, 4096) != nil || record.Format != scope.Format || record.Node != scope.Node ||
 		record.Window != scope.Window || record.Operation != scope.Operation || record.Target != scope.Target ||
 		record.Generation != scope.Generation || record.FinishedUnix < 0 {
+		return record, ErrDenied
+	}
+	if r := record.Repair; r != nil && (record.State != "MISSING" || !record.Ready ||
+		r.ObservedUnix != record.FinishedUnix || !r.Valid(1, 1<<40)) {
 		return record, ErrDenied
 	}
 	switch record.State {
@@ -157,7 +162,7 @@ func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[strin
 		copies := map[string]JobState{}
 		for _, item := range status.Jobs {
 			j := item.Job
-			if item.Phase != "COMPLETE" || j.Kind != "upload" || j.Domain != d.Trust.Domain || j.Generation != latest ||
+			if item.Phase != "COMPLETE" || j.Kind != "upload" || j.MissingRepair != nil || j.Domain != d.Trust.Domain || j.Generation != latest ||
 				j.Executor != w.node || v.requestGates[j.Target] == nil || !d.Placement.PermitsCloud(w.node, j.Target) {
 				continue
 			}
@@ -190,6 +195,9 @@ func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[strin
 				continue
 			}
 			if record.FinishedUnix > 0 && now.Unix()-record.FinishedUnix < interval {
+				if record.Repair != nil && record.FinishedUnix <= now.Unix() {
+					w.admitExternalRepair(v, status, j, *record.Repair)
+				}
 				continue
 			}
 			if selected == nil || record.FinishedUnix < selected.record.FinishedUnix ||
@@ -211,6 +219,34 @@ func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[strin
 		_ = store.Close()
 		results <- result{externalAudit: key}
 	}()
+}
+
+func (w *Worker) externalRepairJob(v *view, original control.Job, repair upload.MissingRepair) (control.Job, bool) {
+	raw, grant, ok := v.cfg.UploadDelegation(original.Delegation)
+	if !ok || original.Domain != grant.Trust.Domain || original.Target != grant.Profile.ID() ||
+		original.Operation != upload.DelegatedOperation(raw, original.Generation) {
+		return control.Job{}, false
+	}
+	job := control.UploadRepairJob(raw, grant, original.Generation, w.node, repair)
+	return job, v.autonomy.Permits(job)
+}
+
+func (w *Worker) admitExternalRepair(v *view, status Status, original control.Job, repair upload.MissingRepair) {
+	job, ok := w.externalRepairJob(v, original, repair)
+	if !ok || v.paused(job.Domain, job.Operation) || status.Controls.paused(job.Domain, job.Operation) {
+		return
+	}
+	for _, item := range status.Jobs {
+		old := item.Job
+		if old.Operation != job.Operation && old.MissingRepair != nil && old.MissingRepair.Part == repair.Part &&
+			old.Generation == job.Generation && old.Delegation == job.Delegation && item.Phase != "COMPLETE" && item.Phase != "WITHDRAWN" {
+			return // keep one unresolved operation per exact part and delegation
+		}
+	}
+	if _, exists := status.Jobs[job.Operation]; !exists && w.point("external-repair-before-admission") != nil {
+		return
+	}
+	_ = w.admitDerived(v.ctx, v, []control.Job{job})
 }
 
 func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, selected externalAuditCandidate) {
@@ -244,6 +280,7 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 		record.Ready = true
 	}
 	record.Receipt = nil
+	record.Repair = nil
 	record.FinishedUnix = time.Now().Unix()
 	switch {
 	case err == nil:
@@ -255,6 +292,13 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 		record.FinishedUnix = 0
 	case storage.Missing(err):
 		record.State = "MISSING"
+		var absent *storage.MissingPart
+		if record.Ready && errors.As(err, &absent) {
+			repair := upload.MissingRepair{Part: absent.Part.ID, ObservedUnix: record.FinishedUnix}
+			if _, allowed := w.externalRepairJob(v, selected.job, repair); allowed {
+				record.Repair = &repair
+			}
+		}
 	case errors.Is(err, storage.ErrIntegrity), errors.Is(err, storage.ErrConflict):
 		record.State = "INVALID_CONTENT"
 	default:

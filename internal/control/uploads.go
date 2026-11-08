@@ -74,6 +74,14 @@ func (c Config) validateUploads() error {
 func UploadJob(raw []byte, g upload.Delegation, id, node string) Job {
 	return Job{Operation: upload.DelegatedOperation(raw, id), Executor: node, Kind: "upload", Domain: g.Trust.Domain, Generation: id, Target: g.Profile.ID(), Delegation: storage.Hash(raw)}
 }
+
+func UploadRepairJob(raw []byte, g upload.Delegation, id, node string, repair upload.MissingRepair) Job {
+	j := UploadJob(raw, g, id, node)
+	j.Operation = upload.RepairOperation(j.Delegation, id, repair)
+	j.MissingRepair = &repair
+	return j
+}
+
 func (c Config) AutonomousUpload(j Job) bool {
 	if !storage.ID(j.Generation) || !storage.ID(j.Delegation) {
 		return false
@@ -82,7 +90,15 @@ func (c Config) AutonomousUpload(j Job) bool {
 	if !ok {
 		return false
 	}
-	expected, _ := json.Marshal(UploadJob(raw, g, j.Generation, c.Node))
+	canonical := UploadJob(raw, g, j.Generation, c.Node)
+	if j.MissingRepair != nil {
+		d, _ := c.DomainByID(g.Trust.Domain)
+		if !d.ExternalRepairMissing || !g.AllowMissingRepair || !j.MissingRepair.Valid(g.StartMillis/1000, g.ExpiresUnix) {
+			return false
+		}
+		canonical = UploadRepairJob(raw, g, j.Generation, c.Node, *j.MissingRepair)
+	}
+	expected, _ := json.Marshal(canonical)
 	actual, _ := json.Marshal(j)
 	return bytes.Equal(expected, actual)
 }

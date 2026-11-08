@@ -9,7 +9,11 @@ type compiledRoute struct {
 	rule Replication
 	id   string
 }
-type compiledUpload struct{ domain, target string }
+type compiledUpload struct {
+	domain, target string
+	repair         bool
+	start, expires int64
+}
 
 // Autonomy is an immutable lookup for one already verified configuration.
 // Compilation does not replace owner signature or placement verification.
@@ -52,7 +56,7 @@ func (c Config) CompileAutonomy() (*Autonomy, error) {
 		if _, ok := a.uploads[id]; ok {
 			return nil, ErrDenied
 		}
-		a.uploads[id] = compiledUpload{g.Trust.Domain, g.Profile.ID()}
+		a.uploads[id] = compiledUpload{g.Trust.Domain, g.Profile.ID(), d.ExternalRepairMissing && g.AllowMissingRepair, g.StartMillis / 1000, g.ExpiresUnix}
 	}
 	return a, nil
 }
@@ -61,13 +65,17 @@ func (a *Autonomy) Permits(j Job) bool {
 		return false
 	}
 	if j.Kind == "upload" {
-		if j.Repair != "" {
+		g, ok := a.uploads[j.Delegation]
+		if !ok || j.Repair != "" || j.Executor != a.node || j.Peer != "" || j.PeerRevision != 0 || j.Domain != g.domain || j.Target != g.target {
 			return false
 		}
-		g, ok := a.uploads[j.Delegation]
-		return ok && j.Executor == a.node && j.Peer == "" && j.PeerRevision == 0 && j.Domain == g.domain && j.Target == g.target && j.Operation == storage.Hash([]byte(j.Delegation+"/"+j.Generation))
+		if j.MissingRepair != nil {
+			return g.repair && j.MissingRepair.Valid(g.start, g.expires) &&
+				j.Operation == upload.RepairOperation(j.Delegation, j.Generation, *j.MissingRepair)
+		}
+		return j.Operation == storage.Hash([]byte(j.Delegation+"/"+j.Generation))
 	}
-	if j.Delegation != "" || j.Target != "" {
+	if j.Delegation != "" || j.Target != "" || j.MissingRepair != nil {
 		return false
 	}
 	r, ok := a.routes[routeKey(j.Domain, j.Kind, j.Executor, j.Peer)]

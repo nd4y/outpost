@@ -48,6 +48,7 @@ type Domain struct {
 	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
 	ExternalAuditIntervalSeconds int64             `json:"externalAuditIntervalSeconds,omitempty"`
+	ExternalRepairMissing        bool              `json:"externalRepairMissing,omitempty"`
 	Trust                        generation.Trust  `json:"trust"`
 	Planner                      ed25519.PublicKey `json:"planner"`
 	Placement                    policy.Placement  `json:"placement"`
@@ -60,17 +61,18 @@ type Target struct {
 // A job contains opaque identifiers only. Storage credentials and plaintext
 // source rules are provisioned locally and never carried in shared jobs.
 type Job struct {
-	PeerRevision uint64          `json:"peerRevision,omitempty"`
-	Operation    string          `json:"operationId"`
-	Executor     string          `json:"executor"`
-	Kind         string          `json:"kind"`
-	Domain       string          `json:"domain"`
-	Generation   string          `json:"generation"`
-	Peer         string          `json:"peer,omitempty"`
-	Target       string          `json:"target,omitempty"`
-	Plan         json.RawMessage `json:"plan,omitempty"`
-	Delegation   string          `json:"delegation,omitempty"`
-	Repair       string          `json:"repair,omitempty"`
+	PeerRevision  uint64                `json:"peerRevision,omitempty"`
+	Operation     string                `json:"operationId"`
+	Executor      string                `json:"executor"`
+	Kind          string                `json:"kind"`
+	Domain        string                `json:"domain"`
+	Generation    string                `json:"generation"`
+	Peer          string                `json:"peer,omitempty"`
+	Target        string                `json:"target,omitempty"`
+	Plan          json.RawMessage       `json:"plan,omitempty"`
+	Delegation    string                `json:"delegation,omitempty"`
+	Repair        string                `json:"repair,omitempty"`
+	MissingRepair *upload.MissingRepair `json:"missingRepair,omitempty"`
 }
 type Config struct {
 	Format       string                `json:"format"`
@@ -155,6 +157,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 			return ErrDenied
 		}
 		if d.ExternalAuditIntervalSeconds != 0 && (d.ExternalAuditIntervalSeconds < 2 || d.ExternalAuditIntervalSeconds > 30*24*3600) {
+			return ErrDenied
+		}
+		if d.ExternalRepairMissing && d.ExternalAuditIntervalSeconds == 0 {
 			return ErrDenied
 		}
 		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds || d.CloudReadbackMaxAgeSeconds < 0 || d.CloudReadbackMaxAgeSeconds > readback.MaxAgeSeconds {
@@ -250,7 +255,7 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	}
 	for _, j := range c.Jobs {
 		d, ok := domains[j.Domain]
-		if !ok || j.Delegation != "" || !storage.ID(j.Operation) || !storage.ID(j.Generation) || operations[j.Operation] || !d.Placement.PermitsNode(c.Node) || !d.Placement.PermitsNode(j.Executor) {
+		if !ok || j.Delegation != "" || j.MissingRepair != nil || !storage.ID(j.Operation) || !storage.ID(j.Generation) || operations[j.Operation] || !d.Placement.PermitsNode(c.Node) || !d.Placement.PermitsNode(j.Executor) {
 			return ErrDenied
 		}
 		operations[j.Operation] = true
