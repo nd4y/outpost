@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
@@ -48,6 +49,14 @@ func (a *Agent) loadCompanion() error {
 	}
 	if !sameReceiverPair(a.anchor, companion) {
 		return ErrInvalid
+	}
+	if a.b.Profile.ReleasePolicy == capture.TwoHolderCoverage {
+		targets := a.b.Profile.CopyTargets
+		if len(targets) != 2 ||
+			!(targets[0] == a.anchor.Ingress && targets[1] == companion.Ingress ||
+				targets[1] == a.anchor.Ingress && targets[0] == companion.Ingress) {
+			return ErrInvalid
+		}
 	}
 	a.companion, a.companionAuthority = companion, raw
 	return nil
@@ -87,16 +96,18 @@ type companionReceipt struct {
 // be verified on both independently before release.
 type parallelSink struct {
 	*ingress.Client
-	companion *ingress.Client
-	intention ingress.Intent
-	binding   string
-	records   *statefile.Store
-	writer    ed25519.PrivateKey
-	replaying bool
-	next      atomic.Uint64
+	companion               *ingress.Client
+	intention               ingress.Intent
+	primary, primaryBinding string
+	binding                 string
+	records                 *statefile.Store
+	writer                  ed25519.PrivateKey
+	replaying               bool
+	next                    atomic.Uint64
 }
 
 func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []byte, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool) (*parallelSink, error) {
+	primaryID := i.Ingress
 	i.Ingress = a.companion.Ingress
 	i.Authority = storage.Hash(authority)
 	raw, e := ingress.SignIntent(i, authority, a.b.Local.Owner, a.writer, time.Unix(i.NotBefore, 0))
@@ -119,7 +130,7 @@ func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []by
 		return nil, e
 	}
 	store.Admit = a.admission(dir)
-	return &parallelSink{Client: primary, companion: companion, intention: i, binding: storage.Hash(raw), records: store, writer: a.writer, replaying: !initialize}, nil
+	return &parallelSink{Client: primary, companion: companion, intention: i, primary: primaryID, primaryBinding: primary.IntentID(), binding: storage.Hash(raw), records: store, writer: a.writer, replaying: !initialize}, nil
 }
 
 func (s *parallelSink) Close() {
@@ -129,6 +140,28 @@ func (s *parallelSink) Close() {
 }
 
 func (s *parallelSink) ParallelWrites() int { return 2 }
+
+func (s *parallelSink) CoverageBindings() map[string]string {
+	return map[string]string{s.primary: s.primaryBinding, s.intention.Ingress: s.binding}
+}
+
+func (s *parallelSink) Coverage(ctx context.Context, raw []byte) ([]ingress.CoverageReceipt, error) {
+	type result struct {
+		receipt ingress.CoverageReceipt
+		err     error
+	}
+	done := make(chan result, 1)
+	go func() {
+		receipt, err := s.companion.StageCoverage(ctx, raw)
+		done <- result{receipt, err}
+	}()
+	primary, err := s.Client.StageCoverage(ctx, raw)
+	other := <-done
+	if err != nil || other.err != nil {
+		return nil, errors.Join(err, other.err)
+	}
+	return []ingress.CoverageReceipt{primary, other.receipt}, nil
+}
 
 func (s *parallelSink) Begin(ctx context.Context) error {
 	if e := s.Client.Begin(ctx); e != nil {

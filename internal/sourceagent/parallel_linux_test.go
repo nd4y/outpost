@@ -117,6 +117,15 @@ func runCaptureWorker(t *testing.T, ctx context.Context, w *worker.Worker) func(
 }
 
 func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
+	testPairedCapture(t, false)
+}
+
+func TestSourceCoverageReleasesBeforePublicationAndWorkersResume(t *testing.T) {
+	testPairedCapture(t, true)
+}
+
+func testPairedCapture(t *testing.T, coverage bool) {
+	t.Helper()
 	var followerCert tls.Certificate
 	f := newFixtureWithPeer(t, 1800, &followerCert)
 	ctx, cancel := context.WithTimeout(t.Context(), 240*time.Second)
@@ -146,6 +155,17 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	traffic := &captureTraffic{initial: map[string]int{}, payload: map[string]bool{}, together: make(chan struct{})}
 	aHandler := traffic.watch(aID, aWorker)
 	var attemptedDrop, dropped atomic.Bool
+	var allowCoverage, allowPublication atomic.Bool
+	allowCoverage.Store(!coverage)
+	allowPublication.Store(!coverage)
+	for _, node := range []*worker.Worker{aWorker, bWorker} {
+		node.Fault = func(point string) error {
+			if point == "capture-coverage-before-publication" && !allowPublication.Load() {
+				return errors.New("publication paused until source exits")
+			}
+			return nil
+		}
+	}
 	f.intercept = func(out http.ResponseWriter, r *http.Request) bool {
 		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/catalog") && attemptedDrop.CompareAndSwap(false, true) {
 			rec := httptest.NewRecorder()
@@ -166,7 +186,14 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 		aHandler(out, r)
 		return true
 	}
-	bServer := httptest.NewUnstartedServer(traffic.watch(bID, bWorker))
+	bHandler := traffic.watch(bID, bWorker)
+	bServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !allowCoverage.Load() && strings.HasSuffix(r.URL.Path, "/coverage") {
+			http.Error(w, "required coverage unavailable", http.StatusPreconditionFailed)
+			return
+		}
+		bHandler.ServeHTTP(w, r)
+	}))
 	bServer.TLS, e = peer.AuthenticatedServerTLS(f.replicaCertificate, f.roots, bID)
 	must(t, e)
 	bServer.StartTLS()
@@ -227,7 +254,12 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 	must(t, os.WriteFile(f.b.ObservationFile, proofGrant, 0600))
 	must(t, os.WriteFile(f.b.Companion.AuthorityFile, companion, 0600))
 	// Two payload packs are enough to force concurrent durable writes.
-	payload := make([]byte, 9<<20)
+	size := 9 << 20
+	if coverage {
+		f.b.Profile.ReleasePolicy = capture.TwoHolderCoverage
+		size = 32 << 10
+	}
+	payload := make([]byte, size)
 	_, e = rand.Read(payload)
 	must(t, e)
 	input := filepath.Join(f.tree, "private.bin")
@@ -277,7 +309,7 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 		}
 	}
 	traffic.mu.Unlock()
-	if !both || initial < 3 || relayed != initial {
+	if (!coverage && (!both || initial < 3)) || initial == 0 || relayed != initial {
 		t.Fatal("distinct initial uploads or pre-publication pulls missing", both, initial, relayed)
 	}
 	client, _, e := peer.AuthenticatedHTTP(f.server.URL, followerCert, f.roots, cID, aID, sourceFixtureLimits)
@@ -295,6 +327,90 @@ func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
 		t.Fatal("ordinary follower route admitted a staged read", response.StatusCode)
 	}
 	t.Logf("sealed after %s with %d initial sends and %d peer reads", time.Since(started), initial, relayed)
+	if coverage {
+		f.a.Fault = nil
+		if e = f.a.Run(ctx); !errors.Is(e, ingress.ErrIncomplete) {
+			t.Fatal("capture did not wait for the second holder", e)
+		}
+		current, e := f.a.Status(ctx)
+		must(t, e)
+		if current.Job.StagedRelease != "" {
+			t.Fatal("snapshot release advanced without the second coverage receipt", current.Job)
+		}
+		allowCoverage.Store(true)
+		f.a.Fault = func(point string) error {
+			if point == "source-coverage-checkpoint-durable" {
+				return pause
+			}
+			return nil
+		}
+		if e = f.a.Run(ctx); !errors.Is(e, pause) {
+			t.Fatal("capture did not persist its signed coverage before release", e)
+		}
+		f.reopen(t)
+		f.a.Fault = func(point string) error {
+			if point == "source-coverage-release-durable" {
+				return pause
+			}
+			return nil
+		}
+		if e = f.a.Run(ctx); !errors.Is(e, pause) {
+			t.Fatal("capture did not release independently of publication", e)
+		}
+		current, e = f.a.Status(ctx)
+		must(t, e)
+		if current.Job.Phase != "SEALED" || current.Job.StagedRelease != "RELEASED" || current.Job.Receipt != nil {
+			t.Fatal("coverage was confused with full publication", current.Job)
+		}
+		if _, e = f.a.Checkpoint(ctx); !errors.Is(e, capture.ErrCopies) {
+			t.Fatal("coverage was exposed as a full-copy checkpoint", e)
+		}
+		must(t, os.Remove(input))
+		must(t, f.a.Close())
+		f.a = nil
+		stopA()
+		stopB()
+		for _, dir := range paths {
+			replica, e := generation.Open(dir, f.grant.Trust, false)
+			must(t, e)
+			inventory, e := replica.Inventory(ctx)
+			must(t, e)
+			must(t, replica.Close())
+			if len(inventory) != 0 {
+				t.Fatal("coverage published a full replica before verification")
+			}
+		}
+		allowPublication.Store(true)
+		runCaptureWorker(t, ctx, aWorker)
+		runCaptureWorker(t, ctx, bWorker)
+		for idx, dir := range paths {
+			replica, e := generation.Open(dir, f.grant.Trust, false)
+			must(t, e)
+			for {
+				inventory, e := replica.Inventory(ctx)
+				must(t, e)
+				if len(inventory) == 1 {
+					break
+				}
+				select {
+				case <-time.After(100 * time.Millisecond):
+				case <-ctx.Done():
+					t.Fatal("worker did not publish without the source", ctx.Err())
+				}
+			}
+			must(t, replica.Close())
+			out := filepath.Join(f.base, "coverage-restore-"+string(rune('a'+idx)))
+			_, e = generation.RecoverMaterialized(ctx, dir, s.Job.Generation, f.grant.Trust, f.owner, generation.RecoverySelection{}, out)
+			must(t, e)
+			got, e := os.ReadFile(filepath.Join(out, "private.bin"))
+			must(t, e)
+			if !bytes.Equal(got, payload) {
+				t.Fatal("coverage restore differs", idx)
+			}
+		}
+		t.Log("withheld coverage blocked release; signed checkpoint survived source restart; both restarted workers restored independently with the source offline")
+		return
+	}
 	must(t, os.Remove(input))
 	f.reopen(t)
 	finishCtx, stopFinish := context.WithTimeout(t.Context(), 180*time.Second)

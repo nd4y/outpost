@@ -41,6 +41,7 @@ func (s *Session) Acknowledge(ctx context.Context, receipt Receipt, maxObjects i
 		old := s.state
 		s.state.Acknowledged = true
 		s.state.Catalog = nil
+		s.state.Coverage = nil
 		if e := s.save(); e != nil {
 			s.state = old
 			return result, e

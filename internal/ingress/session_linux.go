@@ -33,15 +33,16 @@ type SessionOptions struct {
 	RemoveObject            func(context.Context, string, int64) error
 }
 type sessionState struct {
-	Format       string          `json:"format"`
-	Intent       json.RawMessage `json:"intent"`
-	Authority    json.RawMessage `json:"authority"`
-	LastObserved int64           `json:"lastObserved"`
-	Catalog      json.RawMessage `json:"catalog,omitempty"`
-	Complete     bool            `json:"complete"`
-	CompletedAt  int64           `json:"completedAt,omitempty"`
-	Receipt      *Receipt        `json:"receipt,omitempty"`
-	Acknowledged bool            `json:"acknowledged,omitempty"`
+	Format       string           `json:"format"`
+	Intent       json.RawMessage  `json:"intent"`
+	Authority    json.RawMessage  `json:"authority"`
+	LastObserved int64            `json:"lastObserved"`
+	Catalog      json.RawMessage  `json:"catalog,omitempty"`
+	Coverage     *CoverageReceipt `json:"coverage,omitempty"`
+	Complete     bool             `json:"complete"`
+	CompletedAt  int64            `json:"completedAt,omitempty"`
+	Receipt      *Receipt         `json:"receipt,omitempty"`
+	Acknowledged bool             `json:"acknowledged,omitempty"`
 }
 type Receipt struct {
 	Operation  string `json:"operation"`
@@ -277,6 +278,13 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		}
 	} else if s.state.Complete && !s.state.Acknowledged {
 		return fail(ErrConflict)
+	}
+	if s.state.Coverage != nil {
+		c := s.state.Coverage
+		if !c.matches(i, o.Intent) || c.AcceptedUnix > s.state.LastObserved || s.state.Acknowledged ||
+			c.Generation != storage.Hash(s.state.Catalog) {
+			return fail(ErrConflict)
+		}
 	}
 	if s.state.Receipt != nil {
 		r := *s.state.Receipt
@@ -551,6 +559,11 @@ func (s *Session) FinishBatch(ctx context.Context, raw []byte, maxObjects int, m
 	refs, e := s.prepare(ctx, raw)
 	if e != nil {
 		return result, Receipt{}, e
+	}
+	if s.state.Coverage != nil {
+		if e = s.point("capture-coverage-before-publication"); e != nil {
+			return result, Receipt{}, e
+		}
 	}
 	result, e = s.replica.ReceiveBatch(ctx, raw, maxObjects, maxBytes, func(ref generation.Object) ([]byte, error) {
 		return s.read(ctx, filekit.Object{ID: ref.ID, Bytes: ref.Bytes})

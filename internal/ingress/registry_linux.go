@@ -533,6 +533,10 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if len(parts) == 2 && parts[1] == "coverage" && r.Method == http.MethodPut {
+		g.serveCoverage(w, r.WithContext(ctx), i, remote.NotAfter)
+		return
+	}
 	g.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 

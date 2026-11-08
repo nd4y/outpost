@@ -51,6 +51,7 @@ type Profile struct {
 	Consistency    string           `json:"consistency"`
 	Selection      source.Selection `json:"selection"`
 	MaxSourceBytes int64            `json:"maxSourceBytes"`
+	ReleasePolicy  string           `json:"releasePolicy,omitempty"`
 	MinimumCopies  int              `json:"minimumCopies"`
 	CopyTargets    []string         `json:"copyTargets"`
 }
@@ -103,6 +104,7 @@ type State struct {
 	Binding        string           `json:"binding"`
 	Plan           string           `json:"plan"`
 	Phase          string           `json:"phase"`
+	StagedRelease  string           `json:"stagedRelease,omitempty"`
 	CompletedFiles int              `json:"completedFiles"`
 	ObservedUnix   int64            `json:"observedUnix"`
 	Generation     string           `json:"generation,omitempty"`
@@ -183,6 +185,25 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 		seen[id] = true
 	}
 	if !seen[i.Ingress] || p.MinimumCopies > len(seen) || p.MinimumCopies > 1 && o.Copies == nil || !bytes.Equal(o.Data.Master, o.Cache.Owner.Master) || !bytes.Equal(o.Data.VerifyKey, o.Cache.Owner.VerifyKey) {
+		return nil, ErrInvalid
+	}
+	switch p.ReleasePolicy {
+	case "":
+	case TwoHolderCoverage:
+		sink, ok := o.Sink.(coverageSink)
+		if !ok || p.MinimumCopies != 2 || len(seen) != 2 {
+			return nil, ErrInvalid
+		}
+		bindings := sink.CoverageBindings()
+		if len(bindings) != 2 || bindings[i.Ingress] != storage.Hash(o.Intent) {
+			return nil, ErrInvalid
+		}
+		for id, binding := range bindings {
+			if !seen[id] || !storage.ID(binding) {
+				return nil, ErrInvalid
+			}
+		}
+	default:
 		return nil, ErrInvalid
 	}
 	for file, version := range o.Previous {
@@ -267,6 +288,11 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 				return e
 			}
 		}
+		if s.StagedRelease != "" {
+			if e = j.validateStagedRelease(s); e != nil {
+				return e
+			}
+		}
 		if currentError != nil && !o.ReadOnly && len(o.Settlement) == 0 && phase(s.Phase) < phase("CHECKPOINTED") {
 			return currentError
 		}
@@ -336,6 +362,12 @@ func (j *Job) Close() error {
 func (j *Job) decodeState(raw []byte) (State, error) {
 	var s State
 	if storage.Decode(raw, &s, maxPlan) != nil || s.Format != Format || s.Binding != j.binding || !storage.ID(s.Plan) || phase(s.Phase) < 0 || s.ObservedUnix < 1 || s.ObservedUnix > time.Now().Unix() || s.CompletedFiles < 0 || s.CompletedFiles > generation.MaxKits {
+		return s, ErrInvalid
+	}
+	if s.StagedRelease != "" && (j.options.Profile.ReleasePolicy != TwoHolderCoverage ||
+		phase(s.Phase) < phase("SEALED") ||
+		s.StagedRelease != "CHECKPOINTED" && s.StagedRelease != "RELEASING" && s.StagedRelease != "RELEASED" ||
+		phase(s.Phase) >= phase("RELEASED") && s.StagedRelease != "RELEASED") {
 		return s, ErrInvalid
 	}
 	if phase(s.Phase) >= phase("SEALED") && !storage.ID(s.Generation) {
@@ -525,6 +557,11 @@ func (j *Job) Run(ctx context.Context) error {
 			if storage.Hash(raw) != s.Generation {
 				return ErrInvalid
 			}
+			if j.options.Profile.ReleasePolicy == TwoHolderCoverage {
+				if e = j.releaseWithCoverage(ctx, &s, raw); e != nil {
+					return e
+				}
+			}
 			for {
 				if e = j.guard(ctx); e != nil {
 					return e
@@ -597,11 +634,16 @@ func (j *Job) Run(ctx context.Context) error {
 			}
 		}
 		if s.Phase == "RELEASING" {
-			if e = j.options.Provider.Release(ctx, j.intent.Operation, j.options.Profile.View); e != nil {
-				return e
+			if s.StagedRelease != "RELEASED" {
+				if e = j.options.Provider.Release(ctx, j.intent.Operation, j.options.Profile.View); e != nil {
+					return e
+				}
+				if e = j.point("source-provider-released"); e != nil {
+					return e
+				}
 			}
-			if e = j.point("source-provider-released"); e != nil {
-				return e
+			if s.StagedRelease != "" {
+				s.StagedRelease = "RELEASED"
 			}
 			s.Phase = "RELEASED"
 			if e = j.save(&s); e != nil {

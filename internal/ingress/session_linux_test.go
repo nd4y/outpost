@@ -169,6 +169,42 @@ func TestSessionPublishesOnlyCompleteClosureAndRetriesLostReceipt(t *testing.T) 
 		t.Fatal("bytes differ")
 	}
 }
+func TestStagedCoverageRejectsMissingDependencyAndNeverPublishes(t *testing.T) {
+	f := setup(t)
+	ctx := t.Context()
+	must(t, os.WriteFile(f.input, []byte("small recovery input"), 0600))
+	v, err := f.source.Backup(ctx, f.input, filekit.BackupOptions{Names: []string{"private/data"}})
+	must(t, err)
+	raw, roots := f.catalog(t, []string{v.Version})
+	if _, err = f.session.stageCoverage(ctx, raw); !errors.Is(err, ErrIncomplete) {
+		t.Fatal("coverage accepted without catalog roots", err)
+	}
+	f.roots(t, roots)
+	proof, err := f.session.stageCoverage(ctx, raw)
+	must(t, err)
+	f.reopen(t)
+	replayed, err := f.session.stageCoverage(ctx, raw)
+	must(t, err)
+	if replayed != proof || proof.Generation != storage.Hash(raw) {
+		t.Fatal("durable coverage replay changed", proof, replayed)
+	}
+	if _, err = f.session.Acknowledge(ctx, Receipt{}, 1); !errors.Is(err, ErrConflict) {
+		t.Fatal("coverage permitted cleanup without a full receipt", err)
+	}
+	for id := range roots {
+		must(t, f.session.objectRoot.Remove(id))
+		break
+	}
+	if _, err = f.session.stageCoverage(ctx, raw); !errors.Is(err, ErrIncomplete) {
+		t.Fatal("coverage replay ignored a missing staged part", err)
+	}
+	inventory, err := f.options.Replica.Inventory(ctx)
+	must(t, err)
+	if len(inventory) != 0 {
+		t.Fatal("coverage published before full verification")
+	}
+}
+
 func TestSessionReopenInventoriesDurableObjectsAndRefusesSecondProcessLease(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()

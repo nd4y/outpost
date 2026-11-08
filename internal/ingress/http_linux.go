@@ -312,6 +312,8 @@ func clientWithIdentity(endpoint, self string, i Intent, authority, intent []byt
 	}
 	return &Client{http: h, endpoint: u, intent: i, cert: leaf, authority: bytes.Clone(authority), intentRaw: bytes.Clone(intent), owner: bytes.Clone(owner), cleanup: cleanup}, nil
 }
+func (c *Client) IntentID() string { return storage.Hash(c.intentRaw) }
+
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	now := time.Now()

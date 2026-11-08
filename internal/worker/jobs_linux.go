@@ -16,12 +16,26 @@ type result struct {
 	action        *actionResult
 	scrub         *scrubResult
 	externalAudit string
+	coverage      string
+	advanced      bool
 }
 
 func (w *Worker) jobs(v *view) error {
 	results := make(chan result, v.cfg.Limits.Parallel)
 	running := map[string]bool{}
+	coverageNext := map[string]time.Time{}
 	finish := func(r result) error {
+		if r.coverage != "" {
+			delete(running, "capture-coverage/"+r.coverage)
+			delay := time.Second
+			if r.err != nil {
+				delay = 5 * time.Second
+			} else if r.advanced {
+				delay = 0
+			}
+			coverageNext[r.coverage] = time.Now().Add(delay)
+			return nil
+		}
 		if r.externalAudit != "" {
 			delete(running, r.externalAudit)
 			return nil
@@ -149,6 +163,22 @@ func (w *Worker) jobs(v *view) error {
 		}
 		if len(running) < v.cfg.Limits.Parallel {
 			w.scheduleExternalAudit(v, s, running, results)
+		}
+		for domain, local := range v.domains {
+			if len(running) >= v.cfg.Limits.Parallel {
+				break
+			}
+			key := "capture-coverage/" + domain
+			if local.ingress == nil || running[key] || v.paused(domain, "") || time.Now().Before(coverageNext[domain]) {
+				continue
+			}
+			running[key] = true
+			go func() {
+				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
+				defer cancel()
+				advanced, err := local.ingress.AdvanceCoverage(ctx, func(op string) bool { return v.paused(domain, op) })
+				results <- result{coverage: domain, advanced: advanced, err: err}
+			}()
 		}
 		select {
 		case r := <-results:

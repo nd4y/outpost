@@ -147,6 +147,9 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 	if (!bestEffort && !preparedBootstrap(b)) || b.Profile.MinimumCopies < 1 || b.Profile.MinimumCopies > 2 || b.Profile.MinimumCopies == 2 && b.ObservationFile == "" {
 		return nil, ErrUnsupported
 	}
+	if b.Profile.ReleasePolicy != "" && (b.Profile.ReleasePolicy != capture.TwoHolderCoverage || b.Companion == nil) {
+		return nil, ErrUnsupported
+	}
 	if b.Prepared != nil {
 		p := *b.Prepared
 		p.Trust.Producer = bytes.Clone(p.Trust.Producer)
