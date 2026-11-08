@@ -95,7 +95,7 @@ outpost restore-external --bootstrap /private/external-reader.json \
 
 Omit `--version` to restore the selected generation. Use `--input` with the existing version-list or directory selection JSON for a narrower restore. The output must be a new directory under an existing parent. The command opens the exact complete marker and verifies the signed catalog, then reads the selected immutable dependencies. It publishes the restored tree atomically after validating and decrypting the selected content. It streams objects directly from the target and needs no source, control service, other worker or temporary ciphertext replica.
 
-A successful selection proves the restored versions match the specified checkpoint. Other versions and current target health require their own evidence. Missing or corrupt required data prevents publication. The CLI receipt contains opaque identities and restored counts.
+A successful selection proves the restored versions match the specified checkpoint. Directory selection reads the candidate file metadata to resolve paths. An explicit version selects its metadata directly. Missing or corrupt required data prevents publication. Other versions and current target health require their own evidence. The CLI receipt contains opaque identities and restored counts.
 
 ## Evidence and remaining costs
 

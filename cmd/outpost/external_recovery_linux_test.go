@@ -51,6 +51,9 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 			trust := generation.Trust{Domain: owner.Domain, Repository: storage.Hash([]byte("external-recovery-repository")), Epoch: 1, Writer: writer, Maintenance: maintenance}
 			namespace := storage.Hash([]byte(trust.Domain + "/" + trust.Repository))
 			var invalidWrite atomic.Bool
+			var raceArmed atomic.Bool
+			stageReady := make(chan struct{})
+			resume := make(chan struct{})
 			server := teststore.New(t, teststore.Options{Kind: protocol, Namespace: namespace, Logins: map[string]teststore.Login{
 				"fixture-writer": {Secret: "synthetic-write-secret"},
 				"fixture-reader": {Secret: "synthetic-read-secret"},
@@ -59,6 +62,17 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 					invalidWrite.Store(true)
 					w.WriteHeader(http.StatusForbidden)
 					return true
+				}
+				if actor == "fixture-reader" && raceArmed.Load() {
+					staging, _ := filepath.Glob(filepath.Join(root, ".outpost-restore-*"))
+					if len(staging) != 0 && raceArmed.CompareAndSwap(true, false) {
+						close(stageReady)
+						select {
+						case <-resume:
+						case <-r.Context().Done():
+							return true
+						}
+					}
 				}
 				return false
 			}})
@@ -199,6 +213,35 @@ func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 				t.Fatal("existing destination was used", code)
 			}
 			verify(full, 1)
+			raceDest := filepath.Join(root, "concurrent-output")
+			raceArmed.Store(true)
+			completed := make(chan int, 1)
+			go func() {
+				defer close(completed)
+				_, code := invoke(checkpoints[1], raceDest, "--version", versions[1])
+				completed <- code
+			}()
+			select {
+			case <-stageReady:
+			case <-ctx.Done():
+				t.Fatal("restore did not reach its staged payload read")
+			}
+			must(os.Mkdir(raceDest, 0700))
+			sentinel := filepath.Join(raceDest, "concurrent-owner")
+			must(os.WriteFile(sentinel, []byte("retain"), 0600))
+			close(resume)
+			if code := <-completed; code != 5 {
+				t.Fatal("concurrent output did not prevent publication", code)
+			}
+			got, err := os.ReadFile(sentinel)
+			must(err)
+			entries, err := os.ReadDir(raceDest)
+			must(err)
+			staging, err := filepath.Glob(filepath.Join(root, ".outpost-restore-*"))
+			must(err)
+			if string(got) != "retain" || len(entries) != 1 || len(staging) != 0 {
+				t.Fatal("concurrent owner output or staging lifecycle changed")
+			}
 			selection := write("directory-selection.json", generation.RecoverySelection{Directory: "private"})
 			directory := filepath.Join(root, "directory")
 			result, code = invoke(checkpoints[1], directory, "--input", selection)
