@@ -122,3 +122,20 @@ jobs:
           "$OUTPOST_RECEIPT_RECOVERY_CURRENT_CLI" version
           go test -count=1 -timeout=120s -run 'ReceiptRecovery|PublishedEvidence|RegistryRenewal' \
             -v ./internal/sourceagent ./internal/worker ./internal/ingress ./internal/generation
+      - name: Capture and recover prepared application exports with the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/prepared-previous-source"
+          git archive fbf72424a48c6c52f832906ab0cbeef314e0c536 | tar -xf - -C "$RUNNER_TEMP/prepared-previous-source"
+          go -C "$RUNNER_TEMP/prepared-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/prepared-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/prepared-tests"
+          export TMPDIR="$RUNNER_TEMP/prepared-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_PREPARED_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_PREPARED_PREVIOUS_CLI="$RUNNER_TEMP/prepared-previous"
+          export OUTPOST_PREPARED_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_PREPARED_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_PREPARED_CURRENT_CLI" version
+          go test -count=1 -timeout=150s -run 'Prepared|SourceAgentSIGKILLChild' \
+            -v ./internal/sourceagent ./internal/capture ./cmd/outpost

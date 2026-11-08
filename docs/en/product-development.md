@@ -69,3 +69,5 @@ The persistent browser journal keeps original requests across actual browser res
 A [private management snapshot](management-snapshots.md) now preserves administrative dependencies and restores historical audit/receipts through a keyless independent reader. It keeps abandonment fences and durable caches ahead of their receipts. Activation after journal loss remains separate: inspection never reports current authority or replays commands.
 
 Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.
+
+[Prepared application exports](prepared-exports.md) bind a native producer's signed closed inventory to an immutable source operation, preserving original age and file history. Current/previous CLI and actual SIGKILL checks include independent restoration and reopening of two native SQLite exports. Native filesystem snapshot acquisition, other applications and full-scale acceptance remain open.

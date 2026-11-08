@@ -20,7 +20,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -40,10 +40,58 @@
         {
           "path": "internal/sourceagent/observations_linux_test.go",
           "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportVerifiesClosedBytesAndPreservesProducerAge"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRejectsAmbiguousClaimsAndTrustSubstitution"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRefusesChangedUnknownAliasedAndCanceledViews"
+        },
+        {
+          "path": "internal/capture/prepared_create_linux_test.go",
+          "name": "TestPreparedExportCreateMeasuresClosedInventoryAndRejectsUnsafeInputs"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderFreezesExactViewAndReleasesWithoutSourceCleanup"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRejectsSelectionAndLateContentChange"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/prepared_application_linux_test.go",
+          "name": "TestPreparedSourceRestoresNativeSQLiteOnlineBackupsWithUncommittedWrites"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-03",
@@ -102,7 +150,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -142,10 +190,58 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalPreservesHeadScheduleAndIndependentVersions"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportVerifiesClosedBytesAndPreservesProducerAge"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRejectsAmbiguousClaimsAndTrustSubstitution"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRefusesChangedUnknownAliasedAndCanceledViews"
+        },
+        {
+          "path": "internal/capture/prepared_create_linux_test.go",
+          "name": "TestPreparedExportCreateMeasuresClosedInventoryAndRejectsUnsafeInputs"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderFreezesExactViewAndReleasesWithoutSourceCleanup"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRejectsSelectionAndLateContentChange"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/prepared_application_linux_test.go",
+          "name": "TestPreparedSourceRestoresNativeSQLiteOnlineBackupsWithUncommittedWrites"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -189,10 +285,22 @@
         {
           "path": "internal/sourceagent/observations_linux_test.go",
           "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderFreezesExactViewAndReleasesWithoutSourceCleanup"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRejectsSelectionAndLateContentChange"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-06",
@@ -210,7 +318,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -352,10 +460,30 @@
         {
           "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
           "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/prepared_application_linux_test.go",
+          "name": "TestPreparedSourceRestoresNativeSQLiteOnlineBackupsWithUncommittedWrites"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-09",
@@ -556,7 +684,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
@@ -801,6 +929,14 @@
         {
           "path": "internal/worker/receipt_recovery_linux_test.go",
           "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesQuotaVolumeLossAndExpiredFrozenAdmission"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1539,6 +1675,42 @@
         {
           "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
           "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderFreezesExactViewAndReleasesWithoutSourceCleanup"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRejectsSelectionAndLateContentChange"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRefusesMissingHistoryQuotaGuardAndOverlap"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesQuotaVolumeLossAndExpiredFrozenAdmission"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1717,6 +1889,38 @@
         {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportVerifiesClosedBytesAndPreservesProducerAge"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRejectsAmbiguousClaimsAndTrustSubstitution"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRefusesChangedUnknownAliasedAndCanceledViews"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderFreezesExactViewAndReleasesWithoutSourceCleanup"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRejectsSelectionAndLateContentChange"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -2011,6 +2215,30 @@
         {
           "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
           "name": "TestReceiptRecoveryExpiredExecutionRetainsAuditAndResumesWithFreshPermission"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderFreezesExactViewAndReleasesWithoutSourceCleanup"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRejectsSelectionAndLateContentChange"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -2920,6 +3148,26 @@
         {
           "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
           "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceFreezesPointerPreservesAgeLineageAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/prepared_application_linux_test.go",
+          "name": "TestPreparedSourceRestoresNativeSQLiteOnlineBackupsWithUncommittedWrites"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         }
       ],
       "acceptance": ["AT-24"],
@@ -3799,6 +4047,18 @@
         {
           "path": "internal/worker/receipt_recovery_linux_test.go",
           "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRefusesMissingHistoryQuotaGuardAndOverlap"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesQuotaVolumeLossAndExpiredFrozenAdmission"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -4278,6 +4538,10 @@
         {
           "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
           "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -4849,6 +5113,18 @@
         {
           "path": "internal/worker/receipt_recovery_linux_test.go",
           "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRefusesMissingHistoryQuotaGuardAndOverlap"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesQuotaVolumeLossAndExpiredFrozenAdmission"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -5248,6 +5524,10 @@
         {
           "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
           "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -6069,6 +6349,34 @@
         {
           "path": "internal/worker/receipt_recovery_linux_test.go",
           "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportVerifiesClosedBytesAndPreservesProducerAge"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRejectsAmbiguousClaimsAndTrustSubstitution"
+        },
+        {
+          "path": "internal/capture/prepared_linux_test.go",
+          "name": "TestPreparedExportRefusesChangedUnknownAliasedAndCanceledViews"
+        },
+        {
+          "path": "internal/capture/prepared_create_linux_test.go",
+          "name": "TestPreparedExportCreateMeasuresClosedInventoryAndRejectsUnsafeInputs"
+        },
+        {
+          "path": "internal/capture/prepared_provider_linux_test.go",
+          "name": "TestPreparedProviderRefusesMissingHistoryQuotaGuardAndOverlap"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesQuotaVolumeLossAndExpiredFrozenAdmission"
+        },
+        {
+          "path": "internal/sourceagent/prepared_linux_test.go",
+          "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -6266,6 +6574,14 @@
         {
           "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
           "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
+        },
+        {
+          "path": "internal/capture/prepared_create_linux_test.go",
+          "name": "TestPreparedExportCreateMeasuresClosedInventoryAndRejectsUnsafeInputs"
+        },
+        {
+          "path": "internal/sourceagent/prepared_cli_linux_test.go",
+          "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         }
       ],
       "acceptance": ["AT-31"],

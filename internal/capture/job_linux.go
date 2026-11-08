@@ -169,6 +169,9 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 		}
 	}
 	p := o.Profile
+	if provider, ok := o.Provider.(VerifyingProvider); ok && p.Consistency != provider.Consistency() {
+		return nil, ErrInvalid
+	}
 	if p.ID != a.Profile || !storage.ID(p.Origin) || !storage.ID(p.View) || p.MaxSourceBytes < 1 || p.MaxSourceBytes > 1<<60 || (p.Consistency != "best-effort" && p.Consistency != "filesystem" && p.Consistency != "application") || p.MinimumCopies < 1 || p.MinimumCopies > 2 || len(p.CopyTargets) > 128 || o.Provider == nil || o.Sink == nil || o.Cache == nil || o.Cache.Owner.Domain != i.Domain || o.Data.Domain != i.Domain || len(o.Data.Master) != 32 || len(o.Writer) != 64 || !bytes.Equal(o.Writer.Public().(ed25519.PublicKey), a.Trust.Writer) || len(o.Previous) > generation.MaxKits {
 		return nil, ErrInvalid
 	}
@@ -389,18 +392,41 @@ func (j *Job) prepare(ctx context.Context) error {
 		if entry.Domain != j.intent.Domain {
 			continue
 		}
-		sec, ns, known, e := filekit.Birth(root, entry.Names[0], entry.Identity)
-		if e != nil {
-			return e
+		var raw []byte
+		known := false
+		if provider, ok := j.options.Provider.(LogicalProvider); ok {
+			var logical []byte
+			logical, known, e = provider.Lineage(entry)
+			if e != nil {
+				return e
+			}
+			if known {
+				if len(logical) == 0 || len(logical) > 8192 {
+					return ErrInvalid
+				}
+				raw, _ = json.Marshal(struct {
+					Origin, Domain string
+					Logical        []byte
+				}{j.options.Profile.Origin, entry.Domain, logical})
+			}
+		}
+		if !known {
+			sec, ns, found, err := filekit.Birth(root, entry.Names[0], entry.Identity)
+			if err != nil {
+				return err
+			}
+			known = found
+			if known {
+				raw, _ = json.Marshal(struct {
+					Origin, Domain string
+					Device, Inode  uint64
+					Birth          int64
+					NS             uint32
+				}{j.options.Profile.Origin, entry.Domain, entry.Identity.Device, entry.Identity.Inode, sec, ns})
+			}
 		}
 		var id string
 		if known {
-			raw, _ := json.Marshal(struct {
-				Origin, Domain string
-				Device, Inode  uint64
-				Birth          int64
-				NS             uint32
-			}{j.options.Profile.Origin, entry.Domain, entry.Identity.Device, entry.Identity.Inode, sec, ns})
 			mac := hmac.New(sha256.New, j.options.Data.Master)
 			mac.Write([]byte("outpost-source-lineage-1\x00"))
 			mac.Write(raw)
@@ -419,6 +445,11 @@ func (j *Job) prepare(ctx context.Context) error {
 	}
 	if e = plan.Recheck(ctx, root); e != nil {
 		return e
+	}
+	if provider, ok := j.options.Provider.(VerifyingProvider); ok {
+		if e = provider.Validate(ctx, j.options.Profile.View, root, plan, j.intent.Domain); e != nil {
+			return e
+		}
 	}
 	raw, e := json.Marshal(j.plan)
 	if e != nil || len(raw) > maxPlan {
@@ -776,6 +807,11 @@ func (j *Job) capture(ctx context.Context, root *os.Root, s *State) error {
 	}
 	if e = j.plan.Source.Recheck(ctx, root); e != nil {
 		return e
+	}
+	if provider, ok := j.options.Provider.(VerifyingProvider); ok {
+		if e = provider.Validate(ctx, j.options.Profile.View, root, j.plan.Source, j.intent.Domain); e != nil {
+			return e
+		}
 	}
 	if e = j.state.Write("catalog.json", raw); e != nil {
 		return e

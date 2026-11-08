@@ -49,6 +49,7 @@ type Bootstrap struct {
 	ObservationFile string              `json:"observationFile,omitempty"`
 	Endpoint        string              `json:"endpoint"`
 	Limits          diskbudget.Limits   `json:"limits"`
+	Prepared        *PreparedSource     `json:"prepared,omitempty"`
 }
 
 func Load(path string) (Bootstrap, error) {
@@ -81,14 +82,15 @@ type state struct {
 }
 
 type Status struct {
-	Format            string         `json:"format"`
-	Profile           string         `json:"profile"`
-	Phase             string         `json:"phase"`
-	Operation         string         `json:"operation,omitempty"`
-	Sequence          uint64         `json:"sequence"`
-	Generation        string         `json:"generation,omitempty"`
-	Job               *capture.State `json:"job,omitempty"`
-	AuthorityRevision uint64         `json:"authorityRevision,omitempty"`
+	Format            string          `json:"format"`
+	Profile           string          `json:"profile"`
+	Phase             string          `json:"phase"`
+	Operation         string          `json:"operation,omitempty"`
+	Sequence          uint64          `json:"sequence"`
+	Generation        string          `json:"generation,omitempty"`
+	Job               *capture.State  `json:"job,omitempty"`
+	AuthorityRevision uint64          `json:"authorityRevision,omitempty"`
+	Prepared          *PreparedStatus `json:"prepared,omitempty"`
 }
 
 type Agent struct {
@@ -124,12 +126,18 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 }
 
 func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, directory string, fault func(string) error) (*Agent, error) {
-	if b.Format != Format || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
+	if (b.Format != Format && b.Format != PreparedAgentFormat) || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
 		return nil, ErrInvalid
 	}
 	// Never downgrade requested consistency or an unconfigured copy policy.
-	if b.Profile.Consistency != "best-effort" || b.Profile.MinimumCopies < 1 || b.Profile.MinimumCopies > 2 || b.Profile.MinimumCopies == 2 && b.ObservationFile == "" {
+	bestEffort := b.Format == Format && b.Prepared == nil && b.Profile.Consistency == "best-effort"
+	if (!bestEffort && !preparedBootstrap(b)) || b.Profile.MinimumCopies < 1 || b.Profile.MinimumCopies > 2 || b.Profile.MinimumCopies == 2 && b.ObservationFile == "" {
 		return nil, ErrUnsupported
+	}
+	if b.Prepared != nil {
+		p := *b.Prepared
+		p.Trust.Producer = bytes.Clone(p.Trust.Producer)
+		b.Prepared = &p
 	}
 	a := &Agent{b: b, runtimeDirectory: directory, Fault: fault}
 	var e error
@@ -217,6 +225,17 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		}
 		contains, e := localfs.Contains(ctx, source, parent)
 		parent.Close()
+		if e == nil && !contains && b.Prepared != nil {
+			raw, err := worker.ReadPrivate(b.Prepared.ManifestFile, capture.MaxPreparedExport)
+			if err == nil {
+				var view *os.Root
+				view, _, err = capture.OpenPreparedExport(ctx, source, raw, b.Prepared.Trust, time.Now())
+				if view != nil {
+					view.Close()
+				}
+			}
+			e = err
+		}
 		source.Close()
 		if e != nil {
 			return nil, e
@@ -450,6 +469,14 @@ func (a *Agent) next(ctx context.Context) error {
 	if s.Sequence == ^uint64(0) {
 		return ErrInvalid
 	}
+	var prepared capture.PreparedExport
+	var manifest []byte
+	if a.b.Prepared != nil {
+		prepared, manifest, e = a.selectPrepared(ctx, s)
+		if e != nil {
+			return e
+		}
+	}
 	var nonce [32]byte
 	if _, e = rand.Read(nonce[:]); e != nil {
 		return e
@@ -457,9 +484,18 @@ func (a *Agent) next(ctx context.Context) error {
 	now := time.Now().Unix()
 	g := a.grant
 	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash(nonce[:]), Authority: storage.Hash(a.authority), Tenant: g.Tenant, Profile: g.Profile, Source: g.Source, Ingress: g.Ingress, Domain: g.Trust.Domain, Repository: g.Trust.Repository, Epoch: g.Trust.Epoch, Sequence: s.Sequence + 1, Parent: s.Generation, Policy: g.Revision, SnapshotUnix: now, NotBefore: now, ExpiresUnix: g.ExpiresUnix, MaxBytes: g.MaxBytes, MaxObjects: g.MaxObjects}
+	if manifest != nil {
+		i.Operation = storage.Hash(manifest)
+		i.SnapshotUnix = prepared.SnapshotUnix
+	}
 	raw, e := ingress.SignIntent(i, a.authority, a.b.Local.Owner, a.writer, time.Now())
 	if e != nil {
 		return e
+	}
+	if manifest != nil {
+		if e = a.freezePrepared(ctx, manifest, raw); e != nil {
+			return e
+		}
 	}
 	return a.prepare(ctx, raw)
 }
@@ -482,6 +518,18 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 		}
 		if s.Sequence == ^uint64(0) || i.Sequence != s.Sequence+1 || i.Parent != s.Generation {
 			return ingress.ErrConflict
+		}
+		if a.b.Prepared != nil {
+			m, _, e := a.readPrepared(ctx, i.Operation)
+			if e != nil {
+				return e
+			}
+			if m.SnapshotUnix != i.SnapshotUnix {
+				return ErrInvalid
+			}
+			if e = a.checkPreparedAdvance(ctx, s, m, i.Operation); e != nil {
+				return e
+			}
 		}
 		s.Phase, s.Intent = "PREPARING", bytes.Clone(raw)
 		if s.Format == renewedFormat {
@@ -538,7 +586,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	}
 	initialize := s.Phase == "PREPARING"
 	prefix := path.Join("operations", i.Operation)
-	provider, e := capture.OpenTreeProvider(ctx, a.root, prefix+"/provider", i.Operation, i.Operation, a.b.Tree, initialize, a.admission(prefix+"/provider"), a.guard)
+	provider, e := a.openProvider(ctx, prefix, i, initialize)
 	if e != nil {
 		client.Close()
 		return nil, nil, e
@@ -703,6 +751,13 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 				return e
 			}
 			out.Operation = i.Operation
+			if a.b.Prepared != nil {
+				m, _, e := a.readPrepared(ctx, i.Operation)
+				if e != nil {
+					return e
+				}
+				out.Prepared = &PreparedStatus{Method: m.Method, ProducerSequence: m.Sequence, SnapshotUnix: m.SnapshotUnix, CompletedUnix: m.CompletedUnix, Attestation: "producer-signed"}
+			}
 		}
 		if s.Phase == "ACTIVE" {
 			job, close, e := a.openJobMode(ctx, s, true, nil)

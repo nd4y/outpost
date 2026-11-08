@@ -197,13 +197,15 @@ func (a *Agent) ConfigureSchedule(ctx context.Context, c Schedule) error {
 }
 func scheduleCode(s string) bool {
 	switch s {
-	case "", "CANCELLED", "TIMEOUT", "COPY_THRESHOLD_PENDING", "AUTHORITY_UNAVAILABLE", "CAPACITY", "SOURCE_CHANGED", "IO_UNAVAILABLE", "SCHEDULE_CHANGED":
+	case "", "CANCELLED", "TIMEOUT", "COPY_THRESHOLD_PENDING", "AUTHORITY_UNAVAILABLE", "CAPACITY", "SOURCE_CHANGED", "IO_UNAVAILABLE", "SCHEDULE_CHANGED", "EXPORT_NOT_ADVANCED":
 		return true
 	}
 	return false
 }
 func scheduleError(e error) string {
 	switch {
+	case errors.Is(e, ErrPreparedUnchanged):
+		return "EXPORT_NOT_ADVANCED"
 	case errors.Is(e, ErrScheduleChanged):
 		return "SCHEDULE_CHANGED"
 	case errors.Is(e, context.DeadlineExceeded):
