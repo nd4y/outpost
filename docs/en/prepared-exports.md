@@ -4,7 +4,7 @@
 
 The source agent can capture a closed export created by a separately configured native application producer. The private `outpost-source-agent-prepared-1` bootstrap declares `profile.consistency: "application"` and binds the producer's public key, method, original timestamps and exact file inventory. The producer must finish its consistent export before signing it. `producer-signed` status identifies this attestation; a signature or matching file hash alone does not establish application consistency.
 
-This provider does not execute application commands, freeze a live database, or create Btrfs, ZFS or LVM snapshots. Shared configuration cannot supply a shell command. The current executable still supports ordinary best-effort sources separately. Unsupported consistency providers fail closed.
+This provider consumes completed native views. The configured producer creates the application export or filesystem snapshot outside Outpost. Shared configuration cannot supply a shell command. The executable supports ordinary best-effort sources separately and refuses unsupported consistency providers.
 
 ## Private enrollment
 
@@ -56,6 +56,14 @@ The first manifest must already exist for initialization. `source-next` archives
 Successful captures retain the producer's original snapshot time. A subsequent export must advance its producer sequence and cannot move either original timestamp backwards. An unchanged export returns `EXPORT_NOT_ADVANCED`; the scheduler waits using its configured retry interval without refreshing the last completed generation or its age. Regular artifact names have stable keyed lineage within this provider binding, so recreated export inodes do not break file version history.
 
 Full byte verification occurs on admission and before sealing. This deliberately adds source reads; low memory use does not imply low read amplification or proven large-file throughput. Native export creation, retained export bytes and snapshot churn need separate capacity/performance accounting. Runtime metadata uses the existing shared quota, volume identity and authority guards.
+
+## Read-only Btrfs snapshots
+
+For filesystem consistency, use the same prepared bootstrap with `profile.consistency` set to `filesystem`. Set `prepared.trust.method` to `btrfs-readonly-snapshot-v1` and `prepared.trust.snapshotOrigin` to the source subvolume UUID as 32 lowercase hex digits. Enroll the private snapshot parent as the source tree. Keep the source subvolume and its snapshot directories accessible to the enrolled source user with private permissions.
+
+The trusted producer runs `btrfs subvolume snapshot -r LIVE SNAPSHOT` on the source host, with `SNAPSHOT` below the enrolled parent. It uses the existing manifest command with an increasing sequence, the relative snapshot root and `completedUnix`. Omit `snapshotUnix` to use the snapshot creation time returned by the kernel, or supply that exact time. The signed manifest carries the snapshot UUID. Admission and pre-seal verification check the native read-only flag, original transaction, enrolled parent UUID, snapshot UUID and creation time. An ordinary directory, writable snapshot, changed snapshot or snapshot of another source is refused. These checks use an unprivileged consumer.
+
+Keep the closed-inventory limits above. Btrfs snapshots do not include nested subvolumes. Enroll each required nested subvolume separately. Snapshot creation and retention remain with the producer. The filesystem profile establishes a filesystem view and makes no application-consistency claim.
 
 ## Recovery and compatibility
 

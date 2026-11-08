@@ -36,6 +36,7 @@ type PreparedExport struct {
 	CompletedUnix int64          `json:"completedUnix"`
 	Root          string         `json:"root"`
 	Files         []PreparedFile `json:"files"`
+	SnapshotID    string         `json:"snapshotId,omitempty"`
 	Signature     []byte         `json:"signature,omitempty"`
 }
 type PreparedFile struct {
@@ -47,12 +48,13 @@ type PreparedFile struct {
 // PreparedTrust is a local enrollment boundary. No field selects a command,
 // executable, network endpoint or producer-owned cleanup action.
 type PreparedTrust struct {
-	Profile  string            `json:"profile"`
-	Origin   string            `json:"origin"`
-	Method   string            `json:"method"`
-	Producer ed25519.PublicKey `json:"producer"`
-	MaxBytes int64             `json:"maxBytes"`
-	MaxFiles int               `json:"maxFiles"`
+	Profile        string            `json:"profile"`
+	Origin         string            `json:"origin"`
+	Method         string            `json:"method"`
+	Producer       ed25519.PublicKey `json:"producer"`
+	MaxBytes       int64             `json:"maxBytes"`
+	MaxFiles       int               `json:"maxFiles"`
+	SnapshotOrigin string            `json:"snapshotOrigin,omitempty"`
 }
 
 func preparedName(s string, root bool) bool {
@@ -70,12 +72,30 @@ func (b PreparedTrust) validate() error {
 			return ErrInvalid
 		}
 	}
+	if b.SnapshotOrigin != "" && (b.Method != BtrfsSnapshotMethod || !btrfsUUID(b.SnapshotOrigin)) {
+		return ErrInvalid
+	}
 	return nil
 }
 
 func (b PreparedTrust) Validate() error { return b.validate() }
+
+func (b PreparedTrust) Consistency() string {
+	if b.SnapshotOrigin != "" {
+		return "filesystem"
+	}
+	return "application"
+}
+
 func (m PreparedExport) validate(b PreparedTrust, now time.Time) error {
 	if b.validate() != nil || m.Format != PreparedExportFormat || m.Profile != b.Profile || m.Origin != b.Origin || m.Method != b.Method || m.Sequence == 0 || m.SnapshotUnix < 1 || m.CompletedUnix < m.SnapshotUnix || m.CompletedUnix > now.Unix() || !preparedName(m.Root, true) || len(m.Files) < 1 || len(m.Files) > b.MaxFiles {
+		return ErrInvalid
+	}
+	if b.Consistency() == "filesystem" {
+		if !btrfsUUID(m.SnapshotID) || m.SnapshotID == b.SnapshotOrigin {
+			return ErrInvalid
+		}
+	} else if m.SnapshotID != "" {
 		return ErrInvalid
 	}
 	var total int64
@@ -155,6 +175,12 @@ func OpenPreparedExport(ctx context.Context, parent *os.Root, raw []byte, b Prep
 			r.Close()
 		}
 	}()
+	if b.Consistency() == "filesystem" {
+		proof, e := inspectBtrfsSnapshot(r)
+		if e != nil || proof.id != m.SnapshotID || proof.parent != b.SnapshotOrigin || proof.created != m.SnapshotUnix {
+			return nil, empty, ErrInvalid
+		}
+	}
 	selection := source.Selection{Rules: []policy.Rule{{Prefix: ".", Domain: b.Profile}}, Domains: map[string]bool{b.Profile: true}, EntryLimit: source.MaxEntries}
 	plan, e := source.Scan(ctx, r, selection)
 	if e != nil {

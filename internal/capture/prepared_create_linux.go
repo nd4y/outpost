@@ -28,7 +28,7 @@ type PreparedClaim struct {
 }
 
 func CreatePreparedExport(ctx context.Context, parent *os.Root, b PreparedTrust, c PreparedClaim, key ed25519.PrivateKey, now time.Time) ([]byte, error) {
-	if b.validate() != nil || len(key) != ed25519.PrivateKeySize || !bytes.Equal(key.Public().(ed25519.PublicKey), b.Producer) || c.Sequence == 0 || c.SnapshotUnix < 1 || c.CompletedUnix < c.SnapshotUnix || c.CompletedUnix > now.Unix() || !preparedName(c.Root, true) {
+	if b.validate() != nil || len(key) != ed25519.PrivateKeySize || !bytes.Equal(key.Public().(ed25519.PublicKey), b.Producer) || c.Sequence == 0 || c.CompletedUnix > now.Unix() || !preparedName(c.Root, true) {
 		return nil, ErrInvalid
 	}
 	if e := ctx.Err(); e != nil {
@@ -39,6 +39,17 @@ func CreatePreparedExport(ctx context.Context, parent *os.Root, b PreparedTrust,
 		return nil, e
 	}
 	defer root.Close()
+	snapshotID := ""
+	if b.Consistency() == "filesystem" {
+		proof, err := inspectBtrfsSnapshot(root)
+		if err != nil || proof.parent != b.SnapshotOrigin || c.SnapshotUnix != 0 && c.SnapshotUnix != proof.created {
+			return nil, ErrInvalid
+		}
+		snapshotID, c.SnapshotUnix = proof.id, proof.created
+	}
+	if c.SnapshotUnix < 1 || c.CompletedUnix < c.SnapshotUnix {
+		return nil, ErrInvalid
+	}
 	plan, e := source.Scan(ctx, root, source.Selection{Rules: []policy.Rule{{Prefix: ".", Domain: b.Profile}}, Domains: map[string]bool{b.Profile: true}, EntryLimit: source.MaxEntries})
 	if e != nil {
 		return nil, e
@@ -46,7 +57,7 @@ func CreatePreparedExport(ctx context.Context, parent *os.Root, b PreparedTrust,
 	if plan.Excluded != 0 || plan.SourceBytes > b.MaxBytes {
 		return nil, ErrInvalid
 	}
-	m := PreparedExport{Format: PreparedExportFormat, Profile: b.Profile, Origin: b.Origin, Method: b.Method, Sequence: c.Sequence, SnapshotUnix: c.SnapshotUnix, CompletedUnix: c.CompletedUnix, Root: c.Root}
+	m := PreparedExport{Format: PreparedExportFormat, Profile: b.Profile, Origin: b.Origin, Method: b.Method, Sequence: c.Sequence, SnapshotUnix: c.SnapshotUnix, CompletedUnix: c.CompletedUnix, Root: c.Root, SnapshotID: snapshotID}
 	dirs := map[string]bool{".": true}
 	for _, entry := range plan.Entries {
 		if len(entry.Names) != 1 {
@@ -88,6 +99,12 @@ func CreatePreparedExport(ctx context.Context, parent *os.Root, b PreparedTrust,
 	}
 	if e = plan.Recheck(ctx, root); e != nil {
 		return nil, e
+	}
+	if b.Consistency() == "filesystem" {
+		proof, err := inspectBtrfsSnapshot(root)
+		if err != nil || proof.id != snapshotID || proof.parent != b.SnapshotOrigin || proof.created != c.SnapshotUnix {
+			return nil, ErrInvalid
+		}
 	}
 	return SignPreparedExport(m, b, key, now)
 }

@@ -38,6 +38,10 @@
       ],
       "checks": [
         {
+          "path": "internal/sourceagent/btrfs_snapshot_linux_test.go",
+          "name": "TestPreparedBtrfsSnapshotRestoresIndependentVersions"
+        },
+        {
           "path": "internal/sourceagent/observations_linux_test.go",
           "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         },
@@ -91,7 +95,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Admit production snapshot producers and other filesystem and application profiles, measure retention and performance, resolve truly unpublished expired operations and lost active journals, and verify recovery package lifecycle across key epochs."
     },
     {
       "id": "REQ-03",

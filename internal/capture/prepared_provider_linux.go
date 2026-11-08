@@ -132,7 +132,7 @@ func OpenPreparedProvider(ctx context.Context, o PreparedProviderOptions) (*Prep
 	return p, nil
 }
 func (p *PreparedProvider) Close() error        { return errors.Join(p.store.Close(), p.runtime.Close()) }
-func (p *PreparedProvider) Consistency() string { return "application" }
+func (p *PreparedProvider) Consistency() string { return p.o.Trust.Consistency() }
 func (p *PreparedProvider) Lineage(entry source.Entry) ([]byte, bool, error) {
 	if entry.Identity.Kind() != "regular" {
 		return nil, false, nil

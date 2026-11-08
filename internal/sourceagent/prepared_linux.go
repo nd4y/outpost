@@ -58,7 +58,7 @@ func CreatePreparedManifest(ctx context.Context, b Bootstrap, c capture.Prepared
 
 func preparedBootstrap(b Bootstrap) bool {
 	p := b.Prepared
-	return b.Format == PreparedAgentFormat && p != nil && b.Profile.Consistency == "application" && p.Trust.Validate() == nil && p.Trust.Profile == b.Profile.ID && p.Trust.Origin == b.Profile.Origin && p.Trust.MaxBytes <= b.Profile.MaxSourceBytes && filepath.IsAbs(p.ManifestFile) && filepath.Clean(p.ManifestFile) == p.ManifestFile && len(p.ManifestFile) <= 4095
+	return b.Format == PreparedAgentFormat && p != nil && b.Profile.Consistency == p.Trust.Consistency() && p.Trust.Validate() == nil && p.Trust.Profile == b.Profile.ID && p.Trust.Origin == b.Profile.Origin && p.Trust.MaxBytes <= b.Profile.MaxSourceBytes && filepath.IsAbs(p.ManifestFile) && filepath.Clean(p.ManifestFile) == p.ManifestFile && len(p.ManifestFile) <= 4095
 }
 func (a *Agent) preparedStore(initialize bool) (*statefile.Store, error) {
 	s, e := statefile.OpenAt(a.root, "prepared-views", capture.MaxPreparedExport, initialize)
