@@ -16,12 +16,11 @@ import (
 
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
-	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
 func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
-	f := newFixtureLifetime(t, 5)
+	f := newFixture(t)
 	ctx := context.Background()
 	var requests atomic.Int64
 	f.registryMu.Lock()
@@ -43,13 +42,15 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 		}
 		return nil
 	}
-	if err = f.a.Next(ctx); !errors.Is(err, stop) {
+	expiry := time.Now().Add(12 * time.Second).Unix()
+	intent := f.intentUntil(t, first.Sequence+1, first.Generation, expiry)
+	if err = f.a.Prepare(ctx, intent); !errors.Is(err, stop) {
 		t.Fatal("intent fence not reached", err)
 	}
 	if _, err = f.a.UnstartedRetirementPreview(ctx); !errors.Is(err, ErrInvalid) {
 		t.Fatal("current intent accepted for expiry", err)
 	}
-	f.expire(t)
+	f.waitForIntentExpiry(t, intent, expiry)
 	f.reopen(t)
 	preview, err := f.a.UnstartedRetirementPreview(ctx)
 	must(t, err)
@@ -172,7 +173,7 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 	f.reopen(t)
 	options := ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: f.authority,
 		Owner: f.b.Local.Owner, Replica: f.replica, Certificate: f.destination, Roots: f.roots,
-		Limits: peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1}}
+		Limits: sourceFixtureLimits}
 	f.registryMu.Lock()
 	err = f.registry.Close()
 	if err == nil {
@@ -222,10 +223,12 @@ func runUnstartedCLI(t *testing.T, binary string, args ...string) {
 }
 
 func TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt(t *testing.T) {
-	f := newFixtureLifetime(t, 3)
+	f := newFixture(t)
 	ctx := context.Background()
-	must(t, f.a.Next(ctx))
-	f.expire(t)
+	expiry := time.Now().Add(12 * time.Second).Unix()
+	intent := f.intentUntil(t, 1, "", expiry)
+	must(t, f.a.Prepare(ctx, intent))
+	f.waitForIntentExpiry(t, intent, expiry)
 	if _, err := f.a.UnstartedRetirementPreview(ctx); !errors.Is(err, ErrInvalid) {
 		t.Fatal("ACTIVE intent can be classified as unstarted", err)
 	}
@@ -238,5 +241,16 @@ func TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt(t *testing
 	must(t, err)
 	if err = f.a.RetireUnstarted(ctx, grant); !errors.Is(err, ErrInvalid) {
 		t.Fatal("no receiver receipt bypassed ACTIVE fence", err)
+	}
+}
+
+func (f *fixture) waitForIntentExpiry(t *testing.T, raw []byte, expiry int64) {
+	t.Helper()
+	time.Sleep(time.Until(time.Unix(expiry, 0)))
+	now := time.Now()
+	_, err := ingress.VerifyAuthority(f.authority, f.b.Local.Owner, now)
+	must(t, err)
+	if _, _, err = ingress.VerifyIntent(raw, f.authority, f.b.Local.Owner, now); !errors.Is(err, ingress.ErrDenied) {
+		t.Fatal("signed intent did not expire", err)
 	}
 }

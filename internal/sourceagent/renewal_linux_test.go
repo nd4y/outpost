@@ -188,12 +188,18 @@ func TestSourceRenewalRevalidatesAfterLeaseWait(t *testing.T) {
 func TestSourceRenewalPreservesHeadScheduleAndIndependentVersions(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	must(t, f.a.ConfigureSchedule(ctx, testSchedule()))
+	config := testSchedule()
+	// This case needs a completed capture before it tests renewal.
+	config.AttemptSeconds = 90
+	must(t, f.a.ConfigureSchedule(ctx, config))
 	must(t, f.a.scheduleStep(ctx))
 	first, e := f.a.Status(ctx)
 	must(t, e)
 	schedule, e := f.a.ScheduleStatus(ctx)
 	must(t, e)
+	if first.Phase != "COMPLETE" || first.Sequence != 1 || schedule.LastSequence != 1 {
+		t.Fatalf("scheduled capture did not complete: source=%s sequence=%d schedule=%s error=%s", first.Phase, first.Sequence, schedule.Phase, schedule.ErrorCode)
+	}
 	content, e := os.ReadFile(filepath.Join(f.tree, "private.bin"))
 	must(t, e)
 	before, e := f.a.store.Read("agent.json")
@@ -234,10 +240,12 @@ func TestSourceRenewalPreservesHeadScheduleAndIndependentVersions(t *testing.T) 
 	replica, e := generation.Open(f.replicaPath, f.grant.Trust, false)
 	must(t, e)
 	defer replica.Close()
-	registry, e := ingress.OpenRegistry(ctx, ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry-revision-two"), Authority: raw, Owner: f.b.Local.Owner, Replica: replica, Certificate: f.destination, Roots: f.roots, Limits: peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1}, Initialize: true})
+	registry, e := ingress.OpenRegistry(ctx, ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry-revision-two"), Authority: raw, Owner: f.b.Local.Owner, Replica: replica, Certificate: f.destination, Roots: f.roots, Limits: sourceFixtureLimits, Initialize: true})
 	must(t, e)
 	defer registry.Close()
+	f.registryMu.Lock()
 	f.intercept = func(w http.ResponseWriter, r *http.Request) bool { registry.ServeHTTP(w, r); return true }
+	f.registryMu.Unlock()
 	next := bytes.Repeat([]byte("renewed source"), 24000)
 	must(t, os.WriteFile(filepath.Join(f.tree, "private.bin"), next, 0640))
 	must(t, f.a.Next(ctx))

@@ -18,7 +18,6 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/observation"
-	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -42,7 +41,7 @@ func (f *fixture) provisionSettlement(t *testing.T, item control.SettlementAdmis
 	f.registryMu.Lock()
 	defer f.registryMu.Unlock()
 	must(t, f.registry.Close())
-	g, e := ingress.OpenRegistry(context.Background(), ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: item.Authority, Settlement: item.Grant, SettlementIntent: item.Intent, Owner: f.b.Local.Owner, Replica: f.replica, Certificate: f.destination, Roots: f.roots, Limits: peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1}, Initialize: false})
+	g, e := ingress.OpenRegistry(context.Background(), ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: item.Authority, Settlement: item.Grant, SettlementIntent: item.Intent, Owner: f.b.Local.Owner, Replica: f.replica, Certificate: f.destination, Roots: f.roots, Limits: sourceFixtureLimits, Initialize: false})
 	must(t, e)
 	f.registry = g
 }
@@ -55,7 +54,8 @@ func (f *fixture) expire(t *testing.T) {
 }
 
 func TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations(t *testing.T) {
-	f := newFixtureLifetime(t, 10)
+	// Two durable captures must reach the receiver before the authority expires.
+	f := newFixtureLifetime(t, 120)
 	ctx := context.Background()
 	expectedOld, e := os.ReadFile(filepath.Join(f.tree, "private.bin"))
 	must(t, e)
@@ -92,14 +92,15 @@ func TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations(t *te
 		return true
 	}
 	f.registryMu.Unlock()
-	if f.a.Run(ctx) == nil {
+	runErr := f.a.Run(ctx)
+	if runErr == nil {
 		t.Fatal("lost reply unexpectedly completed source")
 	}
 	f.registryMu.Lock()
 	f.intercept = nil
 	f.registryMu.Unlock()
 	if original.Generation == "" {
-		t.Fatal("receiver did not durably complete")
+		t.Fatalf("receiver did not durably complete before the reply was lost: %v (authority remaining %s)", runErr, time.Until(time.Unix(f.grant.ExpiresUnix, 0)))
 	}
 	f.expire(t)
 	f.reopen(t)

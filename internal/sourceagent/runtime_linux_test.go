@@ -42,6 +42,10 @@ func must(t *testing.T, e error) {
 	}
 }
 
+// The source and receiver share the fixture disk. Allow durable receiver
+// writes within the same bounded request window as the source client.
+var sourceFixtureLimits = peer.Limits{Concurrency: 1, Timeout: 30 * time.Second, Attempts: 1}
+
 type fixture struct {
 	server                          *httptest.Server
 	base, tree, replicaPath         string
@@ -125,7 +129,7 @@ func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 	must(t, e)
 	f.replica = r
 	t.Cleanup(func() { r.Close() })
-	g, e := ingress.OpenRegistry(ctx, ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: f.authority, Owner: ownerPub, Replica: r, Certificate: dst, Roots: roots, Limits: peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1}, Initialize: true})
+	g, e := ingress.OpenRegistry(ctx, ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: f.authority, Owner: ownerPub, Replica: r, Certificate: dst, Roots: roots, Limits: sourceFixtureLimits, Initialize: true})
 	must(t, e)
 	f.registry = g
 	t.Cleanup(func() { f.registry.Close() })
@@ -166,10 +170,15 @@ func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 }
 func (f *fixture) intent(t *testing.T, seq uint64, parent string) []byte {
 	t.Helper()
+	return f.intentUntil(t, seq, parent, time.Now().Add(10*time.Minute).Unix())
+}
+
+func (f *fixture) intentUntil(t *testing.T, seq uint64, parent string, expiry int64) []byte {
+	t.Helper()
 	a := f.grant
-	now := time.Now().Unix()
-	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte(parent + "operation")), Authority: storage.Hash(f.authority), Tenant: a.Tenant, Profile: a.Profile, Source: a.Source, Ingress: a.Ingress, Domain: a.Trust.Domain, Repository: a.Trust.Repository, Epoch: 1, Sequence: seq, Parent: parent, Policy: 1, SnapshotUnix: now, NotBefore: now - 1, ExpiresUnix: now + 600, MaxBytes: a.MaxBytes, MaxObjects: a.MaxObjects}
-	raw, e := ingress.SignIntent(i, f.authority, f.b.Local.Owner, f.writer, time.Now())
+	now := time.Now()
+	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte(parent + "operation")), Authority: storage.Hash(f.authority), Tenant: a.Tenant, Profile: a.Profile, Source: a.Source, Ingress: a.Ingress, Domain: a.Trust.Domain, Repository: a.Trust.Repository, Epoch: 1, Sequence: seq, Parent: parent, Policy: 1, SnapshotUnix: now.Unix(), NotBefore: now.Unix() - 1, ExpiresUnix: expiry, MaxBytes: a.MaxBytes, MaxObjects: a.MaxObjects}
+	raw, e := ingress.SignIntent(i, f.authority, f.b.Local.Owner, f.writer, now)
 	must(t, e)
 	return raw
 }
