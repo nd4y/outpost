@@ -79,6 +79,7 @@ type state struct {
 	Observation     []byte            `json:"observation,omitempty"`
 	IntentAuthority []byte            `json:"intentAuthority,omitempty"`
 	LegacyDigest    string            `json:"legacyDigest,omitempty"`
+	Retirement      string            `json:"retirement,omitempty"`
 }
 
 type Status struct {
@@ -397,7 +398,8 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 			return s, ErrInvalid
 		}
 	}
-	if s.Phase != "IDLE" && s.Phase != "PREPARING" && s.Phase != "ACTIVE" && s.Phase != "COMPLETE" {
+	if s.Phase != "IDLE" && s.Phase != "PREPARING" && s.Phase != "ACTIVE" && s.Phase != "COMPLETE" && s.Phase != "ABANDONED" ||
+		s.Phase != "ABANDONED" && s.Retirement != "" {
 		return s, ErrInvalid
 	}
 	if s.Sequence == 0 && (s.Generation != "" || len(s.Previous) != 0 || len(s.Checkpoint) != 0) || s.Sequence > 0 && !storage.ID(s.Generation) {
@@ -420,6 +422,12 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 			}
 		} else if i.Sequence != s.Sequence+1 || i.Parent != s.Generation {
 			return s, ErrInvalid
+		}
+		if s.Phase == "ABANDONED" {
+			record, err := a.readUnstartedArchive(s, i, s.Retirement)
+			if err != nil || record.RecordedUnix > s.ObservedUnix {
+				return s, ErrInvalid
+			}
 		}
 	} else if len(s.Intent) != 0 || s.Sequence != 0 {
 		return s, ErrInvalid
@@ -532,6 +540,7 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 			}
 		}
 		s.Phase, s.Intent = "PREPARING", bytes.Clone(raw)
+		s.Retirement = ""
 		if s.Format == renewedFormat {
 			s.IntentAuthority = bytes.Clone(a.authority)
 		}
@@ -669,7 +678,7 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte) error {
 	if e != nil {
 		return e
 	}
-	if s.Phase == "IDLE" {
+	if s.Phase == "IDLE" || s.Phase == "ABANDONED" {
 		return ErrInvalid
 	}
 	if s.Phase == "COMPLETE" {

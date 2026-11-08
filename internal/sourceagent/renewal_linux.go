@@ -77,7 +77,7 @@ func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 		if e != nil || !sameAuthorityScope(current, prior) || prior.Revision > current.Revision {
 			return current, ErrInvalid
 		}
-		if s.Phase != "COMPLETE" && !bytes.Equal(s.IntentAuthority, s.Authority) {
+		if s.Phase != "COMPLETE" && s.Phase != "ABANDONED" && !bytes.Equal(s.IntentAuthority, s.Authority) {
 			return current, ErrInvalid
 		}
 	} else if len(s.IntentAuthority) != 0 {
@@ -169,7 +169,7 @@ func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal,
 			out = Renewal{renewedFormat, a.b.Profile.ID, next.Revision, s.Sequence, s.Generation, s.LegacyDigest, true}
 			return nil
 		}
-		if next.Revision <= a.grant.Revision || s.Phase != "IDLE" && s.Phase != "COMPLETE" {
+		if next.Revision <= a.grant.Revision || s.Phase != "IDLE" && s.Phase != "COMPLETE" && s.Phase != "ABANDONED" {
 			return ingress.ErrConflict
 		}
 		if s.Format == Format {

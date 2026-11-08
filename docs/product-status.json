@@ -238,6 +238,14 @@
         {
           "path": "internal/sourceagent/prepared_cli_linux_test.go",
           "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
@@ -297,6 +305,14 @@
         {
           "path": "internal/capture/prepared_provider_linux_test.go",
           "name": "TestPreparedProviderValidationBlocksSealAndIsNotRepeatedAfterSeal"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
@@ -1769,6 +1785,14 @@
           "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
         },
         {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
+        },
+        {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalRepairReplaysDurableMissingPart"
         },
@@ -1989,6 +2013,14 @@
         {
           "path": "internal/sourceagent/prepared_linux_test.go",
           "name": "TestPreparedSourceScheduleDoesNotRefreshCompletionForUnchangedExport"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -2315,6 +2347,14 @@
         {
           "path": "internal/sourceagent/prepared_crash_linux_test.go",
           "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -3436,6 +3476,14 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         },
         {
           "path": "internal/upload/upload_linux_test.go",
@@ -5278,6 +5326,14 @@
           "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
         },
         {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
+        },
+        {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalRepairReplaysDurableMissingPart"
         }
@@ -6921,6 +6977,14 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementSIGKILLAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/unstarted_linux_test.go",
+          "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         },
         {
           "path": "internal/worker/external_schedule_linux_test.go",

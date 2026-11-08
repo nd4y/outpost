@@ -223,7 +223,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"format": capture.TreeFormat, "probed": true}, nil
-	case "source-receipt-recovery-preview", "source-settlement-preview", "source-settle", "source-recovery-export", "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
+	case "source-receipt-recovery-preview", "source-settlement-preview", "source-settle", "source-unstarted-preview", "source-unstarted-retire", "source-recovery-export", "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
 		b, e := sourceagent.Load(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -256,6 +256,27 @@ func run(ctx context.Context, args []string) (any, error) {
 		}
 		defer a.Close()
 		switch args[0] {
+		case "source-unstarted-preview":
+			grant, e := a.UnstartedRetirementPreview(ctx)
+			if e != nil {
+				return nil, e
+			}
+			raw, e := json.Marshal(grant)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, raw); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": sourceagent.UnstartedRetirementFormat, "signed": false}, nil
+		case "source-unstarted-retire":
+			raw, e := worker.ReadPrivate(*input, sourceagent.MaxUnstartedRetirement)
+			if e != nil {
+				return nil, e
+			}
+			if e = a.RetireUnstarted(ctx, raw); e != nil {
+				return nil, e
+			}
 		case "source-receipt-recovery-preview":
 			item, e := a.ReceiptRecoveryPreview(ctx)
 			if e != nil {
@@ -516,7 +537,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"format": capture.PreparedExportFormat, "operation": storage.Hash(manifest), "attestation": "producer-signed"}, nil
-	case "source-receipt-recovery-sign", "source-settlement-sign", "config-sign", "command-authority-sign", "management-enrollment-sign", "source-authority-sign", "observation-grant-sign", "upload-delegation-sign":
+	case "source-receipt-recovery-sign", "source-settlement-sign", "source-unstarted-sign", "config-sign", "command-authority-sign", "management-enrollment-sign", "source-authority-sign", "observation-grant-sign", "upload-delegation-sign":
 		private, e := worker.ReadPrivate(*key, 65536)
 		if e != nil {
 			return nil, e
@@ -534,6 +555,9 @@ func run(ctx context.Context, args []string) (any, error) {
 		if args[0] == "source-settlement-sign" {
 			limit = sourceagent.MaxSettlementAdmission
 		}
+		if args[0] == "source-unstarted-sign" {
+			limit = sourceagent.MaxUnstartedRetirement
+		}
 		if args[0] == "command-authority-sign" {
 			limit = command.MaxAuthority
 		}
@@ -546,6 +570,20 @@ func run(ctx context.Context, args []string) (any, error) {
 		raw, e := worker.ReadPrivate(*input, limit)
 		if e != nil {
 			return nil, e
+		}
+		if args[0] == "source-unstarted-sign" {
+			var grant sourceagent.UnstartedRetirement
+			if worker.DecodeInput(raw, &grant, sourceagent.MaxUnstartedRetirement) != nil {
+				return nil, errUsage
+			}
+			signed, e := sourceagent.SignUnstartedRetirement(grant, signer.PrivateKey, time.Now())
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, signed); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": sourceagent.UnstartedRetirementFormat, "signed": true}, nil
 		}
 		if args[0] == "source-receipt-recovery-sign" {
 			var item ingress.ReceiptRecoveryAdmission

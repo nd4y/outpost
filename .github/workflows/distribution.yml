@@ -86,7 +86,7 @@ jobs:
           export OUTPOST_SETTLEMENT_PREVIOUS_CLI="$RUNNER_TEMP/settlement-previous"
           export OUTPOST_SETTLEMENT_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_SETTLEMENT_PREVIOUS_CLI" | cut -d ' ' -f1)"
           "$OUTPOST_SETTLEMENT_CURRENT_CLI" version
-          go test -count=1 -timeout=180s -run 'Settlement|SourceAgentSIGKILLChild' \
+          go test -count=1 -timeout=180s -run 'Settlement|SourceUnstartedRetirement|SourceAgentSIGKILLChild' \
             -v ./internal/sourceagent ./internal/worker ./internal/control ./internal/ingress
       - name: Renew the existing receiver through the selected native CLI
         env:

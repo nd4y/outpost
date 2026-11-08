@@ -90,7 +90,7 @@ func (a *Agent) readPrepared(ctx context.Context, operation string) (capture.Pre
 	return m, raw, e
 }
 func (a *Agent) checkPreparedAdvance(ctx context.Context, s state, m capture.PreparedExport, operation string) error {
-	if s.Sequence == 0 {
+	if s.Sequence == 0 && s.Phase != "ABANDONED" {
 		return nil
 	}
 	i, e := a.stateIntent(s)

@@ -273,7 +273,7 @@ func (a *Agent) attemptSchedule(ctx context.Context, expected Schedule) error {
 			return a.completeSchedule(ctx, head)
 		}
 		now := time.Now().Unix()
-		if now < status.RetryUnix || (head.Phase == "IDLE" || head.Phase == "COMPLETE") && now < status.NextUnix {
+		if now < status.RetryUnix || (head.Phase == "IDLE" || head.Phase == "COMPLETE" || head.Phase == "ABANDONED") && now < status.NextUnix {
 			return nil
 		}
 		e = a.store.WithLock(ctx, func() error {

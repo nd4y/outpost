@@ -23,6 +23,7 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 		Point      string
 		Schedule   bool
 		Settlement *control.SettlementAdmission
+		Retirement []byte
 	}
 	raw, e := os.ReadFile(file)
 	must(t, e)
@@ -40,6 +41,8 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 	}
 	if input.Settlement != nil {
 		must(t, a.Settle(ctx, *input.Settlement))
+	} else if len(input.Retirement) != 0 {
+		must(t, a.RetireUnstarted(ctx, input.Retirement))
 	} else if input.Schedule {
 		must(t, a.RunSchedule(ctx))
 	} else {

@@ -50,7 +50,22 @@ Success requires `COMPLETE`, the selected generation, the original receipt verif
 
 No receipt, a mismatched generation, revoked policy, expired TLS identity, expired settlement grant, unavailable volume or missing required copy leaves the operation pending. A settlement grant cannot extend an observation grant or lower `minimumCopies`. Original verification age is never replaced with settlement time. If the fresh grant expires mid-operation, retain the journal and obtain another explicit grant for the same original documents and generation.
 
-The receiver must already have persisted its complete receipt. A replica head by itself, a sealed local catalog, or absence of a receipt cannot prove that publication completed or that it is safe to abandon the operation. When publication is complete but the ingress receipt is missing, use the separate [local receipt recovery](receipt-recovery.md) workflow first. Truly unpublished expired captures and lost active journals still need separate reconciliation. No reset, automatic abort or staging deletion is provided by this command.
+The receiver must already have persisted its complete receipt. A replica head by itself, a sealed local catalog, or absence of a receipt cannot prove that publication completed or that it is safe to abandon the operation. When publication is complete but the ingress receipt is missing, use the separate [local receipt recovery](receipt-recovery.md) workflow first. Expired captures that reached the ACTIVE fence and lost active journals still need separate reconciliation.
+
+## Retire an expired unstarted intent
+
+The source agent can retire an exact expired intent while its signed journal is still `PREPARING`. The ordinary agent durably saves `ACTIVE` before making its first receiver request. Preview and retirement take the same execution lease as capture. The owner permit binds the exact source, intent, previous checkpoint and expiry. An `ACTIVE` intent requires separate reconciliation even if it has no receipt.
+
+```sh
+outpost source-unstarted-preview --bootstrap /private/source.json \
+  --output /private/retirement-request.json
+outpost source-unstarted-sign --key /private/owner-signing-key.json \
+  --input /private/retirement-request.json --output /private/signed-retirement.json
+outpost source-unstarted-retire --bootstrap /private/source.json \
+  --input /private/signed-retirement.json
+```
+
+Run the signing command on the owner host. A successful source response reports `ABANDONED` with the original operation and the previous completed generation. The source first stores a signed audit record, then commits the state transition. A restart between these writes can replay the same active permit. Local files, the previous checkpoint and the receiver remain intact. Before the next capture, renew authority on both the source and its existing receiver. A prepared-export source needs an advanced producer export.
 
 The original source authority remains expired after settlement. A subsequent capture needs explicit authority renewal and compatible admission at the same receiver. Receiver renewal is an explicit local maintenance operation. Preserve the existing registry and old generations; do not replace its directory to bypass a binding conflict.
 
