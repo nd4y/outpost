@@ -51,21 +51,26 @@ func safeName(s string, max int) bool {
 // Profile contains no credentials. Endpoint is an explicitly provisioned bucket
 // prefix or existing collection; keys are flat within this namespace.
 type Profile struct {
-	Kind              string `json:"kind"`
-	Endpoint          string `json:"endpoint"`
-	Namespace         string `json:"namespace"`
-	Region            string `json:"region,omitempty"`
-	MaxObjectBytes    int    `json:"maxObjectBytes"`
-	Concurrency       int    `json:"concurrency"`
-	RequestsPerSecond int    `json:"requestsPerSecond"`
-	Attempts          int    `json:"attempts"`
-	TimeoutMillis     int    `json:"timeoutMillis"`
-	CredentialScope   string `json:"credentialScope"`
-	NoDelete          bool   `json:"noDelete"`
+	Kind               string `json:"kind"`
+	Endpoint           string `json:"endpoint"`
+	Namespace          string `json:"namespace"`
+	Region             string `json:"region,omitempty"`
+	MaxObjectBytes     int    `json:"maxObjectBytes"`
+	Concurrency        int    `json:"concurrency"`
+	RequestsPerSecond  int    `json:"requestsPerSecond"`
+	Attempts           int    `json:"attempts"`
+	TimeoutMillis      int    `json:"timeoutMillis"`
+	CredentialScope    string `json:"credentialScope"`
+	NoDelete           bool   `json:"noDelete"`
+	WriteMode          string `json:"writeMode,omitempty"`
+	MaxStagingAttempts int    `json:"maxStagingAttempts,omitempty"`
 }
 
 func (p Profile) ID() string { b, _ := json.Marshal(p); return Hash(b) }
 func (p Profile) Validate() error {
+	if p.WriteMode != "" && (p.WriteMode != WebDAVMoveMode || p.Kind != "webdav" || p.MaxStagingAttempts < 1 || p.MaxStagingAttempts > 8) || p.WriteMode == "" && p.MaxStagingAttempts != 0 {
+		return ErrDenied
+	}
 	if p.Kind != "s3" && p.Kind != "webdav" || !ID(p.Namespace) || p.MaxObjectBytes < 64<<10 || p.MaxObjectBytes > MaxPhysical || p.Concurrency < 1 || p.Concurrency > 4 || p.RequestsPerSecond < 1 || p.RequestsPerSecond > 1000 || p.Attempts < 1 || p.Attempts > 3 || p.TimeoutMillis < 1 || p.TimeoutMillis > 300000 || (p.CredentialScope != "namespace" && p.CredentialScope != "account") || !p.NoDelete {
 		return ErrDenied
 	}
@@ -171,9 +176,49 @@ func (b *Backend) cooldown(delay time.Duration) {
 	}
 	b.mu.Unlock()
 }
+
+type requestOptions struct {
+	stage       bool
+	destination string
+}
+
+func (b *Backend) resourceURL(key string) string {
+	address := *b.base
+	address.Path += b.profile.Namespace + "-" + key
+	return address.String()
+}
+
 func (b *Backend) request(ctx context.Context, method, key string, payload []byte) ([]byte, int, error) {
+	return b.requestWith(ctx, method, key, payload, requestOptions{})
+}
+
+func (b *Backend) requestWith(ctx context.Context, method, key string, payload []byte, options requestOptions) ([]byte, int, error) {
 	if !safeName(key, 170) || len(payload) > b.profile.MaxObjectBytes {
 		return nil, 0, ErrCapacity
+	}
+	if method == http.MethodPut && b.profile.WriteMode == WebDAVMoveMode && !options.stage {
+		return nil, 0, ErrDenied
+	}
+	attempts := b.profile.Attempts
+	if options.stage {
+		if b.profile.WriteMode != WebDAVMoveMode || method != http.MethodPut || !moveTemporary(key) || options.destination != "" {
+			return nil, 0, ErrDenied
+		}
+		// A lost staging PUT reply is reconciled from the attempt book.
+		attempts = 1
+	}
+	if method == "MOVE" || options.destination != "" {
+		if b.profile.WriteMode != WebDAVMoveMode || method != "MOVE" || !moveTemporary(key) || !safeName(options.destination, 170) || moveTemporary(options.destination) || len(payload) != 0 {
+			return nil, 0, ErrDenied
+		}
+	}
+	var book WriteAttempts
+	if options.stage || method == "MOVE" {
+		var ok bool
+		book, ok = ctx.Value(writeAttemptsKey{}).(WriteAttempts)
+		if !ok {
+			return nil, 0, ErrDenied
+		}
 	}
 	ctx, timeout := context.WithTimeout(ctx, time.Duration(b.profile.TimeoutMillis)*time.Millisecond)
 	defer timeout()
@@ -186,23 +231,32 @@ func (b *Backend) request(ctx context.Context, method, key string, payload []byt
 	ctx, cancel := context.WithDeadline(ctx, time.Unix(b.credentials.ExpiresUnix, 0))
 	defer cancel()
 	var last int
-	for attempt := 0; attempt < b.profile.Attempts; attempt++ {
+	for attempt := 0; attempt < attempts; attempt++ {
 		if time.Now().Unix() >= b.credentials.ExpiresUnix {
 			return nil, 0, ErrDenied
 		}
 		if e := b.admit(ctx); e != nil {
 			return nil, 0, e
 		}
-		address := *b.base
-		address.Path += b.profile.Namespace + "-" + key
-		req, e := http.NewRequestWithContext(ctx, method, address.String(), bytes.NewReader(payload))
+		if book != nil {
+			if e := book.Check(ctx); e != nil {
+				return nil, 0, e
+			}
+		}
+		req, e := http.NewRequestWithContext(ctx, method, b.resourceURL(key), bytes.NewReader(payload))
 		if e != nil {
 			return nil, 0, ErrDenied
 		}
 		req.Header.Set("Accept-Encoding", "identity")
 		req.Header.Set("Content-Type", "application/octet-stream")
-		if method == http.MethodPut {
+		if options.stage {
+			req.GetBody = nil
+		} else if method == http.MethodPut {
 			req.Header.Set("If-None-Match", "*")
+		}
+		if method == "MOVE" {
+			req.Header.Set("Destination", b.resourceURL(options.destination))
+			req.Header.Set("Overwrite", "F")
 		}
 		if b.profile.Kind == "s3" {
 			if e = signV4(req, payload, b.credentials.Access, b.credentials.Secret, b.credentials.SessionToken, b.profile.Region, time.Now()); e != nil {
@@ -265,7 +319,7 @@ func (b *Backend) request(ctx context.Context, method, key string, payload []byt
 		if e = ctx.Err(); e != nil {
 			return nil, last, e
 		}
-		if attempt+1 < b.profile.Attempts {
+		if attempt+1 < attempts {
 			if e = pause(ctx, delay); e != nil {
 				return nil, last, e
 			}
@@ -280,6 +334,9 @@ func (b *Backend) Get(ctx context.Context, key string) ([]byte, error) {
 
 // Put is create-only. A duplicate succeeds only after byte-for-byte readback.
 func (b *Backend) Put(ctx context.Context, key string, data []byte) error {
+	if b.profile.WriteMode == WebDAVMoveMode {
+		return b.putMove(ctx, key, data)
+	}
 	_, _, e := b.request(ctx, http.MethodPut, key, data)
 	if e != nil && !errors.Is(e, ErrConflict) {
 		return e
@@ -310,6 +367,9 @@ func (b *Backend) Put(ctx context.Context, key string, data []byte) error {
 // every attempt. An existing probe does not prove fresh-create permission,
 // physical durability or the account's actual ACL scope.
 func (b *Backend) Probe(ctx context.Context) error {
+	if b.profile.WriteMode == WebDAVMoveMode {
+		return b.probeMove(ctx)
+	}
 	value := sha256.Sum256([]byte("outpost-storage-probe-1\x00" + b.profile.Namespace))
 	data := value[:]
 	key := "probe-" + Hash(data)
@@ -329,6 +389,10 @@ func (b *Backend) Probe(ctx context.Context) error {
 	if !bytes.Equal(got, data) {
 		return ErrIntegrity
 	}
+	return b.checkLayout(ctx)
+}
+
+func (b *Backend) checkLayout(ctx context.Context) error {
 	// A changed fragmentation profile cannot silently reinterpret old manifests.
 	layout, _ := json.Marshal(struct {
 		Format       string `json:"format"`

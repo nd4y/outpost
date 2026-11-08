@@ -105,16 +105,27 @@ func (f *fixture) capture(t *testing.T, seq uint64, parent string) (string, stri
 	return id, v.Version
 }
 func (f *fixture) server(t *testing.T, kind string, delay time.Duration, before teststore.Hook) *teststore.Server {
+	return f.externalServer(t, teststore.Options{Kind: kind, Delay: delay, Before: before})
+}
+
+func (f *fixture) externalServer(t *testing.T, options teststore.Options) *teststore.Server {
+	t.Helper()
 	logins := map[string]teststore.Login{}
 	for i, w := range f.workers {
 		logins[w.ID] = teststore.Login{Secret: "test-secret-" + string(rune('a'+i))}
 	}
-	return teststore.New(t, teststore.Options{Kind: kind, Namespace: storage.Hash([]byte(f.authority.Generation.Domain + "/" + f.authority.Generation.Repository)), Logins: logins, Delay: delay, Before: before})
+	options.Namespace = storage.Hash([]byte(f.authority.Generation.Domain + "/" + f.authority.Generation.Repository))
+	options.Logins = logins
+	return teststore.New(t, options)
 }
 func profile(s *teststore.Server) storage.Profile {
 	p := storage.Profile{Kind: s.Options.Kind, Endpoint: s.Endpoint(), Namespace: s.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true}
 	if p.Kind == "s3" {
 		p.Region = s.Options.Region
+	}
+	if s.Options.MoveOnly {
+		p.WriteMode = storage.WebDAVMoveMode
+		p.MaxStagingAttempts = 3
 	}
 	return p
 }

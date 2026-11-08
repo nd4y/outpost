@@ -76,6 +76,14 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueThrottleDeadlineSurvivesReopen"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueReopensWithDurableAttemptBook"
         }
       ]
     },
@@ -200,6 +208,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueSlowResolverAndCancellation"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
         }
       ]
     }
@@ -244,7 +256,7 @@
     {
       "id": "REQ-28",
       "acceptanceSubset": ["AT-16"],
-      "scope": "Size/capability probes, verified physical multipart resume, conditional writes, quota, delayed-read retries and throttling in synthetic protocols",
+      "scope": "Size/capability probes, verified physical multipart resume, conditional writes, quota, delayed-read retries and throttling in synthetic protocols; explicit WebDAV MOVE with bounded durable staging and no-overwrite publication",
       "remaining": "Actual S3-compatible/WebDAV endpoint matrix including listing/range/ACL/quota characteristics; unsupported capabilities are explicit",
       "tests": [
         {
@@ -262,6 +274,22 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveLostRepliesResumeOwnedStage"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveProbeRefusesIgnoredOverwrite"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRetainsCorruptStagesAndBoundsRetries"
         }
       ]
     },
@@ -278,6 +306,10 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
         }
       ]
     },
@@ -298,6 +330,14 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests"
+        },
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveBookMissingInitializedBucketAndBindingNeverRecreated"
         }
       ]
     },

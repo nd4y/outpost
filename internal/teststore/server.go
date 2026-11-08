@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,6 +30,8 @@ type Options struct {
 	Delay                              time.Duration
 	Before                             Hook
 	AfterWrite                         Hook
+	MoveOnly                           bool
+	IgnoreMoveOverwrite                bool
 }
 type Event struct {
 	Actor, Key string
@@ -204,12 +207,14 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+hash(data)+`"`)
 		_, _ = w.Write(data)
 	case http.MethodPut:
-		if r.Header.Get("If-None-Match") != "*" {
+		staging := strings.HasPrefix(key, "attempt-") || strings.HasPrefix(key, "probe-stage-")
+		if s.Options.MoveOnly && (!staging || r.Header.Get("If-None-Match") != "") ||
+			!s.Options.MoveOnly && r.Header.Get("If-None-Match") != "*" {
 			w.WriteHeader(400)
 			return
 		}
 		start := time.Now()
-		part := strings.HasPrefix(key, "part-")
+		part := strings.HasPrefix(key, "part-") || s.Options.MoveOnly && staging && len(body) > 4096
 		if part {
 			s.mu.Lock()
 			s.active[actor]++
@@ -246,7 +251,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(507)
 			return
 		}
-		if e = os.Link(temp.Name(), target); os.IsExist(e) {
+		if s.Options.MoveOnly {
+			e = os.Rename(temp.Name(), target)
+		} else {
+			e = os.Link(temp.Name(), target)
+		}
+		if os.IsExist(e) {
 			w.WriteHeader(412)
 			return
 		} else if e != nil {
@@ -274,8 +284,69 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(201)
+	case "MOVE":
+		s.serveMove(w, r, actor, key, target)
 	default:
 		w.WriteHeader(405)
 	}
+}
+
+func (s *Server) serveMove(w http.ResponseWriter, r *http.Request, actor, key, source string) {
+	if !s.Options.MoveOnly || s.Options.Kind != "webdav" || r.Header.Get("Overwrite") != "F" ||
+		!strings.HasPrefix(key, "attempt-") && !strings.HasPrefix(key, "probe-stage-") {
+		w.WriteHeader(405)
+		return
+	}
+	prefix := "/objects/" + s.Options.Namespace + "-"
+	destination, e := url.Parse(r.Header.Get("Destination"))
+	if e != nil || destination.Scheme != "https" || destination.Host != r.Host || destination.User != nil || destination.RawQuery != "" || destination.Fragment != "" || !strings.HasPrefix(destination.Path, prefix) {
+		w.WriteHeader(403)
+		return
+	}
+	name := strings.TrimPrefix(destination.Path, prefix)
+	if name == "" || strings.HasPrefix(name, "attempt-") || strings.HasPrefix(name, "probe-stage-") {
+		w.WriteHeader(400)
+		return
+	}
+	for _, c := range name {
+		if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+			w.WriteHeader(400)
+			return
+		}
+	}
+	final := s.Path(name)
+	s.mu.Lock()
+	_, present := os.Lstat(final)
+	if present == nil && !s.Options.IgnoreMoveOverwrite {
+		s.mu.Unlock()
+		w.WriteHeader(412)
+		return
+	}
+	e = os.Rename(source, final)
+	if e == nil {
+		s.writes[name]++
+	}
+	s.mu.Unlock()
+	if os.IsNotExist(e) {
+		w.WriteHeader(404)
+		return
+	}
+	if e != nil {
+		w.WriteHeader(500)
+		return
+	}
+	dir, e := os.Open(s.Options.Directory)
+	if e == nil {
+		e = dir.Sync()
+		dir.Close()
+	}
+	if e != nil {
+		w.WriteHeader(500)
+		return
+	}
+	if s.Options.AfterWrite != nil && s.Options.AfterWrite(w, r, actor, name, nil) {
+		return
+	}
+	w.WriteHeader(201)
 }
 func (s *Server) String() string { return fmt.Sprintf("synthetic %s endpoint", s.Options.Kind) }

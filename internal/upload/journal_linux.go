@@ -18,6 +18,14 @@ import (
 )
 
 const maxJournal = 8 << 20
+const moveJournalFormat = "outpost-external-move-journal-1"
+
+func journalFormat(p Plan) string {
+	if p.Profile.WriteMode == storage.WebDAVMoveMode {
+		return moveJournalFormat
+	}
+	return Format
+}
 
 type Progress struct {
 	Round          int64  `json:"round"`
@@ -34,13 +42,14 @@ type Receipt struct {
 	ObservedUnix int64  `json:"observedUnix"`
 }
 type State struct {
-	Format   string              `json:"format"`
-	Plan     string              `json:"planDigest"`
-	Worker   string              `json:"worker"`
-	Revision uint64              `json:"revision"`
-	Phase    string              `json:"phase"`
-	Parts    map[string]Progress `json:"parts"`
-	Receipt  *Receipt            `json:"receipt,omitempty"`
+	Format        string              `json:"format"`
+	Plan          string              `json:"planDigest"`
+	Worker        string              `json:"worker"`
+	Revision      uint64              `json:"revision"`
+	Phase         string              `json:"phase"`
+	Parts         map[string]Progress `json:"parts"`
+	Receipt       *Receipt            `json:"receipt,omitempty"`
+	MoveBookReady bool                `json:"moveBookReady,omitempty"`
 }
 type Journal struct {
 	root           *os.Root
@@ -50,6 +59,8 @@ type Journal struct {
 	tasks          map[string]bool
 	Admit          statefile.Admission
 	Readback       ReadbackOptions
+	Guard          func(context.Context) error
+	Fault          func(string) error
 }
 
 func regular(root *os.Root, name string, max int) ([]byte, error) {
@@ -184,7 +195,7 @@ func openJournalRoot(r *os.Root, raw []byte, worker string, a Authority, initial
 			r.Close()
 			return nil, e
 		}
-		if e = j.save(State{Format: Format, Plan: j.planID, Worker: worker, Phase: "PENDING", Parts: map[string]Progress{}}); e != nil {
+		if e = j.save(State{Format: journalFormat(p), Plan: j.planID, Worker: worker, Phase: "PENDING", Parts: map[string]Progress{}}); e != nil {
 			r.Close()
 			return nil, e
 		}
@@ -217,7 +228,10 @@ func (j *Journal) load() (State, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, maxJournal) != nil || s.Format != Format || s.Plan != j.planID || s.Worker != j.worker || s.Parts == nil || len(s.Parts) > MaxTasks {
+	if storage.Decode(raw, &s, maxJournal) != nil || s.Format != journalFormat(j.plan) || s.Plan != j.planID || s.Worker != j.worker || s.Parts == nil || len(s.Parts) > MaxTasks {
+		return s, ErrConflict
+	}
+	if s.Format == moveJournalFormat && !s.MoveBookReady && (len(s.Parts) != 0 || s.Receipt != nil) || s.Format != moveJournalFormat && s.MoveBookReady {
 		return s, ErrConflict
 	}
 	if s.Phase != "PENDING" && s.Phase != "TRANSFERRING" && s.Phase != "RETRYABLE" && s.Phase != "COMPLETE" {
@@ -265,6 +279,35 @@ func (j *Journal) Status(ctx context.Context) (State, error) {
 	}
 	defer unlock()
 	return j.load()
+}
+
+// openMoveBook runs under the worker lease, before the first external write.
+// Its ready bit prevents a lost directory from becoming a fresh attempt scope.
+func (j *Journal) openMoveBook(ctx context.Context) (*storage.MoveBook, error) {
+	s, e := j.Status(ctx)
+	if e != nil {
+		return nil, e
+	}
+	var admit statefile.Admission
+	if j.Admit != nil {
+		admit = func(name string, size int) (func(bool) error, error) {
+			return j.Admit("move-attempts/"+name, size)
+		}
+	}
+	book, e := storage.OpenMoveBook(ctx, storage.MoveBookOptions{
+		Parent: j.root, Directory: "move-attempts", Scope: storage.Hash([]byte(moveJournalFormat + "/" + j.planID + "/" + j.worker)),
+		Profile: j.plan.Profile, Initialize: !s.MoveBookReady, Admission: admit, Guard: j.Guard, Fault: j.Fault,
+	})
+	if e != nil {
+		return nil, e
+	}
+	if !s.MoveBookReady {
+		if e = j.edit(ctx, func(s *State) error { s.MoveBookReady = true; return nil }); e != nil {
+			book.Close()
+			return nil, e
+		}
+	}
+	return book, nil
 }
 func (j *Journal) beginPart(ctx context.Context, id string, round int64) error {
 	return j.edit(ctx, func(s *State) error {

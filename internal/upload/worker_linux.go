@@ -156,6 +156,14 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		return result, e
 	}
 	defer unlock()
+	if j.plan.Profile.WriteMode == storage.WebDAVMoveMode {
+		book, e := j.openMoveBook(ctx)
+		if e != nil {
+			return result, e
+		}
+		defer book.Close()
+		ctx = storage.WithWriteAttempts(ctx, book)
+	}
 	if delay := time.Until(time.UnixMilli(j.plan.StartMillis)); delay > 0 {
 		if e = sleep(ctx, delay); e != nil {
 			return result, e

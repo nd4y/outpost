@@ -21,6 +21,15 @@ import (
 )
 
 func TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols(t *testing.T) {
+	testAutonomousExternalPlanning(t, []string{"s3", "webdav"})
+}
+
+func TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations(t *testing.T) {
+	testAutonomousExternalPlanning(t, []string{storage.WebDAVMoveMode})
+}
+
+func testAutonomousExternalPlanning(t *testing.T, modes []string) {
+	t.Helper()
 	f := newFixture(t)
 	f.endpoint(t, nil)
 	ctx := context.Background()
@@ -36,11 +45,19 @@ func TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols(t *tes
 	}
 	targets := map[string]*teststore.Server{}
 	profiles := map[string]storage.Profile{}
-	for _, kind := range []string{"s3", "webdav"} {
-		s := teststore.New(t, teststore.Options{Kind: kind, Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)), Logins: logins})
+	for _, mode := range modes {
+		kind := mode
+		if mode == storage.WebDAVMoveMode {
+			kind = "webdav"
+		}
+		s := teststore.New(t, teststore.Options{Kind: kind, MoveOnly: mode == storage.WebDAVMoveMode, Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)), Logins: logins})
 		p := storage.Profile{Kind: kind, Endpoint: s.Endpoint(), Namespace: s.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 2000, CredentialScope: "namespace", NoDelete: true}
 		if kind == "s3" {
 			p.Region = s.Options.Region
+		}
+		if s.Options.MoveOnly {
+			p.WriteMode = storage.WebDAVMoveMode
+			p.MaxStagingAttempts = 3
 		}
 		targets[p.ID()] = s
 		profiles[p.ID()] = p
@@ -135,12 +152,12 @@ func TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols(t *tes
 				t.Logf("target-progress kind=%s requests=%d immutableWrites=%d", profiles[target].Kind, snapshot.Requests, len(snapshot.Writes))
 			}
 		}
-		// Six durable target jobs share one test CPU. This is a bounded fixture
+		// Durable target jobs share one test CPU. This is a bounded fixture
 		// wait, not a throughput promise. Slot and protocol deadlines stay unchanged.
 		diagnosed := false
 		for time.Since(started) < 45*time.Second {
 			if ready() {
-				t.Logf("generation completed across three workers/two targets in %s", time.Since(started))
+				t.Logf("generation completed across three workers/%d targets in %s", len(targets), time.Since(started))
 				return
 			}
 			if !diagnosed && time.Since(started) >= 30*time.Second {
@@ -185,7 +202,7 @@ func TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols(t *tes
 	for index, w := range f.nodes {
 		observed, e := w.ManagementSnapshot(ctx, workerEnrollment(t, f, index), f.domain.Trust.Domain)
 		must(t, e)
-		if observed.ExternalState != "OBSERVED" || len(observed.ExternalCopies) != 4 {
+		if observed.ExternalState != "OBSERVED" || len(observed.ExternalCopies) != 2*len(targets) {
 			t.Fatal("external coverage missing", observed.ExternalState, len(observed.ExternalCopies))
 		}
 		current, e := w.Status(ctx)

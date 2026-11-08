@@ -139,3 +139,20 @@ jobs:
           "$OUTPOST_PREPARED_CURRENT_CLI" version
           go test -count=1 -timeout=150s -run 'Prepared|SourceAgentSIGKILLChild' \
             -v ./internal/sourceagent ./internal/capture ./cmd/outpost
+      - name: Verify WebDAV MOVE on native workers and previous CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/move-previous-source"
+          git archive b09af9d5facb4911701d49359bcbbb2ee8d3913e | tar -xf - -C "$RUNNER_TEMP/move-previous-source"
+          go -C "$RUNNER_TEMP/move-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/move-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/move-tests"
+          export TMPDIR="$RUNNER_TEMP/move-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_MOVE_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_MOVE_PREVIOUS_CLI="$RUNNER_TEMP/move-previous"
+          export OUTPOST_MOVE_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_MOVE_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_MOVE_CURRENT_CLI" version
+          go test -count=1 -timeout=130s -run 'WebDAVMove|MoveBook|CLIMoveProfile' \
+            -v ./internal/storage ./internal/upload ./internal/worker ./cmd/outpost

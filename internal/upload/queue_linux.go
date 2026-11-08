@@ -71,6 +71,7 @@ type Queue struct {
 	Fault    func(string) error
 	Admit    statefile.Admission
 	Readback ReadbackOptions
+	Guard    func(context.Context) error
 }
 
 // OpenQueue requires a caller-admitted persistent Linux directory. No credentials
@@ -311,7 +312,7 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 			r.Close()
 			return nil, e
 		}
-		initial, _ := json.Marshal(State{Format: Format, Plan: storage.Hash(job.Plan), Worker: q.worker, Phase: "PENDING", Parts: map[string]Progress{}})
+		initial, _ := json.Marshal(State{Format: journalFormat(p), Plan: storage.Hash(job.Plan), Worker: q.worker, Phase: "PENDING", Parts: map[string]Progress{}})
 		if e = statefile.Guard(q.Admit, name+"/state.json", len(initial), func() error { return atomicFile(r, "state.json", initial) }); e != nil {
 			r.Close()
 			return nil, e
@@ -320,6 +321,8 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 	j, e := openJournalRoot(r, job.Plan, q.worker, q.authority, false)
 	if e == nil {
 		j.Readback = q.Readback
+		j.Guard = q.Guard
+		j.Fault = q.Fault
 	}
 	if e == nil && q.Admit != nil {
 		j.Admit = func(child string, size int) (func(bool) error, error) { return q.Admit(name+"/"+child, size) }

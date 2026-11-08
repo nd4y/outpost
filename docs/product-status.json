@@ -1065,6 +1065,14 @@
           "name": "TestQueueThrottleDeadlineSurvivesReopen"
         },
         {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueReopensWithDurableAttemptBook"
+        },
+        {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
         },
@@ -1711,6 +1719,10 @@
         {
           "path": "internal/sourceagent/prepared_crash_linux_test.go",
           "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveBookInitializationFaultsPreserveIntentAndQuotaRefusal"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2441,6 +2453,10 @@
           "name": "TestQueueSlowResolverAndCancellation"
         },
         {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
         },
@@ -2523,10 +2539,14 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
+        },
+        {
+          "path": "internal/worker/planning_linux_test.go",
+          "name": "TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
-      "remaining": "Capability admission and conditional-write fallback, account-wide budgets, adaptive assignment, shared-link budgets and full wire costs."
+      "remaining": "Actual endpoint capability admission, account-wide and shared-link budgets, adaptive assignment and full wire costs."
     },
     {
       "id": "REQ-28",
@@ -2535,6 +2555,38 @@
       "implementation": ["internal/storage", "internal/upload"],
       "checks": [
         {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolMultipartAndImmutableReadback"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolRetriesAndLostReply"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolLongThrottlePersistsAcrossCalls"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveLostRepliesResumeOwnedStage"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveProbeRefusesIgnoredOverwrite"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRetainsCorruptStagesAndBoundsRetries"
+        },
+        {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery"
         },
@@ -2565,10 +2617,18 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
+        },
+        {
+          "path": "cmd/outpost/storage_mode_linux_test.go",
+          "name": "TestCLIMoveProfileFencesPreviousWriter"
+        },
+        {
+          "path": "internal/worker/planning_linux_test.go",
+          "name": "TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations"
         }
       ],
       "acceptance": ["AT-16"],
-      "remaining": "Capability admission and conditional-write fallback, account-wide budgets, adaptive assignment, shared-link budgets and full wire costs."
+      "remaining": "Actual endpoint capability admission, account-wide and shared-link budgets, adaptive assignment and full wire costs."
     },
     {
       "id": "REQ-29",
@@ -2577,6 +2637,18 @@
       "implementation": ["internal/storage", "internal/upload"],
       "checks": [
         {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
           "path": "internal/upload/progress_linux_test.go",
           "name": "TestSlotRotationKeepsCompletedPartsAndRequeuesOnlyLostPart"
         },
@@ -2607,10 +2679,14 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
+        },
+        {
+          "path": "internal/worker/planning_linux_test.go",
+          "name": "TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
-      "remaining": "Capability admission and conditional-write fallback, account-wide budgets, adaptive assignment, shared-link budgets and full wire costs."
+      "remaining": "Actual endpoint capability admission, account-wide and shared-link budgets, adaptive assignment and full wire costs."
     },
     {
       "id": "REQ-30",
@@ -4059,6 +4135,10 @@
         {
           "path": "internal/sourceagent/prepared_linux_test.go",
           "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
+        },
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveBookInitializationFaultsPreserveIntentAndQuotaRefusal"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -4078,6 +4158,34 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/peer/peer_linux_test.go",
+          "name": "TestAuthorizationTLSScopesAndNoRedirect"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestTLSClientCertificateAndOperationGrants"
+        },
+        {
+          "path": "internal/peer/guards_linux_test.go",
+          "name": "TestRetryBudgetAndCancellation"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueAdmissionBoundsBindingAndBlockedRetry"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueInterruptedAdmissionExpiryAndCompletionCleanup"
+        },
         {
           "path": "internal/worker/worker_linux_test.go",
           "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
@@ -4542,6 +4650,10 @@
         {
           "path": "internal/sourceagent/prepared_cli_linux_test.go",
           "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
+        },
+        {
+          "path": "cmd/outpost/storage_mode_linux_test.go",
+          "name": "TestCLIMoveProfileFencesPreviousWriter"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -5125,6 +5237,10 @@
         {
           "path": "internal/sourceagent/prepared_linux_test.go",
           "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
+        },
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveBookInitializationFaultsPreserveIntentAndQuotaRefusal"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -5530,6 +5646,10 @@
           "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
         },
         {
+          "path": "cmd/outpost/storage_mode_linux_test.go",
+          "name": "TestCLIMoveProfileFencesPreviousWriter"
+        },
+        {
           "path": "internal/filekit/reference_linux_test.go",
           "name": "TestFrozenV1KitCreatedByPreviousImplementation"
         },
@@ -5566,6 +5686,26 @@
         "internal/policy"
       ],
       "checks": [
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestPlanPolicyIdentityAndDurableBinding"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests"
+        },
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveBookMissingInitializedBucketAndBindingNeverRecreated"
+        },
         {
           "path": "internal/control/control_linux_test.go",
           "name": "TestOwnerConfigurationRejectsExpansionAndAmbiguousIdentity"
@@ -6377,6 +6517,10 @@
         {
           "path": "internal/sourceagent/prepared_linux_test.go",
           "name": "TestPreparedSourceRefusesDowngradeMissingProofAndUnavailableCapability"
+        },
+        {
+          "path": "cmd/outpost/storage_mode_linux_test.go",
+          "name": "TestCLIMoveProfileFencesPreviousWriter"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -6582,6 +6726,10 @@
         {
           "path": "internal/sourceagent/prepared_cli_linux_test.go",
           "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
+        },
+        {
+          "path": "cmd/outpost/storage_mode_linux_test.go",
+          "name": "TestCLIMoveProfileFencesPreviousWriter"
         }
       ],
       "acceptance": ["AT-31"],
@@ -6711,6 +6859,30 @@
         "internal/policy"
       ],
       "checks": [
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/upload_linux_test.go",
+          "name": "TestWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolLongThrottlePersistsAcrossCalls"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueAdmissionBoundsBindingAndBlockedRetry"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueSlowResolverAndCancellation"
+        },
+        {
+          "path": "internal/upload/queue_linux_test.go",
+          "name": "TestQueueThrottleDeadlineSurvivesReopen"
+        },
         {
           "path": "internal/peer/readback_linux_test.go",
           "name": "TestExplicitReadbackReuseTransfersOnlyNewObjectsAndPreservesAge"
