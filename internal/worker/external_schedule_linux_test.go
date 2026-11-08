@@ -19,10 +19,48 @@ import (
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/policy"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 	"github.com/nd4y/outpost/internal/upload"
 )
+
+func TestScheduledAuditRejectsLateResultAfterPolicyReplacement(t *testing.T) {
+	f := newFixture(t)
+	w := f.nodes[0]
+	bindFixture(t, f, w)
+	f.domain.Placement.Edges = nil
+	ctx := context.Background()
+	before := f.config(t, 0, nil)
+	store, err := statefile.OpenAt(w.root, externalScheduleDirectory, 4096, true)
+	must(t, err)
+	defer store.Close()
+	store.Admit = w.admission(externalScheduleDirectory)
+	job := control.Job{Domain: f.domain.Trust.Domain, Target: storage.Hash([]byte("target")),
+		Generation: f.generation, Operation: storage.Hash([]byte("audit"))}
+	previous := w.externalAuditScope(job, 3)
+	previous.State, previous.FinishedUnix = "MISSING", time.Now().Unix()-1
+	must(t, w.commitScheduledAudit(ctx, store, before.Revision, job.Domain, previous))
+
+	f.cfg.Revision++
+	current := f.config(t, 0, nil)
+	late := previous
+	late.FinishedUnix++
+	if err = w.commitScheduledAudit(ctx, store, before.Revision, job.Domain, late); !errors.Is(err, control.ErrInactive) {
+		t.Fatal("stale missing result reached the current journal", err)
+	}
+	got, err := readScheduledExternalAudit(store, previous)
+	must(t, err)
+	if !reflect.DeepEqual(got, previous) {
+		t.Fatal("stale attempt replaced prior audit evidence", got)
+	}
+	must(t, w.commitScheduledAudit(ctx, store, current.Revision, job.Domain, late))
+	got, err = readScheduledExternalAudit(store, previous)
+	must(t, err)
+	if !reflect.DeepEqual(got, late) {
+		t.Fatal("current revision failed to update evidence", got)
+	}
+}
 
 func TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart(t *testing.T) {
 	f := newFixture(t)

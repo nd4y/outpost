@@ -277,25 +277,44 @@ func (w *Worker) admitExternalRepair(v *view, status Status, original control.Jo
 	_ = w.admitDerived(v.ctx, v, []control.Job{job})
 }
 
+func (w *Worker) writeScheduledAudit(ctx context.Context, store *statefile.Store, record ExternalAuditStatus) error {
+	if err := w.check(ctx); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	return store.WithLock(ctx, func() error { return store.Write(record.Window+".json", raw) })
+}
+
+func (w *Worker) commitScheduledAudit(ctx context.Context, store *statefile.Store, revision uint64, domain string, record ExternalAuditStatus) error {
+	// Fence the result write against policy replacement, including missing and
+	// integrity results. No network request is made while holding this lock.
+	return w.cache.WithCurrent(ctx, time.Now(), func(current control.Config, _ []byte) error {
+		if current.Revision != revision {
+			return control.ErrInactive
+		}
+		status, err := w.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if status.Controls.paused(domain, record.Operation) {
+			return ErrDenied
+		}
+		return w.writeScheduledAudit(ctx, store, record)
+	})
+}
+
 func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, selected externalAuditCandidate) {
 	record := selected.record
 	window := scheduledExternalProfile(record.Operation, selected.interval)
 	relative := externalAuditDirectory(record.Operation, record.Window)
-	write := func(ctx context.Context) error {
-		if err := w.check(ctx); err != nil {
-			return err
-		}
-		raw, err := json.Marshal(record)
-		if err != nil {
-			return err
-		}
-		return store.WithLock(ctx, func() error { return store.Write(record.Window+".json", raw) })
-	}
 	if selected.new {
 		if _, err := w.root.Stat(relative); !errors.Is(err, os.ErrNotExist) {
 			return // an existing window without a schedule record is unresolved
 		}
-		if err := write(v.ctx); err != nil {
+		if err := w.writeScheduledAudit(v.ctx, store, record); err != nil {
 			return
 		}
 	}
@@ -341,19 +360,5 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 	}
 	bounded, stop := context.WithTimeout(context.WithoutCancel(v.ctx), 5*time.Second)
 	defer stop()
-	// Fence the result write against policy replacement, including missing and
-	// integrity results. No network request is made while holding this lock.
-	_ = w.cache.WithCurrent(bounded, time.Now(), func(current control.Config, _ []byte) error {
-		if current.Revision != v.cfg.Revision {
-			return control.ErrInactive
-		}
-		status, err := w.Status(bounded)
-		if err != nil {
-			return err
-		}
-		if status.Controls.paused(selected.job.Domain, record.Operation) {
-			return ErrDenied
-		}
-		return write(bounded)
-	})
+	_ = w.commitScheduledAudit(bounded, store, v.cfg.Revision, selected.job.Domain, record)
 }
