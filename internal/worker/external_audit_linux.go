@@ -38,7 +38,7 @@ func (w *Worker) AuditExternal(ctx context.Context, operation string, p External
 	err := w.lease.WithLock(acquire, func() error {
 		cancel()
 		var err error
-		result, err = w.auditRetainedUpload(ctx, operation, p, initialize)
+		result, err = w.auditRetainedUpload(ctx, operation, p, initialize, nil)
 		return err
 	})
 	if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil && result.Format == "" && acquire.Err() == context.DeadlineExceeded {
@@ -47,7 +47,7 @@ func (w *Worker) AuditExternal(ctx context.Context, operation string, p External
 	return result, err
 }
 
-func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p ExternalAuditProfile, initialize bool) (upload.TargetAuditReceipt, error) {
+func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p ExternalAuditProfile, initialize bool, gate *storage.RequestGate) (upload.TargetAuditReceipt, error) {
 	var result upload.TargetAuditReceipt
 	if err := w.check(ctx); err != nil {
 		return result, err
@@ -75,6 +75,9 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 	target, allowed := c.TargetByID(job.Target)
 	if !ok || !admitted || !allowed || original.Phase != "COMPLETE" || job.Kind != "upload" || job.Executor != w.node ||
 		!d.Placement.PermitsCloud(w.node, job.Target) || status.Controls.paused(job.Domain, operation) {
+		return result, ErrDenied
+	}
+	if gate != nil && (d.ExternalAuditIntervalSeconds == 0 || p != scheduledExternalProfile(operation, d.ExternalAuditIntervalSeconds)) {
 		return result, ErrDenied
 	}
 	budget, err := w.budgetFor(active, c, false)
@@ -144,7 +147,7 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 	if err != nil {
 		return result, err
 	}
-	relative := filepath.ToSlash(filepath.Join("telemetry", "external-audit", operation, p.Window))
+	relative := externalAuditDirectory(operation, p.Window)
 	store, err := w.openExternalAuditWindow(active, relative, binding, initialize)
 	if err != nil {
 		return result, err
@@ -177,6 +180,12 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 		return result, ErrDenied
 	}
 	defer backend.Close()
+	if gate != nil {
+		backend, err = backend.WithRequestGate(gate)
+		if err != nil {
+			return result, err
+		}
+	}
 	result, err = upload.AuditTargetPlan(work, retained.Plan, authority, w.node, backend, upload.TargetAuditWindow{ID: p.Window, MaxAgeSeconds: p.MaxAgeSeconds, Store: store})
 	if cause := context.Cause(work); cause != nil {
 		return upload.TargetAuditReceipt{}, cause
@@ -188,6 +197,10 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 		return upload.TargetAuditReceipt{}, err
 	}
 	return result, nil
+}
+
+func externalAuditDirectory(operation, window string) string {
+	return filepath.ToSlash(filepath.Join("telemetry", "external-audit", operation, window))
 }
 
 func (w *Worker) openExternalAuditWindow(ctx context.Context, relative string, binding []byte, initialize bool) (*statefile.Store, error) {

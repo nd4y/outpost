@@ -122,6 +122,18 @@ outpost worker-external-audit --bootstrap /private/worker.json \
 
 Initialize once. The second command resumes the exact same window with its durable partial hash progress. A missing or changed scope prevents resumption. Both commands require the exclusive worker lease, current placement, the original complete queue receipt and the admitted local volume. Audit progress uses the telemetry allowance and remote reads stop on observed policy withdrawal. The report's `observedUnix` is the oldest supporting read. `finishedUnix` is the end of this invocation. A new window reads the data again. The original upload receipt remains historical.
 
+### Schedule external verification
+
+The owner can set `externalAuditIntervalSeconds` from 2 to 2592000 in a signed domain policy. Omit the field or set it to zero to disable scheduling. The worker checks the latest locally recorded complete generation and each admitted target for which it has a complete upload receipt. Audits use available worker slots after ordinary jobs and share the existing target request and link limits.
+
+The schedule retains one window identity for the same upload operation and interval. A completed cycle waits the interval before the next pass. Its supporting evidence expires before that pass, so the next cycle reads the ciphertext again. Interrupted work can resume within the same age limit. The latest scheduled outcome uses the telemetry allocation. Scope changes retain old records, and a full allocation can prevent new audit evidence.
+
+```sh
+outpost worker-external-audit-status --bootstrap /private/worker.json --operation UPLOAD_ID
+```
+
+The status command reads local evidence only. A successful audit whose oldest supporting read has aged beyond the interval is reported as `STALE`. A missing or invalid dependency changes the scheduled observation without modifying the original upload receipt. Scheduled reads have no repair authority.
+
 ## Repair a selected external copy
 
 Build a fresh plan from a retained healthy holder's materialized ciphertext. The planner needs its private signing key, public generation trust and a private `outpost-upload-plan-request-1` JSON document. The document contains `format`, the expected public `planner` key and a `plan` template in `outpost-external-plan-1` format. Set the new `operationId`, exact `profile`, `allowExternal`, `allowedClasses`, eligible `workers` and the signed `startMillis`, `expiresUnix` and `slotMillis`. The builder supplies the catalog, blob map and signature.

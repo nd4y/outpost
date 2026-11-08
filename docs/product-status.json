@@ -1751,6 +1751,10 @@
         {
           "path": "internal/upload/target_audit_linux_test.go",
           "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -3044,6 +3048,10 @@
         {
           "path": "internal/upload/target_audit_linux_test.go",
           "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
         }
       ],
       "acceptance": ["AT-13"],
@@ -4899,6 +4907,10 @@
         {
           "path": "internal/upload/target_audit_linux_test.go",
           "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
@@ -5445,6 +5457,10 @@
         {
           "path": "internal/upload/target_audit_linux_test.go",
           "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6769,6 +6785,10 @@
         {
           "path": "internal/upload/target_audit_linux_test.go",
           "name": "TestTargetAuditWindowResumesAfterSIGKILLAndFencesFreshProof"
+        },
+        {
+          "path": "internal/worker/external_schedule_linux_test.go",
+          "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

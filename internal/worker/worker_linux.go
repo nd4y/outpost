@@ -54,18 +54,19 @@ type domainState struct {
 var externalQueueLimits = upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}
 
 type view struct {
-	cfg           control.Config
-	autonomy      *control.Autonomy
-	ctx           context.Context
-	cancel        context.CancelFunc
-	done          chan struct{}
-	err           error
-	requests      sync.WaitGroup
-	metadata      chan struct{}
-	domains       map[string]*domainState
-	controls      *Controls
-	requestGates  map[string]*storage.RequestGate
-	nextScrubScan time.Time
+	cfg                   control.Config
+	autonomy              *control.Autonomy
+	ctx                   context.Context
+	cancel                context.CancelFunc
+	done                  chan struct{}
+	err                   error
+	requests              sync.WaitGroup
+	metadata              chan struct{}
+	domains               map[string]*domainState
+	controls              *Controls
+	requestGates          map[string]*storage.RequestGate
+	nextScrubScan         time.Time
+	nextExternalAuditScan time.Time
 }
 type Worker struct {
 	// Fault is a local test hook, never accepted from shared configuration.

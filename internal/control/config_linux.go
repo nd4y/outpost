@@ -44,12 +44,13 @@ func (l Limits) Validate() error {
 }
 
 type Domain struct {
-	ScrubIntervalSeconds       int64             `json:"scrubIntervalSeconds,omitempty"`
-	PeerReadbackMaxAgeSeconds  int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
-	CloudReadbackMaxAgeSeconds int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
-	Trust                      generation.Trust  `json:"trust"`
-	Planner                    ed25519.PublicKey `json:"planner"`
-	Placement                  policy.Placement  `json:"placement"`
+	ScrubIntervalSeconds         int64             `json:"scrubIntervalSeconds,omitempty"`
+	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
+	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
+	ExternalAuditIntervalSeconds int64             `json:"externalAuditIntervalSeconds,omitempty"`
+	Trust                        generation.Trust  `json:"trust"`
+	Planner                      ed25519.PublicKey `json:"planner"`
+	Placement                    policy.Placement  `json:"placement"`
 }
 type Target struct {
 	ID      string          `json:"id"`
@@ -151,6 +152,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 	domains := map[string]Domain{}
 	for _, d := range c.Domains {
 		if d.ScrubIntervalSeconds < 0 || d.ScrubIntervalSeconds > 30*24*3600 {
+			return ErrDenied
+		}
+		if d.ExternalAuditIntervalSeconds != 0 && (d.ExternalAuditIntervalSeconds < 2 || d.ExternalAuditIntervalSeconds > 30*24*3600) {
 			return ErrDenied
 		}
 		if d.PeerReadbackMaxAgeSeconds < 0 || d.PeerReadbackMaxAgeSeconds > readback.MaxAgeSeconds || d.CloudReadbackMaxAgeSeconds < 0 || d.CloudReadbackMaxAgeSeconds > readback.MaxAgeSeconds {

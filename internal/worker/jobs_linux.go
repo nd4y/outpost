@@ -10,17 +10,22 @@ import (
 )
 
 type result struct {
-	job     control.Job
-	receipt json.RawMessage
-	err     error
-	action  *actionResult
-	scrub   *scrubResult
+	job           control.Job
+	receipt       json.RawMessage
+	err           error
+	action        *actionResult
+	scrub         *scrubResult
+	externalAudit string
 }
 
 func (w *Worker) jobs(v *view) error {
 	results := make(chan result, v.cfg.Limits.Parallel)
 	running := map[string]bool{}
 	finish := func(r result) error {
+		if r.externalAudit != "" {
+			delete(running, r.externalAudit)
+			return nil
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if r.scrub != nil {
@@ -141,6 +146,9 @@ func (w *Worker) jobs(v *view) error {
 				v.cancel()
 				return errors.Join(e, drain())
 			}
+		}
+		if len(running) < v.cfg.Limits.Parallel {
+			w.scheduleExternalAudit(v, s, running, results)
 		}
 		select {
 		case r := <-results:
