@@ -344,7 +344,9 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 	var oldPart string
 	var armed atomic.Bool
 	auditRead, auditCanceled := make(chan struct{}), make(chan struct{})
+	const maxObjectBytes = 1 << 20
 	target := teststore.New(t, teststore.Options{Kind: "webdav",
+		MaxObject: maxObjectBytes,
 		Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)),
 		Logins:    map[string]teststore.Login{w.node: {Secret: "isolated-history-secret"}},
 		Before: func(_ http.ResponseWriter, r *http.Request, _, key string, _ []byte) bool {
@@ -357,7 +359,7 @@ func TestWorkerScheduledExternalAuditChecksOptedInHistory(t *testing.T) {
 			return true
 		}})
 	p := storage.Profile{Kind: "webdav", Endpoint: target.Endpoint(), Namespace: target.Options.Namespace,
-		MaxObjectBytes: 1 << 20, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 12000,
+		MaxObjectBytes: maxObjectBytes, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 12000,
 		CredentialScope: "namespace", NoDelete: true}
 	f.cfg.Targets = []control.Target{{ID: p.ID(), Profile: p}}
 	f.domain.Placement.Targets = []string{p.ID()}
