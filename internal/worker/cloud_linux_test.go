@@ -153,6 +153,8 @@ func testWorkerCloudTargets(t *testing.T, exhaustTelemetry bool) {
 		must(t, e)
 		jobs = append(jobs, control.Job{Operation: op, Executor: w.node, Kind: "upload", Domain: f.domain.Trust.Domain, Generation: f.generation, Target: p.ID(), Plan: plan})
 	}
+	bodyBudget, e := storage.NewHTTPBodyBudget(16 << 20)
+	must(t, e)
 	w.resolve = func(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
 		if e := ctx.Err(); e != nil {
 			return nil, e
@@ -161,7 +163,15 @@ func testWorkerCloudTargets(t *testing.T, exhaustTelemetry bool) {
 		if !ok {
 			return nil, ErrDenied
 		}
-		return storage.New(p, storage.Credentials{Access: w.node, Secret: server.Options.Logins[w.node].Secret, ExpiresUnix: time.Now().Add(time.Minute).Unix()}, server.Roots)
+		backend, err := storage.New(p, storage.Credentials{Access: w.node, Secret: server.Options.Logins[w.node].Secret, ExpiresUnix: time.Now().Add(time.Minute).Unix()}, server.Roots)
+		if err != nil {
+			return nil, err
+		}
+		bound, err := backend.WithHTTPBodyBudget(bodyBudget)
+		if err != nil {
+			backend.Close()
+		}
+		return bound, err
 	}
 	f.config(t, 0, jobs)
 	stop := start(t, w)

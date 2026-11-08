@@ -87,48 +87,12 @@ func TestBootstrapAccountBudgetSharesSlotsRateAndBackoff(t *testing.T) {
 		}})
 	second := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: storage.Hash([]byte("second-namespace"))})
 	other := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: storage.Hash([]byte("other-namespace"))})
-	b.StorageCAFile = filepath.Join(f.base, "storage-ca.pem")
-	credential := filepath.Join(f.base, "external-credential.json")
-	credentialData, err := json.Marshal(map[string]any{"access": "test-worker", "secret": "ephemeral-test-secret", "expiresUnix": time.Now().Add(time.Minute).Unix()})
-	must(t, err)
-	must(t, os.WriteFile(credential, credentialData, 0600))
-	var roots []byte
-	var profiles []storage.Profile
-	b.Credentials = map[string]string{}
-	for _, server := range []*teststore.Server{first, second, other} {
-		roots = append(roots, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.HTTP.Certificate().Raw})...)
-		p := storage.Profile{Kind: server.Options.Kind, Endpoint: server.Endpoint(), Namespace: server.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 2, RequestsPerSecond: 1000, Attempts: 1, TimeoutMillis: 4000, CredentialScope: "namespace", NoDelete: true}
-		if p.Kind == "s3" {
-			p.Region = server.Options.Region
-		}
-		b.Credentials[p.ID()] = credential
-		profiles = append(profiles, p)
-	}
-	must(t, os.WriteFile(b.StorageCAFile, roots, 0600))
+	profiles := externalBudgetFixture(t, f, &b, first, second, other)
 	b.ExternalRequestBudgets = []ExternalRequestBudget{
 		{Targets: []string{profiles[0].ID(), profiles[1].ID()}, Concurrency: 1, RequestsPerSecond: 1},
 		{Targets: []string{profiles[2].ID()}, Concurrency: 2, RequestsPerSecond: 1000},
 	}
-	raw, err := json.Marshal(b)
-	must(t, err)
-	path := filepath.Join(f.base, "worker.json")
-	must(t, os.WriteFile(path, raw, 0600))
-	b, err = LoadBootstrap(path)
-	must(t, err)
-	w, closeWorker, err := b.Open(true)
-	must(t, err)
-	defer closeWorker()
-	var clients []*storage.Backend
-	for _, p := range profiles {
-		client, err := w.resolve(ctx, p)
-		must(t, err)
-		defer client.Close()
-		gate, err := storage.NewRequestGate(p)
-		must(t, err)
-		client, err = client.WithRequestGate(gate)
-		must(t, err)
-		clients = append(clients, client)
-	}
+	clients := openExternalBudgetClients(t, f, b, profiles)
 	done := make(chan error, 1)
 	go func() { _, err := clients[0].Get(ctx, "hold"); done <- err }()
 	select {
@@ -154,7 +118,7 @@ func TestBootstrapAccountBudgetSharesSlotsRateAndBackoff(t *testing.T) {
 	assertWaiting()
 	assertOtherProgress()
 	close(release)
-	if err = <-done; !errors.Is(err, storage.ErrNotFound) {
+	if err := <-done; !errors.Is(err, storage.ErrNotFound) {
 		t.Fatal("first request did not finish", err)
 	}
 	assertWaiting()
@@ -166,4 +130,52 @@ func TestBootstrapAccountBudgetSharesSlotsRateAndBackoff(t *testing.T) {
 	}
 	assertWaiting()
 	assertOtherProgress()
+}
+
+func externalBudgetFixture(t *testing.T, f *fixture, b *Bootstrap, servers ...*teststore.Server) []storage.Profile {
+	t.Helper()
+	b.StorageCAFile = filepath.Join(f.base, "storage-ca.pem")
+	credential := filepath.Join(f.base, "external-credential.json")
+	credentialData, err := json.Marshal(map[string]any{"access": "test-worker", "secret": "ephemeral-test-secret", "expiresUnix": time.Now().Add(time.Minute).Unix()})
+	must(t, err)
+	must(t, os.WriteFile(credential, credentialData, 0600))
+	var roots []byte
+	var profiles []storage.Profile
+	b.Credentials = map[string]string{}
+	for _, server := range servers {
+		roots = append(roots, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.HTTP.Certificate().Raw})...)
+		p := storage.Profile{Kind: server.Options.Kind, Endpoint: server.Endpoint(), Namespace: server.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 2, RequestsPerSecond: 1000, Attempts: 1, TimeoutMillis: 4000, CredentialScope: "namespace", NoDelete: true}
+		if p.Kind == "s3" {
+			p.Region = server.Options.Region
+		}
+		b.Credentials[p.ID()] = credential
+		profiles = append(profiles, p)
+	}
+	must(t, os.WriteFile(b.StorageCAFile, roots, 0600))
+	return profiles
+}
+
+func openExternalBudgetClients(t *testing.T, f *fixture, b Bootstrap, profiles []storage.Profile) []*storage.Backend {
+	t.Helper()
+	raw, err := json.Marshal(b)
+	must(t, err)
+	path := filepath.Join(f.base, "worker.json")
+	must(t, os.WriteFile(path, raw, 0600))
+	b, err = LoadBootstrap(path)
+	must(t, err)
+	w, closeWorker, err := b.Open(true)
+	must(t, err)
+	t.Cleanup(closeWorker)
+	var clients []*storage.Backend
+	for _, p := range profiles {
+		client, err := w.resolve(context.Background(), p)
+		must(t, err)
+		t.Cleanup(client.Close)
+		gate, err := storage.NewRequestGate(p)
+		must(t, err)
+		client, err = client.WithRequestGate(gate)
+		must(t, err)
+		clients = append(clients, client)
+	}
+	return clients
 }

@@ -108,6 +108,7 @@ type Backend struct {
 	client      *http.Client
 	gate        *RequestGate
 	account     *RequestGate
+	bodyBudget  *HTTPBodyBudget
 }
 
 // RequestGate shares request admission without sharing credentials or
@@ -370,6 +371,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		} else {
 			req.SetBasicAuth(b.credentials.Access, b.credentials.Secret)
 		}
+		b.bodyBudget.request(req)
 		traffic.begin(req)
 		res, e := b.client.Do(req)
 		delay := time.Duration(attempt+1) * 50 * time.Millisecond
@@ -380,7 +382,8 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 					res.Body.Close()
 					return nil, last, ErrIntegrity
 				}
-				data, readErr := io.ReadAll(io.LimitReader(traffic.response(res.Body), int64(b.profile.MaxObjectBytes)+1))
+				reader := b.bodyBudget.response(ctx, res.Body)
+				data, readErr := io.ReadAll(io.LimitReader(traffic.response(reader), int64(b.profile.MaxObjectBytes)+1))
 				res.Body.Close()
 				if len(data) > b.profile.MaxObjectBytes {
 					return nil, last, ErrCapacity

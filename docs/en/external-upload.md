@@ -45,6 +45,12 @@ Set each group to the allowance allocated to this worker for that account. Reque
 
 The account limit covers this worker process. Configuration refresh retains its state, and restart reopens the private bootstrap. Queues preserve their own durable retry deadlines. Coordinating slices across workers or constraining shared physical links requires separate evidence. Upgrade the worker before adding the option. An older strict bootstrap reader refuses the new field.
 
+### Private link allowances
+
+Use `externalLinkBudgets` to group credential-bearing target profiles that share this worker's external link. In each group set `targets` to the exact profile IDs and `bodyBytesPerSecond` to an integer from 65536 to 1073741824. The link groups independently partition every key in `credentialFiles` and can be configured together with account groups. Omit the field to keep the previous behavior.
+
+Each group shares one allowance for reading outgoing request bodies and consuming incoming response bodies, including verification and retries. Reads reserve up to 32 KiB at a time. Short reads can leave some of a reservation unused. The existing request deadline includes time spent pacing. The transport can buffer bytes, and TLS, TCP, IP, peer replication and traffic from other processes are outside this allowance. The configured rate represents this process's share of the link. Measure a real shared link separately before choosing combined rates for several workers.
+
 ## WebDAV targets without conditional PUT
 
 In the signed storage profile set `kind` to `webdav`, `writeMode` to `webdav-move-1`, and `maxStagingAttempts` to a value from 1 to 8. Keep `noDelete` enabled. Selecting this mode changes the target profile ID. Sign and distribute the matching target, placement and upload authorization together. The old profile has both new fields omitted.

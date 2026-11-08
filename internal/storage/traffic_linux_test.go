@@ -45,6 +45,14 @@ func TestHTTPMeterCountsRetriesAndDoesNotMixOperations(t *testing.T) {
 func TestHTTPMeterDistinguishesWebDAVStagingAndFinalReadback(t *testing.T) {
 	s := teststore.New(t, teststore.Options{Kind: "webdav", MoveOnly: true, Namespace: Hash([]byte("move-meter"))})
 	b, options := moveBackend(t, s)
+	budget, err := NewHTTPBodyBudget(16 << 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = b.WithHTTPBodyBudget(budget)
+	if err != nil {
+		t.Fatal(err)
+	}
 	book := openMoveTest(t, options)
 	defer book.Close()
 	ctx := WithWriteAttempts(context.Background(), book)
@@ -74,6 +82,14 @@ func (f meterRoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestHTTPMeterMeasuresPartialReadsAndTransportBodyReplays(t *testing.T) {
 	s := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: Hash([]byte("partial-meter"))})
 	b := backend(t, s)
+	budget, err := NewHTTPBodyBudget(64 << 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = b.WithHTTPBodyBudget(budget)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.profile.Attempts = 1
 	b.client.Transport = meterRoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if _, err := io.ReadFull(r.Body, make([]byte, 2)); err != nil {

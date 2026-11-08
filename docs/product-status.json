@@ -2559,6 +2559,10 @@
         {
           "path": "internal/worker/account_budget_linux_test.go",
           "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
+        },
+        {
+          "path": "internal/worker/link_budget_linux_test.go",
+          "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -4791,6 +4795,10 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
+        },
+        {
+          "path": "internal/worker/link_budget_linux_test.go",
+          "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
@@ -5313,6 +5321,14 @@
         {
           "path": "internal/worker/account_budget_linux_test.go",
           "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
+        },
+        {
+          "path": "internal/worker/link_budget_linux_test.go",
+          "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
+        },
+        {
+          "path": "internal/storage/body_budget_test.go",
+          "name": "TestHTTPBodyBudgetCloseCancelsReplayWaitingForAllowance"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6601,6 +6617,14 @@
         {
           "path": "internal/worker/account_budget_linux_test.go",
           "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
+        },
+        {
+          "path": "internal/worker/link_budget_linux_test.go",
+          "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
+        },
+        {
+          "path": "internal/storage/body_budget_test.go",
+          "name": "TestHTTPBodyBudgetCloseCancelsReplayWaitingForAllowance"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -7014,6 +7038,10 @@
         {
           "path": "internal/worker/account_budget_linux_test.go",
           "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
+        },
+        {
+          "path": "internal/worker/link_budget_linux_test.go",
+          "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

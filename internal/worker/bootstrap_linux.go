@@ -39,6 +39,7 @@ type Bootstrap struct {
 	Listen                 string                  `json:"listen,omitempty"`
 	Credentials            map[string]string       `json:"credentialFiles"`
 	ExternalRequestBudgets []ExternalRequestBudget `json:"externalRequestBudgets,omitempty"`
+	ExternalLinkBudgets    []ExternalLinkBudget    `json:"externalLinkBudgets,omitempty"`
 }
 
 // ExternalRequestBudget is one local account allowance for a private set of
@@ -47,6 +48,26 @@ type ExternalRequestBudget struct {
 	Targets           []string `json:"targets"`
 	Concurrency       int      `json:"concurrency"`
 	RequestsPerSecond int      `json:"requestsPerSecond"`
+}
+
+type ExternalLinkBudget struct {
+	Targets            []string `json:"targets"`
+	BodyBytesPerSecond int64    `json:"bodyBytesPerSecond"`
+}
+
+func assignExternalBudget[T any](credentials map[string]string, byTarget map[string]T, targets []string, budget T) error {
+	if len(targets) == 0 || len(targets) > len(credentials) {
+		return ErrDenied
+	}
+	for _, id := range targets {
+		_, known := credentials[id]
+		_, assigned := byTarget[id]
+		if !known || !storage.ID(id) || assigned {
+			return ErrDenied
+		}
+		byTarget[id] = budget
+	}
+	return nil
 }
 
 func (b Bootstrap) accountRequestGates() (map[string]*storage.RequestGate, error) {
@@ -58,24 +79,41 @@ func (b Bootstrap) accountRequestGates() (map[string]*storage.RequestGate, error
 	}
 	gates := make(map[string]*storage.RequestGate, len(b.Credentials))
 	for _, budget := range b.ExternalRequestBudgets {
-		if len(budget.Targets) == 0 || len(budget.Targets) > len(b.Credentials) {
-			return nil, ErrDenied
-		}
 		gate, err := storage.NewAccountRequestGate(budget.Concurrency, budget.RequestsPerSecond)
 		if err != nil {
 			return nil, ErrDenied
 		}
-		for _, id := range budget.Targets {
-			if _, ok := b.Credentials[id]; !ok || !storage.ID(id) || gates[id] != nil {
-				return nil, ErrDenied
-			}
-			gates[id] = gate
+		if err = assignExternalBudget(b.Credentials, gates, budget.Targets, gate); err != nil {
+			return nil, err
 		}
 	}
 	if len(gates) != len(b.Credentials) {
 		return nil, ErrDenied
 	}
 	return gates, nil
+}
+
+func (b Bootstrap) bodyBudgets() (map[string]*storage.HTTPBodyBudget, error) {
+	if b.ExternalLinkBudgets == nil {
+		return nil, nil
+	}
+	if len(b.ExternalLinkBudgets) == 0 || len(b.ExternalLinkBudgets) > 128 || len(b.Credentials) > 128 {
+		return nil, ErrDenied
+	}
+	budgets := make(map[string]*storage.HTTPBodyBudget, len(b.Credentials))
+	for _, input := range b.ExternalLinkBudgets {
+		budget, err := storage.NewHTTPBodyBudget(input.BodyBytesPerSecond)
+		if err != nil {
+			return nil, ErrDenied
+		}
+		if err = assignExternalBudget(b.Credentials, budgets, input.Targets, budget); err != nil {
+			return nil, err
+		}
+	}
+	if len(budgets) != len(b.Credentials) {
+		return nil, ErrDenied
+	}
+	return budgets, nil
 }
 
 // ReadPrivate never follows a final symlink, opens a device/FIFO, or accepts a
@@ -145,6 +183,9 @@ func LoadBootstrap(path string) (Bootstrap, error) {
 		return b, ErrDenied
 	}
 	if _, e := b.accountRequestGates(); e != nil {
+		return b, e
+	}
+	if _, e := b.bodyBudgets(); e != nil {
 		return b, e
 	}
 	return b, nil
@@ -234,23 +275,40 @@ func (b Bootstrap) storageResolver() (func(context.Context, storage.Profile) (*s
 	if err != nil {
 		return nil, err
 	}
-	if gates == nil {
+	links, err := b.bodyBudgets()
+	if err != nil {
+		return nil, err
+	}
+	if gates == nil && links == nil {
 		return b.Resolve, nil
 	}
 	return func(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
-		gate := gates[p.ID()]
-		if gate == nil {
+		id := p.ID()
+		gate, link := gates[id], links[id]
+		if (gates != nil && gate == nil) || (links != nil && link == nil) {
 			return nil, ErrDenied
 		}
 		backend, err := b.Resolve(ctx, p)
 		if err != nil {
 			return nil, err
 		}
-		bound, err := backend.WithAccountRequestGate(gate)
-		if err != nil {
-			backend.Close()
+		if gate != nil {
+			bound, err := backend.WithAccountRequestGate(gate)
+			if err != nil {
+				backend.Close()
+				return nil, err
+			}
+			backend = bound
 		}
-		return bound, err
+		if link != nil {
+			bound, err := backend.WithHTTPBodyBudget(link)
+			if err != nil {
+				backend.Close()
+				return nil, err
+			}
+			backend = bound
+		}
+		return backend, nil
 	}, nil
 }
 
