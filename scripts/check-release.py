@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -146,11 +147,27 @@ def test_output_collision_and_failed_build_keep_original(root, digest, work):
     verifier.verify(root, digest)
 
 
+def test_build_cli_emits_one_json_receipt(root, digest, work):
+    target = work / "cli-build"
+    result = subprocess.run([sys.executable, str(Path(__file__).with_name("build-release.py")),
+                             "--output", str(target), "--architecture", "amd64"],
+                            capture_output=True, text=True, timeout=90, check=True)
+    # Parse the entire stdout, not a last line that could hide diagnostics or
+    # an invalid receipt stream. Compiler/module messages belong to stderr.
+    receipt = json.loads(result.stdout)
+    assert receipt["architectures"] == ["amd64"] and receipt["format"] == builder.FORMAT
+    assert "all modules verified" not in result.stdout
+    verified = verifier.verify(target, receipt["manifestSHA256"])
+    assert verified["sourceDigest"] == receipt["sourceDigest"]
+    verifier.verify(root, digest)
+
+
 TESTS = [test_selected_build_and_archives, test_wrong_manifest_never_selects_archive,
          test_changed_payload_is_rejected, test_wrong_elf_architecture_is_rejected_even_with_new_checksums,
          test_symlink_and_unlisted_files_are_rejected,
          test_archive_missing_dependency_and_path_injection_are_rejected,
-         test_archive_generation_is_reproducible, test_output_collision_and_failed_build_keep_original]
+         test_archive_generation_is_reproducible, test_output_collision_and_failed_build_keep_original,
+         test_build_cli_emits_one_json_receipt]
 
 
 def main():

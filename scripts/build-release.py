@@ -10,6 +10,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,7 +96,7 @@ def build(output, architectures, revision=None):
     version, goroot = subprocess.check_output(["go", "env", "GOVERSION", "GOROOT"], cwd=ROOT, env=env, text=True).splitlines()
     if version != "go" + required_go:
         raise ValueError("toolchain does not match go.mod")
-    subprocess.run(["go", "mod", "verify"], cwd=ROOT, env=env, check=True)
+    subprocess.run(["go", "mod", "verify"], cwd=ROOT, env=env, stdout=sys.stderr, check=True)
     # No completed manifest is published if any build or source check fails.
     output.mkdir(mode=0o700)
     (output / "licenses").mkdir()
@@ -114,7 +115,7 @@ def build(output, architectures, revision=None):
             target = folder / binary
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-ldflags",
                             "-s -w -buildid= -X main.revision=" + revision,
-                            "-o", str(target), "./cmd/" + binary], cwd=ROOT, env=target_env, check=True)
+                            "-o", str(target), "./cmd/" + binary], cwd=ROOT, env=target_env, stdout=sys.stderr, check=True)
             verify_elf(target, architecture)
             target.chmod(0o755)
         archive(output, architecture)

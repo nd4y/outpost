@@ -3749,6 +3749,10 @@
           "name": "test_output_collision_and_failed_build_keep_original"
         },
         {
+          "path": "scripts/check-release.py",
+          "name": "test_build_cli_emits_one_json_receipt"
+        },
+        {
           "path": "scripts/check-container.py",
           "name": "test_explicit_installation"
         },
