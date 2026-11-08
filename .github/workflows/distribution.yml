@@ -88,3 +88,20 @@ jobs:
           "$OUTPOST_SETTLEMENT_CURRENT_CLI" version
           go test -count=1 -timeout=180s -run 'Settlement|SourceAgentSIGKILLChild' \
             -v ./internal/sourceagent ./internal/worker ./internal/control ./internal/ingress
+      - name: Renew the existing receiver through the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/receiver-previous-source"
+          git archive 3632526d7a623cfba7cc7394475c923d32bfcedb | tar -xf - -C "$RUNNER_TEMP/receiver-previous-source"
+          go -C "$RUNNER_TEMP/receiver-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/receiver-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/receiver-tests"
+          export TMPDIR="$RUNNER_TEMP/receiver-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_RECEIVER_RENEWAL_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_RECEIVER_RENEWAL_PREVIOUS_CLI="$RUNNER_TEMP/receiver-previous"
+          export OUTPOST_RECEIVER_RENEWAL_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_RECEIVER_RENEWAL_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_RECEIVER_RENEWAL_CURRENT_CLI" version
+          go test -count=1 -timeout=120s -run 'ReceiverRenewal|WorkerIngressRenewal|RegistryRenewal' \
+            -v ./internal/sourceagent ./internal/worker ./internal/ingress

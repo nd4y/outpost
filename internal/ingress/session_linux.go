@@ -135,6 +135,9 @@ func OpenSession(ctx context.Context, o SessionOptions) (*Session, error) {
 	return openSession(ctx, o, false)
 }
 func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (*Session, error) {
+	return openSessionMode(ctx, o, acknowledgedOnly, false)
+}
+func openSessionMode(ctx context.Context, o SessionOptions, acknowledgedOnly, requireAcknowledged bool) (*Session, error) {
 	checkTime := time.Now()
 	if acknowledgedOnly {
 		// Historical validation opens only an existing COMPLETE slot for cleanup.
@@ -226,7 +229,7 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 		}
 	}
 	if acknowledgedOnly {
-		if !s.state.Complete || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
+		if !s.state.Complete || requireAcknowledged && !s.state.Acknowledged || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
 			return fail(ErrConflict)
 		}
 	} else {

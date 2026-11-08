@@ -38,3 +38,5 @@ A completed operation can acknowledge its exact original receipt after its captu
 403 means denied authority; 404 absent scoped object; 409 operation/lineage conflict; 412 incomplete data; 429 request capacity; 503 temporary unavailability; 507 storage admission refused. None permits a broader route. Expiry/rollback preserve retained data. Unknown files are never removed; interrupted temporary files need explicit owned-file reconciliation.
 
 The [expired-operation settlement workflow](source-settlement.md) retrieves only an already durable original receipt under fresh owner permission and current receiver policy. It preserves original verification age and the independent-copy threshold. Missing receipt or expired observation permission remains pending; an immutable write intent is never renewed by settlement.
+
+The [receiver renewal workflow](receiver-renewal.md) admits a fresh same-scope grant in the existing registry after explicit quiescent maintenance. It preserves historical receipts and generations, fences previous readers and uses the current receiver policy and disk budget.

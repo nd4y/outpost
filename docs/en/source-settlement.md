@@ -52,7 +52,7 @@ No receipt, a mismatched generation, revoked policy, expired TLS identity, expir
 
 The receiver must already have persisted its complete receipt. A replica head by itself, a sealed local catalog, or absence of a receipt cannot prove that publication completed or that it is safe to abandon the operation. Publication interrupted before durable ingress receipt, truly unpublished expired captures, and lost active journals need separate reconciliation. No reset, automatic abort or staging deletion is provided by this command.
 
-The original source authority remains expired after settlement. A subsequent capture needs explicit authority renewal and compatible admission at the same receiver. Automatic receiver-authority rotation is not established by this component. Preserve the existing registry and old generations; do not replace its directory to bypass a binding conflict.
+The original source authority remains expired after settlement. A subsequent capture needs explicit authority renewal and compatible admission at the same receiver. Receiver renewal is an explicit local maintenance operation. Preserve the existing registry and old generations; do not replace its directory to bypass a binding conflict.
 
 ## Compatibility and acceptance
 
@@ -61,3 +61,5 @@ The original source authority remains expired after settlement. A subsequent cap
 Short tests cover the fresh capability, same-directory HTTPS registry reopening, exact receipt replay, payload denial, current worker policy withdrawal, missing receipt and expired independent-copy authorization. The complete CLI preview/sign/config-apply/settle workflow runs against a current worker; a selected previous executable accepts control1 and refuses control2. Three actual `SIGKILL` boundaries cover receipt observation, checkpoint persistence and final source head. A queued grant is rechecked after the execution lease is acquired. Both 393,216-byte source generations restore byte-for-byte after settlement, including the ten-byte change, with the source tree unavailable.
 
 The native distribution workflow repeats settlement and CLI cases on amd64 and arm64; inspect the exact commit's execution result before treating either architecture as verified. Full installation, key lifecycle, scale and product acceptance remain separate. Keep the full product acceptance open; this narrow recovery path is not a general solution for every expired operation.
+
+The [receiver renewal workflow](receiver-renewal.md) admits a fresh same-scope grant in the existing registry after explicit quiescent maintenance. It preserves historical receipts and generations, fences previous readers and uses the current receiver policy and disk budget.

@@ -19,17 +19,7 @@ const renewedFormat = "outpost-source-agent-2"
 var ErrAuthorityChanged = errors.New("source authority changed; reopen the agent")
 
 func sameAuthorityScope(a, b ingress.Authority) bool {
-	a.Revision = 0
-	b.Revision = 0
-	a.NotBefore = 0
-	b.NotBefore = 0
-	a.ExpiresUnix = 0
-	b.ExpiresUnix = 0
-	a.Signature = nil
-	b.Signature = nil
-	left, _ := json.Marshal(a)
-	right, _ := json.Marshal(b)
-	return bytes.Equal(left, right)
+	return ingress.SameAuthorityScope(a, b)
 }
 func sameObservationScope(a, b observation.Grant) bool {
 	a.Epoch = 0

@@ -20,7 +20,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -43,7 +43,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-03",
@@ -102,7 +102,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -145,7 +145,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -192,7 +192,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-06",
@@ -210,7 +210,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -340,10 +340,18 @@
         {
           "path": "internal/sourceagent/settlement_linux_test.go",
           "name": "TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
+          "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-09",
@@ -544,7 +552,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
@@ -769,6 +777,18 @@
         {
           "path": "internal/sourceagent/settlement_cli_linux_test.go",
           "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRequiresCurrentPolicyAndStoppedWorker"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalDoesNotCreateMissingHistoryOrIgnoreGuard"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1447,6 +1467,34 @@
         {
           "path": "internal/sourceagent/settlement_cli_linux_test.go",
           "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalEmptyHistoryMonotonicReplayAndLegacyTamper"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalRefusesIncompleteUnacknowledgedDirtyAndQuota"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRequiresCurrentPolicyAndStoppedWorker"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalDoesNotCreateMissingHistoryOrIgnoreGuard"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
+        },
+        {
+          "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
+          "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1895,6 +1943,10 @@
         {
           "path": "internal/sourceagent/settlement_linux_test.go",
           "name": "TestSourceSettlementDoesNotBypassExpiredSecondCopyPermission"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -2780,6 +2832,14 @@
         {
           "path": "internal/sourceagent/settlement_linux_test.go",
           "name": "TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
+        },
+        {
+          "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
+          "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
         }
       ],
       "acceptance": ["AT-24"],
@@ -4114,6 +4174,22 @@
         {
           "path": "internal/sourceagent/settlement_cli_linux_test.go",
           "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalEmptyHistoryMonotonicReplayAndLegacyTamper"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalRefusesIncompleteUnacknowledgedDirtyAndQuota"
+        },
+        {
+          "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
+          "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -4416,6 +4492,18 @@
         {
           "path": "internal/sourceagent/settlement_crash_linux_test.go",
           "name": "TestSourceSettlementRechecksExpiryAfterExecutionLeaseWait"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRequiresCurrentPolicyAndStoppedWorker"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalDoesNotCreateMissingHistoryOrIgnoreGuard"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -4641,6 +4729,18 @@
         {
           "path": "internal/recoverybundle/recovery_linux_test.go",
           "name": "TestRecoveryPackageConcurrentPublishHasOneWinner"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRequiresCurrentPolicyAndStoppedWorker"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalDoesNotCreateMissingHistoryOrIgnoreGuard"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -5020,6 +5120,22 @@
         {
           "path": "internal/sourceagent/settlement_cli_linux_test.go",
           "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalEmptyHistoryMonotonicReplayAndLegacyTamper"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalRefusesIncompleteUnacknowledgedDirtyAndQuota"
+        },
+        {
+          "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
+          "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -5793,6 +5909,26 @@
         {
           "path": "internal/sourceagent/settlement_crash_linux_test.go",
           "name": "TestSourceSettlementRechecksExpiryAfterExecutionLeaseWait"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalEmptyHistoryMonotonicReplayAndLegacyTamper"
+        },
+        {
+          "path": "internal/ingress/registry_renewal_linux_test.go",
+          "name": "TestRegistryRenewalRefusesIncompleteUnacknowledgedDirtyAndQuota"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRequiresCurrentPolicyAndStoppedWorker"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalDoesNotCreateMissingHistoryOrIgnoreGuard"
+        },
+        {
+          "path": "internal/worker/ingress_renewal_linux_test.go",
+          "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -5982,6 +6118,10 @@
         {
           "path": "internal/sourceagent/settlement_cli_linux_test.go",
           "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
+        },
+        {
+          "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
+          "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
         }
       ],
       "acceptance": ["AT-31"],

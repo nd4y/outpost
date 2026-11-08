@@ -24,6 +24,8 @@ import (
 )
 
 const RegistryFormat = "outpost-ingress-registry-1"
+const RenewedRegistryFormat = "outpost-ingress-registry-2"
+const maxRegistryState = 5*MaxDocument + 4096
 
 type RegistryOptions struct {
 	Parent      *os.Root
@@ -43,10 +45,15 @@ type RegistryOptions struct {
 	RemoveObject func(context.Context, string, int64) error
 }
 type registryState struct {
-	Format       string          `json:"format"`
-	Authority    string          `json:"authority"`
-	Intent       json.RawMessage `json:"intent,omitempty"`
-	ObservedUnix int64           `json:"observedUnix"`
+	Format            string          `json:"format"`
+	Authority         string          `json:"authority"`
+	Intent            json.RawMessage `json:"intent,omitempty"`
+	ObservedUnix      int64           `json:"observedUnix"`
+	CurrentAuthority  json.RawMessage `json:"currentAuthority,omitempty"`
+	IntentAuthority   json.RawMessage `json:"intentAuthority,omitempty"`
+	OriginalAuthority json.RawMessage `json:"originalAuthority,omitempty"`
+	PreviousAuthority json.RawMessage `json:"previousAuthority,omitempty"`
+	LegacyDigest      string          `json:"legacyDigest,omitempty"`
 }
 type Registry struct {
 	root      *os.Root
@@ -88,7 +95,19 @@ func (g *Registry) save() error {
 	return e
 }
 func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
+	return openRegistry(ctx, o, false)
+}
+
+// historical is private to explicit offline maintenance. No network handler is
+// exposed before the caller closes the returned registry.
+func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Registry, error) {
 	a, e := VerifyAuthority(o.Authority, o.Owner, time.Now())
+	if historical {
+		if o.Initialize || len(o.Settlement)+len(o.SettlementIntent) != 0 {
+			return nil, ErrDenied
+		}
+		a, e = VerifyAuthorityDocument(o.Authority, o.Owner)
+	}
 	if len(o.Settlement) != 0 {
 		if o.Initialize {
 			return nil, ErrDenied
@@ -154,7 +173,7 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	owned = true
 	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
 	fail := func(e error) (*Registry, error) { g.Close(); return nil, e }
-	g.store, e = statefile.OpenAt(r, "state", 2*MaxDocument, o.Initialize)
+	g.store, e = statefile.OpenAt(r, "state", maxRegistryState, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
@@ -168,18 +187,8 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	} else if e != nil {
 		return fail(e)
 	} else {
-		if storage.Decode(raw, &g.state, 2*MaxDocument) != nil {
-			return fail(ErrConflict)
-		}
-		canonical, _ := json.Marshal(g.state)
-		if !bytes.Equal(raw, canonical) || g.state.Format != RegistryFormat || g.state.Authority != storage.Hash(o.Authority) || g.state.ObservedUnix < 1 || g.state.ObservedUnix > time.Now().Unix() {
-			return fail(ErrConflict)
-		}
-		if len(g.state.Intent) > 0 {
-			var intent Intent
-			if canonicalIntent(g.state.Intent, o.Authority, o.Owner, &intent) != nil {
-				return fail(ErrConflict)
-			}
+		if e = g.loadRegistry(raw); e != nil {
+			return fail(e)
 		}
 	}
 	if len(o.Settlement) != 0 && !bytes.Equal(g.state.Intent, o.SettlementIntent) {
@@ -222,7 +231,11 @@ func (g *Registry) Close() error {
 	return e
 }
 func (g *Registry) sessionOptions(raw []byte) SessionOptions {
-	return SessionOptions{Parent: g.root, Directory: "current", Authority: g.options.Authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject}
+	authority := g.options.Authority
+	if bytes.Equal(raw, g.state.Intent) {
+		authority = g.intentAuthority()
+	}
+	return SessionOptions{Parent: g.root, Directory: "current", Authority: authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject}
 }
 func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	o := g.sessionOptions(raw)
@@ -246,6 +259,11 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 		return nil, ErrConflict
 	}
 	oldOptions := o
+	oldAuthority, e := VerifyAuthorityDocument(state.Authority, g.options.Owner)
+	if e != nil || !SameAuthorityScope(oldAuthority, g.authority) || oldAuthority.Revision > g.authority.Revision || oldAuthority.Revision == g.authority.Revision && !bytes.Equal(state.Authority, g.options.Authority) {
+		return nil, ErrConflict
+	}
+	oldOptions.Authority = bytes.Clone(state.Authority)
 	oldOptions.Intent = state.Intent
 	oldOptions.Initialize = false
 	old, e := openSession(ctx, oldOptions, true)
@@ -305,7 +323,7 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	}
 	if len(g.state.Intent) > 0 && !bytes.Equal(g.state.Intent, raw) {
 		var previous Intent
-		if canonicalIntent(g.state.Intent, g.options.Authority, g.options.Owner, &previous) != nil || i.Sequence <= previous.Sequence {
+		if canonicalIntent(g.state.Intent, g.intentAuthority(), g.options.Owner, &previous) != nil || i.Sequence <= previous.Sequence {
 			return i, ErrConflict
 		}
 		if g.session == nil {
@@ -344,6 +362,9 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 		}
 		before := g.state
 		g.state.Intent = bytes.Clone(raw)
+		if g.state.Format == RenewedRegistryFormat {
+			g.state.IntentAuthority = bytes.Clone(g.options.Authority)
+		}
 		g.state.ObservedUnix = time.Now().Unix()
 		if e = g.save(); e != nil {
 			g.state = before
