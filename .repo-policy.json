@@ -28,7 +28,7 @@
     },
     "bootstrap": {
       "status": "NOT_VERIFIED",
-      "reference": "docs/en/development-standard.md describes toolkit bootstrap; product installation is not implemented."
+      "reference": "docs/en/distribution.md describes the source-bound installation candidate and isolated checks; complete product installation acceptance remains open."
     },
     "release": {
       "status": "NOT_VERIFIED",

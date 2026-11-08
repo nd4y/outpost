@@ -1,0 +1,62 @@
+# Set a verified immutable image ID/digest and pre-created private bind paths.
+# This file does not initialize state or publish a host port.
+x-runtime: &runtime
+  image: "${OUTPOST_IMAGE:?set a verified immutable Outpost image}"
+  pull_policy: never
+  user: "${OUTPOST_UID:?set the nonzero runtime UID}:${OUTPOST_GID:?set the nonzero runtime GID}"
+  read_only: true
+  cap_drop: [ALL]
+  cgroup: private
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  mem_limit: 768m
+  memswap_limit: 768m
+  cpus: 1
+  restart: "on-failure:5"
+  stop_grace_period: 30s
+  tmpfs: ["/tmp:rw,nosuid,nodev,noexec,size=67108864,mode=1777"]
+  logging:
+    driver: local
+    options:
+      max-size: "5m"
+      max-file: "2"
+  volumes:
+    - type: bind
+      source: "${OUTPOST_DATA:?set the already enrolled worker volume root}"
+      target: /var/lib/outpost
+      bind:
+        create_host_path: false
+    - type: bind
+      source: "${OUTPOST_PRIVATE:?set the existing private worker profile directory}"
+      target: /run/outpost
+      read_only: true
+      bind:
+        create_host_path: false
+services:
+  worker:
+    <<: *runtime
+    command: [worker-run, --require-isolation, --bootstrap, /run/outpost/worker.json]
+  commands:
+    <<: *runtime
+    profiles: [commands]
+    command:
+      [
+        worker-command-loop,
+        --require-isolation,
+        --bootstrap,
+        /run/outpost/worker.json,
+        --input,
+        /run/outpost/commands.json,
+      ]
+  reports:
+    <<: *runtime
+    profiles: [reports]
+    command:
+      [
+        worker-report-loop,
+        --require-isolation,
+        --bootstrap,
+        /run/outpost/worker.json,
+        --input,
+        /run/outpost/reports.json,
+      ]

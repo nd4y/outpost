@@ -327,6 +327,10 @@
         {
           "path": "internal/recovery/executor_linux_test.go",
           "name": "TestRecoveryExecutorCommitGateWithdrawalAndTerminalCleanup"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_independent_recovery_after_source_removal"
         }
       ],
       "acceptance": ["AT-02", "AT-03"],
@@ -387,6 +391,10 @@
         {
           "path": "internal/filekit/gc_linux_test.go",
           "name": "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_independent_recovery_after_source_removal"
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12"],
@@ -2527,7 +2535,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -2819,7 +2831,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -3103,7 +3119,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -3293,6 +3313,62 @@
         {
           "path": "internal/managementservice/snapshot_linux_test.go",
           "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
+        },
+        {
+          "path": "internal/isolation/isolation_linux_test.go",
+          "name": "TestProcessIsolationRejectsUnknownAndUnboundedControls"
+        },
+        {
+          "path": "internal/isolation/isolation_linux_test.go",
+          "name": "TestProcessIsolationStatusParserFailsClosed"
+        },
+        {
+          "path": "internal/isolation/isolation_linux_test.go",
+          "name": "TestProcessIsolationObservesActualKernelWithoutClaimingRuntimeAcceptance"
+        },
+        {
+          "path": "internal/isolation/cgroup_legacy_linux_test.go",
+          "name": "TestProcessIsolationV1RequiresPrivateUnambiguousControllers"
+        },
+        {
+          "path": "internal/isolation/cgroup_legacy_linux_test.go",
+          "name": "TestProcessIsolationV1MemorySwapAndUnlimitedLimits"
+        },
+        {
+          "path": "cmd/outpost/isolation_linux_test.go",
+          "name": "TestCLIIsolationObservationAndAdmissionPrecedePrivateState"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_selected_build_and_archives"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_archive_generation_is_reproducible"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_image_and_enforced_isolation"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_unsafe_runtime_rejected_before_profile"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_compose_profile_preserves_runtime_constraints"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_explicit_installation"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_cached_start_upgrade_stop_and_rollback"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_missing_or_readonly_volume_fails_without_fallback"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -3525,7 +3601,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -3635,6 +3715,54 @@
         {
           "path": "internal/managementservice/snapshot_linux_test.go",
           "name": "TestManagementServiceSnapshotSIGKILLNeverPublishesPrefixOrReplacesComplete"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_selected_build_and_archives"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_archive_generation_is_reproducible"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_wrong_manifest_never_selects_archive"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_changed_payload_is_rejected"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_wrong_elf_architecture_is_rejected_even_with_new_checksums"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_symlink_and_unlisted_files_are_rejected"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_archive_missing_dependency_and_path_injection_are_rejected"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_output_collision_and_failed_build_keep_original"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_explicit_installation"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_cached_start_upgrade_stop_and_rollback"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_missing_or_readonly_volume_fails_without_fallback"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_independent_recovery_after_source_removal"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -3649,7 +3777,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [],
       "acceptance": ["AT-22", "AT-25", "AT-26"],
@@ -3664,7 +3796,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -3836,7 +3972,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -4012,7 +4152,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -4302,6 +4446,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "cmd/outpost/isolation_linux_test.go",
+          "name": "TestCLIIsolationObservationAndAdmissionPrecedePrivateState"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -4320,6 +4468,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_independent_recovery_after_source_removal"
+        },
         {
           "path": "internal/filekit/reference_linux_test.go",
           "name": "TestFrozenV1KitCreatedByPreviousImplementation"
@@ -4872,6 +5024,58 @@
         {
           "path": "internal/management/external_report_linux_test.go",
           "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
+        },
+        {
+          "path": "internal/isolation/isolation_linux_test.go",
+          "name": "TestProcessIsolationRejectsUnknownAndUnboundedControls"
+        },
+        {
+          "path": "internal/isolation/isolation_linux_test.go",
+          "name": "TestProcessIsolationStatusParserFailsClosed"
+        },
+        {
+          "path": "internal/isolation/isolation_linux_test.go",
+          "name": "TestProcessIsolationObservesActualKernelWithoutClaimingRuntimeAcceptance"
+        },
+        {
+          "path": "internal/isolation/cgroup_legacy_linux_test.go",
+          "name": "TestProcessIsolationV1RequiresPrivateUnambiguousControllers"
+        },
+        {
+          "path": "internal/isolation/cgroup_legacy_linux_test.go",
+          "name": "TestProcessIsolationV1MemorySwapAndUnlimitedLimits"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_wrong_manifest_never_selects_archive"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_changed_payload_is_rejected"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_wrong_elf_architecture_is_rejected_even_with_new_checksums"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_symlink_and_unlisted_files_are_rejected"
+        },
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_archive_missing_dependency_and_path_injection_are_rejected"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_image_and_enforced_isolation"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_unsafe_runtime_rejected_before_profile"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_compose_profile_preserves_runtime_constraints"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -4886,7 +5090,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -5054,7 +5262,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [
         {
@@ -5122,7 +5334,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [],
       "acceptance": ["AT-34"],
@@ -5137,7 +5353,11 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
-        "cmd/outpost"
+        "cmd/outpost",
+        "internal/isolation",
+        "packaging",
+        "scripts/build-release.py",
+        "scripts/verify-release.py"
       ],
       "checks": [],
       "acceptance": ["AT-26", "AT-35"],

@@ -1,0 +1,10 @@
+**
+!Dockerfile
+!linux_amd64/
+!linux_amd64/outpost
+!linux_amd64/outpost-kit
+!linux_arm64/
+!linux_arm64/outpost
+!linux_arm64/outpost-kit
+!licenses/
+!licenses/**

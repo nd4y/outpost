@@ -39,9 +39,58 @@ try {
     value.requirements.flatMap((r) => r.checks).find((c) => c.path === "scripts/browser/check.mjs");
   const go = (value) =>
     value.requirements.flatMap((r) => r.checks).find((c) => c.path.endsWith("_test.go"));
-  assert(browser(original) && go(original));
+  const artifact = (value) =>
+    value.requirements.flatMap((r) => r.checks).find((c) => c.path === "scripts/check-release.py");
+  const container = (value) =>
+    value.requirements
+      .flatMap((r) => r.checks)
+      .find((c) => c.path === "scripts/check-container.py");
+  assert(browser(original) && go(original) && artifact(original) && container(original));
   for (const [name, accepted, mutate] of [
     ["valid", true, () => {}],
+    [
+      "missing-container-check",
+      false,
+      (v) => {
+        container(v).name = "test_nonexistent_container_case";
+      },
+    ],
+    [
+      "unregistered-container-function",
+      false,
+      (v) => {
+        container(v).name = "test_defined_but_unregistered";
+        fs.appendFileSync(
+          path.join(fixture, "scripts/check-container.py"),
+          "\ndef test_defined_but_unregistered(suite):\n    pass\n",
+        );
+      },
+    ],
+    [
+      "missing-artifact-check",
+      false,
+      (v) => {
+        artifact(v).name = "test_nonexistent_artifact_case";
+      },
+    ],
+    [
+      "unapproved-artifact-path",
+      false,
+      (v) => {
+        artifact(v).path = "scripts/build-release.py";
+      },
+    ],
+    [
+      "unregistered-artifact-function",
+      false,
+      (v) => {
+        artifact(v).name = "test_defined_but_unregistered";
+        fs.appendFileSync(
+          path.join(fixture, "scripts/check-release.py"),
+          "\ndef test_defined_but_unregistered(root, digest, work):\n    pass\n",
+        );
+      },
+    ],
     [
       "unknown-browser-scenario",
       false,

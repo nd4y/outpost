@@ -51,6 +51,23 @@ for (const item of product.requirements) {
     assert(fs.existsSync(path.join(root, file)), `Missing implementation: ${item.id} ${file}`);
   }
   for (const check of item.checks) {
+    if (["scripts/check-release.py", "scripts/check-container.py"].includes(check.path)) {
+      assert(/^test_[a-z0-9_]{5,160}$/.test(check.name));
+      const source = read(check.path);
+      const registration = source.match(/^TESTS\s*=\s*\[([\s\S]*?)\]/m);
+      assert(registration && /^(?:\s*test_[a-z0-9_]+\s*,?)+\s*$/.test(registration[1]));
+      const registered = registration[1].match(/test_[a-z0-9_]+/g);
+      assert.equal(new Set(registered).size, registered.length);
+      assert(
+        registered.includes(check.name),
+        `Unregistered artifact check: ${item.id} ${check.name}`,
+      );
+      assert(
+        new RegExp(`^def ${check.name}\\(`, "m").test(source),
+        `Stale artifact check: ${item.id} ${check.name}`,
+      );
+      continue;
+    }
     if (check.path === "scripts/browser/check.mjs") {
       assert(/^[A-Za-z0-9][A-Za-z0-9 ,%-]{10,160}$/.test(check.name));
       assert(
