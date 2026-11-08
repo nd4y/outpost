@@ -106,13 +106,28 @@ type Backend struct {
 	credentials Credentials
 	base        *url.URL
 	client      *http.Client
-	slots       chan struct{}
-	mu          sync.Mutex
-	next        time.Time
+	gate        *RequestGate
+}
+
+// RequestGate shares request admission for one exact target profile across
+// independent backends without sharing credentials or transports.
+type RequestGate struct {
+	profile Profile
+	slots   chan struct{}
+	mu      sync.Mutex
+	next    time.Time
+}
+
+func NewRequestGate(p Profile) (*RequestGate, error) {
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
+	return &RequestGate{profile: p, slots: make(chan struct{}, p.Concurrency)}, nil
 }
 
 func New(p Profile, c Credentials, roots *x509.CertPool) (*Backend, error) {
-	if e := p.Validate(); e != nil {
+	gate, e := NewRequestGate(p)
+	if e != nil {
 		return nil, e
 	}
 	if c.Access == "" || c.Secret == "" || strings.ContainsAny(c.Access+c.Secret+c.SessionToken, "\r\n") || c.ExpiresUnix <= time.Now().Unix() {
@@ -128,17 +143,28 @@ func New(p Profile, c Credentials, roots *x509.CertPool) (*Backend, error) {
 	}
 	tr := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: ca}, DisableCompression: true, MaxConnsPerHost: p.Concurrency, MaxIdleConnsPerHost: p.Concurrency, MaxIdleConns: p.Concurrency, MaxResponseHeaderBytes: 16 << 10, TLSHandshakeTimeout: time.Duration(p.TimeoutMillis) * time.Millisecond, ResponseHeaderTimeout: time.Duration(p.TimeoutMillis) * time.Millisecond, IdleConnTimeout: 30 * time.Second}
 	client := &http.Client{Transport: tr, Timeout: time.Duration(p.TimeoutMillis) * time.Millisecond, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	return &Backend{profile: p, credentials: c, base: u, client: client, slots: make(chan struct{}, p.Concurrency)}, nil
+	return &Backend{profile: p, credentials: c, base: u, client: client, gate: gate}, nil
 }
 func (b *Backend) Profile() Profile { return b.profile }
 func (b *Backend) Close()           { b.client.CloseIdleConnections() }
 
+// WithRequestGate binds a freshly resolved backend to shared admission.
+// The returned backend takes over the caller's transport.
+func (b *Backend) WithRequestGate(g *RequestGate) (*Backend, error) {
+	if b == nil || g == nil || g.profile != b.profile {
+		return nil, ErrDenied
+	}
+	bound := *b
+	bound.gate = g
+	return &bound, nil
+}
+
 // NextRequest preserves an observed throttle deadline when a scheduler persists a retry.
-// It does not include another worker's account-wide traffic.
+// It includes other backends sharing the same gate in this process.
 func (b *Backend) NextRequest() time.Time {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.next
+	b.gate.mu.Lock()
+	defer b.gate.mu.Unlock()
+	return b.gate.next
 }
 func pause(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
@@ -150,31 +176,31 @@ func pause(ctx context.Context, d time.Duration) error {
 		return nil
 	}
 }
-func (b *Backend) admit(ctx context.Context) error {
+func (g *RequestGate) admit(ctx context.Context) error {
 	for {
 		if e := ctx.Err(); e != nil {
 			return e
 		}
-		b.mu.Lock()
+		g.mu.Lock()
 		now := time.Now()
-		delay := b.next.Sub(now)
+		delay := g.next.Sub(now)
 		if delay <= 0 {
-			b.next = now.Add(time.Second / time.Duration(b.profile.RequestsPerSecond))
-			b.mu.Unlock()
+			g.next = now.Add(time.Second / time.Duration(g.profile.RequestsPerSecond))
+			g.mu.Unlock()
 			return nil
 		}
-		b.mu.Unlock()
+		g.mu.Unlock()
 		if e := pause(ctx, delay); e != nil {
 			return e
 		}
 	}
 }
-func (b *Backend) cooldown(delay time.Duration) {
-	b.mu.Lock()
-	if at := time.Now().Add(delay); at.After(b.next) {
-		b.next = at
+func (g *RequestGate) cooldown(delay time.Duration) {
+	g.mu.Lock()
+	if at := time.Now().Add(delay); at.After(g.next) {
+		g.next = at
 	}
-	b.mu.Unlock()
+	g.mu.Unlock()
 }
 
 type requestOptions struct {
@@ -224,8 +250,8 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 	ctx, timeout := context.WithTimeout(ctx, time.Duration(b.profile.TimeoutMillis)*time.Millisecond)
 	defer timeout()
 	select {
-	case b.slots <- struct{}{}:
-		defer func() { <-b.slots }()
+	case b.gate.slots <- struct{}{}:
+		defer func() { <-b.gate.slots }()
 	case <-ctx.Done():
 		return nil, 0, ctx.Err()
 	}
@@ -237,7 +263,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		if time.Now().Unix() >= b.credentials.ExpiresUnix {
 			return nil, 0, ErrDenied
 		}
-		if e := b.admit(ctx); e != nil {
+		if e := b.gate.admit(ctx); e != nil {
 			return nil, 0, e
 		}
 		if book != nil {
@@ -309,7 +335,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 						}
 						delay = min(remaining, max(time.Duration(0), delay))
 						// Preserve server backoff across calls and already waiting requests.
-						b.cooldown(delay)
+						b.gate.cooldown(delay)
 						if delay > 30*time.Second {
 							return nil, last, ErrUnavailable
 						}

@@ -61,6 +61,7 @@ type view struct {
 	metadata      chan struct{}
 	domains       map[string]*domainState
 	controls      *Controls
+	requestGates  map[string]*storage.RequestGate
 	nextScrubScan time.Time
 }
 type Worker struct {
@@ -76,6 +77,8 @@ type Worker struct {
 	state, lease *statefile.Store
 	fetcher      *control.Fetcher
 	resolve      func(context.Context, storage.Profile) (*storage.Backend, error)
+	// Only the execution lease owner replaces this map. Each view reads its own map.
+	requestGates map[string]*storage.RequestGate
 	mu           sync.Mutex
 	active       *view
 	budget       *diskbudget.Budget
@@ -340,6 +343,17 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	if compileError != nil {
 		return nil, compileError
 	}
+	v.requestGates = make(map[string]*storage.RequestGate, len(c.Targets))
+	for _, target := range c.Targets {
+		gate := w.requestGates[target.ID]
+		if gate == nil {
+			gate, e = storage.NewRequestGate(target.Profile)
+			if e != nil {
+				return nil, e
+			}
+		}
+		v.requestGates[target.ID] = gate
+	}
 	v.ctx, v.cancel = context.WithDeadline(ctx, time.Unix(c.ExpiresUnix, 0))
 	fail := func(e error) (*view, error) {
 		v.cancel()
@@ -458,6 +472,7 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	if e := w.resetDiscovery(ctx, v); e != nil {
 		return fail(e)
 	}
+	w.requestGates = v.requestGates
 	w.mu.Lock()
 	w.active = v
 	w.mu.Unlock()
@@ -844,7 +859,8 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		}
 		return json.Marshal(result)
 	}
-	if j.Kind != "upload" || w.resolve == nil {
+	gate := v.requestGates[j.Target]
+	if j.Kind != "upload" || w.resolve == nil || gate == nil {
 		return nil, ErrDenied
 	}
 	automatic := j.Delegation != ""
@@ -889,7 +905,17 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 			return nil, e
 		}
 	}
-	e = queue.Run(ctx, local.replica, w.resolve, w.cert.PrivateKey.(ed25519.PrivateKey))
+	e = queue.Run(ctx, local.replica, func(ctx context.Context, profile storage.Profile) (*storage.Backend, error) {
+		backend, err := w.resolve(ctx, profile)
+		if err != nil {
+			return backend, err
+		}
+		bound, err := backend.WithRequestGate(gate)
+		if err != nil && backend != nil {
+			backend.Close()
+		}
+		return bound, err
+	}, w.cert.PrivateKey.(ed25519.PrivateKey))
 	if e != nil {
 		return nil, e
 	}

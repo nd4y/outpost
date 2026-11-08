@@ -2543,6 +2543,14 @@
         {
           "path": "internal/worker/planning_linux_test.go",
           "name": "TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestRequestGateSharesPacingAndCooldownAcrossBackends"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerParallelUploadsShareOneTargetRequestGate"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -5281,6 +5289,14 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestRequestGateSharesPacingAndCooldownAcrossBackends"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerParallelUploadsShareOneTargetRequestGate"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6958,6 +6974,14 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestRequestGateSharesPacingAndCooldownAcrossBackends"
+        },
+        {
+          "path": "internal/worker/cloud_linux_test.go",
+          "name": "TestWorkerParallelUploadsShareOneTargetRequestGate"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

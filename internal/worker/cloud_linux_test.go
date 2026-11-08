@@ -6,8 +6,10 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,6 +30,92 @@ func TestWorkerPublishesBothExternalTargetsAndStandaloneRecovery(t *testing.T) {
 
 func TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery(t *testing.T) {
 	testWorkerCloudTargets(t, true)
+}
+
+func TestWorkerParallelUploadsShareOneTargetRequestGate(t *testing.T) {
+	f := newFixture(t)
+	w := f.nodes[0]
+	ctx := context.Background()
+	pub, planner := key(t)
+	f.domain.Planner = pub
+	f.domain.Placement.Edges = nil
+	f.domain.Placement.AllowedClasses = append(f.domain.Placement.AllowedClasses, "external")
+	firstRequest := make(chan struct{})
+	release := make(chan struct{})
+	secondRequest := make(chan struct{})
+	var requests atomic.Int32
+	server := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)),
+		Logins: map[string]teststore.Login{w.node: {Secret: "isolated-cloud-secret"}},
+		Before: func(out http.ResponseWriter, r *http.Request, actor, key string, body []byte) bool {
+			switch requests.Add(1) {
+			case 1:
+				close(firstRequest)
+				select {
+				case <-release:
+				case <-r.Context().Done():
+					return true
+				}
+			case 2:
+				close(secondRequest)
+			}
+			return false
+		}})
+	p := storage.Profile{Kind: "webdav", Endpoint: server.Endpoint(), Namespace: server.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true}
+	f.cfg.Targets = []control.Target{{ID: p.ID(), Profile: p}}
+	f.domain.Placement.Targets = []string{p.ID()}
+	f.domain.Placement.CloudEdges = []policy.CloudEdge{{Node: w.node, Target: p.ID()}}
+	replica, err := generation.Open(filepath.Join(DomainDirectory(w.dir, f.domain.Trust), "replica"), f.domain.Trust, false)
+	must(t, err)
+	defer replica.Close()
+	worker := upload.Worker{ID: w.node, Class: "trusted", PublicKey: w.cert.PrivateKey.(ed25519.PrivateKey).Public().(ed25519.PublicKey)}
+	jobs := []control.Job{}
+	for _, name := range []string{"upload-first", "upload-second"} {
+		op := storage.Hash([]byte(name))
+		plan, err := upload.Build(ctx, replica, f.generation, upload.Plan{Format: upload.Format, Operation: op, Profile: p, AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{worker}, StartMillis: time.Now().UnixMilli(), ExpiresUnix: time.Now().Add(time.Minute).Unix(), SlotMillis: 1000}, planner)
+		must(t, err)
+		jobs = append(jobs, control.Job{Operation: op, Executor: w.node, Kind: "upload", Domain: f.domain.Trust.Domain, Generation: f.generation, Target: p.ID(), Plan: plan})
+	}
+	var resolved atomic.Int32
+	w.resolve = func(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
+		b, err := storage.New(p, storage.Credentials{Access: w.node, Secret: server.Options.Logins[w.node].Secret, ExpiresUnix: time.Now().Add(time.Minute).Unix()}, server.Roots)
+		if err == nil {
+			resolved.Add(1)
+		}
+		return b, err
+	}
+	f.config(t, 0, jobs)
+	stop := start(t, w)
+	select {
+	case <-firstRequest:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first upload never reached target")
+	}
+	wait(t, func() bool { return resolved.Load() == 2 })
+	select {
+	case <-secondRequest:
+		t.Fatal("separate upload jobs exceeded target concurrency")
+	case <-time.After(200 * time.Millisecond):
+	}
+	close(release)
+	wait(t, func() bool { return complete(w, jobs[0].Operation) && complete(w, jobs[1].Operation) })
+
+	w.mu.Lock()
+	first := w.active
+	w.mu.Unlock()
+	f.cfg.Revision++
+	f.config(t, 0, jobs)
+	wait(t, func() bool {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.active != nil && w.active.cfg.Revision == f.cfg.Revision
+	})
+	w.mu.Lock()
+	sameGate := w.active != first && w.active.requestGates[p.ID()] == first.requestGates[p.ID()]
+	w.mu.Unlock()
+	if !sameGate {
+		t.Fatal("same signed target lost its gate on configuration refresh")
+	}
+	stop()
 }
 
 func testWorkerCloudTargets(t *testing.T, exhaustTelemetry bool) {
