@@ -63,3 +63,5 @@ Short tests cover the fresh capability, same-directory HTTPS registry reopening,
 The native distribution workflow repeats settlement and CLI cases on amd64 and arm64; inspect the exact commit's execution result before treating either architecture as verified. Full installation, key lifecycle, scale and product acceptance remain separate. Keep the full product acceptance open; this narrow recovery path is not a general solution for every expired operation.
 
 The [receiver renewal workflow](receiver-renewal.md) admits a fresh same-scope grant in the existing registry after explicit quiescent maintenance. It preserves historical receipts and generations, fences previous readers and uses the current receiver policy and disk budget.
+
+CLI checks wait for the exact authenticated receipt over HTTPS after a deliberate transient 503. Persisted ACTIVE status alone is not evidence that the receiver is serving.

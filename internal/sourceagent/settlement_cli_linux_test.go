@@ -21,6 +21,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/ingress"
+	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/volume"
@@ -92,9 +93,14 @@ func TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence(t *testing.T
 	must(t, e)
 	t.Cleanup(closeWorker)
 	var lose atomic.Bool
+	var readinessDenied atomic.Bool
 	var original ingress.Receipt
 	f.registryMu.Lock()
 	f.intercept = func(out http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/receipt") && readinessDenied.CompareAndSwap(true, false) {
+			http.Error(out, "fixture receiver still starting", http.StatusServiceUnavailable)
+			return true
+		}
 		if lose.Load() && r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/catalog") {
 			buffer := &settlementReplyBuffer{ResponseRecorder: httptest.NewRecorder(), underlying: out}
 			w.ServeHTTP(buffer, r)
@@ -195,7 +201,12 @@ func TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence(t *testing.T
 	c.Ingress, c.Settlements = nil, []control.SettlementAdmission{item}
 	signed := apply("settlement", c)
 	run(oldCLI, false, "config-apply", "--bootstrap", receiverPath, "--input", signed)
+	readinessDenied.Store(true)
 	stop = startWorker()
+	ready := waitSettlementCLIReceiver(t, f, item)
+	if ready != original || readinessDenied.Load() {
+		t.Fatal("receipt readiness did not cross the transient unavailable boundary")
+	}
 	result := run(current, true, "source-settle", "--bootstrap", sourcePath, "--input", admission)
 	var out struct {
 		Result Status `json:"result"`
@@ -211,4 +222,29 @@ func TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence(t *testing.T
 		t.Fatal("new reader contract absent")
 	}
 	t.Log("actual CLI preview/sign/config-apply/settle and previous control2 refusal passed; original generation", original.Generation)
+}
+
+// Durable ACTIVE status describes admitted policy, not live serving readiness.
+// Probe the exact authorized receipt without changing the pending operation.
+func waitSettlementCLIReceiver(t *testing.T, f *fixture, item control.SettlementAdmission) ingress.Receipt {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	client, e := ingress.NewSettlementClient(f.server.URL, item.Authority, item.Intent, item.Grant, f.b.Local.Owner, f.a.cert, f.roots, peer.Limits{Concurrency: 1, Timeout: time.Second, Attempts: 1})
+	must(t, e)
+	defer client.Close()
+	var last error
+	for ctx.Err() == nil {
+		receipt, e := client.SettlementReceipt(ctx)
+		if e == nil {
+			return receipt
+		}
+		last = e
+		select {
+		case <-ctx.Done():
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	t.Fatal("receiver did not serve the exact authorized receipt", last)
+	return ingress.Receipt{}
 }

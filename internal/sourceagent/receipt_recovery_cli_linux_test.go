@@ -222,6 +222,9 @@ func TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBoth
 	apply("receipt-recovered", c)
 	stop = startWorker()
 	// Restored receipt uses the unchanged session format and ordinary settlement.
+	if ready := waitSettlementCLIReceiver(t, f, item); ready != recovered.Result {
+		t.Fatal("receiver did not serve the reconstructed receipt")
+	}
 	run(oldCLI, true, "source-settle", "--bootstrap", sourcePath, "--input", settleAdmission)
 	var complete struct {
 		Result Status `json:"result"`
