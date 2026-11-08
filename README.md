@@ -70,7 +70,7 @@ These commands validate documentation and the standard toolkit. They do not star
 - [G2 generation and replica contracts](docs/en/generation-replicas.md)
 - [G2 scoped requirement-to-check trace](docs/g2-trace.json)
 - [G3 peer protocol, evidence and limits](docs/en/peer-transfer.md)
-- [Distributed external upload, recovery and limits](docs/en/external-upload.md)
+- [Distributed external upload, recovery and limits](docs/en/external-upload.md) - S3-compatible and WebDAV targets with bounded repeated capability checks.
 - [Autonomous external planning](docs/en/delegated-upload.md)
 - [Immutable-object readback reuse contract](docs/en/readback-reuse.md)
 - [G3 scoped requirement-to-check trace](docs/g3-trace.json)

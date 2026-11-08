@@ -2019,6 +2019,10 @@
         {
           "path": "internal/upload/source_cache_linux_test.go",
           "name": "TestSourceObjectCacheCancelledReplacementPreservesReadableBytes"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -2057,6 +2061,10 @@
         {
           "path": "internal/upload/hash_progress_linux_test.go",
           "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
         }
       ],
       "acceptance": ["AT-16"],
@@ -2095,6 +2103,10 @@
         {
           "path": "internal/upload/hash_progress_linux_test.go",
           "name": "TestCloudHashProgressRestartsAfterEveryActualPart"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -4358,6 +4370,10 @@
         {
           "path": "internal/sourceagent/install_linux_test.go",
           "name": "TestSourceInstallCandidateLimitAndCancelledAdmission"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -5405,6 +5421,10 @@
         {
           "path": "internal/sourceagent/install_linux_test.go",
           "name": "TestSourceInstallCandidateLimitAndCancelledAdmission"
+        },
+        {
+          "path": "internal/storage/http_test.go",
+          "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

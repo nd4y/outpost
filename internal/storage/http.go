@@ -4,7 +4,6 @@ package storage
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
@@ -305,13 +304,14 @@ func (b *Backend) Put(ctx context.Context, key string, data []byte) error {
 	return ErrUnavailable
 }
 
-// Probe checks conditional creation and readback using nonsensitive random data.
-// It does not prove physical durability or the account's actual ACL scope.
+// Probe checks create-only behavior and readback with one immutable diagnostic
+// object per namespace. Retries and independent workers use identical public,
+// nonsensitive bytes, so a no-delete profile cannot accumulate a new probe on
+// every attempt. An existing probe does not prove fresh-create permission,
+// physical durability or the account's actual ACL scope.
 func (b *Backend) Probe(ctx context.Context) error {
-	data := make([]byte, 32)
-	if _, e := rand.Read(data); e != nil {
-		return e
-	}
+	value := sha256.Sum256([]byte("outpost-storage-probe-1\x00" + b.profile.Namespace))
+	data := value[:]
 	key := "probe-" + Hash(data)
 	if e := b.Put(ctx, key, data); e != nil {
 		return e

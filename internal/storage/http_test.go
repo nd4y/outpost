@@ -94,6 +94,74 @@ func TestProtocolMultipartAndImmutableReadback(t *testing.T) {
 		})
 	}
 }
+
+func TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply(t *testing.T) {
+	for _, kind := range []string{"s3", "webdav"} {
+		t.Run(kind, func(t *testing.T) {
+			var lost atomic.Bool
+			s := teststore.New(t, teststore.Options{
+				Kind: kind, Namespace: Hash([]byte("bounded-probe-" + kind)),
+				AfterWrite: func(w http.ResponseWriter, r *http.Request, actor, key string, body []byte) bool {
+					if strings.HasPrefix(key, "probe-") && lost.CompareAndSwap(false, true) {
+						conn, _, e := w.(http.Hijacker).Hijack()
+						if e == nil {
+							conn.Close()
+						}
+						return true
+					}
+					return false
+				},
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			for range 4 {
+				b := backend(t, s)
+				if e := b.Probe(ctx); e != nil {
+					t.Fatal(e)
+				}
+				b.Close()
+			}
+			result := make(chan error, 3)
+			for range 3 {
+				b := backend(t, s)
+				go func() { result <- b.Probe(ctx) }()
+			}
+			for range 3 {
+				if e := <-result; e != nil {
+					t.Fatal(e)
+				}
+			}
+			snapshot := s.Snapshot()
+			if !lost.Load() || len(snapshot.Writes) != 2 {
+				t.Fatal("probe retry accumulated objects", snapshot.Writes)
+			}
+			probe := ""
+			for key, count := range snapshot.Writes {
+				if count != 1 {
+					t.Fatal("diagnostic object overwritten", key, count)
+				}
+				if strings.HasPrefix(key, "probe-") {
+					probe = key
+				}
+			}
+			if probe == "" || snapshot.Writes["layout"] != 1 {
+				t.Fatal(snapshot.Writes)
+			}
+			// Corruption is preserved and refused; the probe is not silently reset.
+			bad := bytes.Repeat([]byte{0x7f}, 32)
+			if e := os.WriteFile(s.Path(probe), bad, 0600); e != nil {
+				t.Fatal(e)
+			}
+			if e := backend(t, s).Probe(ctx); !errors.Is(e, ErrConflict) {
+				t.Fatal("changed probe accepted", e)
+			}
+			got, e := os.ReadFile(s.Path(probe))
+			if e != nil || !bytes.Equal(got, bad) || len(s.Snapshot().Writes) != 2 {
+				t.Fatal("probe corruption overwritten", e)
+			}
+		})
+	}
+}
 func TestProtocolRetriesAndLostReply(t *testing.T) {
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
