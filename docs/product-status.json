@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "specVersion": "1.4",
+  "specVersion": "1.5",
   "status": "IN_DEVELOPMENT",
   "evidenceRule": "A source symbol or passing component test is not full acceptance. Exact-source execution records and environment admission are separate.",
   "requirements": [
@@ -319,8 +319,8 @@
           "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
         }
       ],
-      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. Parallel initial admission to authorized ingress nodes, durable per-object confirmation, explicit distributed release and asymmetric-path measurements remain open."
     },
     {
       "id": "REQ-06",
@@ -2497,8 +2497,8 @@
           "name": "TestIntegrityRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
         }
       ],
-      "acceptance": ["AT-01", "AT-07", "AT-08"],
-      "remaining": "Installation, long-outage and complete process-level acceptance."
+      "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
+      "remaining": "Installation, long-outage and complete process-level acceptance. Forwarding staged objects before seal, reconciliation against the signed closure and crash/failover acceptance remain open."
     },
     {
       "id": "REQ-26",
@@ -5065,8 +5065,8 @@
           "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
         }
       ],
-      "acceptance": ["AT-22", "AT-25", "AT-26"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Separate measured snapshot release, first independent restore and per-replica readiness timestamps remain open."
     },
     {
       "id": "REQ-43",
@@ -7525,7 +7525,7 @@
     {
       "id": "AT-10",
       "state": "NOT_VERIFIED",
-      "requirements": ["REQ-22", "REQ-31", "REQ-32", "REQ-33"]
+      "requirements": ["REQ-05", "REQ-22", "REQ-25", "REQ-31", "REQ-32", "REQ-33"]
     },
     {
       "id": "AT-11",
@@ -7676,11 +7676,13 @@
       "state": "NOT_VERIFIED",
       "requirements": [
         "REQ-02",
+        "REQ-05",
         "REQ-17",
         "REQ-18",
         "REQ-37",
         "REQ-39",
         "REQ-40",
+        "REQ-42",
         "REQ-44",
         "REQ-45",
         "REQ-47",

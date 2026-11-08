@@ -16,6 +16,8 @@ The local CLI accepts regular source and owner-key files. It rejects symbolic li
 
 The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signed complete catalogs, keyless reception, restart-safe progress, persistent pins and separately authorized cleanup. Its compact local history index has explicit migration and guarded rollback commands; wire catalogs and existing file kits remain compatible. Small HDD tests cover checkpoint catch-up, source repack, actual process termination and independent old/new restoration. Heavy scale/endurance tests remain deferred; this is not full G2 acceptance or a network service.
 
+The [specification 1.5](docs/en/specification.md) requires parallel capture across authorized receivers, forwarding before generation sealing and a policy-defined release threshold for the source snapshot. These requirements are planned work.
+
 The [G3 peer candidate](docs/en/peer-transfer.md) adds mutually authenticated HTTPS push/pull, durable operation journals and complete publication through an asynchronous bridge. Bounded fault tests include false acknowledgments, lost replies, cancelled parallel reads and independent restoration after source/bridge loss. Push defaults to full target readback; an explicit [reuse policy](docs/en/readback-reuse.md) retains original evidence age while avoiding unchanged-object downloads. The [external-upload candidate](docs/en/external-upload.md) adds S3-compatible/WebDAV adapters, three independent workers, cached signed plans, resumable multipart planning, failover and independently recoverable target generations. A separate owner policy enables cloud readback reuse with exact descriptor binding and original evidence age. Real endpoint admission, full traffic accounting and heavy G3 acceptance remain open.
 
 The [durable upload queue](docs/en/upload-queue.md) now admits signed plans, pins sources and runs independent targets with bounded concurrency, automatic delayed retries and process-crash recovery. Expired or permanently blocked jobs remain explicit and protected.
@@ -58,7 +60,7 @@ These commands validate documentation and the standard toolkit. They do not star
 ## Documentation
 
 - [Project passport and workflows](docs/en/project.md)
-- [Technical specification 1.4](docs/en/specification.md)
+- [Technical specification 1.5](docs/en/specification.md)
 - [Milestones and open acceptance](docs/en/roadmap.md)
 - [Product completion and signed configuration](docs/en/product-development.md)
 - [Development standard and commands](docs/en/development-standard.md)

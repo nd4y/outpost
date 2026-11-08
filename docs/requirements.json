@@ -209,7 +209,7 @@
       "stage": "release",
       "milestones": ["M1", "M2"],
       "level": "MUST",
-      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
+      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
       "id": "REQ-05"
     },
     {
@@ -369,7 +369,7 @@
       "stage": "release",
       "milestones": ["M2"],
       "level": "MUST",
-      "acceptance": ["AT-01", "AT-07", "AT-08"],
+      "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
       "id": "REQ-25"
     },
     {
@@ -505,7 +505,7 @@
       "stage": "release",
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-22", "AT-25", "AT-26"],
+      "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
       "id": "REQ-42"
     },
     {
@@ -598,7 +598,7 @@
       "stage": "release"
     }
   ],
-  "specVersion": "1.4",
+  "specVersion": "1.5",
   "schemaVersion": 1,
   "normativeSources": {
     "ru": "docs/ru/specification.md",
