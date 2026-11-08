@@ -74,7 +74,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT]", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "runtime-observe" || args[0] == "runtime-check" {
 		if len(args) != 1 {
@@ -198,7 +198,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"format": capture.TreeFormat, "probed": true}, nil
-	case "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
+	case "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
 		b, e := sourceagent.Load(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -236,6 +236,19 @@ func run(ctx context.Context, args []string) (any, error) {
 				return nil, e
 			}
 			return a.ScheduleStatus(ctx)
+		case "source-renew":
+			raw, e := worker.ReadPrivate(*input, ingress.MaxDocument)
+			if e != nil {
+				return nil, e
+			}
+			var observed []byte
+			if *trustFile != "" {
+				observed, e = worker.ReadPrivate(*trustFile, observation.MaxDocument)
+				if e != nil {
+					return nil, e
+				}
+			}
+			return a.Renew(ctx, raw, observed)
 		case "source-next":
 			if e = a.Next(ctx); e != nil {
 				return nil, e
@@ -584,6 +597,8 @@ func failure(e error) (string, int) {
 		return "INVALID_ARGUMENT", 2
 	case errors.Is(e, generation.ErrMigrationRequired):
 		return "MIGRATION_REQUIRED", 5
+	case errors.Is(e, sourceagent.ErrAuthorityChanged):
+		return "AUTHORITY_CHANGED", 5
 	case errors.Is(e, sourceagent.ErrUnsupported), errors.Is(e, isolation.ErrRequired):
 		return "CAPABILITY_UNAVAILABLE", 5
 	case errors.Is(e, capture.ErrCopies), errors.Is(e, observation.ErrPending):

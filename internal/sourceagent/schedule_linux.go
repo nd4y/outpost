@@ -300,7 +300,7 @@ func (a *Agent) attemptSchedule(ctx context.Context, expected Schedule) error {
 		if e != nil {
 			return e
 		}
-		intent, e := a.intent(head.Intent, false)
+		intent, e := a.stateIntent(head)
 		if e != nil {
 			return e
 		}

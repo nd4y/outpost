@@ -64,42 +64,49 @@ func Load(path string) (Bootstrap, error) {
 }
 
 type state struct {
-	Format       string            `json:"format"`
-	Binding      string            `json:"binding"`
-	Phase        string            `json:"phase"`
-	ObservedUnix int64             `json:"observedUnix"`
-	Sequence     uint64            `json:"sequence"`
-	Generation   string            `json:"generation,omitempty"`
-	Intent       []byte            `json:"intent,omitempty"`
-	Previous     map[string]string `json:"previous"`
-	Checkpoint   []byte            `json:"checkpoint,omitempty"`
-	Signature    []byte            `json:"signature,omitempty"`
+	Format          string            `json:"format"`
+	Binding         string            `json:"binding"`
+	Phase           string            `json:"phase"`
+	ObservedUnix    int64             `json:"observedUnix"`
+	Sequence        uint64            `json:"sequence"`
+	Generation      string            `json:"generation,omitempty"`
+	Intent          []byte            `json:"intent,omitempty"`
+	Previous        map[string]string `json:"previous"`
+	Checkpoint      []byte            `json:"checkpoint,omitempty"`
+	Signature       []byte            `json:"signature,omitempty"`
+	Authority       []byte            `json:"authority,omitempty"`
+	Observation     []byte            `json:"observation,omitempty"`
+	IntentAuthority []byte            `json:"intentAuthority,omitempty"`
+	LegacyDigest    string            `json:"legacyDigest,omitempty"`
 }
 
 type Status struct {
-	Format     string         `json:"format"`
-	Profile    string         `json:"profile"`
-	Phase      string         `json:"phase"`
-	Operation  string         `json:"operation,omitempty"`
-	Sequence   uint64         `json:"sequence"`
-	Generation string         `json:"generation,omitempty"`
-	Job        *capture.State `json:"job,omitempty"`
+	Format            string         `json:"format"`
+	Profile           string         `json:"profile"`
+	Phase             string         `json:"phase"`
+	Operation         string         `json:"operation,omitempty"`
+	Sequence          uint64         `json:"sequence"`
+	Generation        string         `json:"generation,omitempty"`
+	Job               *capture.State `json:"job,omitempty"`
+	AuthorityRevision uint64         `json:"authorityRevision,omitempty"`
 }
 
 type Agent struct {
-	b            Bootstrap
-	root         *os.Root
-	budget       *diskbudget.Budget
-	store, lease *statefile.Store
-	owner        filekit.Owner
-	writer       ed25519.PrivateKey
-	authority    []byte
-	observation  []byte
-	grant        ingress.Authority
-	cert         tls.Certificate
-	roots        *x509.CertPool
-	binding      string
-	poisoned     atomic.Bool
+	b                  Bootstrap
+	root               *os.Root
+	budget             *diskbudget.Budget
+	store, lease       *statefile.Store
+	owner              filekit.Owner
+	writer             ed25519.PrivateKey
+	authority          []byte
+	observation        []byte
+	initialObservation []byte
+	grant              ingress.Authority
+	anchor             ingress.Authority
+	cert               tls.Certificate
+	roots              *x509.CertPool
+	binding            string
+	poisoned           atomic.Bool
 	// Fault is only a local test hook, never remote configuration.
 	Fault func(string) error
 }
@@ -129,6 +136,7 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 	if a.grant.Source != b.Local.Node || a.grant.Profile != b.Profile.ID {
 		return nil, ErrInvalid
 	}
+	a.anchor = a.grant
 	if b.ObservationFile != "" {
 		if b.Profile.MinimumCopies != 2 {
 			return nil, ErrInvalid
@@ -179,6 +187,7 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 	if e != nil || peer.Identity(leaf) != b.Local.Node {
 		return nil, ErrInvalid
 	}
+	a.initialObservation = bytes.Clone(a.observation)
 	identity, _ := json.Marshal(struct {
 		Bootstrap   Bootstrap
 		Authority   []byte
@@ -233,7 +242,7 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 			if e := a.guard(ctx); e != nil {
 				return e
 			}
-			_, e := a.load()
+			_, e := a.loadAdopt()
 			return e
 		})
 		if e != nil {
@@ -248,7 +257,7 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 			}
 			return a.save(state{Format: Format, Binding: a.binding, Phase: "IDLE", Previous: map[string]string{}})
 		}
-		if _, e := a.load(); e != nil {
+		if _, e := a.loadAdopt(); e != nil {
 			return e
 		}
 		return a.budget.Reconcile(ctx, b.Limits)
@@ -308,7 +317,7 @@ func (a *Agent) save(s state) error {
 	if e != nil {
 		return e
 	}
-	s.Signature = ed25519.Sign(a.writer, append([]byte(Format+"\x00"), raw...))
+	s.Signature = ed25519.Sign(a.writer, append([]byte(s.Format+"\x00"), raw...))
 	raw, e = json.Marshal(s)
 	if e != nil {
 		return e
@@ -319,12 +328,16 @@ func (a *Agent) save(s state) error {
 	return e
 }
 func (a *Agent) load() (state, error) {
+	return a.loadScope(false)
+}
+func (a *Agent) loadAdopt() (state, error) { return a.loadScope(true) }
+func (a *Agent) loadScope(adopt bool) (state, error) {
 	var s state
 	raw, e := a.store.Read("agent.json")
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, maxState) != nil || s.Format != Format || s.Binding != a.binding || s.ObservedUnix < 1 || s.ObservedUnix > time.Now().Unix() || s.Previous == nil || len(s.Previous) > generation.MaxKits {
+	if storage.Decode(raw, &s, maxState) != nil || (s.Format != Format && s.Format != renewedFormat) || s.Binding != a.binding || s.ObservedUnix < 1 || s.ObservedUnix > time.Now().Unix() || s.Previous == nil || len(s.Previous) > generation.MaxKits {
 		return s, ErrInvalid
 	}
 	canonical, _ := json.Marshal(s)
@@ -335,8 +348,12 @@ func (a *Agent) load() (state, error) {
 	s.Signature = nil
 	payload, _ := json.Marshal(s)
 	s.Signature = signature
-	if !ed25519.Verify(a.grant.Trust.Writer, append([]byte(Format+"\x00"), payload...), signature) {
+	if !ed25519.Verify(a.anchor.Trust.Writer, append([]byte(s.Format+"\x00"), payload...), signature) {
 		return s, ErrInvalid
+	}
+	current, e := a.stateScope(s, adopt)
+	if e != nil {
+		return s, e
 	}
 	for f, v := range s.Previous {
 		if !storage.ID(f) || !storage.ID(v) {
@@ -356,7 +373,7 @@ func (a *Agent) load() (state, error) {
 		}
 	}
 	if s.Phase != "IDLE" {
-		i, e := a.intent(s.Intent, false)
+		i, e := a.stateIntent(s)
 		if e != nil {
 			return s, e
 		}
@@ -369,6 +386,11 @@ func (a *Agent) load() (state, error) {
 		}
 	} else if len(s.Intent) != 0 || s.Sequence != 0 {
 		return s, ErrInvalid
+	}
+	if adopt && s.Format == renewedFormat {
+		a.authority = bytes.Clone(s.Authority)
+		a.observation = bytes.Clone(s.Observation)
+		a.grant = current
 	}
 	return s, nil
 }
@@ -444,6 +466,9 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 			return ingress.ErrConflict
 		}
 		s.Phase, s.Intent = "PREPARING", bytes.Clone(raw)
+		if s.Format == renewedFormat {
+			s.IntentAuthority = bytes.Clone(a.authority)
+		}
 		if e = a.save(s); e != nil {
 			return e
 		}
@@ -467,7 +492,7 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 }
 
 func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), error) {
-	i, e := a.intent(s.Intent, false)
+	i, e := a.stateIntent(s)
 	if e != nil {
 		return nil, nil, e
 	}
@@ -625,9 +650,12 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 		if e != nil {
 			return e
 		}
-		out = Status{Format: Format, Profile: a.b.Profile.ID, Phase: s.Phase, Sequence: s.Sequence, Generation: s.Generation}
+		out = Status{Format: s.Format, Profile: a.b.Profile.ID, Phase: s.Phase, Sequence: s.Sequence, Generation: s.Generation}
+		if s.Format == renewedFormat {
+			out.AuthorityRevision = a.grant.Revision
+		}
 		if len(s.Intent) != 0 {
-			i, e := a.intent(s.Intent, false)
+			i, e := a.stateIntent(s)
 			if e != nil {
 				return e
 			}

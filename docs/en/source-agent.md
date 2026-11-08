@@ -28,3 +28,19 @@ outpost source-checkpoint --bootstrap /private/source.json --output /private/che
 Signed agent state fences the operation before provider preparation. Signed file results and encrypted accepted-pack progress survive restart. The source is never reopened after sealing. A lost final head update resumes the completed job and exports its verified checkpoint/lineage. The cache holds encrypted metadata/progress rather than a complete payload copy. Quotas and reconciliation preserve unaccepted files instead of deleting them.
 
 Status exposes opaque identities, phases and copy observations without source names or keys. SIGINT/SIGTERM preserve durable progress. A joined volume monitor cancels outstanding HTTPS requests after identity loss; forcibly interrupting a filesystem call stuck inside the kernel is not promised. Checkpoint output uses a new private file without overwrite. Independent recovery also needs the file-kit recovery owner, public generation trust and complete ciphertext; a checkpoint or source cache alone is not a backup.
+
+## Renewing source authority
+
+`source-renew` accepts a separately owner-signed grant with a higher revision and current validity. Pause the foreground scheduler and wait for the source to be `IDLE` or `COMPLETE` first. The command holds the same execution lease as capture, preserves the generation head and schedule, and refuses a pending `PREPARING` or `ACTIVE` operation. It does not extend an immutable intent or discard work whose grant has expired.
+
+```sh
+outpost source-renew --bootstrap /private/source.json \
+  --input /private/renewed-authority.json
+outpost source-status --bootstrap /private/source.json
+```
+
+Keep the original bootstrap, `authorityFile` and `observationFile` unchanged as installation anchors. Current signed grants live in the agent journal after renewal; replacing the original files changes the installation binding and is rejected. A two-copy source can supply `--trust /private/renewed-observation.json` with a nondecreasing observation epoch. Its collector, reader, targets and freshness bound remain identical. Source, ingress, domain, repository, keys, limits and selection also remain unchanged; a renewal cannot expand their scope. Admit the corresponding receiver capability separately before sending the next generation.
+
+The first renewal explicitly migrates signed runtime state from `outpost-source-agent-1` to `outpost-source-agent-2`. The bootstrap format stays at version 1. An exact signed version-1 checkpoint is retained under its digest before the atomic journal replacement. Later renewals preserve that checkpoint. Completed intents retain their original authority so old generations and receipts remain verifiable. Restart/reopen the source process after renewal; an already-open process returns `AUTHORITY_CHANGED` rather than continuing with stale authority. Repeating identical current input is idempotent; lower revisions or altered content at the same revision are refused.
+
+The previous executable refuses the migrated journal. Downgrading the executable or replacing the active journal with its historical checkpoint is not a supported rollback. Preserve the entire runtime and use a compatible executable; independent ciphertext recovery remains available with its recovery material. Short checks cover old/new independent restoration, actual process kills on both sides of publication, and refusal by the previous CLI without changing the migrated head. Expired pending-operation resolution and recovery after loss of the whole source journal remain open work.
