@@ -20,7 +20,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -43,7 +43,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-03",
@@ -102,7 +102,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -145,7 +145,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -192,7 +192,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-06",
@@ -210,7 +210,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -336,10 +336,14 @@
         {
           "path": "internal/sourceagent/recovery_cli_linux_test.go",
           "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-09",
@@ -540,7 +544,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, receiver authority rotation in the existing registry, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
@@ -745,6 +749,26 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalRevalidatesAfterLeaseWait"
+        },
+        {
+          "path": "internal/ingress/settlement_linux_test.go",
+          "name": "TestSettlementCapabilityDoesNotRenewOriginalWriteIntent"
+        },
+        {
+          "path": "internal/ingress/settlement_linux_test.go",
+          "name": "TestSettlementCapabilityRejectsScopeSubstitutionAndAmbiguousDocuments"
+        },
+        {
+          "path": "internal/control/settlement_linux_test.go",
+          "name": "TestSettlementControlFormatPreservesCurrentPlacementAndLegacySignatures"
+        },
+        {
+          "path": "internal/worker/settlement_linux_test.go",
+          "name": "TestWorkerSettlementReopensSameExpiredSlotAndRevokesSlowAcknowledgement"
+        },
+        {
+          "path": "internal/sourceagent/settlement_cli_linux_test.go",
+          "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1375,6 +1399,54 @@
         {
           "path": "internal/recoverybundle/crash_linux_test.go",
           "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
+        },
+        {
+          "path": "internal/ingress/settlement_linux_test.go",
+          "name": "TestSettlementCapabilityDoesNotRenewOriginalWriteIntent"
+        },
+        {
+          "path": "internal/ingress/settlement_linux_test.go",
+          "name": "TestSettlementCapabilityRejectsScopeSubstitutionAndAmbiguousDocuments"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSReopensExpiredAuthorityAndKeepsOriginalReceipt"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSNeverCreatesReceiptOrHistoricalSlot"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSRequiresProvisionedExactGrantAndCurrentOwner"
+        },
+        {
+          "path": "internal/worker/settlement_linux_test.go",
+          "name": "TestWorkerSettlementReopensSameExpiredSlotAndRevokesSlowAcknowledgement"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementRequiresDurableReceiptAndExactPendingGeneration"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementDoesNotBypassExpiredSecondCopyPermission"
+        },
+        {
+          "path": "internal/sourceagent/settlement_crash_linux_test.go",
+          "name": "TestSourceSettlementSIGKILLResumesReceiptCheckpointAndFinalHead"
+        },
+        {
+          "path": "internal/sourceagent/settlement_crash_linux_test.go",
+          "name": "TestSourceSettlementRechecksExpiryAfterExecutionLeaseWait"
+        },
+        {
+          "path": "internal/sourceagent/settlement_cli_linux_test.go",
+          "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1799,6 +1871,30 @@
         {
           "path": "internal/sourceagent/recovery_linux_test.go",
           "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSReopensExpiredAuthorityAndKeepsOriginalReceipt"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSNeverCreatesReceiptOrHistoricalSlot"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSRequiresProvisionedExactGrantAndCurrentOwner"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementRequiresDurableReceiptAndExactPendingGeneration"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementDoesNotBypassExpiredSecondCopyPermission"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -2680,6 +2776,10 @@
         {
           "path": "internal/sourceagent/recovery_cli_linux_test.go",
           "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations"
         }
       ],
       "acceptance": ["AT-24"],
@@ -4010,6 +4110,10 @@
         {
           "path": "cmd/outpost/recovery_package_linux_test.go",
           "name": "TestCLIOwnerRecoveryPackageContractAndRedactedErrors"
+        },
+        {
+          "path": "internal/sourceagent/settlement_cli_linux_test.go",
+          "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -4304,6 +4408,14 @@
         {
           "path": "internal/recoverybundle/crash_linux_test.go",
           "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
+        },
+        {
+          "path": "internal/sourceagent/settlement_crash_linux_test.go",
+          "name": "TestSourceSettlementSIGKILLResumesReceiptCheckpointAndFinalHead"
+        },
+        {
+          "path": "internal/sourceagent/settlement_crash_linux_test.go",
+          "name": "TestSourceSettlementRechecksExpiryAfterExecutionLeaseWait"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -4900,6 +5012,14 @@
         {
           "path": "internal/sourceagent/recovery_cli_linux_test.go",
           "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
+        },
+        {
+          "path": "internal/control/settlement_linux_test.go",
+          "name": "TestSettlementControlFormatPreservesCurrentPlacementAndLegacySignatures"
+        },
+        {
+          "path": "internal/sourceagent/settlement_cli_linux_test.go",
+          "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -5629,6 +5749,50 @@
         {
           "path": "cmd/outpost/recovery_package_linux_test.go",
           "name": "TestCLIOwnerRecoveryPackageContractAndRedactedErrors"
+        },
+        {
+          "path": "internal/ingress/settlement_linux_test.go",
+          "name": "TestSettlementCapabilityDoesNotRenewOriginalWriteIntent"
+        },
+        {
+          "path": "internal/ingress/settlement_linux_test.go",
+          "name": "TestSettlementCapabilityRejectsScopeSubstitutionAndAmbiguousDocuments"
+        },
+        {
+          "path": "internal/control/settlement_linux_test.go",
+          "name": "TestSettlementControlFormatPreservesCurrentPlacementAndLegacySignatures"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSReopensExpiredAuthorityAndKeepsOriginalReceipt"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSNeverCreatesReceiptOrHistoricalSlot"
+        },
+        {
+          "path": "internal/ingress/settlement_http_linux_test.go",
+          "name": "TestSettlementHTTPSRequiresProvisionedExactGrantAndCurrentOwner"
+        },
+        {
+          "path": "internal/worker/settlement_linux_test.go",
+          "name": "TestWorkerSettlementReopensSameExpiredSlotAndRevokesSlowAcknowledgement"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementRequiresDurableReceiptAndExactPendingGeneration"
+        },
+        {
+          "path": "internal/sourceagent/settlement_linux_test.go",
+          "name": "TestSourceSettlementDoesNotBypassExpiredSecondCopyPermission"
+        },
+        {
+          "path": "internal/sourceagent/settlement_crash_linux_test.go",
+          "name": "TestSourceSettlementSIGKILLResumesReceiptCheckpointAndFinalHead"
+        },
+        {
+          "path": "internal/sourceagent/settlement_crash_linux_test.go",
+          "name": "TestSourceSettlementRechecksExpiryAfterExecutionLeaseWait"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -5814,6 +5978,10 @@
         {
           "path": "cmd/outpost/recovery_package_linux_test.go",
           "name": "TestCLIOwnerRecoveryPackageContractAndRedactedErrors"
+        },
+        {
+          "path": "internal/sourceagent/settlement_cli_linux_test.go",
+          "name": "TestSourceSettlementCLIUsesCurrentWorkerAndPreviousFormatFence"
         }
       ],
       "acceptance": ["AT-31"],

@@ -98,11 +98,14 @@ func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	}
 	return current, nil
 }
-func (a *Agent) stateIntent(s state) (ingress.Intent, error) {
-	raw := a.authority
+func (a *Agent) intentAuthority(s state) []byte {
 	if s.Format == renewedFormat {
-		raw = s.IntentAuthority
+		return s.IntentAuthority
 	}
+	return a.authority
+}
+func (a *Agent) stateIntent(s state) (ingress.Intent, error) {
+	raw := a.intentAuthority(s)
 	var i ingress.Intent
 	if storage.Decode(s.Intent, &i, ingress.MaxDocument) != nil {
 		return i, ErrInvalid

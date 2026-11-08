@@ -65,9 +65,13 @@ type CopyReceipt struct {
 	SignedObservation string `json:"signedObservation,omitempty"`
 }
 type Options struct {
-	Parent            *os.Root
-	Directory         string
-	Initialize        bool
+	Parent     *os.Root
+	Directory  string
+	Initialize bool
+	// ReadOnly permits inspecting authenticated expired local history only.
+	ReadOnly bool
+	// Settlement is a fresh, exact receipt-only capability, never an intent renewal.
+	Settlement        []byte
 	Profile           Profile
 	Authority, Intent []byte
 	Owner             ed25519.PublicKey
@@ -145,6 +149,14 @@ func phase(p string) int {
 	return -1
 }
 func Open(ctx context.Context, o Options) (*Job, error) {
+	if (o.ReadOnly || len(o.Settlement) != 0) && o.Initialize || o.ReadOnly && len(o.Settlement) != 0 {
+		return nil, ErrInvalid
+	}
+	if len(o.Settlement) != 0 {
+		if _, e := ingress.VerifySettlement(o.Settlement, o.Authority, o.Intent, o.Owner, time.Now()); e != nil {
+			return nil, e
+		}
+	}
 	i, a, e := ingress.VerifyIntent(o.Intent, o.Authority, o.Owner, time.Now())
 	currentError := e
 	if e != nil {
@@ -200,6 +212,7 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 	j.options.Intent = frozen.Intent
 	j.options.Previous = frozen.Previous
 	j.options.Owner = bytes.Clone(o.Owner)
+	j.options.Settlement = bytes.Clone(o.Settlement)
 	j.options.Writer = bytes.Clone(o.Writer)
 	j.options.Data.Master = bytes.Clone(o.Data.Master)
 	j.root, e = localfs.Directory(o.Parent, o.Directory, o.Initialize)
@@ -246,7 +259,12 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 		if phase(s.Phase) >= phase("SEALED") && s.CompletedFiles != len(j.plan.Files) {
 			return ErrInvalid
 		}
-		if currentError != nil && phase(s.Phase) < phase("CHECKPOINTED") {
+		if len(o.Settlement) != 0 {
+			if e = j.settlementState(s); e != nil {
+				return e
+			}
+		}
+		if currentError != nil && !o.ReadOnly && len(o.Settlement) == 0 && phase(s.Phase) < phase("CHECKPOINTED") {
 			return currentError
 		}
 		if phase(s.Phase) >= phase("CHECKPOINTED") {
@@ -261,6 +279,9 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 }
 func (j *Job) admission(prefix string) statefile.Admission {
 	return func(name string, size int) (func(bool) error, error) {
+		if j.options.ReadOnly {
+			return nil, ErrInvalid
+		}
 		if e := j.guard(context.Background()); e != nil {
 			return nil, e
 		}
@@ -280,6 +301,11 @@ func (j *Job) guard(ctx context.Context) error {
 	}
 	if e := ctx.Err(); e != nil {
 		return e
+	}
+	if len(j.options.Settlement) != 0 {
+		if _, e := ingress.VerifySettlement(j.options.Settlement, j.options.Authority, j.options.Intent, j.options.Owner, time.Now()); e != nil {
+			return e
+		}
 	}
 	if j.options.Guard != nil {
 		return j.options.Guard(ctx)
@@ -408,6 +434,18 @@ func (j *Job) prepare(ctx context.Context) error {
 // Run holds the operation lease. After SEALED it never reopens the source view.
 // A failed provider release stays RELEASING and is retried before any ack.
 func (j *Job) Run(ctx context.Context) error {
+	if j.options.ReadOnly {
+		return ErrInvalid
+	}
+	if len(j.options.Settlement) != 0 {
+		g, e := ingress.VerifySettlement(j.options.Settlement, j.options.Authority, j.options.Intent, j.options.Owner, time.Now())
+		if e != nil {
+			return e
+		}
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, time.Unix(g.ExpiresUnix, 0))
+		defer cancel()
+	}
 	return j.lease.WithLock(ctx, func() error {
 		if e := j.guard(ctx); e != nil {
 			return e
@@ -416,10 +454,20 @@ func (j *Job) Run(ctx context.Context) error {
 		if e != nil {
 			return e
 		}
+		if len(j.options.Settlement) != 0 {
+			if e = j.settlementState(s); e != nil {
+				return e
+			}
+		}
 		if s.Phase == "COMPLETE" {
 			return nil
 		}
-		if phase(s.Phase) < phase("CHECKPOINTED") {
+		if len(j.options.Settlement) != 0 && phase(s.Phase) < phase("CHECKPOINTED") {
+			if e = j.settleReceipt(ctx, &s); e != nil {
+				return e
+			}
+		}
+		if len(j.options.Settlement) == 0 && phase(s.Phase) < phase("CHECKPOINTED") {
 			if _, _, e = ingress.VerifyIntent(j.options.Intent, j.options.Authority, j.options.Owner, time.Now()); e != nil {
 				return e
 			}

@@ -443,6 +443,9 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 			return fail(e)
 		}
 	}
+	if e := w.openSettlements(v); e != nil {
+		return fail(e)
+	}
 	if e := w.admit(ctx, c); e != nil {
 		return fail(e)
 	}

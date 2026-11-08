@@ -35,6 +35,9 @@ type RegistryOptions struct {
 	Roots       *x509.CertPool
 	Limits      peer.Limits
 	Initialize  bool
+	// Settlement reopens only the exact existing historical slot. It cannot
+	// initialize a registry or authorize any payload route.
+	Settlement, SettlementIntent []byte
 	// Prefix is relative to the caller's shared capacity ledger.
 	Admission    func(prefix string) statefile.Admission
 	RemoveObject func(context.Context, string, int64) error
@@ -86,6 +89,17 @@ func (g *Registry) save() error {
 }
 func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	a, e := VerifyAuthority(o.Authority, o.Owner, time.Now())
+	if len(o.Settlement) != 0 {
+		if o.Initialize {
+			return nil, ErrDenied
+		}
+		if _, err := VerifySettlement(o.Settlement, o.Authority, o.SettlementIntent, o.Owner, time.Now()); err != nil {
+			return nil, err
+		}
+		a, e = VerifyAuthorityDocument(o.Authority, o.Owner)
+	} else if len(o.SettlementIntent) != 0 {
+		return nil, ErrDenied
+	}
 	if e != nil {
 		return nil, e
 	}
@@ -135,6 +149,8 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 	}
 	o.Authority = bytes.Clone(o.Authority)
 	o.Owner = bytes.Clone(o.Owner)
+	o.Settlement = bytes.Clone(o.Settlement)
+	o.SettlementIntent = bytes.Clone(o.SettlementIntent)
 	owned = true
 	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
 	fail := func(e error) (*Registry, error) { g.Close(); return nil, e }
@@ -165,6 +181,9 @@ func OpenRegistry(ctx context.Context, o RegistryOptions) (*Registry, error) {
 				return fail(ErrConflict)
 			}
 		}
+	}
+	if len(o.Settlement) != 0 && !bytes.Equal(g.state.Intent, o.SettlementIntent) {
+		return fail(ErrConflict)
 	}
 	if e = ctx.Err(); e != nil {
 		return fail(e)
@@ -362,6 +381,10 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if len(g.options.Settlement) != 0 {
+		g.serveSettlement(w, r)
+		return
+	}
 	now := time.Now()
 	if _, e := VerifyAuthority(g.options.Authority, g.options.Owner, now); e != nil {
 		fail(w, e)

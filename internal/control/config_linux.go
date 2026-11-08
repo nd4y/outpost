@@ -19,6 +19,7 @@ import (
 )
 
 const Format = "outpost-control-1"
+const SettlementConfigFormat = "outpost-control-2"
 const MaxConfig = 32 << 20
 
 var ErrDenied = errors.New("configuration denied")
@@ -71,22 +72,23 @@ type Job struct {
 	Repair       string          `json:"repair,omitempty"`
 }
 type Config struct {
-	Format       string            `json:"format"`
-	Node         string            `json:"node"`
-	Revision     uint64            `json:"revision"`
-	NotBefore    int64             `json:"notBefore"`
-	ExpiresUnix  int64             `json:"expiresUnix"`
-	Limits       Limits            `json:"limits"`
-	Nodes        []policy.Node     `json:"nodes"`
-	Targets      []Target          `json:"targets"`
-	Domains      []Domain          `json:"domains"`
-	Jobs         []Job             `json:"jobs"`
-	Ingress      []json.RawMessage `json:"ingress,omitempty"`
-	Replication  []Replication     `json:"replication,omitempty"`
-	Observations []json.RawMessage `json:"observations,omitempty"`
-	Uploads      []json.RawMessage `json:"uploads,omitempty"`
-	Commands     []json.RawMessage `json:"commands,omitempty"`
-	Signature    []byte            `json:"signature,omitempty"`
+	Format       string                `json:"format"`
+	Node         string                `json:"node"`
+	Revision     uint64                `json:"revision"`
+	NotBefore    int64                 `json:"notBefore"`
+	ExpiresUnix  int64                 `json:"expiresUnix"`
+	Limits       Limits                `json:"limits"`
+	Nodes        []policy.Node         `json:"nodes"`
+	Targets      []Target              `json:"targets"`
+	Domains      []Domain              `json:"domains"`
+	Jobs         []Job                 `json:"jobs"`
+	Ingress      []json.RawMessage     `json:"ingress,omitempty"`
+	Settlements  []SettlementAdmission `json:"settlements,omitempty"`
+	Replication  []Replication         `json:"replication,omitempty"`
+	Observations []json.RawMessage     `json:"observations,omitempty"`
+	Uploads      []json.RawMessage     `json:"uploads,omitempty"`
+	Commands     []json.RawMessage     `json:"commands,omitempty"`
+	Signature    []byte                `json:"signature,omitempty"`
 }
 
 func (c Config) NodeByID(id string) (policy.Node, bool) {
@@ -120,7 +122,7 @@ func (c Config) Active(now time.Time) error {
 	return nil
 }
 func (c Config) validate(owner ed25519.PublicKey) error {
-	if c.Format != Format || !storage.ID(c.Node) || c.Revision == 0 || c.NotBefore <= 0 || c.ExpiresUnix <= c.NotBefore || c.ExpiresUnix > 1<<40 || c.Limits.Validate() != nil || len(c.Nodes) < 1 || len(c.Nodes) > 128 || len(c.Targets) > 128 || len(c.Domains) > 128 || len(c.Jobs) > 64 || len(c.Ingress) > 128 || len(c.Replication) > 128 {
+	if (c.Format != Format && c.Format != SettlementConfigFormat) || (c.Format == Format && len(c.Settlements) != 0) || !storage.ID(c.Node) || c.Revision == 0 || c.NotBefore <= 0 || c.ExpiresUnix <= c.NotBefore || c.ExpiresUnix > 1<<40 || c.Limits.Validate() != nil || len(c.Nodes) < 1 || len(c.Nodes) > 128 || len(c.Targets) > 128 || len(c.Domains) > 128 || len(c.Jobs) > 64 || len(c.Ingress) > 128 || len(c.Settlements) > 128 || len(c.Replication) > 128 {
 		return ErrDenied
 	}
 	nodes := map[string]policy.Node{}
@@ -239,6 +241,9 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		}
 		grants[binding] = true
 	}
+	if e := c.validateSettlements(owner, grants); e != nil {
+		return e
+	}
 	for _, j := range c.Jobs {
 		d, ok := domains[j.Domain]
 		if !ok || j.Delegation != "" || !storage.ID(j.Operation) || !storage.ID(j.Generation) || operations[j.Operation] || !d.Placement.PermitsNode(c.Node) || !d.Placement.PermitsNode(j.Executor) {
@@ -311,7 +316,7 @@ func Sign(c Config, key ed25519.PrivateKey) ([]byte, error) {
 	if e != nil || len(b) > MaxConfig-128 {
 		return nil, ErrDenied
 	}
-	c.Signature = ed25519.Sign(key, append([]byte(Format+"\x00"), b...))
+	c.Signature = ed25519.Sign(key, append([]byte(c.Format+"\x00"), b...))
 	return json.Marshal(c)
 }
 func Verify(raw []byte, owner ed25519.PublicKey, node string) (Config, error) {
@@ -323,7 +328,7 @@ func Verify(raw []byte, owner ed25519.PublicKey, node string) (Config, error) {
 	c.Signature = nil
 	b, e := json.Marshal(c)
 	c.Signature = sig
-	if e != nil || !ed25519.Verify(owner, append([]byte(Format+"\x00"), b...), sig) {
+	if e != nil || !ed25519.Verify(owner, append([]byte(c.Format+"\x00"), b...), sig) {
 		return Config{}, ErrDenied
 	}
 	if e = c.validate(owner); e != nil {

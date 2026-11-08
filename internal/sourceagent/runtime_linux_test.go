@@ -17,6 +17,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,9 +55,15 @@ type fixture struct {
 	destination, replicaCertificate tls.Certificate
 	roots                           *x509.CertPool
 	intercept                       func(http.ResponseWriter, *http.Request) bool
+	registry                        *ingress.Registry
+	registryMu                      sync.RWMutex
+	replica                         *generation.Replica
 }
 
 func newFixture(t *testing.T) *fixture {
+	return newFixtureLifetime(t, 1800)
+}
+func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	f := &fixture{base: teststore.Root(t)}
@@ -109,22 +116,26 @@ func newFixture(t *testing.T) *fixture {
 	f.owner, e = filekit.NewOwner()
 	must(t, e)
 	trust := generation.Trust{Domain: f.owner.Domain, Repository: storage.Hash([]byte("repo")), Epoch: 1, Writer: writer, Maintenance: maint}
-	f.grant = ingress.Authority{Format: ingress.AuthorityFormat, Tenant: storage.Hash([]byte("tenant")), Profile: storage.Hash([]byte("profile")), Source: id(src), Ingress: id(dst), Revision: 1, NotBefore: now.Unix() - 10, ExpiresUnix: now.Unix() + 1800, Trust: trust, MaxBytes: 32 << 20, MaxObjects: 128}
+	f.grant = ingress.Authority{Format: ingress.AuthorityFormat, Tenant: storage.Hash([]byte("tenant")), Profile: storage.Hash([]byte("profile")), Source: id(src), Ingress: id(dst), Revision: 1, NotBefore: now.Unix() - 10, ExpiresUnix: now.Unix() + seconds, Trust: trust, MaxBytes: 32 << 20, MaxObjects: 128}
 	f.authority, e = ingress.SignAuthority(f.grant, ownerKey)
 	must(t, e)
 	f.replicaPath = filepath.Join(f.base, "replica")
 	must(t, os.Mkdir(f.replicaPath, 0700))
 	r, e := generation.Open(f.replicaPath, trust, true)
 	must(t, e)
+	f.replica = r
 	t.Cleanup(func() { r.Close() })
 	g, e := ingress.OpenRegistry(ctx, ingress.RegistryOptions{Directory: filepath.Join(f.base, "registry"), Authority: f.authority, Owner: ownerPub, Replica: r, Certificate: dst, Roots: roots, Limits: peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1}, Initialize: true})
 	must(t, e)
-	t.Cleanup(func() { g.Close() })
+	f.registry = g
+	t.Cleanup(func() { f.registry.Close() })
 	s := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.registryMu.RLock()
+		defer f.registryMu.RUnlock()
 		if f.intercept != nil && f.intercept(w, r) {
 			return
 		}
-		g.ServeHTTP(w, r)
+		f.registry.ServeHTTP(w, r)
 	}))
 	s.TLS, e = peer.AuthenticatedServerTLS(dst, roots, id(dst))
 	must(t, e)

@@ -248,7 +248,7 @@ func copyELF(out io.Writer, in io.Reader, size int64, arch string) error {
 	if arch == "arm64" {
 		machine = 183
 	}
-	if !bytes.Equal(header[:4], []byte{0x7f, 'E', 'L', 'F'}) || header[4] != 2 || header[5] != 1 || binary.LittleEndian.Uint16(header[18:20]) != machine {
+	if !bytes.Equal(header[:7], []byte{0x7f, 'E', 'L', 'F', 2, 1, 1}) || binary.LittleEndian.Uint16(header[18:20]) != machine {
 		return ErrInvalid
 	}
 	offset := binary.LittleEndian.Uint64(header[32:40])

@@ -71,3 +71,20 @@ jobs:
           go test -count=1 -timeout=150s \
             -run 'RecoveryPackage|SourceRecoveryExport|SourceRecoveryPackage|CLIOwnerRecoveryPackage' \
             -v ./internal/recoverybundle ./internal/sourceagent ./cmd/outpost
+      - name: Settle an expired source through the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/settlement-previous-source"
+          git archive 4d5618405578a7958265446e42a675d3920cca2a | tar -xf - -C "$RUNNER_TEMP/settlement-previous-source"
+          go -C "$RUNNER_TEMP/settlement-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/settlement-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/settlement-tests"
+          export TMPDIR="$RUNNER_TEMP/settlement-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_SETTLEMENT_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_SETTLEMENT_PREVIOUS_CLI="$RUNNER_TEMP/settlement-previous"
+          export OUTPOST_SETTLEMENT_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_SETTLEMENT_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_SETTLEMENT_CURRENT_CLI" version
+          go test -count=1 -timeout=180s -run 'Settlement|SourceAgentSIGKILLChild' \
+            -v ./internal/sourceagent ./internal/worker ./internal/control ./internal/ingress

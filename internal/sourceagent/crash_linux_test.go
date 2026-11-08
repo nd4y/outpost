@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/nd4y/outpost/internal/control"
 )
 
 func TestSourceAgentSIGKILLChild(t *testing.T) {
@@ -17,9 +19,10 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 		t.Skip("child only")
 	}
 	var input struct {
-		Bootstrap Bootstrap
-		Point     string
-		Schedule  bool
+		Bootstrap  Bootstrap
+		Point      string
+		Schedule   bool
+		Settlement *control.SettlementAdmission
 	}
 	raw, e := os.ReadFile(file)
 	must(t, e)
@@ -35,7 +38,9 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 		}
 		return nil
 	}
-	if input.Schedule {
+	if input.Settlement != nil {
+		must(t, a.Settle(ctx, *input.Settlement))
+	} else if input.Schedule {
 		must(t, a.RunSchedule(ctx))
 	} else {
 		must(t, a.Next(ctx))

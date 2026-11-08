@@ -510,14 +510,28 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 }
 
 func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), error) {
+	return a.openJobMode(ctx, s, false, nil)
+}
+func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settlement []byte) (*capture.Job, func(), error) {
+	if s.Phase == "PREPARING" && (inspect || len(settlement) != 0) {
+		return nil, nil, ErrInvalid
+	}
 	i, e := a.stateIntent(s)
 	if e != nil {
 		return nil, nil, e
 	}
 	limits := peer.Limits{Concurrency: 1, Timeout: 30 * time.Second, Attempts: 1}
-	client, e := ingress.NewClient(a.b.Endpoint, a.authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
-	if e != nil && s.Phase != "PREPARING" {
-		client, e = ingress.NewCleanupClient(a.b.Endpoint, a.authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+	authority := a.intentAuthority(s)
+	var client *ingress.Client
+	if len(settlement) != 0 {
+		client, e = ingress.NewSettlementClient(a.b.Endpoint, authority, s.Intent, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
+	} else if inspect {
+		client, e = ingress.NewCleanupClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+	} else {
+		client, e = ingress.NewClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+		if e != nil && s.Phase != "PREPARING" {
+			client, e = ingress.NewCleanupClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+		}
 	}
 	if e != nil {
 		return nil, nil, e
@@ -582,7 +596,7 @@ func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), err
 	if len(a.observation) > 0 {
 		copies = a.copies
 	}
-	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, Profile: p, Authority: a.authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: client, Cache: cache, Previous: previous, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
+	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, ReadOnly: inspect, Settlement: settlement, Profile: p, Authority: authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: client, Cache: cache, Previous: previous, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
 	if e != nil {
 		cache.Close()
 		provider.Close()
@@ -597,6 +611,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	return a.lease.WithLock(ctx, func() error { return a.run(ctx) })
 }
 func (a *Agent) run(ctx context.Context) error {
+	return a.runSettlement(ctx, nil)
+}
+func (a *Agent) runSettlement(ctx context.Context, grant []byte) error {
 	if e := a.guard(ctx); e != nil {
 		return e
 	}
@@ -629,7 +646,7 @@ func (a *Agent) run(ctx context.Context) error {
 		}
 	}()
 	defer func() { cancel(nil); <-joined }()
-	job, close, e := a.openJob(ctx, s)
+	job, close, e := a.openJobMode(ctx, s, false, grant)
 	if e != nil {
 		return e
 	}
@@ -654,6 +671,14 @@ func (a *Agent) run(ctx context.Context) error {
 	s.Phase, s.Sequence, s.Generation, s.Previous, s.Checkpoint = "COMPLETE", c.Sequence, c.Generation, heads, checkpoint
 	if e = a.point("source-agent-before-head"); e != nil {
 		return e
+	}
+	if len(grant) != 0 {
+		if e = a.guard(ctx); e != nil {
+			return e
+		}
+		if _, e = ingress.VerifySettlement(grant, a.intentAuthority(s), s.Intent, a.b.Local.Owner, time.Now()); e != nil {
+			return e
+		}
 	}
 	return a.save(s)
 }
@@ -680,7 +705,7 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 			out.Operation = i.Operation
 		}
 		if s.Phase == "ACTIVE" {
-			job, close, e := a.openJob(ctx, s)
+			job, close, e := a.openJobMode(ctx, s, true, nil)
 			if e != nil {
 				return e
 			}

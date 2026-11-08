@@ -16,7 +16,7 @@ import (
 )
 
 func TestRecoveryPackageRejectsSelectedToolsWithUnsafeSemantics(t *testing.T) {
-	for _, kind := range []string{"wrong-machine", "dynamic-interpreter", "symlink", "duplicate", "extra-gzip-member", "extra-padding", "duplicate-manifest-key", "unknown-manifest-key", "wrong-source-digest"} {
+	for _, kind := range []string{"wrong-machine", "invalid-elf-version", "dynamic-interpreter", "symlink", "duplicate", "extra-gzip-member", "extra-padding", "duplicate-manifest-key", "unknown-manifest-key", "wrong-source-digest", "wrong-development-revision"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
 			manifestPath := filepath.Join(f.options.ToolsDirectory, "manifest.json")
@@ -41,9 +41,11 @@ func TestRecoveryPackageRejectsSelectedToolsWithUnsafeSemantics(t *testing.T) {
 				must(t, e)
 				data, e := io.ReadAll(r)
 				must(t, e)
-				if h.Name == "outpost" && (kind == "wrong-machine" || kind == "dynamic-interpreter") {
+				if h.Name == "outpost" && (kind == "wrong-machine" || kind == "invalid-elf-version" || kind == "dynamic-interpreter") {
 					if kind == "wrong-machine" {
 						binary.LittleEndian.PutUint16(data[18:], 183)
+					} else if kind == "invalid-elf-version" {
+						data[6] = 2
 					} else {
 						binary.LittleEndian.PutUint32(data[64:], 3)
 					}
@@ -79,6 +81,10 @@ func TestRecoveryPackageRejectsSelectedToolsWithUnsafeSemantics(t *testing.T) {
 			must(t, os.WriteFile(archivePath, archive, 0600))
 			if kind == "wrong-source-digest" {
 				m.SourceDigest = storage.Hash([]byte("unrelated-source"))
+			}
+			if kind == "wrong-development-revision" {
+				m.Revision = "dev-" + storage.Hash([]byte("unrelated-source"))
+				f.options.Revision = m.Revision
 			}
 			raw = encoded(t, m)
 			if kind == "duplicate-manifest-key" {

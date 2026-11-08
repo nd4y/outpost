@@ -251,6 +251,7 @@ type Client struct {
 	authority, intentRaw         []byte
 	owner                        ed25519.PublicKey
 	cleanup                      bool
+	settlement                   []byte
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
 type countedBody struct {
@@ -306,10 +307,19 @@ func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	now := time.Now()
 	ack := resource == "ack" && method == http.MethodPut
-	if c.cleanup && !ack {
+	settling := len(c.settlement) != 0
+	if (c.cleanup || settling) && !ack && !(settling && resource == "receipt" && method == http.MethodGet) {
 		return 0, nil, nil, ErrDenied
 	}
-	if !ack {
+	var grant Settlement
+	if settling {
+		var e error
+		grant, e = VerifySettlement(c.settlement, c.authority, c.intentRaw, c.owner, now)
+		if e != nil {
+			return 0, nil, nil, e
+		}
+	}
+	if !ack && !settling {
 		if _, _, e := VerifyIntent(c.intentRaw, c.authority, c.owner, now); e != nil {
 			return 0, nil, nil, e
 		}
@@ -318,8 +328,11 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		return 0, nil, nil, ErrDenied
 	}
 	deadline := time.Unix(c.intent.ExpiresUnix, 0)
-	if ack {
+	if ack || settling {
 		deadline = c.cert.NotAfter
+	}
+	if settling && time.Unix(grant.ExpiresUnix, 0).Before(deadline) {
+		deadline = time.Unix(grant.ExpiresUnix, 0)
 	}
 	if c.cert.NotAfter.Before(deadline) {
 		deadline = c.cert.NotAfter
@@ -337,6 +350,9 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		r.Body = http.NoBody
 	}
 	r.Header.Set("Outpost-Authority", c.intent.Authority)
+	if settling {
+		r.Header.Set("Outpost-Settlement", storage.Hash(c.settlement))
+	}
 	if ref != nil {
 		r.Header.Set("Outpost-Bytes", strconv.Itoa(ref.Bytes))
 	}
@@ -385,6 +401,11 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 	}
 	if !c.peerCurrent(response.TLS) {
 		return 0, nil, nil, ErrDenied
+	}
+	if settling {
+		if _, e = VerifySettlement(c.settlement, c.authority, c.intentRaw, c.owner, time.Now()); e != nil {
+			return 0, nil, nil, e
+		}
 	}
 	return response.StatusCode, response.Header, body, nil
 }
