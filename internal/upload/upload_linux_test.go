@@ -82,7 +82,7 @@ func fixtureBytes(t *testing.T, size int) *fixture {
 		t.Cleanup(func() { r.Close() })
 		pub, key, e := ed25519.GenerateKey(rand.Reader)
 		must(t, e)
-		f.workers = append(f.workers, Worker{Identity(pub), "trusted", pub})
+		f.workers = append(f.workers, Worker{ID: Identity(pub), Class: "trusted", PublicKey: pub})
 		f.keys = append(f.keys, key)
 	}
 	f.id, f.version = f.capture(t, 1, "")
@@ -406,9 +406,19 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 	}
 }
 func TestWorkerSIGKILLReassignmentAndRestart(t *testing.T) {
+	testWorkerSIGKILLReassignment(t, 0)
+}
+
+func TestWeightedWorkerSIGKILLReassignmentAndRestart(t *testing.T) {
+	testWorkerSIGKILLReassignment(t, MaxWorkerWeight)
+}
+
+func testWorkerSIGKILLReassignment(t *testing.T, weight int) {
+	t.Helper()
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
+			f.workers[0].Weight = weight
 			blocked := make(chan string, 1)
 			var once sync.Once
 			var enabled atomic.Bool

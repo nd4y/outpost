@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -18,6 +20,7 @@ import (
 const Format = "outpost-external-plan-1"
 const MaxPlan = 16 << 20
 const MaxTasks = 32768
+const MaxWorkerWeight = 4
 
 var ErrDenied = errors.New("upload plan or worker denied")
 var ErrConflict = errors.New("upload journal binding conflict")
@@ -26,6 +29,7 @@ type Worker struct {
 	ID        string            `json:"id"`
 	Class     string            `json:"class"`
 	PublicKey ed25519.PublicKey `json:"publicKey"`
+	Weight    int               `json:"weight,omitempty"`
 }
 
 func Identity(key ed25519.PublicKey) string {
@@ -85,7 +89,8 @@ func (p Plan) policy() error {
 	}
 	seen := map[string]bool{}
 	for _, w := range p.Workers {
-		if !storage.ID(w.ID) || Identity(w.PublicKey) != w.ID || seen[w.ID] || !allowed[w.Class] || w.Class == "untrusted" && p.Profile.CredentialScope != "namespace" {
+		if !storage.ID(w.ID) || Identity(w.PublicKey) != w.ID || seen[w.ID] || !allowed[w.Class] ||
+			w.Weight < 0 || w.Weight > MaxWorkerWeight || w.Class == "untrusted" && p.Profile.CredentialScope != "namespace" {
 			return ErrDenied
 		}
 		seen[w.ID] = true
@@ -267,11 +272,40 @@ func (p Plan) round(now time.Time) (int64, time.Time) {
 	return round, time.UnixMilli(p.StartMillis + (round+1)*p.SlotMillis)
 }
 func (p Plan) owner(object string, round int64) string {
-	workers := append([]Worker(nil), p.Workers...)
+	type rankedWorker struct {
+		id, rank string
+		weight   int
+	}
+	workers := make([]rankedWorker, 0, len(p.Workers))
+	maxWeight, total := 1, 0
+	for _, w := range p.Workers {
+		weight := max(1, w.Weight)
+		workers = append(workers, rankedWorker{w.ID, storage.Hash([]byte(p.Operation + "/" + object + "/" + w.ID)), weight})
+		maxWeight = max(maxWeight, weight)
+		total += weight
+	}
 	sort.Slice(workers, func(i, j int) bool {
-		return storage.Hash([]byte(p.Operation+"/"+object+"/"+workers[i].ID)) > storage.Hash([]byte(p.Operation+"/"+object+"/"+workers[j].ID))
+		return workers[i].rank > workers[j].rank
 	})
-	return workers[int(round%int64(len(workers)))].ID
+	if maxWeight == 1 || object == "publication" {
+		return workers[int(round%int64(len(workers)))].id
+	}
+	// Each part enters the same bounded weighted cycle at its own offset.
+	// Interleaving tiers gives all workers a slot even when a heavier worker fails.
+	digest := sha256.Sum256([]byte(p.Operation + "/weight/" + object))
+	period := uint64(total)
+	slot := (binary.BigEndian.Uint64(digest[:8])%period + uint64(round)%period) % period
+	for tier := 1; tier <= maxWeight; tier++ {
+		for _, w := range workers {
+			if w.weight >= tier {
+				if slot == 0 {
+					return w.id
+				}
+				slot--
+			}
+		}
+	}
+	return "" // unreachable for a valid, nonempty worker set
 }
 func sameTrust(a, b generation.Trust) bool {
 	left, _ := json.Marshal(a)

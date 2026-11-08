@@ -13,6 +13,63 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
+func TestSignedWeightedAssignmentsKeepEligibleFallbackAndLegacyPublication(t *testing.T) {
+	f := fixtureBytes(t, 128<<10)
+	target := f.server(t, "s3", 0, nil)
+	workers := append([]Worker(nil), f.workers...)
+	workers[0].Weight, workers[1].Weight = 4, 2
+	now := time.Now()
+	d := Delegation{Format: DelegationFormat, Trust: f.authority.Generation, Epoch: 1,
+		Profile: profile(target), AllowedClasses: []string{"trusted"}, Workers: workers,
+		StartMillis: now.UnixMilli(), ExpiresUnix: now.Add(time.Minute).Unix(), SlotMillis: 1000}
+	raw, err := SignDelegation(d, f.planner)
+	must(t, err)
+	ctx := context.Background()
+	first, err := BuildDerived(ctx, f.replicas[0], f.id, raw, f.authority)
+	must(t, err)
+	second, err := BuildDerived(ctx, f.replicas[1], f.id, raw, f.authority)
+	must(t, err)
+	if !bytes.Equal(first, second) {
+		t.Fatal("independent holders derived different weighted plans")
+	}
+	p, err := Verify(first, f.authority)
+	must(t, err)
+	legacy := p
+	legacy.Workers = append([]Worker(nil), f.workers...)
+	tasks, err := p.Tasks()
+	must(t, err)
+	for _, task := range tasks {
+		seen := map[string]int{}
+		for round := int64(0); round < 7; round++ {
+			owner := p.owner(task.Part.ID, round)
+			if owner != p.owner(task.Part.ID, round+7) {
+				t.Fatal("weighted assignment did not repeat after its bounded cycle")
+			}
+			seen[owner]++
+			if p.owner("publication", round) != legacy.owner("publication", round) {
+				t.Fatal("weight changed historical publication rotation")
+			}
+		}
+		for _, w := range workers {
+			if seen[w.ID] != max(1, w.Weight) {
+				t.Fatal("eligible worker lost a slot or received a different signed share", seen)
+			}
+		}
+	}
+	p.Workers[0].Weight = 3
+	tampered, err := json.Marshal(p)
+	must(t, err)
+	if _, err = Verify(tampered, f.authority); !errors.Is(err, ErrDenied) {
+		t.Fatal("worker altered its share outside the signed delegation", err)
+	}
+	for _, weight := range []int{-1, MaxWorkerWeight + 1} {
+		d.Workers[0].Weight = weight
+		if _, err = SignDelegation(d, f.planner); !errors.Is(err, ErrDenied) {
+			t.Fatal("out-of-range weight signed", weight, err)
+		}
+	}
+}
+
 func TestDelegatedPlansAreIdenticalAcrossReplicasAndRecoverBothProtocols(t *testing.T) {
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
