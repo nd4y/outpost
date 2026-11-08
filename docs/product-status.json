@@ -480,6 +480,10 @@
         {
           "path": "internal/sourceagent/prepared_cli_linux_test.go",
           "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -534,6 +538,10 @@
         {
           "path": "internal/recoverybundle/recovery_linux_test.go",
           "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-02", "AT-03"],
@@ -602,6 +610,10 @@
         {
           "path": "scripts/check-container.py",
           "name": "test_independent_recovery_after_source_removal"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12"],
@@ -2703,6 +2715,10 @@
         {
           "path": "internal/worker/planning_linux_test.go",
           "name": "TestWebDAVMoveAutonomousPlanningPublishesAndRestoresNewGenerations"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -3264,6 +3280,10 @@
         {
           "path": "internal/sourceagent/prepared_cli_linux_test.go",
           "name": "TestPreparedSourceCLIExportsNativeApplicationAndRejectsPreviousBootstrapReader"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-24"],
@@ -4674,6 +4694,10 @@
         {
           "path": "cmd/outpost/storage_mode_linux_test.go",
           "name": "TestCLIMoveProfileFencesPreviousWriter"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -5738,6 +5762,10 @@
           "name": "TestCLIMoveProfileFencesPreviousWriter"
         },
         {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
           "path": "internal/filekit/reference_linux_test.go",
           "name": "TestFrozenV1KitCreatedByPreviousImplementation"
         },
@@ -6625,6 +6653,10 @@
         {
           "path": "internal/storage/body_budget_test.go",
           "name": "TestHTTPBodyBudgetCloseCancelsReplayWaitingForAllowance"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -6834,6 +6866,10 @@
         {
           "path": "cmd/outpost/storage_mode_linux_test.go",
           "name": "TestCLIMoveProfileFencesPreviousWriter"
+        },
+        {
+          "path": "cmd/outpost/external_recovery_linux_test.go",
+          "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
       "acceptance": ["AT-31"],

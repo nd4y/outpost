@@ -82,6 +82,21 @@ Plans are limited to 16 MiB, 32768 distinct physical parts and 32 workers; journ
 
 The diagnostic probe is reused across retries and process restarts. Existing probes verify conflict rejection and readback, but do not prove permission to create a new object, account ACLs or physical durability. Each payload still requires its own verified upload/readback. Older random probe objects are preserved; this change performs no remote cleanup.
 
+## Independent external recovery
+
+Keep a private `outpost-external-recovery-1` JSON file with `format`, `target` (the expected profile ID), `profile` (the exact storage profile), `credentialFile` (an absolute path to read-only credentials) and optional `caFile` (an absolute path to trusted PEM roots). The credential file uses `access`, `secret`, `expiresUnix` and optional `sessionToken` for S3-compatible access. Keep the recovery owner kit and public generation trust separately. The external namespace must match that trust.
+
+```sh
+outpost restore-external --bootstrap /private/external-reader.json \
+  --key /private/recovery-owner.json --trust /private/generation-trust.json \
+  --generation EXPECTED_CHECKPOINT --version EXPECTED_VERSION \
+  --output /recovery/new-output
+```
+
+Omit `--version` to restore the selected generation. Use `--input` with the existing version-list or directory selection JSON for a narrower restore. The output must be a new directory under an existing parent. The command opens the exact complete marker and verifies the signed catalog, then reads the selected immutable dependencies. It publishes the restored tree atomically after validating and decrypting the selected content. It streams objects directly from the target and needs no source, control service, other worker or temporary ciphertext replica.
+
+A successful selection proves the restored versions match the specified checkpoint. Other versions and current target health require their own evidence. Missing or corrupt required data prevents publication. The CLI receipt contains opaque identities and restored counts.
+
 ## Evidence and remaining costs
 
 Run `go test -count=1 ./...` and `go vet ./...` in the admitted Linux test environment. Point `TMPDIR` and `OUTPOST_TEST_ROOT` to its data volume; executable Go scratch may use a separate bounded tmpfs. The tests use ephemeral credentials, real loopback TLS and disk-backed independent S3-signature/WebDAV authentication handlers. No real storage account is contacted.

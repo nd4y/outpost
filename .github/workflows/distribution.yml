@@ -156,3 +156,14 @@ jobs:
           "$OUTPOST_MOVE_CURRENT_CLI" version
           go test -count=1 -timeout=130s -run 'WebDAVMove|MoveBook|CLIMoveProfile' \
             -v ./internal/storage ./internal/upload ./internal/worker ./cmd/outpost
+      - name: Restore external generations with the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/external-restore-tests"
+          export TMPDIR="$RUNNER_TEMP/external-restore-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_EXTERNAL_RECOVERY_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          "$OUTPOST_EXTERNAL_RECOVERY_CLI" version
+          go test -count=1 -timeout=65s -run '^TestCLIExternalRestoreReadsOnlySelectedCloudDependencies$' \
+            -v ./cmd/outpost
