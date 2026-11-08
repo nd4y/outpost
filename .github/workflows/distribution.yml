@@ -105,3 +105,20 @@ jobs:
           "$OUTPOST_RECEIVER_RENEWAL_CURRENT_CLI" version
           go test -count=1 -timeout=120s -run 'ReceiverRenewal|WorkerIngressRenewal|RegistryRenewal' \
             -v ./internal/sourceagent ./internal/worker ./internal/ingress
+      - name: Recover a published generation's missing receipt through the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/receipt-previous-source"
+          git archive 504b63411ee015b127630c53911863ede6b3858f | tar -xf - -C "$RUNNER_TEMP/receipt-previous-source"
+          go -C "$RUNNER_TEMP/receipt-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/receipt-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/receipt-tests"
+          export TMPDIR="$RUNNER_TEMP/receipt-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_RECEIPT_RECOVERY_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_RECEIPT_RECOVERY_PREVIOUS_CLI="$RUNNER_TEMP/receipt-previous"
+          export OUTPOST_RECEIPT_RECOVERY_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_RECEIPT_RECOVERY_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_RECEIPT_RECOVERY_CURRENT_CLI" version
+          go test -count=1 -timeout=120s -run 'ReceiptRecovery|PublishedEvidence|RegistryRenewal' \
+            -v ./internal/sourceagent ./internal/worker ./internal/ingress ./internal/generation

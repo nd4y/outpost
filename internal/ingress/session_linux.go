@@ -68,6 +68,7 @@ type Session struct {
 	bytes         int64
 	poisoned      bool
 	removeObject  func(context.Context, string, int64) error
+	inspection    bool
 	Fault         func(string) error
 }
 
@@ -95,6 +96,9 @@ func (s *Session) guard(ctx context.Context) error {
 	return s.guardMode(ctx, false)
 }
 func (s *Session) guardMode(ctx context.Context, cleanup bool) error {
+	if s.inspection {
+		return ErrDenied
+	}
 	if s.poisoned {
 		return ErrConflict
 	}
@@ -138,10 +142,36 @@ func openSession(ctx context.Context, o SessionOptions, acknowledgedOnly bool) (
 	return openSessionMode(ctx, o, acknowledgedOnly, false)
 }
 func openSessionMode(ctx context.Context, o SessionOptions, acknowledgedOnly, requireAcknowledged bool) (*Session, error) {
-	checkTime := time.Now()
+	mode := sessionActive
 	if acknowledgedOnly {
-		// Historical validation opens only an existing COMPLETE slot for cleanup.
-		// Every data operation still requires current authority.
+		mode = sessionComplete
+	}
+	if requireAcknowledged {
+		mode = sessionAcknowledged
+	}
+	return openSessionFor(ctx, o, mode)
+}
+
+type sessionOpenMode uint8
+
+const (
+	sessionActive sessionOpenMode = iota
+	sessionComplete
+	sessionAcknowledged
+	sessionInspect
+)
+
+// Inspection is private to explicit local receipt recovery. It validates
+// historical state but cannot execute ordinary session operations or repin.
+func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode) (*Session, error) {
+	historical := mode != sessionActive
+	inspection := mode == sessionInspect
+	acknowledgedOnly := mode == sessionComplete || mode == sessionAcknowledged
+	requireAcknowledged := mode == sessionAcknowledged
+	checkTime := time.Now()
+	if historical {
+		// Historical validation opens only existing state. Cleanup requires a
+		// COMPLETE slot; private inspection cannot execute data operations.
 		if o.Initialize {
 			return nil, ErrDenied
 		}
@@ -193,7 +223,7 @@ func openSessionMode(ctx context.Context, o SessionOptions, acknowledgedOnly, re
 		return nil, ErrConflict
 	}
 	owned = true
-	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject}
+	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, inspection: inspection}
 	fail := func(e error) (*Session, error) { s.Close(); return nil, e }
 	s.meta, e = statefile.OpenAt(r, "state", generation.MaxCatalog+2*MaxDocument+4096, o.Initialize)
 	if e != nil {
@@ -228,8 +258,8 @@ func openSessionMode(ctx context.Context, o SessionOptions, acknowledgedOnly, re
 			return fail(ErrConflict)
 		}
 	}
-	if acknowledgedOnly {
-		if !s.state.Complete || requireAcknowledged && !s.state.Acknowledged || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
+	if historical {
+		if acknowledgedOnly && !s.state.Complete || requireAcknowledged && !s.state.Acknowledged || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
 			return fail(ErrConflict)
 		}
 	} else {
@@ -263,7 +293,7 @@ func openSessionMode(ctx context.Context, o SessionOptions, acknowledgedOnly, re
 	if s.state.Complete {
 		s.baseID = storage.Hash(s.state.Catalog)
 	}
-	if s.baseID != "" && !s.state.Acknowledged {
+	if s.baseID != "" && !s.state.Acknowledged && !inspection {
 		kind := "base"
 		if s.state.Complete {
 			kind = "receipt"

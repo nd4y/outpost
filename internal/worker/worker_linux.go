@@ -446,6 +446,12 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	if e := w.openSettlements(v); e != nil {
 		return fail(e)
 	}
+	// Local development fault hooks never enter signed configuration.
+	for _, local := range v.domains {
+		if local.ingress != nil {
+			local.ingress.Fault = w.Fault
+		}
+	}
 	if e := w.admit(ctx, c); e != nil {
 		return fail(e)
 	}

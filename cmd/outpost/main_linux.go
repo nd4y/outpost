@@ -75,7 +75,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT]", "source-settlement-preview --bootstrap FILE --output NEW_REQUEST", "source-settlement-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "source-settle --bootstrap FILE --input SIGNED_ADMISSION", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "source-recovery-export --bootstrap FILE --input PRIVATE_EXPORT_PROFILE --output NEW_PRIVATE_PACKAGE", "recovery-package-inspect --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256", "recovery-package-extract --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256 --output NEW_PRIVATE_DIRECTORY", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "worker-ingress-renew --bootstrap FILE --domain ID --trust PREVIOUS_SIGNED_AUTHORITY --input NEW_SIGNED_AUTHORITY", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT]", "source-receipt-recovery-preview --bootstrap FILE --output NEW_REQUEST", "source-receipt-recovery-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "worker-ingress-receipt-recover --bootstrap FILE --domain ID --input SIGNED_ADMISSION", "source-settlement-preview --bootstrap FILE --output NEW_REQUEST", "source-settlement-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "source-settle --bootstrap FILE --input SIGNED_ADMISSION", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "source-recovery-export --bootstrap FILE --input PRIVATE_EXPORT_PROFILE --output NEW_PRIVATE_PACKAGE", "recovery-package-inspect --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256", "recovery-package-extract --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256 --output NEW_PRIVATE_DIRECTORY", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "worker-ingress-renew --bootstrap FILE --domain ID --trust PREVIOUS_SIGNED_AUTHORITY --input NEW_SIGNED_AUTHORITY", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "runtime-observe" || args[0] == "runtime-check" {
 		if len(args) != 1 {
@@ -93,7 +93,7 @@ func run(ctx context.Context, args []string) (any, error) {
 		if len(args) != 1 {
 			return nil, errUsage
 		}
-		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "workerRead": []string{worker.LegacyFormat, worker.Format, worker.ScheduledFormat, worker.RecoveryFormat}, "managementService": managementservice.Format, "managementSnapshot": management.SnapshotFormat, "ownerRecoveryPackage": recoverybundle.Format, "processIsolation": isolation.Format, "recovery": recovery.ProfileFormat, "bootstrap": worker.BootstrapFormat, "config": control.Format, "configRead": []string{control.Format, control.SettlementConfigFormat}, "sourceSettlement": ingress.SettlementFormat, "ingressRegistryRead": []string{ingress.RegistryFormat, ingress.RenewedRegistryFormat}, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
+		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "workerRead": []string{worker.LegacyFormat, worker.Format, worker.ScheduledFormat, worker.RecoveryFormat}, "managementService": managementservice.Format, "managementSnapshot": management.SnapshotFormat, "ownerRecoveryPackage": recoverybundle.Format, "processIsolation": isolation.Format, "recovery": recovery.ProfileFormat, "bootstrap": worker.BootstrapFormat, "config": control.Format, "configRead": []string{control.Format, control.SettlementConfigFormat}, "sourceSettlement": ingress.SettlementFormat, "sourceReceiptRecovery": ingress.ReceiptRecoveryFormat, "ingressRegistryRead": []string{ingress.RegistryFormat, ingress.RenewedRegistryFormat}, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -200,7 +200,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"format": capture.TreeFormat, "probed": true}, nil
-	case "source-settlement-preview", "source-settle", "source-recovery-export", "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
+	case "source-receipt-recovery-preview", "source-settlement-preview", "source-settle", "source-recovery-export", "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
 		b, e := sourceagent.Load(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -233,6 +233,19 @@ func run(ctx context.Context, args []string) (any, error) {
 		}
 		defer a.Close()
 		switch args[0] {
+		case "source-receipt-recovery-preview":
+			item, e := a.ReceiptRecoveryPreview(ctx)
+			if e != nil {
+				return nil, e
+			}
+			raw, e := json.Marshal(item)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, raw); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": ingress.ReceiptRecoveryFormat, "signed": false}, nil
 		case "source-settlement-preview":
 			item, e := a.SettlementPreview(ctx)
 			if e != nil {
@@ -405,7 +418,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return report, verifyErr
 		}
 		return generation.RecoverMaterialized(ctx, *store, *generationID, trust, owner, selection, *output)
-	case "source-settlement-sign", "config-sign", "command-authority-sign", "management-enrollment-sign", "source-authority-sign", "observation-grant-sign", "upload-delegation-sign":
+	case "source-receipt-recovery-sign", "source-settlement-sign", "config-sign", "command-authority-sign", "management-enrollment-sign", "source-authority-sign", "observation-grant-sign", "upload-delegation-sign":
 		private, e := worker.ReadPrivate(*key, 65536)
 		if e != nil {
 			return nil, e
@@ -417,6 +430,9 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, errUsage
 		}
 		limit := control.MaxConfig
+		if args[0] == "source-receipt-recovery-sign" {
+			limit = ingress.MaxReceiptRecoveryAdmission
+		}
 		if args[0] == "source-settlement-sign" {
 			limit = sourceagent.MaxSettlementAdmission
 		}
@@ -432,6 +448,24 @@ func run(ctx context.Context, args []string) (any, error) {
 		raw, e := worker.ReadPrivate(*input, limit)
 		if e != nil {
 			return nil, e
+		}
+		if args[0] == "source-receipt-recovery-sign" {
+			var item ingress.ReceiptRecoveryAdmission
+			if worker.DecodeInput(raw, &item, ingress.MaxReceiptRecoveryAdmission) != nil {
+				return nil, errUsage
+			}
+			signed, e := sourceagent.SignReceiptRecoveryAdmission(item, signer.PrivateKey)
+			if e != nil {
+				return nil, e
+			}
+			encoded, e := json.Marshal(signed)
+			if e != nil {
+				return nil, e
+			}
+			if e = writeNew(*output, encoded); e != nil {
+				return nil, e
+			}
+			return map[string]any{"format": ingress.ReceiptRecoveryFormat, "signed": true}, nil
 		}
 		if args[0] == "source-settlement-sign" {
 			var item control.SettlementAdmission
@@ -558,7 +592,7 @@ func run(ctx context.Context, args []string) (any, error) {
 		return runReporting(ctx, args[0], *bootstrap, *input)
 	case "worker-command-once", "worker-command-loop":
 		return runCommands(ctx, args[0], *bootstrap, *input)
-	case "worker-init", "worker-run", "worker-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "worker-ingress-renew", "replica-migrate", "replica-rollback", "worker-controls-migrate", "worker-controls-rollback", "worker-command-apply":
+	case "worker-init", "worker-run", "worker-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "worker-ingress-receipt-recover", "worker-ingress-renew", "replica-migrate", "replica-rollback", "worker-controls-migrate", "worker-controls-rollback", "worker-command-apply":
 		b, e := worker.LoadBootstrap(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -605,6 +639,16 @@ func run(ctx context.Context, args []string) (any, error) {
 			return map[string]any{"node": b.Node, "configurationAccepted": e == nil}, e
 		case "worker-run":
 			return map[string]any{"node": b.Node, "stopped": true}, serveWorker(ctx, b, w)
+		case "worker-ingress-receipt-recover":
+			raw, e := worker.ReadPrivate(*input, ingress.MaxReceiptRecoveryAdmission)
+			if e != nil {
+				return nil, e
+			}
+			var item ingress.ReceiptRecoveryAdmission
+			if worker.DecodeInput(raw, &item, ingress.MaxReceiptRecoveryAdmission) != nil {
+				return nil, errUsage
+			}
+			return w.RecoverIngressReceipt(ctx, *domain, item)
 		case "worker-ingress-renew":
 			previous, e := worker.ReadPrivate(*trustFile, ingress.MaxDocument)
 			if e != nil {

@@ -20,7 +20,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -43,7 +43,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-03",
@@ -102,7 +102,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -145,7 +145,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -192,7 +192,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-06",
@@ -210,7 +210,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -348,10 +348,14 @@
         {
           "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
           "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
+        },
+        {
+          "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
+          "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-09",
@@ -552,7 +556,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, expired unpublished/publication-before-receipt resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native consistency providers, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
@@ -789,6 +793,14 @@
         {
           "path": "internal/worker/ingress_renewal_linux_test.go",
           "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_linux_test.go",
+          "name": "TestReceiptRecoveryCapabilityCannotBecomeSettlementOrRenewIntent"
+        },
+        {
+          "path": "internal/worker/receipt_recovery_linux_test.go",
+          "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
@@ -1495,6 +1507,38 @@
         {
           "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
           "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
+        },
+        {
+          "path": "internal/generation/publication_linux_test.go",
+          "name": "TestPublishedEvidenceKeepsOriginalTimeAndDoesNotWrite"
+        },
+        {
+          "path": "internal/generation/publication_linux_test.go",
+          "name": "TestPublishedEvidenceRejectsMissingChangedAndIncompleteProofWithoutWriting"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_linux_test.go",
+          "name": "TestReceiptRecoveryCapabilityCannotBecomeSettlementOrRenewIntent"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryPreservesOriginalPublicationAgeAndSettlement"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryRefusesUnsupportedProofWithoutChangingSession"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryExpiredExecutionRetainsAuditAndResumesWithFreshPermission"
+        },
+        {
+          "path": "internal/worker/receipt_recovery_linux_test.go",
+          "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
+        },
+        {
+          "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
+          "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1947,6 +1991,26 @@
         {
           "path": "internal/ingress/registry_renewal_linux_test.go",
           "name": "TestRegistryRenewalPreservesSameSlotSettlementAndNextGeneration"
+        },
+        {
+          "path": "internal/generation/publication_linux_test.go",
+          "name": "TestPublishedEvidenceKeepsOriginalTimeAndDoesNotWrite"
+        },
+        {
+          "path": "internal/generation/publication_linux_test.go",
+          "name": "TestPublishedEvidenceRejectsMissingChangedAndIncompleteProofWithoutWriting"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryPreservesOriginalPublicationAgeAndSettlement"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryRefusesUnsupportedProofWithoutChangingSession"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryExpiredExecutionRetainsAuditAndResumesWithFreshPermission"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -2840,6 +2904,22 @@
         {
           "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
           "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryPreservesOriginalPublicationAgeAndSettlement"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryRefusesUnsupportedProofWithoutChangingSession"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryExpiredExecutionRetainsAuditAndResumesWithFreshPermission"
+        },
+        {
+          "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
+          "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
         }
       ],
       "acceptance": ["AT-24"],
@@ -3715,6 +3795,10 @@
         {
           "path": "internal/sourceagent/recovery_linux_test.go",
           "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
+        },
+        {
+          "path": "internal/worker/receipt_recovery_linux_test.go",
+          "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -4190,6 +4274,10 @@
         {
           "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
           "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
+        },
+        {
+          "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
+          "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -4504,6 +4592,22 @@
         {
           "path": "internal/worker/ingress_renewal_linux_test.go",
           "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryPreservesOriginalPublicationAgeAndSettlement"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryRefusesUnsupportedProofWithoutChangingSession"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryExpiredExecutionRetainsAuditAndResumesWithFreshPermission"
+        },
+        {
+          "path": "internal/worker/receipt_recovery_linux_test.go",
+          "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -4741,6 +4845,10 @@
         {
           "path": "internal/worker/ingress_renewal_linux_test.go",
           "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
+        },
+        {
+          "path": "internal/worker/receipt_recovery_linux_test.go",
+          "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -5136,6 +5244,10 @@
         {
           "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
           "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
+        },
+        {
+          "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
+          "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -5929,6 +6041,34 @@
         {
           "path": "internal/worker/ingress_renewal_linux_test.go",
           "name": "TestWorkerIngressRenewalRechecksExpiryAfterPolicyLock"
+        },
+        {
+          "path": "internal/generation/publication_linux_test.go",
+          "name": "TestPublishedEvidenceKeepsOriginalTimeAndDoesNotWrite"
+        },
+        {
+          "path": "internal/generation/publication_linux_test.go",
+          "name": "TestPublishedEvidenceRejectsMissingChangedAndIncompleteProofWithoutWriting"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_linux_test.go",
+          "name": "TestReceiptRecoveryCapabilityCannotBecomeSettlementOrRenewIntent"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryPreservesOriginalPublicationAgeAndSettlement"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryRefusesUnsupportedProofWithoutChangingSession"
+        },
+        {
+          "path": "internal/ingress/receipt_recovery_registry_linux_test.go",
+          "name": "TestReceiptRecoveryExpiredExecutionRetainsAuditAndResumesWithFreshPermission"
+        },
+        {
+          "path": "internal/worker/receipt_recovery_linux_test.go",
+          "name": "TestWorkerReceiptRecoveryUsesCurrentPlacementLeaseAndBudget"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -6122,6 +6262,10 @@
         {
           "path": "internal/sourceagent/receiver_renewal_cli_linux_test.go",
           "name": "TestReceiverRenewalCLIUsesSameRootAndPreservesVersions"
+        },
+        {
+          "path": "internal/sourceagent/receipt_recovery_cli_linux_test.go",
+          "name": "TestReceiptRecoveryCLIReconstructsOriginalReceiptThenSettlesAndRestoresBothVersions"
         }
       ],
       "acceptance": ["AT-31"],

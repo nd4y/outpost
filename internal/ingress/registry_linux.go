@@ -241,6 +241,9 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	o := g.sessionOptions(raw)
 	s, e := OpenSession(ctx, o)
 	if !errors.Is(e, ErrConflict) {
+		if e == nil {
+			s.Fault = g.point
+		}
 		return s, e
 	}
 	// A fence may have committed just before a crash. Only an acknowledged old
@@ -311,7 +314,11 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	old.meta = nil
 	old.objects = nil
 	old.objectRoot = nil
-	return OpenSession(ctx, o)
+	s, e = OpenSession(ctx, o)
+	if e == nil {
+		s.Fault = g.point
+	}
+	return s, e
 }
 func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	if g.poisoned || time.Now().Unix() < g.state.ObservedUnix {

@@ -39,3 +39,5 @@ The previous executable rejects registry version 2. Replacing the active journal
 ## Verification boundary
 
 Short synthetic checks cover the same receiver root after expiry, current policy and volume guards, active-worker refusal, historical receipt settlement, unknown staged files, quota failure, revision replay and checkpoint corruption. The CLI workflow signs and applies configuration, renews both sides, captures another version and independently restores both generations. Process interruption checks exercise durable migration and the next-intent/slot transition. These checks do not establish recovery from total registry loss, key rotation, long network partitions, physical disk failure or final large-file/RPO/RTO acceptance. Full product acceptance remains open.
+
+[Missing receipt recovery](receipt-recovery.md) uses separate fresh owner permission and current receiver policy to reconstruct a receipt only from an already complete generation and unchanged original publication proof. It preserves the original verification age and signed audit; ordinary settlement remains a separate step. Truly unpublished operations and lost journals remain pending.
