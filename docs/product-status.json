@@ -7306,11 +7306,25 @@
         "internal/telemetry",
         "packaging",
         "scripts/build-release.py",
-        "scripts/verify-release.py"
+        "scripts/verify-release.py",
+        "scripts/build-sbom.py"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "scripts/check-release.py",
+          "name": "test_selected_build_and_archives"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_cached_start_upgrade_stop_and_rollback"
+        },
+        {
+          "path": "scripts/check-container.py",
+          "name": "test_independent_recovery_after_source_removal"
+        }
+      ],
       "acceptance": ["AT-34"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Publish selected version and commit, checksums, provenance, binary-bound SBOM and bilingual release notes together. Download the published artifacts and verify clean installation, supported upgrade and independent restore from those exact bytes."
     },
     {
       "id": "REQ-52",

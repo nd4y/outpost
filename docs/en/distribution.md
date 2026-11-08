@@ -19,6 +19,19 @@ Keep the manifest hash separately from the downloaded or copied artifact. Comput
 
 Each architecture archive contains both binaries and license notices. Timestamps, ownership, ordering and compression headers are normalized. Repeated build equality and hostile-artifact checks run separately from executing the product. The independent reader needs selected keys/checkpoints according to the [file-kit contract](file-kit-format.md); no running service or repository-wide catalog is introduced by packaging.
 
+## Software inventory
+
+Create a CycloneDX 1.6 SBOM for each selected executable and architecture. Use the [official cyclonedx-gomod 1.12.0 release archive](https://github.com/CycloneDX/cyclonedx-gomod/releases/tag/v1.12.0) for the Linux machine generating the inventories. The script checks the pinned archive SHA-256 and reads the exact verified binaries without executing them or downloading modules. The Go command on the path must support reading the selected binary build information.
+
+```sh
+python3 scripts/build-sbom.py --root /build/outpost-dist \
+  --manifest-sha256 SELECTED_MANIFEST_SHA256 \
+  --generator-archive /build/cyclonedx-gomod-linux.tar.gz \
+  --output /build/outpost-sbom
+```
+
+Use a new output directory outside the distribution. The final `sbom-manifest.json` binds the distribution manifest, revision, exact binary SHA-256 and SBOM SHA-256. Store this receipt alongside the selected distribution evidence. Each SBOM includes the linked Go modules and standard library version. This inventory covers the selected binaries. Release signatures and published installation acceptance remain separate.
+
 ## Container and private runtime preparation
 
 The [Dockerfile](../../packaging/Dockerfile) consumes the verified output directory. It starts from an empty root filesystem and copies only the two binaries and license notices. It contains no shell, package manager, source code, credentials or runtime initialization. Select the matching platform and `TARGETARCH`, pass the verified revision, build a local candidate image and retain its immutable image ID. Building an arm64 image without executing it is only a cross-build result.

@@ -215,6 +215,7 @@ def test_explicit_installation(s):
 def test_cached_start_upgrade_stop_and_rollback(s):
     meta = json.loads((s.fixture / "metadata.json").read_text())
     replica = s.fixture / "data" / Path(meta["replica"]).relative_to("/var/lib/outpost")
+    state_path = s.fixture / "data/worker/state/worker.json"
     def closure():
         return {p.relative_to(replica).as_posix(): verifier.builder.digest_file(p) for folder in ("catalogs", "objects") for p in (replica / folder).rglob("*") if p.is_file()}
     before = closure()
@@ -222,17 +223,30 @@ def test_cached_start_upgrade_stop_and_rollback(s):
     for stage, old, revision in (("previous", True, 1), ("current", False, 2), ("rollback", True, 2)):
         if stage == "current":
             s.worker("config-apply", ["--input", "/run/outpost/policy-next.json"])
+        prior = state_path.stat()
         name = s.create(s.old_image if old else s.image, ["worker-run", *([] if old else ["--require-isolation"]), "--bootstrap", "/run/outpost/worker.json"],
                         user=str(s.uid) + ":" + str(s.gid), mounts=s.worker_mounts())
         command(["docker", "start", name])
-        time.sleep(1.2)
-        running = s.inspect(name)
-        assert running["State"]["Running"]
+        deadline = time.monotonic() + 45
+        while True:
+            running = s.inspect(name)
+            if not running["State"]["Running"]:
+                raise AssertionError(f"{stage} worker exited before policy admission: {running['State']['ExitCode']}")
+            with state_path.open("rb") as f:
+                current = os.fstat(f.fileno())
+                observed = json.load(f)
+            replaced = (current.st_ino, current.st_ctime_ns) != (prior.st_ino, prior.st_ctime_ns)
+            if replaced and observed["phase"] == "ACTIVE" and observed["configurationRevision"] == revision:
+                break
+            if time.monotonic() >= deadline:
+                raise AssertionError(f"{stage} did not admit cached revision {revision}: "
+                                     f"{observed['phase']} revision {observed['configurationRevision']}")
+            time.sleep(0.25)
         mounts = {(m["Destination"], m["RW"]) for m in running["Mounts"] if m["Type"] == "bind"}
         assert mounts == {("/var/lib/outpost", True), ("/run/outpost", False)}
         result, _ = s.worker("worker-status", old=old)
         status = json.loads(result.stdout)["result"]
-        assert status["configurationRevision"] == revision and status["node"] == meta["node"]
+        assert status["phase"] == "ACTIVE" and status["configurationRevision"] == revision and status["node"] == meta["node"]
         command(["docker", "stop", "--time", "10", name], timeout=15)
         stopped = s.inspect(name)["State"]
         assert not stopped["Running"] and not stopped["OOMKilled"] and stopped["ExitCode"] == 0

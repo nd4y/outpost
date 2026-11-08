@@ -59,6 +59,21 @@ jobs:
             --manifest-sha256 "$current_hash" --previous-root "$RUNNER_TEMP/previous" \
             --previous-manifest-sha256 "$previous_hash" --fixture-binary "$RUNNER_TEMP/container-fixture.test" \
             --work "$RUNNER_TEMP/container-checks"
+      - name: Generate binary-bound CycloneDX inventories
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$ARCHITECTURE" in
+            amd64) asset=524971569 ;;
+            arm64) asset=524971566 ;;
+            *) exit 1 ;;
+          esac
+          timeout 45s gh api "repos/CycloneDX/cyclonedx-gomod/releases/assets/$asset" \
+            --header 'Accept: application/octet-stream' > "$RUNNER_TEMP/sbom-generator.tar.gz"
+          current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
+          python3 scripts/build-sbom.py --root "$RUNNER_TEMP/current" --manifest-sha256 "$current_hash" \
+            --generator-archive "$RUNNER_TEMP/sbom-generator.tar.gz" --output "$RUNNER_TEMP/sbom"
       - name: Restore owner packages with the selected native CLI
         run: |
           current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
