@@ -75,7 +75,7 @@ These commands validate documentation and the standard toolkit. They do not star
 - [Immutable-object readback reuse contract](docs/en/readback-reuse.md)
 - [G3 scoped requirement-to-check trace](docs/g3-trace.json)
 
-[Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials.
+[Repository checks](https://github.com/nd4y/outpost/actions) assess source/documentation mechanics. Product builds, releases, installation, restore and runtime acceptance remain separate. The pinned toolkit is autonomous and needs no private-repository credentials. CI verifies the unchanged scanner checksum even when using the official release API download route.
 
 ## Support and licensing
 

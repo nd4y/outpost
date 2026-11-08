@@ -32,7 +32,9 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci --prefix .standards --ignore-scripts --no-audit --no-fund
       - name: Install checksum-verified scanner
-        run: node .standards/install-gitleaks.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/install-ci-scanner.sh
       - name: Verify documentation and full formatting
         run: |
           node .standards/check.mjs structure
