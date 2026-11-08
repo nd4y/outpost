@@ -29,6 +29,7 @@ import (
 	"github.com/nd4y/outpost/internal/managementservice"
 	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/recovery"
+	"github.com/nd4y/outpost/internal/recoverybundle"
 	"github.com/nd4y/outpost/internal/sourceagent"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -74,7 +75,7 @@ func writeNew(path string, b []byte) error {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT]", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT]", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "source-recovery-export --bootstrap FILE --input PRIVATE_EXPORT_PROFILE --output NEW_PRIVATE_PACKAGE", "recovery-package-inspect --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256", "recovery-package-extract --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256 --output NEW_PRIVATE_DIRECTORY", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "config-apply --bootstrap FILE --input FILE", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]"}}, nil
 	}
 	if args[0] == "runtime-observe" || args[0] == "runtime-check" {
 		if len(args) != 1 {
@@ -92,13 +93,14 @@ func run(ctx context.Context, args []string) (any, error) {
 		if len(args) != 1 {
 			return nil, errUsage
 		}
-		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "workerRead": []string{worker.LegacyFormat, worker.Format, worker.ScheduledFormat, worker.RecoveryFormat}, "managementService": managementservice.Format, "managementSnapshot": management.SnapshotFormat, "processIsolation": isolation.Format, "recovery": recovery.ProfileFormat, "bootstrap": worker.BootstrapFormat, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
+		return map[string]any{"revision": revision, "cli": "outpost-cli-1", "worker": worker.Format, "workerRead": []string{worker.LegacyFormat, worker.Format, worker.ScheduledFormat, worker.RecoveryFormat}, "managementService": managementservice.Format, "managementSnapshot": management.SnapshotFormat, "ownerRecoveryPackage": recoverybundle.Format, "processIsolation": isolation.Format, "recovery": recovery.ProfileFormat, "bootstrap": worker.BootstrapFormat, "config": control.Format, "generation": generation.Format, "fileKit": filekit.Format, "fileKitRead": []string{filekit.Format, filekit.TypedFormat}, "replicaState": generation.StateFormat}, nil
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	requireIsolation := flags.Bool("require-isolation", false, "require observable bounded process isolation before an operation")
 	bootstrap := flags.String("bootstrap", "", "private local bootstrap JSON")
 	input := flags.String("input", "", "input file")
+	sha256 := flags.String("sha256", "", "independently retained artifact SHA-256")
 	output := flags.String("output", "", "new output path")
 	key := flags.String("key", "", "private key file")
 	store := flags.String("store", "", "file kit directory")
@@ -198,7 +200,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"format": capture.TreeFormat, "probed": true}, nil
-	case "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
+	case "source-recovery-export", "source-renew", "source-init", "source-next", "source-prepare", "source-run", "source-status", "source-checkpoint", "source-schedule-set", "source-schedule-status", "source-loop":
 		b, e := sourceagent.Load(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -231,6 +233,12 @@ func run(ctx context.Context, args []string) (any, error) {
 		}
 		defer a.Close()
 		switch args[0] {
+		case "source-recovery-export":
+			profile, e := sourceagent.LoadRecoveryExport(*input)
+			if e != nil {
+				return nil, e
+			}
+			return a.ExportRecovery(ctx, profile, revision, *output)
 		case "source-loop":
 			if e = a.RunSchedule(ctx); e != nil {
 				return nil, e
@@ -318,6 +326,16 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, e
 		}
 		return map[string]any{"format": volume.Format, "enrolled": true, "scope": binding.Scope, "epoch": binding.Epoch}, nil
+	case "recovery-package-inspect", "recovery-package-extract":
+		f, e := recoverybundle.Open(*input)
+		if e != nil {
+			return nil, e
+		}
+		defer f.Close()
+		if args[0] == "recovery-package-extract" {
+			return recoverybundle.Extract(ctx, f, *sha256, *output)
+		}
+		return recoverybundle.Inspect(ctx, f, *sha256)
 	case "restore-replica", "verify-replica":
 		if args[0] == "verify-replica" && !filepath.IsAbs(*output) {
 			return nil, errUsage
@@ -605,13 +623,13 @@ func failure(e error) (string, int) {
 		return "COPY_THRESHOLD_PENDING", 5
 	case errors.Is(e, telemetry.ErrBlocked):
 		return "TELEMETRY_BLOCKED", 5
-	case errors.Is(e, worker.ErrDenied), errors.Is(e, management.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ingress.ErrDenied), errors.Is(e, observation.ErrDenied), errors.Is(e, upload.ErrDenied):
+	case errors.Is(e, recoverybundle.ErrDenied), errors.Is(e, worker.ErrDenied), errors.Is(e, management.ErrDenied), errors.Is(e, control.ErrDenied), errors.Is(e, storage.ErrDenied), errors.Is(e, ingress.ErrDenied), errors.Is(e, observation.ErrDenied), errors.Is(e, upload.ErrDenied):
 		return "DENIED", 3
-	case errors.Is(e, telemetry.ErrInvalid), errors.Is(e, generation.ErrIncomplete), errors.Is(e, management.ErrInvalid), errors.Is(e, filekit.ErrInvalid), errors.Is(e, storage.ErrIntegrity), errors.Is(e, capture.ErrInvalid), errors.Is(e, sourceagent.ErrInvalid):
+	case errors.Is(e, recoverybundle.ErrInvalid), errors.Is(e, telemetry.ErrInvalid), errors.Is(e, generation.ErrIncomplete), errors.Is(e, management.ErrInvalid), errors.Is(e, filekit.ErrInvalid), errors.Is(e, storage.ErrIntegrity), errors.Is(e, capture.ErrInvalid), errors.Is(e, sourceagent.ErrInvalid):
 		return "INCOMPLETE_OR_CORRUPT", 4
-	case errors.Is(e, telemetry.ErrConflict), errors.Is(e, control.ErrRollback), errors.Is(e, management.ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, storage.ErrConflict), errors.Is(e, ingress.ErrConflict), errors.Is(e, os.ErrExist):
+	case errors.Is(e, recoverybundle.ErrConflict), errors.Is(e, telemetry.ErrConflict), errors.Is(e, control.ErrRollback), errors.Is(e, management.ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, storage.ErrConflict), errors.Is(e, ingress.ErrConflict), errors.Is(e, os.ErrExist):
 		return "CONFLICT", 5
-	case errors.Is(e, telemetry.ErrCapacity), errors.Is(e, worker.ErrCapacity), errors.Is(e, management.ErrCapacity), errors.Is(e, storage.ErrCapacity), errors.Is(e, statefile.ErrCapacity):
+	case errors.Is(e, recoverybundle.ErrCapacity), errors.Is(e, telemetry.ErrCapacity), errors.Is(e, worker.ErrCapacity), errors.Is(e, management.ErrCapacity), errors.Is(e, storage.ErrCapacity), errors.Is(e, statefile.ErrCapacity):
 		return "CAPACITY_BLOCKED", 6
 	default:
 		return "UNAVAILABLE", 7

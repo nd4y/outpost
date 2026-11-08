@@ -54,6 +54,15 @@ func (o Owner) validate() error {
 	}
 	return nil
 }
+
+// RecoveryMaterial returns an independent read-only copy of the data owner's
+// material. It can decrypt and verify existing kits but cannot sign new ones.
+func (o Owner) RecoveryMaterial() (Owner, error) {
+	if e := o.validate(); e != nil {
+		return Owner{}, e
+	}
+	return Owner{Format: o.Format, Domain: o.Domain, Master: bytes.Clone(o.Master), VerifyKey: bytes.Clone(o.VerifyKey)}, nil
+}
 func (o Owner) key(file, kind string) ([]byte, error) {
 	if err := o.validate(); err != nil {
 		return nil, err

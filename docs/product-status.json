@@ -13,13 +13,14 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -30,6 +31,7 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
@@ -41,7 +43,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-03",
@@ -52,6 +54,7 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
@@ -99,7 +102,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -110,6 +113,7 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
@@ -141,7 +145,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -152,6 +156,7 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
@@ -187,7 +192,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-06",
@@ -198,13 +203,14 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -233,6 +239,7 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
@@ -297,10 +304,42 @@
         {
           "path": "internal/sourceagent/install_linux_test.go",
           "name": "TestSourceAtomicInstallPublishesBoundRuntimeAndCaptures"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRoundTripHasOnlyReadOnlySecrets"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRejectsTamperingEvenWithCallerSelectedDigest"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackagePrivateBoundariesCancellationAndCandidateAdmission"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageConcurrentPublishHasOneWinner"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportRejectsSourceAndRuntimeDestinations"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
+        },
+        {
+          "path": "internal/sourceagent/recovery_cli_linux_test.go",
+          "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-09",
@@ -343,6 +382,14 @@
         {
           "path": "scripts/check-container.py",
           "name": "test_independent_recovery_after_source_removal"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRoundTripHasOnlyReadOnlySecrets"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
         }
       ],
       "acceptance": ["AT-02", "AT-03"],
@@ -377,6 +424,10 @@
         {
           "path": "internal/filekit/tamper_linux_test.go",
           "name": "TestNamesRespectLinuxFilesystemBounds"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-06", "AT-12", "AT-26"],
@@ -473,6 +524,7 @@
         "internal/capture",
         "internal/sourceagent",
         "internal/filekit",
+        "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
         "internal/policy"
@@ -488,7 +540,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
@@ -1319,6 +1371,10 @@
         {
           "path": "internal/sourceagent/install_linux_test.go",
           "name": "TestSourceInstallVolumeLossBeforePublicationRetainsCandidate"
+        },
+        {
+          "path": "internal/recoverybundle/crash_linux_test.go",
+          "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -1739,6 +1795,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -2299,6 +2359,7 @@
         "internal/filekit",
         "internal/generation",
         "internal/recovery",
+        "internal/recoverybundle",
         "internal/worker",
         "internal/storage",
         "cmd/outpost"
@@ -2388,6 +2449,7 @@
         "internal/filekit",
         "internal/generation",
         "internal/recovery",
+        "internal/recoverybundle",
         "internal/worker",
         "internal/storage",
         "cmd/outpost"
@@ -2457,6 +2519,7 @@
         "internal/filekit",
         "internal/generation",
         "internal/recovery",
+        "internal/recoverybundle",
         "internal/worker",
         "internal/storage",
         "cmd/outpost"
@@ -2589,6 +2652,34 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRoundTripHasOnlyReadOnlySecrets"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRejectsTamperingEvenWithCallerSelectedDigest"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackagePrivateBoundariesCancellationAndCandidateAdmission"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageConcurrentPublishHasOneWinner"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
+        },
+        {
+          "path": "internal/recoverybundle/crash_linux_test.go",
+          "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
+        },
+        {
+          "path": "internal/sourceagent/recovery_cli_linux_test.go",
+          "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
         }
       ],
       "acceptance": ["AT-24"],
@@ -2886,6 +2977,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -3440,6 +3535,26 @@
         {
           "path": "scripts/check-container.py",
           "name": "test_missing_or_readonly_volume_fails_without_fallback"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRejectsTamperingEvenWithCallerSelectedDigest"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackagePrivateBoundariesCancellationAndCandidateAdmission"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageConcurrentPublishHasOneWinner"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportRejectsSourceAndRuntimeDestinations"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -3871,6 +3986,30 @@
         {
           "path": "internal/sourceagent/install_linux_test.go",
           "name": "TestSourceInstallCandidateLimitAndCancelledAdmission"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
+        },
+        {
+          "path": "internal/recoverybundle/crash_linux_test.go",
+          "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
+        },
+        {
+          "path": "internal/recoverybundle/tools_linux_test.go",
+          "name": "TestRecoveryPackageRejectsSelectedToolsWithUnsafeSemantics"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
+        },
+        {
+          "path": "internal/sourceagent/recovery_cli_linux_test.go",
+          "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
+        },
+        {
+          "path": "cmd/outpost/recovery_package_linux_test.go",
+          "name": "TestCLIOwnerRecoveryPackageContractAndRedactedErrors"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -4161,6 +4300,10 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalRevalidatesAfterLeaseWait"
+        },
+        {
+          "path": "internal/recoverybundle/crash_linux_test.go",
+          "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
@@ -4374,6 +4517,18 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRejectsTamperingEvenWithCallerSelectedDigest"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackagePrivateBoundariesCancellationAndCandidateAdmission"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageConcurrentPublishHasOneWinner"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -4695,6 +4850,10 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState"
+        },
+        {
+          "path": "internal/sourceagent/recovery_cli_linux_test.go",
+          "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -4708,6 +4867,7 @@
         "internal/filekit",
         "internal/generation",
         "internal/recovery",
+        "internal/recoverybundle",
         "internal/worker",
         "internal/storage",
         "cmd/outpost"
@@ -4728,6 +4888,18 @@
         {
           "path": "internal/sourceagent/install_linux_test.go",
           "name": "TestSourceAtomicInstallPublishesBoundRuntimeAndCaptures"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
+        },
+        {
+          "path": "internal/recoverybundle/tools_linux_test.go",
+          "name": "TestRecoveryPackageRejectsSelectedToolsWithUnsafeSemantics"
+        },
+        {
+          "path": "internal/sourceagent/recovery_cli_linux_test.go",
+          "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -5425,6 +5597,38 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRoundTripHasOnlyReadOnlySecrets"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRejectsTamperingEvenWithCallerSelectedDigest"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackagePrivateBoundariesCancellationAndCandidateAdmission"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageConcurrentPublishHasOneWinner"
+        },
+        {
+          "path": "internal/recoverybundle/crash_linux_test.go",
+          "name": "TestRecoveryPackageActualSIGKILLPreservesOnlyCompletePublishedResults"
+        },
+        {
+          "path": "internal/recoverybundle/tools_linux_test.go",
+          "name": "TestRecoveryPackageRejectsSelectedToolsWithUnsafeSemantics"
+        },
+        {
+          "path": "internal/sourceagent/recovery_linux_test.go",
+          "name": "TestSourceRecoveryExportRejectsSourceAndRuntimeDestinations"
+        },
+        {
+          "path": "cmd/outpost/recovery_package_linux_test.go",
+          "name": "TestCLIOwnerRecoveryPackageContractAndRedactedErrors"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -5602,6 +5806,14 @@
         {
           "path": "cmd/outpost/telemetry_linux_test.go",
           "name": "TestCLITelemetryInitStatusPauseRenewAndBinding"
+        },
+        {
+          "path": "internal/sourceagent/recovery_cli_linux_test.go",
+          "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
+        },
+        {
+          "path": "cmd/outpost/recovery_package_linux_test.go",
+          "name": "TestCLIOwnerRecoveryPackageContractAndRedactedErrors"
         }
       ],
       "acceptance": ["AT-31"],

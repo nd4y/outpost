@@ -42,6 +42,7 @@ func must(t *testing.T, e error) {
 }
 
 type fixture struct {
+	server                          *httptest.Server
 	base, tree, replicaPath         string
 	b                               Bootstrap
 	a                               *Agent
@@ -128,6 +129,7 @@ func newFixture(t *testing.T) *fixture {
 	s.TLS, e = peer.AuthenticatedServerTLS(dst, roots, id(dst))
 	must(t, e)
 	s.StartTLS()
+	f.server = s
 	t.Cleanup(s.Close)
 	vol := filepath.Join(f.base, "volume")
 	must(t, os.Mkdir(vol, 0700))
