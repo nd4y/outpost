@@ -17,6 +17,7 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/management"
 	"github.com/nd4y/outpost/internal/recovery"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
 )
@@ -201,6 +202,7 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 			return out, errors.Join(re, ce)
 		}
 		out.InventoryState = "OBSERVED"
+		w.addExternalAuditObservations(ctx, cfg, d, status, latestRecordedComplete(recorded), out.ExternalCopies)
 		for _, g := range recorded {
 			state := "INCOMPLETE"
 			if g.Complete {
@@ -387,4 +389,43 @@ func externalCopyObservations(status Status, domain, node string) ([]management.
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Operation < out[j].Operation })
 	return out, nil
+}
+
+func (w *Worker) addExternalAuditObservations(ctx context.Context, cfg control.Config, d control.Domain, status Status, latest string, copies []management.ExternalCopy) {
+	interval := d.ExternalAuditIntervalSeconds
+	if interval == 0 || latest == "" || cfg.Active(time.Now()) != nil || w.check(ctx) != nil {
+		return
+	}
+	selected := scheduledExternalCopies(status, d, latest, w.node)
+	if len(selected) == 0 {
+		return
+	}
+	store, err := statefile.OpenAt(w.root, externalScheduleDirectory, 4096, false)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+	for i := range copies {
+		copy := &copies[i]
+		item := selected[copy.Target]
+		if item.Job.Operation != copy.Operation || copy.State != "OBSERVED_COMPLETE" {
+			continue
+		}
+		if w.check(ctx) != nil {
+			return
+		}
+		record, err := readScheduledExternalAudit(store, w.externalAuditScope(item.Job, interval))
+		if err != nil || record.PolicyExpiresUnix == 0 || record.FinishedUnix > time.Now().Unix() {
+			continue
+		}
+		observed := record.FinishedUnix
+		if record.Receipt != nil {
+			observed = record.Receipt.ObservedUnix
+		}
+		expires := min(cfg.ExpiresUnix, record.PolicyExpiresUnix, observed+interval)
+		if observed >= copy.VerifiedUnix && expires > observed {
+			copy.Audit = &management.ExternalAuditObservation{State: record.State, ObservedUnix: observed,
+				FinishedUnix: record.FinishedUnix, ExpiresUnix: expires}
+		}
+	}
 }

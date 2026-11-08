@@ -101,6 +101,7 @@ try {
     const row = page.locator("#external-copies tbody tr").filter({ hasText: meta.cloudTarget });
     assert.equal(await row.count(), 1);
     assert.match(await row.innerText(), /Complete at the recorded check time/);
+    assert.match(await row.innerText(), /Missing data/);
     const verified = await row.locator("td").nth(4).innerText();
     const expected = await page.evaluate(
       (t) => new Date(t * 1000).toLocaleString("en", { timeZoneName: "short" }),
@@ -116,6 +117,21 @@ try {
     await page.locator("#refresh").click();
     await contains(page, "#notice", "View loaded");
     assert.equal(await row.locator("td").nth(4).innerText(), verified);
+  });
+  await test("expired scheduled audit remains a separate historical observation", async () => {
+    await page.route("**/domains/**/report", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const copy = body.externalCopies.find((entry) => entry.target === meta.cloudTarget);
+      copy.audit.expiresUnix = copy.audit.observedUnix + 1;
+      await route.fulfill({ response, json: body });
+    });
+    await page.locator("#refresh").click();
+    await contains(page, "#notice", "View loaded");
+    const row = page.locator("#external-copies tbody tr").filter({ hasText: meta.cloudTarget });
+    assert.match(await row.innerText(), /Stale observation · Missing data/);
+    assert.match(await row.innerText(), /Complete at the recorded check time/);
+    await page.unroute("**/domains/**/report");
   });
   await test("legacy external report and assigned target without receipts remain unknown", async () => {
     const missing = "d".repeat(64);

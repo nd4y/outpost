@@ -130,3 +130,5 @@ The scoped `GET /api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/policy` c
 Owner-only resolution preview and mutation are described in the [service lifecycle](management-service.md#resolving-unpublished-intents). Original request receipts may be `ABANDONED`; the independent resolution receipt is `COMPLETE`. Both remain scoped and separately audited. This path never represents a worker execution acknowledgement.
 
 Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.
+
+Report6 and view6 carry the latest scoped scheduled audit alongside that historical receipt, with separate observation and expiry times.

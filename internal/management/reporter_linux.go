@@ -254,6 +254,12 @@ func (r *Reporter) Enqueue(ctx context.Context, in Snapshot) ([]byte, error) {
 		}
 		if in.ExternalState != "" || len(in.ExternalCopies) > 0 {
 			report.Format = ExternalReportFormat
+			for _, copy := range in.ExternalCopies {
+				if copy.Audit != nil {
+					report.Format = ExternalAuditReportFormat
+					break
+				}
+			}
 		}
 		raw, e := SignReport(report, grant, r.signer, time.Now())
 		if e != nil {

@@ -2205,6 +2205,10 @@
           "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
         },
         {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS"
+        },
+        {
           "path": "internal/worker/external_reporting_linux_test.go",
           "name": "TestExternalCopyObservationsPreserveReceiptAgeAndUnknown"
         },
@@ -2215,6 +2219,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "expired scheduled audit remains a separate historical observation"
         },
         {
           "path": "internal/sourceagent/recovery_linux_test.go",
@@ -3042,6 +3050,10 @@
           "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
         },
         {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS"
+        },
+        {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         },
@@ -3663,6 +3675,10 @@
           "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
         },
         {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS"
+        },
+        {
           "path": "internal/worker/external_reporting_linux_test.go",
           "name": "TestExternalCopyObservationsPreserveReceiptAgeAndUnknown"
         },
@@ -3673,6 +3689,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "expired scheduled audit remains a separate historical observation"
         },
         {
           "path": "internal/sourceagent/recovery_linux_test.go",
@@ -5792,12 +5812,20 @@
           "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
         },
         {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS"
+        },
+        {
           "path": "scripts/browser/check.mjs",
           "name": "external target observations preserve original readback age and unconfirmed state"
         },
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "expired scheduled audit remains a separate historical observation"
         },
         {
           "path": "cmd/outpost/isolation_linux_test.go",
@@ -6479,6 +6507,10 @@
           "name": "TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS"
         },
         {
+          "path": "internal/management/external_report_linux_test.go",
+          "name": "TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS"
+        },
+        {
           "path": "internal/isolation/isolation_linux_test.go",
           "name": "TestProcessIsolationRejectsUnknownAndUnboundedControls"
         },
@@ -6994,6 +7026,10 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "legacy external report and assigned target without receipts remain unknown"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "expired scheduled audit remains a separate historical observation"
         },
         {
           "path": "cmd/outpost/telemetry_linux_test.go",

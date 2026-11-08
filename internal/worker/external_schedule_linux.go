@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/upload"
@@ -18,17 +19,18 @@ const externalScheduleDirectory = "telemetry/external-schedule"
 const ExternalAuditStatusFormat = "outpost-worker-external-audit-status-1"
 
 type ExternalAuditStatus struct {
-	Format       string                     `json:"format"`
-	Node         string                     `json:"node"`
-	Operation    string                     `json:"operation"`
-	Window       string                     `json:"window"`
-	Target       string                     `json:"target"`
-	Generation   string                     `json:"generation"`
-	Ready        bool                       `json:"ready"`
-	State        string                     `json:"state"`
-	FinishedUnix int64                      `json:"finishedUnix,omitempty"`
-	Receipt      *upload.TargetAuditReceipt `json:"receipt,omitempty"`
-	Repair       *upload.MissingRepair      `json:"repair,omitempty"`
+	Format            string                     `json:"format"`
+	Node              string                     `json:"node"`
+	Operation         string                     `json:"operation"`
+	Window            string                     `json:"window"`
+	Target            string                     `json:"target"`
+	Generation        string                     `json:"generation"`
+	Ready             bool                       `json:"ready"`
+	State             string                     `json:"state"`
+	FinishedUnix      int64                      `json:"finishedUnix,omitempty"`
+	PolicyExpiresUnix int64                      `json:"policyExpiresUnix,omitempty"`
+	Receipt           *upload.TargetAuditReceipt `json:"receipt,omitempty"`
+	Repair            *upload.MissingRepair      `json:"repair,omitempty"`
 }
 
 func scheduledExternalProfile(operation string, interval int64) ExternalAuditProfile {
@@ -51,6 +53,10 @@ func readScheduledExternalAudit(store *statefile.Store, scope ExternalAuditStatu
 	}
 	if r := record.Repair; r != nil && (record.State != "MISSING" || !record.Ready ||
 		r.ObservedUnix != record.FinishedUnix || !r.Valid(1, 1<<40)) {
+		return record, ErrDenied
+	}
+	if record.PolicyExpiresUnix != 0 && (record.FinishedUnix == 0 || record.PolicyExpiresUnix > 1<<40 ||
+		record.PolicyExpiresUnix <= record.FinishedUnix) {
 		return record, ErrDenied
 	}
 	switch record.State {
@@ -120,7 +126,8 @@ func (w *Worker) ScheduledExternalAuditStatus(ctx context.Context, operation str
 	result, err = readScheduledExternalAudit(store, w.externalAuditScope(record.Job, d.ExternalAuditIntervalSeconds))
 	if err == nil && result.Receipt != nil {
 		now := time.Now().Unix()
-		if result.Receipt.ObservedUnix > now || now-result.Receipt.ObservedUnix >= d.ExternalAuditIntervalSeconds {
+		if result.Receipt.ObservedUnix > now || now-result.Receipt.ObservedUnix >= d.ExternalAuditIntervalSeconds ||
+			(result.PolicyExpiresUnix > 0 && now >= result.PolicyExpiresUnix) {
 			result.State = "STALE"
 		}
 	}
@@ -132,6 +139,33 @@ type externalAuditCandidate struct {
 	interval int64
 	record   ExternalAuditStatus
 	new      bool
+}
+
+func latestRecordedComplete(entries []generation.RecordedGeneration) string {
+	var latest string
+	var sequence uint64
+	for _, entry := range entries {
+		if entry.Complete && entry.Sequence > sequence {
+			latest, sequence = entry.Generation, entry.Sequence
+		}
+	}
+	return latest
+}
+
+func scheduledExternalCopies(status Status, d control.Domain, latest, node string) map[string]JobState {
+	copies := map[string]JobState{}
+	for _, item := range status.Jobs {
+		j := item.Job
+		if item.Phase != "COMPLETE" || j.Kind != "upload" || j.MissingRepair != nil || j.Domain != d.Trust.Domain ||
+			j.Generation != latest || j.Executor != node || !d.Placement.PermitsCloud(node, j.Target) {
+			continue
+		}
+		old := copies[j.Target]
+		if item.UpdatedUnix > old.UpdatedUnix || (item.UpdatedUnix == old.UpdatedUnix && j.Operation > old.Job.Operation) {
+			copies[j.Target] = item
+		}
+	}
+	return copies
 }
 
 func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[string]bool, results chan<- result) {
@@ -152,28 +186,10 @@ func (w *Worker) scheduleExternalAudit(v *view, status Status, running map[strin
 		if err != nil {
 			continue
 		}
-		var latest string
-		var sequence uint64
-		for _, entry := range entries {
-			if entry.Complete && entry.Sequence > sequence {
-				latest, sequence = entry.Generation, entry.Sequence
-			}
-		}
-		copies := map[string]JobState{}
-		for _, item := range status.Jobs {
-			j := item.Job
-			if item.Phase != "COMPLETE" || j.Kind != "upload" || j.MissingRepair != nil || j.Domain != d.Trust.Domain || j.Generation != latest ||
-				j.Executor != w.node || v.requestGates[j.Target] == nil || !d.Placement.PermitsCloud(w.node, j.Target) {
-				continue
-			}
-			old := copies[j.Target]
-			if item.UpdatedUnix > old.UpdatedUnix || (item.UpdatedUnix == old.UpdatedUnix && j.Operation > old.Job.Operation) {
-				copies[j.Target] = item
-			}
-		}
+		copies := scheduledExternalCopies(status, d, latestRecordedComplete(entries), w.node)
 		for _, copy := range copies {
 			j := copy.Job
-			if running["external-audit/"+j.Operation] || v.paused(j.Domain, j.Operation) || status.Controls.paused(j.Domain, j.Operation) {
+			if v.requestGates[j.Target] == nil || running["external-audit/"+j.Operation] || v.paused(j.Domain, j.Operation) || status.Controls.paused(j.Domain, j.Operation) {
 				continue
 			}
 			if store == nil {
@@ -281,6 +297,7 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 	}
 	record.Receipt = nil
 	record.Repair = nil
+	record.PolicyExpiresUnix = 0
 	record.FinishedUnix = time.Now().Unix()
 	switch {
 	case err == nil:
@@ -303,6 +320,9 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 		record.State = "INVALID_CONTENT"
 	default:
 		record.State = "UNAVAILABLE"
+	}
+	if record.FinishedUnix > 0 && record.FinishedUnix < v.cfg.ExpiresUnix {
+		record.PolicyExpiresUnix = v.cfg.ExpiresUnix
 	}
 	bounded, stop := context.WithTimeout(context.WithoutCancel(v.ctx), time.Second)
 	defer stop()

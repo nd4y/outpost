@@ -176,6 +176,9 @@ func (r *Registry) Report(ctx context.Context, p Principal, tenant, node, domain
 			state = "STALE"
 		}
 		out = ReportView{Format: "outpost-management-report-view-1", Node: node, Tenant: tenant, Domain: domain, Sequence: report.Sequence, ConfigurationRevision: report.ConfigurationRevision, ObservedUnix: report.ObservedUnix, InventoryState: report.InventoryState, ExternalState: report.ExternalState, ExternalCopies: report.ExternalCopies, State: state, DocumentDigest: pointer.Digest, Generations: report.Generations, Jobs: report.Jobs, Commands: report.Commands, Space: report.Space}
+		if report.Format == ExternalAuditReportFormat {
+			out.Format = "outpost-management-report-view-6"
+		}
 		if report.Format == ExternalReportFormat {
 			out.Format = "outpost-management-report-view-5"
 		}

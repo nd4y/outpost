@@ -22,6 +22,13 @@ const words = {
     evidenceHelp:
       "Backup creation, target readback and verified restore are separate observations. Unknown values are not zero.",
     externalCopies: "External target observations",
+    externalAudit: "Scheduled verification",
+    externalAuditObserved: "Audit observed",
+    auditVerified: "Ciphertext verified",
+    auditMissing: "Missing data",
+    auditInvalid: "Invalid content",
+    auditUnavailable: "Audit unavailable",
+    auditStale: "Stale observation",
     externalHelp:
       "These are historical worker readbacks, not current cloud health. Repeated observations of the same target are not extra copies. No receipt means unknown, not absent.",
     observedComplete: "Complete at the recorded check time",
@@ -231,6 +238,13 @@ const words = {
     evidenceHelp:
       "Создание копии, чтение из целевого хранилища и проверенное восстановление - разные наблюдения. Неизвестное значение не равно нулю.",
     externalCopies: "Наблюдения внешних копий",
+    externalAudit: "Проверка по расписанию",
+    externalAuditObserved: "Время наблюдения",
+    auditVerified: "Шифротекст проверен",
+    auditMissing: "Данные отсутствуют",
+    auditInvalid: "Содержимое повреждено",
+    auditUnavailable: "Проверка недоступна",
+    auditStale: "Наблюдение устарело",
     externalHelp:
       "Это исторические проверки воркера, а не текущее здоровье облака. Повторные наблюдения одного назначения не увеличивают число копий. Нет квитанции - неизвестно, а не отсутствует.",
     observedComplete: "Полнота подтверждена в указанное время",
@@ -951,13 +965,18 @@ async function loadDomain() {
       r.generations.length > 256 ||
       !Array.isArray(r.jobs) ||
       r.jobs.length > 4096 ||
-      !/^outpost-management-report-view-[1-5]$/.test(r.format) ||
+      !/^outpost-management-report-view-[1-6]$/.test(r.format) ||
       (r.externalState !== undefined &&
-        (r.format !== "outpost-management-report-view-5" || r.externalState !== "OBSERVED")) ||
+        (!/^outpost-management-report-view-[56]$/.test(r.format) ||
+          r.externalState !== "OBSERVED")) ||
       (r.externalCopies !== undefined &&
         (!Array.isArray(r.externalCopies) ||
           r.externalCopies.length > 4096 ||
-          r.externalState !== "OBSERVED"))
+          r.externalState !== "OBSERVED" ||
+          r.externalCopies.some(
+            (c) => !c || (c.audit !== undefined && !validExternalAudit(c, r)),
+          ))) ||
+      (r.format === "outpost-management-report-view-6" && !r.externalCopies?.some((c) => c.audit))
     )
       throw new Error("INVALID");
     state.report = r;
@@ -1049,6 +1068,38 @@ function renderPolicy() {
   $("command-fields").disabled = state.loading || !kinds.length;
   commandFields();
 }
+const externalAuditLabels = new Map([
+  ["VERIFIED_CIPHERTEXT", "auditVerified"],
+  ["MISSING", "auditMissing"],
+  ["INVALID_CONTENT", "auditInvalid"],
+  ["UNAVAILABLE", "auditUnavailable"],
+]);
+
+function validExternalAudit(copy, report) {
+  const a = copy.audit;
+  return (
+    report.format === "outpost-management-report-view-6" &&
+    copy.state === "OBSERVED_COMPLETE" &&
+    a &&
+    externalAuditLabels.has(a.state) &&
+    [a.observedUnix, a.finishedUnix, a.expiresUnix].every(Number.isSafeInteger) &&
+    a.observedUnix > 0 &&
+    a.observedUnix >= copy.verifiedUnix &&
+    a.finishedUnix >= a.observedUnix &&
+    a.finishedUnix <= report.observedUnix &&
+    a.expiresUnix > a.observedUnix &&
+    a.expiresUnix - a.observedUnix <= 2592000 &&
+    (a.state === "VERIFIED_CIPHERTEXT" || a.observedUnix === a.finishedUnix)
+  );
+}
+
+function externalAuditLabel(audit, report) {
+  if (!audit) return tr("unknown");
+  const state = tr(externalAuditLabels.get(audit.state));
+  const stale = report.state === "STALE" || Date.now() >= audit.expiresUnix * 1000;
+  return stale ? `${tr("auditStale")} · ${state}` : state;
+}
+
 function renderExternalCopies() {
   const report = state.report;
   const supported = report?.externalState === "OBSERVED";
@@ -1069,6 +1120,8 @@ function renderExternalCopies() {
     c.operationId,
     desired.has(c.target) ? tr("currentAssignment") : tr("historicalAssignment"),
     c.errorCode || "-",
+    externalAuditLabel(c.audit, report),
+    date(c.audit?.observedUnix),
   ]);
   for (const target of desired)
     if (!seen.has(target))
@@ -1081,6 +1134,8 @@ function renderExternalCopies() {
         null,
         tr("currentAssignment"),
         "-",
+        tr("unknown"),
+        tr("unknown"),
       ]);
   table(
     $("external-copies"),
@@ -1093,6 +1148,8 @@ function renderExternalCopies() {
       "operationId",
       "assignment",
       "error",
+      "externalAudit",
+      "externalAuditObserved",
     ],
     rows,
   );

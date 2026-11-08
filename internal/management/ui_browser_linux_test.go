@@ -46,13 +46,15 @@ func TestManagementBrowserFixture(t *testing.T) {
 	for i := 0; i < 61; i++ {
 		view.Jobs = append(view.Jobs, Job{Operation: id(fmt.Sprint("browser-job-", i)), Domain: view.Domain, Generation: id("generation"), Kind: "PEER", Phase: "QUEUED", UpdatedUnix: view.ObservedUnix})
 	}
-	view.Format = ExternalReportFormat
+	view.Format = ExternalAuditReportFormat
 	view.ExternalState = "OBSERVED"
 	for i := 0; i < 2; i++ {
 		view.Jobs[i].Kind = "UPLOAD"
 	}
+	view.Jobs[0].Phase = "COMPLETE"
 	view.ExternalCopies = []ExternalCopy{
-		{Operation: view.Jobs[0].Operation, Generation: view.Jobs[0].Generation, Target: id("browser-cloud-target"), State: "OBSERVED_COMPLETE", Verification: "cached-target-readback", VerifiedUnix: view.ObservedUnix - 300, ReceiptDigest: id("browser-cloud-receipt")},
+		{Operation: view.Jobs[0].Operation, Generation: view.Jobs[0].Generation, Target: id("browser-cloud-target"), State: "OBSERVED_COMPLETE", Verification: "cached-target-readback", VerifiedUnix: view.ObservedUnix - 300, ReceiptDigest: id("browser-cloud-receipt"),
+			Audit: &ExternalAuditObservation{State: "MISSING", ObservedUnix: view.ObservedUnix - 1, FinishedUnix: view.ObservedUnix - 1, ExpiresUnix: view.ObservedUnix + 600}},
 		{Operation: view.Jobs[1].Operation, Generation: view.Jobs[1].Generation, Target: id("browser-pending-target"), State: "UNCONFIRMED", Verification: "NONE"},
 	}
 	raw, e := SignReport(view, f.e, f.node, time.Now())

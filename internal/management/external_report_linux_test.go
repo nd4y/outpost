@@ -72,3 +72,62 @@ func TestExternalCopyReportVersionBindingAndOriginalAgeOverHTTPS(t *testing.T) {
 		}
 	}
 }
+
+func TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS(t *testing.T) {
+	h := newHTTPFixture(t)
+	r, _, client := reporterFixture(t, h)
+	defer r.Close()
+	ctx := context.Background()
+	now := time.Now().Unix() - 20
+	snapshot := reporterSnapshot(t, h.f, now)
+	snapshot.ExternalState = "OBSERVED"
+	job := Job{Operation: id("audited-cloud-op"), Domain: id("domain"), Generation: id("generation"), Kind: "UPLOAD", Phase: "COMPLETE", UpdatedUnix: now - 200}
+	audit := ExternalAuditObservation{State: "MISSING", ObservedUnix: now - 3, FinishedUnix: now - 3, ExpiresUnix: now + 1}
+	copy := ExternalCopy{Operation: job.Operation, Generation: job.Generation, Target: id("audited-cloud-target"), State: "OBSERVED_COMPLETE",
+		Verification: "full-target-readback", VerifiedUnix: now - 201, ReceiptDigest: id("historical-audited-receipt"), Audit: &audit}
+	snapshot.Jobs = append(snapshot.Jobs, job)
+	snapshot.ExternalCopies = []ExternalCopy{copy}
+	raw, err := r.Enqueue(ctx, snapshot)
+	must(t, err)
+	signed, err := VerifyReport(raw, h.f.e, time.Now())
+	must(t, err)
+	if signed.Format != ExternalAuditReportFormat {
+		t.Fatal("audit omitted from versioned report", signed.Format)
+	}
+	_, err = r.Deliver(ctx, client)
+	must(t, err)
+	code, body := h.request(t, h.viewer, "GET", h.base()+"/domains/"+id("domain")+"/report", nil)
+	if code != 200 {
+		t.Fatal(code, string(body))
+	}
+	var view ReportView
+	must(t, json.Unmarshal(body, &view))
+	if view.Format != "outpost-management-report-view-6" || len(view.ExternalCopies) != 1 ||
+		view.ExternalCopies[0].Audit == nil || *view.ExternalCopies[0].Audit != audit ||
+		view.ExternalCopies[0].VerifiedUnix != copy.VerifiedUnix || view.ExternalCopies[0].ReceiptDigest != copy.ReceiptDigest {
+		t.Fatal("scope or age changed in the view", view)
+	}
+	for _, mutate := range []func(*Report){
+		func(r *Report) { r.Format = ExternalReportFormat },
+		func(r *Report) { r.ExternalCopies[0].Audit = nil },
+		func(r *Report) { r.ExternalCopies[0].Audit.State = "COMPLETE" },
+		func(r *Report) { r.ExternalCopies[0].Audit.ExpiresUnix = now - 4 },
+		func(r *Report) { r.ExternalCopies[0].Audit.ObservedUnix = now - 301 },
+		func(r *Report) { r.ExternalCopies[0].Audit.FinishedUnix = now + 1 },
+		func(r *Report) {
+			duplicate := job
+			duplicate.Operation = id("second-audit-same-target")
+			r.Jobs = append(r.Jobs, duplicate)
+			extra := copy
+			extra.Operation = duplicate.Operation
+			r.ExternalCopies = append(r.ExternalCopies, extra)
+		},
+	} {
+		var bad Report
+		must(t, json.Unmarshal(raw, &bad))
+		mutate(&bad)
+		if _, err = SignReport(bad, h.f.e, h.f.node, time.Now()); err == nil {
+			t.Fatal("invalid scheduled observation accepted")
+		}
+	}
+}

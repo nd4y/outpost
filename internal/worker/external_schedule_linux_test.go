@@ -88,6 +88,16 @@ func TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart(t *testin
 	if historical.State != "MISSING" {
 		t.Fatal("restart erased the last failed audit", historical)
 	}
+	requests := target.Snapshot().Requests
+	snapshot, err := reopened.ManagementSnapshot(ctx, workerEnrollment(t, f, 0), f.domain.Trust.Domain)
+	must(t, err)
+	copy := snapshot.ExternalCopies[0]
+	if copy.Operation != operation || copy.State != "OBSERVED_COMPLETE" || copy.ReceiptDigest != storage.Hash(original) ||
+		copy.Audit == nil || copy.Audit.State != "MISSING" || copy.Audit.ObservedUnix != historical.FinishedUnix ||
+		copy.Audit.ExpiresUnix != historical.FinishedUnix+f.domain.ExternalAuditIntervalSeconds ||
+		target.Snapshot().Requests != requests {
+		t.Fatal("snapshot refreshed the old receipt or lost the actual missing observation", copy)
+	}
 	// Independent fixture repair. The scheduled auditor never writes to storage.
 	must(t, os.WriteFile(path, part, 0600))
 	stop = start(t, reopened)

@@ -2771,7 +2771,7 @@
             "type": "string",
             "contentEncoding": "base64",
             "maxLength": 11184812,
-            "description": "Signed outpost-management-report-1 through report-5. Version2 carries scrub/maintenance, version3 adds trusted restore, version4 adds unavailable catalog metadata; version5 adds original-age external-copy receipt observations. Original times, sequence and exact tenant/domain scope are required."
+            "description": "Signed outpost-management-report-1 through report-6. Version2 carries scrub/maintenance, version3 adds trusted restore, version4 adds unavailable catalog metadata, version5 adds original-age external-copy receipts, and version6 adds scheduled audit observations. Original times, sequence and exact tenant/domain scope are required."
           }
         },
         "required": ["document"]
@@ -2787,7 +2787,8 @@
               "outpost-management-report-view-2",
               "outpost-management-report-view-3",
               "outpost-management-report-view-4",
-              "outpost-management-report-view-5"
+              "outpost-management-report-view-5",
+              "outpost-management-report-view-6"
             ]
           },
           "node": {
@@ -2943,7 +2944,7 @@
             "if": {
               "properties": {
                 "format": {
-                  "const": "outpost-management-report-view-5"
+                  "enum": ["outpost-management-report-view-5", "outpost-management-report-view-6"]
                 }
               }
             },
@@ -2960,6 +2961,37 @@
                     "required": ["externalCopies"]
                   }
                 ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-6"
+                }
+              }
+            },
+            "then": {
+              "required": ["externalCopies"],
+              "properties": {
+                "externalCopies": {
+                  "contains": {
+                    "required": ["audit"]
+                  },
+                  "maxContains": 128
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "externalCopies": {
+                  "items": {
+                    "not": {
+                      "required": ["audit"]
+                    }
+                  }
+                }
               }
             }
           }
@@ -4225,6 +4257,21 @@
           }
         }
       },
+      "ExternalAuditObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "One scheduled result per current target. Successful observations keep the oldest supporting read. Expiry never renews with report delivery.",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["VERIFIED_CIPHERTEXT", "MISSING", "INVALID_CONTENT", "UNAVAILABLE"]
+          },
+          "observedUnix": { "type": "integer", "minimum": 1, "maximum": 1099511627776 },
+          "finishedUnix": { "type": "integer", "minimum": 1, "maximum": 1099511627776 },
+          "expiresUnix": { "type": "integer", "minimum": 1, "maximum": 1099511627776 }
+        },
+        "required": ["state", "observedUnix", "finishedUnix", "expiresUnix"]
+      },
       "ExternalCopy": {
         "type": "object",
         "additionalProperties": false,
@@ -4254,6 +4301,9 @@
           },
           "receiptDigest": {
             "$ref": "#/components/schemas/ID"
+          },
+          "audit": {
+            "$ref": "#/components/schemas/ExternalAuditObservation"
           },
           "errorCode": {
             "type": "string",
@@ -4303,7 +4353,7 @@
                 }
               },
               "not": {
-                "required": ["receiptDigest"]
+                "anyOf": [{ "required": ["receiptDigest"] }, { "required": ["audit"] }]
               }
             }
           },
