@@ -53,7 +53,7 @@ func TestSourceAgentSIGKILLChild(t *testing.T) {
 }
 
 func TestSourceAgentSIGKILLFencesAndFinalHead(t *testing.T) {
-	for _, point := range []string{"source-agent-intent-durable", "source-agent-before-head", "source-schedule-head-observed"} {
+	for _, point := range []string{"source-agent-intent-durable", "source-agent-active-durable", "source-agent-before-head", "source-schedule-head-observed"} {
 		t.Run(point, func(t *testing.T) {
 			f := newFixture(t)
 			scheduled := point == "source-schedule-head-observed"

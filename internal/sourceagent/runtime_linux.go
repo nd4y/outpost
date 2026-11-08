@@ -566,10 +566,8 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 	if _, e = job.Status(ctx); e != nil {
 		return e
 	}
-	if s.Phase == "PREPARING" {
-		s.Phase = "ACTIVE"
-		return a.save(s)
-	}
+	// Preparing the local job does not contact the receiver. Leave the intent
+	// eligible for unstarted retirement until the execution fence is durable.
 	return nil
 }
 
@@ -716,8 +714,17 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte) error {
 	}
 	defer close()
 	if s.Phase == "PREPARING" {
+		if e = a.guard(ctx); e != nil {
+			return e
+		}
+		if _, e = a.intent(s.Intent, true); e != nil {
+			return e
+		}
 		s.Phase = "ACTIVE"
 		if e = a.save(s); e != nil {
+			return e
+		}
+		if e = a.point("source-agent-active-durable"); e != nil {
 			return e
 		}
 	}

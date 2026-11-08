@@ -54,7 +54,7 @@ The receiver must already have persisted its complete receipt. A replica head by
 
 ## Retire an expired unstarted intent
 
-The source agent can retire an exact expired intent while its signed journal is still `PREPARING`. The ordinary agent durably saves `ACTIVE` before making its first receiver request. Preview and retirement take the same execution lease as capture. The owner permit binds the exact source, intent, previous checkpoint and expiry. An `ACTIVE` intent requires separate reconciliation even if it has no receipt.
+The source agent can retire an exact expired intent while its signed journal is still `PREPARING`, including after successful local job preparation. At execution the agent checks validity again and durably saves `ACTIVE` before making its first receiver request. Preview and retirement take the same execution lease as capture. The owner permit binds the exact source, intent, previous checkpoint and expiry. Existing and new `ACTIVE` intents require separate reconciliation even without a receipt.
 
 ```sh
 outpost source-unstarted-preview --bootstrap /private/source.json \

@@ -35,28 +35,25 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(f.tree, "private.bin"))
 	must(t, err)
 	before := requests.Load()
-	stop := errors.New("stop after the durable source intent")
-	f.a.Fault = func(p string) error {
-		if p == "source-agent-intent-durable" {
-			return stop
-		}
-		return nil
-	}
 	expiry := time.Now().Add(12 * time.Second).Unix()
 	intent := f.intentUntil(t, first.Sequence+1, first.Generation, expiry)
-	if err = f.a.Prepare(ctx, intent); !errors.Is(err, stop) {
-		t.Fatal("intent fence not reached", err)
+	must(t, f.a.Prepare(ctx, intent))
+	if requests.Load() != before {
+		t.Fatal("preparation contacted the receiver", requests.Load(), before)
 	}
 	if _, err = f.a.UnstartedRetirementPreview(ctx); !errors.Is(err, ErrInvalid) {
 		t.Fatal("current intent accepted for expiry", err)
 	}
 	status, err := f.a.Status(ctx)
 	must(t, err)
-	if status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RESUME"}) {
+	if status.Phase != "PREPARING" || status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RESUME"}) {
 		t.Fatal("current intent has the wrong recovery action", status.Pending)
 	}
 	f.waitForIntentExpiry(t, intent, expiry)
 	f.reopen(t)
+	if err = f.a.Run(ctx); !errors.Is(err, ingress.ErrDenied) || requests.Load() != before {
+		t.Fatal("expired prepared job crossed the receiver fence", err, requests.Load(), before)
+	}
 	status, err = f.a.Status(ctx)
 	must(t, err)
 	if status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RETIRE_UNSTARTED"}) {
@@ -234,6 +231,7 @@ func TestSourceUnstartedRetirementSIGKILLAndNextGeneration(t *testing.T) {
 		}
 	}
 	t.Log("actual SIGKILL, zero retirement requests, same receiver renewal and two independent restores")
+	t.Log("successfully prepared local job retired after expiry without a receiver request")
 }
 
 func runUnstartedCLI(t *testing.T, binary string, args ...string) []byte {
@@ -250,13 +248,24 @@ func runUnstartedCLI(t *testing.T, binary string, args ...string) []byte {
 func TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	expiry := time.Now().Add(12 * time.Second).Unix()
+	expiry := time.Now().Add(15 * time.Second).Unix()
 	intent := f.intentUntil(t, 1, "", expiry)
 	must(t, f.a.Prepare(ctx, intent))
+	stop := errors.New("stop after the durable execution fence")
+	f.a.Fault = func(point string) error {
+		if point == "source-agent-active-durable" {
+			return stop
+		}
+		return nil
+	}
+	if err := f.a.Run(ctx); !errors.Is(err, stop) {
+		t.Fatal("run did not reach its execution fence", err)
+	}
 	f.waitForIntentExpiry(t, intent, expiry)
+	f.reopen(t)
 	status, err := f.a.Status(ctx)
 	must(t, err)
-	if status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RECONCILE_RECEIVER"}) {
+	if status.Phase != "ACTIVE" || status.Pending == nil || *status.Pending != (PendingStatus{expiry, "RECONCILE_RECEIVER"}) {
 		t.Fatal("expired active intent has the wrong recovery action", status.Pending)
 	}
 	if _, err := f.a.UnstartedRetirementPreview(ctx); !errors.Is(err, ErrInvalid) {

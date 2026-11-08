@@ -23,7 +23,7 @@ outpost source-status --bootstrap /private/source.json
 outpost source-checkpoint --bootstrap /private/source.json --output /private/checkpoint.json
 ```
 
-`source-next` signs an operation from the durable generation head. Repeating it during a pending operation resumes that operation; after completion it prepares the next sequence and exact parent. `source-prepare --bootstrap FILE --input SIGNED_INTENT` accepts a supplied intent under the same fence. `source-run` executes/resumes the prepared operation and remains idempotent after completion; it does not schedule or create another generation.
+`source-next` signs an operation from the durable generation head and prepares its local job. Repeating it reuses the exact pending intent. `source-prepare --bootstrap FILE --input SIGNED_INTENT` accepts a supplied intent under the same fence. A successful local preparation leaves the source in `PREPARING` and sends no receiver request. `source-run` persists `ACTIVE` before contacting the receiver. It reuses the prepared operation and remains idempotent after completion.
 
 Signed agent state fences the operation before provider preparation. Signed file results and encrypted accepted-pack progress survive restart. The source is never reopened after sealing. A lost final head update resumes the completed job and exports its verified checkpoint/lineage. The cache holds encrypted metadata/progress rather than a complete payload copy. Quotas and reconciliation preserve unaccepted files instead of deleting them.
 
@@ -31,7 +31,7 @@ Status exposes opaque identities, phases and copy observations without source na
 
 ## Renewing source authority
 
-`source-renew` accepts a separately owner-signed grant with a higher revision and current validity. Pause the foreground scheduler and wait for the source to be `IDLE` or `COMPLETE` first. The command holds the same execution lease as capture, preserves the generation head and schedule, and refuses a pending `PREPARING` or `ACTIVE` operation. It does not extend an immutable intent or discard work whose grant has expired.
+`source-renew` accepts a separately owner-signed grant with a higher revision and current validity. Pause the foreground scheduler first. Renewal accepts `IDLE`, `COMPLETE` and an owner-authorized `ABANDONED` operation. The command holds the same execution lease as capture, preserves the generation head and schedule, and refuses a pending `PREPARING` or `ACTIVE` operation. It does not extend an immutable intent or discard work whose grant has expired.
 
 ```sh
 outpost source-renew --bootstrap /private/source.json \
