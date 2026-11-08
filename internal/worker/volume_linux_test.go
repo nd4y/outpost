@@ -116,8 +116,8 @@ func TestBootstrapRejectsLegacyUnboundFormatBeforeRuntimeCreation(t *testing.T) 
 	}
 }
 
-func TestBoundBootstrapInitializesAndReopensOnlyEnrolledRuntime(t *testing.T) {
-	f := newFixture(t)
+func boundBootstrapFixture(t *testing.T, f *fixture) Bootstrap {
+	t.Helper()
 	node := f.nodes[0]
 	root := filepath.Join(f.base, "enrolled")
 	must(t, os.Mkdir(root, 0700))
@@ -134,12 +134,18 @@ func TestBoundBootstrapInitializesAndReopensOnlyEnrolledRuntime(t *testing.T) {
 	must(t, e)
 	must(t, os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: private}), 0600))
 	must(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.ca.cert.Raw}), 0600))
-	b := Bootstrap{Format: BootstrapFormat, Volume: binding, Directory: filepath.Join(root, "runtime"), Node: node.node, Owner: f.owner.Public().(ed25519.PublicKey), CertificateFile: certFile, PrivateKeyFile: keyFile, CAFile: caFile}
+	return Bootstrap{Format: BootstrapFormat, Volume: binding, Directory: filepath.Join(root, "runtime"), Node: node.node, Owner: f.owner.Public().(ed25519.PublicKey), CertificateFile: certFile, PrivateKeyFile: keyFile, CAFile: caFile}
+}
+
+func TestBoundBootstrapInitializesAndReopensOnlyEnrolledRuntime(t *testing.T) {
+	f := newFixture(t)
+	b := boundBootstrapFixture(t, f)
+	ctx := context.Background()
 	w, close, e := b.Open(true)
 	must(t, e)
 	status, e := w.Status(ctx)
 	must(t, e)
-	if status.Node != node.node {
+	if status.Node != b.Node {
 		t.Fatal("wrong node")
 	}
 	close()
@@ -148,7 +154,7 @@ func TestBoundBootstrapInitializesAndReopensOnlyEnrolledRuntime(t *testing.T) {
 	_, e = w.Status(ctx)
 	must(t, e)
 	close()
-	must(t, os.Remove(filepath.Join(root, volume.Sentinel)))
+	must(t, os.Remove(filepath.Join(b.Volume.Root, volume.Sentinel)))
 	if _, _, e = b.Open(false); !errors.Is(e, volume.ErrUnavailable) {
 		t.Fatal("reopened without marker", e)
 	}

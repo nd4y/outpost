@@ -107,22 +107,31 @@ type Backend struct {
 	base        *url.URL
 	client      *http.Client
 	gate        *RequestGate
+	account     *RequestGate
 }
 
-// RequestGate shares request admission for one exact target profile across
-// independent backends without sharing credentials or transports.
+// RequestGate shares request admission without sharing credentials or
+// transports. The optional exact profile binding distinguishes target gates.
 type RequestGate struct {
-	profile Profile
-	slots   chan struct{}
-	mu      sync.Mutex
-	next    time.Time
+	profile  Profile
+	slots    chan struct{}
+	interval time.Duration
+	mu       sync.Mutex
+	next     time.Time
 }
 
 func NewRequestGate(p Profile) (*RequestGate, error) {
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
-	return &RequestGate{profile: p, slots: make(chan struct{}, p.Concurrency)}, nil
+	return &RequestGate{profile: p, slots: make(chan struct{}, p.Concurrency), interval: time.Second / time.Duration(p.RequestsPerSecond)}, nil
+}
+
+func NewAccountRequestGate(concurrency, requestsPerSecond int) (*RequestGate, error) {
+	if concurrency < 1 || concurrency > 4 || requestsPerSecond < 1 || requestsPerSecond > 1000 {
+		return nil, ErrDenied
+	}
+	return &RequestGate{slots: make(chan struct{}, concurrency), interval: time.Second / time.Duration(requestsPerSecond)}, nil
 }
 
 func New(p Profile, c Credentials, roots *x509.CertPool) (*Backend, error) {
@@ -159,13 +168,49 @@ func (b *Backend) WithRequestGate(g *RequestGate) (*Backend, error) {
 	return &bound, nil
 }
 
-// NextRequest preserves an observed throttle deadline when a scheduler persists a retry.
-// It includes other backends sharing the same gate in this process.
-func (b *Backend) NextRequest() time.Time {
-	b.gate.mu.Lock()
-	defer b.gate.mu.Unlock()
-	return b.gate.next
+// WithAccountRequestGate adds a private process-local account budget.
+// The caller supplies an explicit group; endpoints and credentials are opaque.
+func (b *Backend) WithAccountRequestGate(g *RequestGate) (*Backend, error) {
+	if b == nil || g == nil || g.profile.Kind != "" || g.slots == nil || b.account != nil {
+		return nil, ErrDenied
+	}
+	bound := *b
+	bound.account = g
+	return &bound, nil
 }
+
+// NextRequest preserves an observed throttle deadline when a scheduler persists a retry.
+// It includes the target gate and the optional account gate.
+func (b *Backend) NextRequest() time.Time {
+	return b.gate.deadline(b.account)
+}
+
+func (g *RequestGate) enter(ctx context.Context) error {
+	select {
+	case g.slots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (g *RequestGate) leave() { <-g.slots }
+
+// Always lock the target first. An account gate can be shared with several
+// targets, and reserving both deadlines at once keeps both rates independent.
+func (g *RequestGate) deadline(account *RequestGate) time.Time {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if account != nil {
+		account.mu.Lock()
+		defer account.mu.Unlock()
+		if account.next.After(g.next) {
+			return account.next
+		}
+	}
+	return g.next
+}
+
 func pause(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
@@ -176,31 +221,56 @@ func pause(ctx context.Context, d time.Duration) error {
 		return nil
 	}
 }
-func (g *RequestGate) admit(ctx context.Context) error {
+func (g *RequestGate) reserve(account *RequestGate) time.Duration {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if account != nil {
+		account.mu.Lock()
+		defer account.mu.Unlock()
+	}
+	now := time.Now()
+	next := g.next
+	if account != nil && account.next.After(next) {
+		next = account.next
+	}
+	if delay := next.Sub(now); delay > 0 {
+		return delay
+	}
+	g.next = now.Add(g.interval)
+	if account != nil {
+		account.next = now.Add(account.interval)
+	}
+	return 0
+}
+
+func (g *RequestGate) admit(ctx context.Context, account *RequestGate) error {
 	for {
 		if e := ctx.Err(); e != nil {
 			return e
 		}
-		g.mu.Lock()
-		now := time.Now()
-		delay := g.next.Sub(now)
+		delay := g.reserve(account)
 		if delay <= 0 {
-			g.next = now.Add(time.Second / time.Duration(g.profile.RequestsPerSecond))
-			g.mu.Unlock()
 			return nil
 		}
-		g.mu.Unlock()
 		if e := pause(ctx, delay); e != nil {
 			return e
 		}
 	}
 }
-func (g *RequestGate) cooldown(delay time.Duration) {
+func (g *RequestGate) cooldown(account *RequestGate, delay time.Duration) {
 	g.mu.Lock()
-	if at := time.Now().Add(delay); at.After(g.next) {
+	defer g.mu.Unlock()
+	at := time.Now().Add(delay)
+	if at.After(g.next) {
 		g.next = at
 	}
-	g.mu.Unlock()
+	if account != nil {
+		account.mu.Lock()
+		defer account.mu.Unlock()
+		if at.After(account.next) {
+			account.next = at
+		}
+	}
 }
 
 type requestOptions struct {
@@ -247,23 +317,30 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 			return nil, 0, ErrDenied
 		}
 	}
+	if time.Now().Unix() >= b.credentials.ExpiresUnix {
+		return nil, 0, ErrDenied
+	}
 	ctx, timeout := context.WithTimeout(ctx, time.Duration(b.profile.TimeoutMillis)*time.Millisecond)
 	defer timeout()
-	select {
-	case b.gate.slots <- struct{}{}:
-		defer func() { <-b.gate.slots }()
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	}
 	ctx, cancel := context.WithDeadline(ctx, time.Unix(b.credentials.ExpiresUnix, 0))
 	defer cancel()
+	if e := b.gate.enter(ctx); e != nil {
+		return nil, 0, e
+	}
+	defer b.gate.leave()
+	if b.account != nil {
+		if e := b.account.enter(ctx); e != nil {
+			return nil, 0, e
+		}
+		defer b.account.leave()
+	}
 	var last int
 	traffic := b.requestTraffic(ctx, method, key, options)
 	for attempt := 0; attempt < attempts; attempt++ {
 		if time.Now().Unix() >= b.credentials.ExpiresUnix {
 			return nil, 0, ErrDenied
 		}
-		if e := b.gate.admit(ctx); e != nil {
+		if e := b.gate.admit(ctx, b.account); e != nil {
 			return nil, 0, e
 		}
 		if book != nil {
@@ -335,7 +412,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 						}
 						delay = min(remaining, max(time.Duration(0), delay))
 						// Preserve server backoff across calls and already waiting requests.
-						b.gate.cooldown(delay)
+						b.gate.cooldown(b.account, delay)
 						if delay > 30*time.Second {
 							return nil, last, ErrUnavailable
 						}

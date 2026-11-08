@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"github.com/nd4y/outpost/internal/recovery"
 	"io"
 	"net"
 	"os"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/volume"
 )
@@ -25,19 +25,57 @@ const BootstrapFormat = "outpost-bootstrap-2"
 
 // Bootstrap is local-only. It cannot be supplied or expanded by a remote job.
 type Bootstrap struct {
-	Volume          volume.Binding    `json:"volume"`
-	Format          string            `json:"format"`
-	Directory       string            `json:"directory"`
-	Node            string            `json:"node"`
-	Owner           ed25519.PublicKey `json:"ownerPublicKey"`
-	CertificateFile string            `json:"certificateFile"`
-	PrivateKeyFile  string            `json:"privateKeyFile"`
-	CAFile          string            `json:"caFile"`
-	StorageCAFile   string            `json:"storageCAFile,omitempty"`
-	ControlEndpoint string            `json:"controlEndpoint,omitempty"`
-	ControlIdentity string            `json:"controlIdentity,omitempty"`
-	Listen          string            `json:"listen,omitempty"`
-	Credentials     map[string]string `json:"credentialFiles"`
+	Volume                 volume.Binding          `json:"volume"`
+	Format                 string                  `json:"format"`
+	Directory              string                  `json:"directory"`
+	Node                   string                  `json:"node"`
+	Owner                  ed25519.PublicKey       `json:"ownerPublicKey"`
+	CertificateFile        string                  `json:"certificateFile"`
+	PrivateKeyFile         string                  `json:"privateKeyFile"`
+	CAFile                 string                  `json:"caFile"`
+	StorageCAFile          string                  `json:"storageCAFile,omitempty"`
+	ControlEndpoint        string                  `json:"controlEndpoint,omitempty"`
+	ControlIdentity        string                  `json:"controlIdentity,omitempty"`
+	Listen                 string                  `json:"listen,omitempty"`
+	Credentials            map[string]string       `json:"credentialFiles"`
+	ExternalRequestBudgets []ExternalRequestBudget `json:"externalRequestBudgets,omitempty"`
+}
+
+// ExternalRequestBudget is one local account allowance for a private set of
+// credential-bearing storage profile IDs.
+type ExternalRequestBudget struct {
+	Targets           []string `json:"targets"`
+	Concurrency       int      `json:"concurrency"`
+	RequestsPerSecond int      `json:"requestsPerSecond"`
+}
+
+func (b Bootstrap) accountRequestGates() (map[string]*storage.RequestGate, error) {
+	if b.ExternalRequestBudgets == nil {
+		return nil, nil
+	}
+	if len(b.ExternalRequestBudgets) == 0 || len(b.ExternalRequestBudgets) > 128 || len(b.Credentials) > 128 {
+		return nil, ErrDenied
+	}
+	gates := make(map[string]*storage.RequestGate, len(b.Credentials))
+	for _, budget := range b.ExternalRequestBudgets {
+		if len(budget.Targets) == 0 || len(budget.Targets) > len(b.Credentials) {
+			return nil, ErrDenied
+		}
+		gate, err := storage.NewAccountRequestGate(budget.Concurrency, budget.RequestsPerSecond)
+		if err != nil {
+			return nil, ErrDenied
+		}
+		for _, id := range budget.Targets {
+			if _, ok := b.Credentials[id]; !ok || !storage.ID(id) || gates[id] != nil {
+				return nil, ErrDenied
+			}
+			gates[id] = gate
+		}
+	}
+	if len(gates) != len(b.Credentials) {
+		return nil, ErrDenied
+	}
+	return gates, nil
 }
 
 // ReadPrivate never follows a final symlink, opens a device/FIFO, or accepts a
@@ -106,6 +144,9 @@ func LoadBootstrap(path string) (Bootstrap, error) {
 	if b.ControlEndpoint == "" && b.ControlIdentity != "" || b.ControlEndpoint != "" && !storage.ID(b.ControlIdentity) {
 		return b, ErrDenied
 	}
+	if _, e := b.accountRequestGates(); e != nil {
+		return b, e
+	}
 	return b, nil
 }
 func (b Bootstrap) TLS() (tls.Certificate, *x509.CertPool, error) {
@@ -144,6 +185,10 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 	if b.Format != BootstrapFormat || b.Volume.Scope != b.Node {
 		return nil, nil, ErrDenied
 	}
+	resolve, e := b.storageResolver()
+	if e != nil {
+		return nil, nil, e
+	}
 	if e := b.Volume.Check(context.Background(), b.Directory, initialize); e != nil {
 		return nil, nil, e
 	}
@@ -167,7 +212,7 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 		return nil, nil, e
 	}
 	// The guard owns this descriptor until cleanup; Worker keeps its own clone.
-	w, e := Open(Options{Recovery: x, Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: b.Resolve})
+	w, e := Open(Options{Recovery: x, Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: resolve})
 	if e != nil {
 		root.Close()
 		if fetcher != nil {
@@ -183,6 +228,32 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 		}
 	}, nil
 }
+
+func (b Bootstrap) storageResolver() (func(context.Context, storage.Profile) (*storage.Backend, error), error) {
+	gates, err := b.accountRequestGates()
+	if err != nil {
+		return nil, err
+	}
+	if gates == nil {
+		return b.Resolve, nil
+	}
+	return func(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
+		gate := gates[p.ID()]
+		if gate == nil {
+			return nil, ErrDenied
+		}
+		backend, err := b.Resolve(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		bound, err := backend.WithAccountRequestGate(gate)
+		if err != nil {
+			backend.Close()
+		}
+		return bound, err
+	}, nil
+}
+
 func (b Bootstrap) Resolve(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
 	if e := ctx.Err(); e != nil {
 		return nil, e

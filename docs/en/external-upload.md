@@ -35,7 +35,15 @@ The endpoint is an explicitly configured HTTPS URL for an existing bucket prefix
 
 Admission requires the capabilities of the signed target profile. Run capability and failure tests against the actual endpoint before using it for backups. The current checks use synthetic endpoints.
 
-Concurrent jobs share request slots and pacing for an exact signed profile in the same worker process. An in-process configuration refresh preserves the gate for retained profiles. Each queue keeps its own transport and privately resolves credentials. Distinct profiles have independent admission. Shared account and link limits across profiles or processes require separate admission evidence.
+Concurrent jobs share request slots and pacing for an exact signed profile in the same worker process. An in-process configuration refresh preserves the gate for retained profiles. Each queue keeps its own transport and privately resolves credentials. Distinct profiles use independent target gates and can also share a private account allowance.
+
+### Private account allowances
+
+In the local `outpost-bootstrap-2` file, `externalRequestBudgets` optionally defines an array of groups. Each group lists exact storage profile IDs in `targets` and sets `concurrency` from 1 to 4 and `requestsPerSecond` from 1 to 1000. Once configured, every key in `credentialFiles` must belong to exactly one nonempty group. Unknown, duplicate and unassigned targets block bootstrap before volume admission. Omit the field to keep the existing profile-only admission.
+
+Set each group to the allowance allocated to this worker for that account. Requests must satisfy both target and account limits. A `Retry-After` response delays all targets in that group. Different groups remain independent. The private bootstrap owns the grouping. Shared jobs cannot increase it, and the group is never sent with plans or telemetry.
+
+The account limit covers this worker process. Configuration refresh retains its state, and restart reopens the private bootstrap. Queues preserve their own durable retry deadlines. Coordinating slices across workers or constraining shared physical links requires separate evidence. Upgrade the worker before adding the option. An older strict bootstrap reader refuses the new field.
 
 ## WebDAV targets without conditional PUT
 

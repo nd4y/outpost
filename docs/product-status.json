@@ -2551,6 +2551,14 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerParallelUploadsShareOneTargetRequestGate"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetRejectsInvalidPartitions"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -5297,6 +5305,14 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerParallelUploadsShareOneTargetRequestGate"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetRejectsInvalidPartitions"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6577,6 +6593,14 @@
         {
           "path": "cmd/outpost/storage_mode_linux_test.go",
           "name": "TestCLIMoveProfileFencesPreviousWriter"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetRejectsInvalidPartitions"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -6982,6 +7006,14 @@
         {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerParallelUploadsShareOneTargetRequestGate"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetRejectsInvalidPartitions"
+        },
+        {
+          "path": "internal/worker/account_budget_linux_test.go",
+          "name": "TestBootstrapAccountBudgetSharesSlotsRateAndBackoff"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],
