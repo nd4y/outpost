@@ -19,7 +19,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-02",
@@ -41,7 +41,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-03",
@@ -99,7 +99,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-04",
@@ -141,7 +141,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-05",
@@ -187,7 +187,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-06",
@@ -204,7 +204,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-07",
@@ -293,10 +293,14 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalPreservesHeadScheduleAndIndependentVersions"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceAtomicInstallPublishesBoundRuntimeAndCaptures"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-09",
@@ -484,7 +488,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native consistency providers, expired pending-operation resolution, initial-install recovery and recovery-kit orchestration."
+      "remaining": "Native consistency providers, expired pending-operation resolution, lost active-journal recovery and recovery-kit orchestration."
     },
     {
       "id": "REQ-15",
@@ -1303,6 +1307,18 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalSIGKILLPreservesOldOrNewAuthority"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallSIGKILLNeverExposesPartialFinalRuntime"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceAtomicInstallConcurrentCandidateAndForeignDirectory"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallVolumeLossBeforePublicationRetainsCandidate"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -3823,6 +3839,26 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceAtomicInstallPublishesBoundRuntimeAndCaptures"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallSIGKILLNeverExposesPartialFinalRuntime"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceAtomicInstallConcurrentCandidateAndForeignDirectory"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallVolumeLossBeforePublicationRetainsCandidate"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallCandidateLimitAndCancelledAdmission"
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
@@ -4318,6 +4354,10 @@
         {
           "path": "internal/worker/telemetry_linux_test.go",
           "name": "TestWorkerTelemetrySharedQuotaRefusesSendWithoutLosingQueue"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallCandidateLimitAndCancelledAdmission"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -4668,6 +4708,10 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceAtomicInstallPublishesBoundRuntimeAndCaptures"
         },
         {
           "path": "internal/filekit/reference_linux_test.go",
@@ -5345,6 +5389,22 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallSIGKILLNeverExposesPartialFinalRuntime"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceAtomicInstallConcurrentCandidateAndForeignDirectory"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallVolumeLossBeforePublicationRetainsCandidate"
+        },
+        {
+          "path": "internal/sourceagent/install_linux_test.go",
+          "name": "TestSourceInstallCandidateLimitAndCancelledAdmission"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

@@ -93,6 +93,7 @@ type Status struct {
 
 type Agent struct {
 	b                  Bootstrap
+	runtimeDirectory   string
 	root               *os.Root
 	budget             *diskbudget.Budget
 	store, lease       *statefile.Store
@@ -116,6 +117,13 @@ func Open(ctx context.Context, b Bootstrap, initialize bool) (*Agent, error) {
 }
 
 func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Agent, error) {
+	if initialize {
+		return initializeAgent(ctx, b, nil)
+	}
+	return openAt(ctx, b, false, scheduleOnly, b.Local.Directory, nil)
+}
+
+func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, directory string, fault func(string) error) (*Agent, error) {
 	if b.Format != Format || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
 		return nil, ErrInvalid
 	}
@@ -123,7 +131,7 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 	if b.Profile.Consistency != "best-effort" || b.Profile.MinimumCopies < 1 || b.Profile.MinimumCopies > 2 || b.Profile.MinimumCopies == 2 && b.ObservationFile == "" {
 		return nil, ErrUnsupported
 	}
-	a := &Agent{b: b}
+	a := &Agent{b: b, runtimeDirectory: directory, Fault: fault}
 	var e error
 	a.authority, e = worker.ReadPrivate(b.AuthorityFile, ingress.MaxDocument)
 	if e != nil {
@@ -217,11 +225,16 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 			return nil, ErrInvalid
 		}
 	}
-	a.root, e = b.Local.Volume.Open(ctx, b.Local.Directory, initialize)
+	a.root, e = b.Local.Volume.Open(ctx, directory, initialize)
 	if e != nil {
 		return nil, e
 	}
 	fail := func(e error) (*Agent, error) { a.Close(); return nil, e }
+	if initialize {
+		if e = a.point("source-install-directory-created"); e != nil {
+			return fail(e)
+		}
+	}
 	a.lease, e = statefile.OpenAt(a.root, "lease", 4096, initialize)
 	if e != nil {
 		return fail(e)
@@ -235,6 +248,11 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 		return fail(e)
 	}
 	a.store.Admit = a.admission("state")
+	if initialize {
+		if e = a.point("source-install-stores-created"); e != nil {
+			return fail(e)
+		}
+	}
 	if scheduleOnly {
 		// Atomic signed state can be inspected without the long capture lease.
 		// Reconciliation is reserved for the normal execution open path.
@@ -287,7 +305,7 @@ func (a *Agent) guard(ctx context.Context) error {
 	if a.poisoned.Load() {
 		return ErrInvalid
 	}
-	return a.b.Local.Volume.CheckHandle(ctx, a.b.Local.Directory, a.root)
+	return a.b.Local.Volume.CheckHandle(ctx, a.runtimeDirectory, a.root)
 }
 func (a *Agent) point(name string) error {
 	if a.Fault != nil {
