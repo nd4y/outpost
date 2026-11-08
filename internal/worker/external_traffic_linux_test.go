@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,7 +107,7 @@ func TestHTTPAttemptObservationSelectsBoundedTargetPages(t *testing.T) {
 		snapshot.ExternalCopies = append(snapshot.ExternalCopies, management.ExternalCopy{Target: id, Operation: id})
 	}
 	const interval = 30
-	for page, want := range []int{8, 8, 1} {
+	for page, want := range []int{6, 6, 5} {
 		snapshot.ObservedUnix = int64(interval * (10002 + page))
 		r, err := TelemetryRecord(snapshot, w.node)
 		must(t, err)
@@ -125,7 +126,7 @@ func TestHTTPAttemptObservationSelectsBoundedTargetPages(t *testing.T) {
 					t.Fatal("incorrect page coverage", m)
 				}
 			case "external_http_attempt_requests":
-				id := fmt.Sprintf("%064x", page*8+seen+1)
+				id := fmt.Sprintf("%064x", page*maxExternalHTTPMetricTargets+seen+1)
 				if m.Target != id || m.Value != nil {
 					t.Fatal("wrong target page or fabricated count", page, m)
 				}
@@ -139,5 +140,55 @@ func TestHTTPAttemptObservationSelectsBoundedTargetPages(t *testing.T) {
 		if seen != want {
 			t.Fatal("missing target page", page, seen)
 		}
+	}
+}
+
+func TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge(t *testing.T) {
+	node, domain := storage.Hash([]byte("node")), storage.Hash([]byte("domain"))
+	now := time.Now().Unix()
+	maxValue := int64(math.MaxInt64)
+	snapshot := management.Snapshot{ObservedUnix: now, ConfigurationRevision: management.MaxSafeInteger,
+		InventoryState: "OBSERVED", Space: management.Space{State: "OBSERVED", PhysicalBytes: &maxValue,
+			FreeBytes: &maxValue, AccountedBytes: &maxValue, ReservedBytes: &maxValue}}
+	record, err := TelemetryRecord(snapshot, node)
+	must(t, err)
+	inScope, selected := int64(128), int64(maxExternalHTTPMetricTargets)
+	record.Metrics = append(record.Metrics,
+		telemetry.Metric{Name: "external_http_targets_in_scope", Value: &inScope},
+		telemetry.Metric{Name: "external_http_targets_selected", Value: &selected})
+	for i := range maxExternalHTTPMetricTargets {
+		target := fmt.Sprintf("%064x", i+1)
+		audit := &management.ExternalAuditObservation{State: "MISSING", ObservedUnix: now - 3, FinishedUnix: now - 3, ExpiresUnix: now + 10}
+		if i == 1 {
+			audit.ExpiresUnix = now
+		} else if i == 2 {
+			audit.State = "UNAVAILABLE"
+		}
+		attempt := upload.HTTPAttempt{FinishedMillis: now * 1000, Counts: &storage.HTTPBodyCounts{
+			Requests: maxValue, RequestBytes: maxValue, ResponseBytes: maxValue, RepeatedRequestBytes: maxValue}}
+		addExternalHTTPAttemptMetrics(&record, target, attempt)
+		addExternalAuditMetrics(&record, target, audit)
+	}
+	get := func(target int, name string) *int64 {
+		t.Helper()
+		for _, item := range record.Metrics {
+			if item.Target == fmt.Sprintf("%064x", target) && item.Name == name {
+				return item.Value
+			}
+		}
+		t.Fatal("missing metric", target, name)
+		return nil
+	}
+	absent := get(1, "external_audit_result")
+	unavailable := get(3, "external_audit_result")
+	staleAt := get(2, "external_audit_observed_timestamp_seconds")
+	if absent == nil || *absent != 2 || unavailable == nil || *unavailable != 4 ||
+		get(2, "external_audit_result") != nil || staleAt == nil || *staleAt != now-3 {
+		t.Fatal("wrong outcome or observation age")
+	}
+	messages, err := telemetry.Encode(node, domain, record)
+	must(t, err)
+	if len(messages[0].Body) >= telemetry.MaxFrame {
+		t.Fatal("audit and HTTP telemetry exceeded the frame bound")
 	}
 }

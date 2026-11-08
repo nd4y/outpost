@@ -20,7 +20,9 @@ import (
 const externalHTTPFormat = "outpost-external-http-attempt-1"
 const externalHTTPDirectory = "telemetry/http-attempts"
 const maxExternalHTTPRecord = 4096
-const maxExternalHTTPMetricTargets = 8
+
+// A full page includes HTTP accounting and audit gauges with known markers.
+const maxExternalHTTPMetricTargets = 6
 
 type externalHTTPRecord struct {
 	Format string `json:"format"`
@@ -133,6 +135,7 @@ func (w *Worker) addExternalHTTPMetrics(ctx context.Context, domain string, inte
 		return
 	}
 	routes := map[string]map[string]bool{}
+	audits := map[string]*management.ExternalAuditObservation{}
 	for _, copy := range snapshot.ExternalCopies {
 		if !storage.ID(copy.Target) || !storage.ID(copy.Operation) {
 			continue
@@ -141,6 +144,9 @@ func (w *Worker) addExternalHTTPMetrics(ctx context.Context, domain string, inte
 			routes[copy.Target] = map[string]bool{}
 		}
 		routes[copy.Target][copy.Operation] = true
+		if copy.Audit != nil {
+			audits[copy.Target] = copy.Audit
+		}
 	}
 	if len(routes) == 0 {
 		return
@@ -176,7 +182,36 @@ func (w *Worker) addExternalHTTPMetrics(ctx context.Context, domain string, inte
 			}
 		}
 		addExternalHTTPAttemptMetrics(record, target, attempt)
+		addExternalAuditMetrics(record, target, audits[target])
 	}
+}
+
+func addExternalAuditMetrics(record *telemetry.Record, target string, audit *management.ExternalAuditObservation) {
+	var outcome, observed, expires *int64
+	if audit != nil && audit.ObservedUnix > 0 && audit.ObservedUnix <= audit.FinishedUnix &&
+		audit.FinishedUnix <= record.ObservedUnix && audit.ExpiresUnix > audit.ObservedUnix {
+		observed, expires = &audit.ObservedUnix, &audit.ExpiresUnix
+		if record.ObservedUnix < audit.ExpiresUnix {
+			var code int64
+			switch audit.State {
+			case "VERIFIED_CIPHERTEXT":
+				code = 1
+			case "MISSING":
+				code = 2
+			case "INVALID_CONTENT":
+				code = 3
+			case "UNAVAILABLE":
+				code = 4
+			}
+			if code != 0 {
+				outcome = &code
+			}
+		}
+	}
+	record.Metrics = append(record.Metrics,
+		telemetry.Metric{Name: "external_audit_result", Target: target, Value: outcome},
+		telemetry.Metric{Name: "external_audit_observed_timestamp_seconds", Target: target, Value: observed},
+		telemetry.Metric{Name: "external_audit_expires_timestamp_seconds", Target: target, Value: expires})
 }
 
 func addExternalHTTPAttemptMetrics(record *telemetry.Record, target string, attempt upload.HTTPAttempt) {

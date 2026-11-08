@@ -3054,6 +3054,10 @@
           "name": "TestExternalAuditReportCarriesLossAndOriginalReceiptOverHTTPS"
         },
         {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge"
+        },
+        {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         },
@@ -3697,6 +3701,10 @@
         {
           "path": "internal/sourceagent/recovery_linux_test.go",
           "name": "TestSourceRecoveryExportPreservesHistoricalCheckpointAndReleasesLease"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
@@ -4933,6 +4941,10 @@
           "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
         },
         {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge"
+        },
+        {
           "path": "internal/worker/cloud_linux_test.go",
           "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
         },
@@ -5196,6 +5208,10 @@
         {
           "path": "internal/worker/external_traffic_linux_test.go",
           "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge"
         },
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
@@ -7258,6 +7274,10 @@
         {
           "path": "internal/worker/external_traffic_linux_test.go",
           "name": "TestHTTPAttemptObservationSelectsBoundedTargetPages"
+        },
+        {
+          "path": "internal/worker/external_traffic_linux_test.go",
+          "name": "TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge"
         },
         {
           "path": "internal/worker/cloud_linux_test.go",

@@ -57,6 +57,9 @@ var metricNames = map[string]bool{
 	"external_http_attempt_requests": true, "external_http_attempt_request_body_bytes": true,
 	"external_http_attempt_response_body_bytes": true, "external_http_attempt_replayed_body_bytes": true,
 	"external_http_attempt_observed_timestamp_seconds": true,
+	"external_audit_result":                            true,
+	"external_audit_observed_timestamp_seconds":        true,
+	"external_audit_expires_timestamp_seconds":         true,
 }
 
 func member(value string, choices ...string) bool {
@@ -76,6 +79,9 @@ func (r Record) Validate() error {
 	for _, m := range r.Metrics {
 		key := m.Name + "/" + m.Target
 		if !metricNames[m.Name] || !optionalID(m.Target) || seen[key] || m.Value != nil && *m.Value < 0 {
+			return ErrInvalid
+		}
+		if m.Name == "external_audit_result" && (m.Target == "" || m.Value != nil && (*m.Value < 1 || *m.Value > 4)) {
 			return ErrInvalid
 		}
 		seen[key] = true

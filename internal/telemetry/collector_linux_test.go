@@ -143,6 +143,9 @@ func TestTelemetryRealCollectorAcceptsBothSignals(t *testing.T) {
 		{Name: "external_http_attempt_request_body_bytes", Target: target, Value: &value},
 		{Name: "external_http_attempt_response_body_bytes", Target: target},
 		{Name: "external_http_attempt_observed_timestamp_seconds", Target: target, Value: &observed},
+		{Name: "external_audit_result", Target: target},
+		{Name: "external_audit_observed_timestamp_seconds", Target: target, Value: &observed},
+		{Name: "external_audit_expires_timestamp_seconds", Target: target, Value: &observed},
 	}
 	messages, e := Encode(peer.Identity(cert.Leaf), storage.Hash([]byte("domain")), record)
 	if e != nil {
@@ -168,6 +171,8 @@ func TestTelemetryRealCollectorAcceptsBothSignals(t *testing.T) {
 		"resourceMetrics", "resourceLogs", "outpost_jobs_running", "outpost_space_free_bytes_known",
 		"outpost_external_http_attempt_request_body_bytes", "outpost_external_http_attempt_response_body_bytes_known",
 		"outpost_external_http_attempt_observed_timestamp_seconds", target, strconv.FormatInt(observed, 10),
+		"outpost_external_audit_result_known", "outpost_external_audit_observed_timestamp_seconds",
+		"outpost_external_audit_expires_timestamp_seconds",
 		"STATE_CHANGED", strconv.FormatInt(record.ObservedUnix*1000000000, 10),
 	} {
 		if !bytes.Contains(raw, []byte(expected)) {
@@ -176,6 +181,9 @@ func TestTelemetryRealCollectorAcceptsBothSignals(t *testing.T) {
 	}
 	if bytes.Contains(raw, []byte(`"outpost_external_http_attempt_response_body_bytes"`)) {
 		t.Fatal("collector exported unknown body bytes as a measurement")
+	}
+	if bytes.Contains(raw, []byte(`"outpost_external_audit_result"`)) {
+		t.Fatal("collector exported a stale audit as a current result")
 	}
 	t.Log("COLLECTOR_PASS: mutually authenticated logs and metrics accepted; original timestamp and unknown marker exported")
 }
