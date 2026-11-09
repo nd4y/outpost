@@ -163,7 +163,7 @@ jobs:
           export TMPDIR="$RUNNER_TEMP/parallel-capture-tests"
           export OUTPOST_TEST_ROOT="$TMPDIR"
           go test -count=1 -timeout=120s \
-            -run '^(TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth|TestParallelIngressRenewsBothAuthoritiesAtomically|TestSourceCoverageReleasesBeforePublicationAndWorkersResume|TestSourcePartitionCoverageAssemblesFromPeersAfterRelease|TestStagedCoverageRejectsMissingDependencyAndNeverPublishes)$' \
+            -run '^(TestPairedIngressAdaptsInitialCiphertextBytes|TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth|TestParallelIngressRenewsBothAuthoritiesAtomically|TestSourceCoverageReleasesBeforePublicationAndWorkersResume|TestSourcePartitionCoverageAssemblesFromPeersAfterRelease|TestStagedCoverageRejectsMissingDependencyAndNeverPublishes)$' \
             -v ./internal/sourceagent ./internal/ingress
       - name: Verify WebDAV MOVE on native workers and previous CLI
         env:

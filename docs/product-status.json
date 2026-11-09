@@ -351,6 +351,10 @@
           "name": "TestSourceSealedReceiverReplacementAndReclaimsSlot"
         },
         {
+          "path": "internal/sourceagent/ingress_distribution_linux_test.go",
+          "name": "TestPairedIngressAdaptsInitialCiphertextBytes"
+        },
+        {
           "path": "internal/ingress/reconcile_linux_test.go",
           "name": "TestActiveInspectionDistinguishesDurableFenceFromNonAdmission"
         },
@@ -368,7 +372,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection or retirement of a proven unadmitted ACTIVE. An opt-in ACTIVE replacement before durable catalog supports single-copy standby and a third receiver for two-copy mode, with signed restart state and staged-pack reuse. A surviving complete ciphertext closure allows paired replacement after sealing without changing the catalog. The replaced receiver reclaims its slot after verified catch-up. Physical long-offline rejoin, recovery when no reachable holder has a required ciphertext dependency, adaptive weighting and measured asymmetric 500/500/100 acceptance remain open."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection or retirement of a proven unadmitted ACTIVE. An opt-in ACTIVE replacement before durable catalog supports single-copy standby and a third receiver for two-copy mode, with signed restart state and staged-pack reuse. A surviving complete ciphertext closure allows paired replacement after sealing without changing the catalog. The replaced receiver reclaims its slot after verified catch-up. Physical long-offline rejoin, recovery when no reachable holder has a required ciphertext dependency, and measured asymmetric 500/500/100 acceptance remain open. Full-copy initial transfers adapt to measured durable ingress throughput with a bounded weight ratio; split coverage retains deterministic ownership."
     },
     {
       "id": "REQ-06",

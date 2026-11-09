@@ -8,7 +8,6 @@ import (
 	"errors"
 	"os"
 	"path"
-	"sync/atomic"
 	"time"
 
 	"github.com/nd4y/outpost/internal/capture"
@@ -106,7 +105,7 @@ type parallelSink struct {
 	split                   bool
 	recoverRoute            bool
 	replaying               bool
-	next                    atomic.Uint64
+	distribution            ingressDistribution
 }
 
 func (a *Agent) companionIntent(i ingress.Intent, authority []byte) (ingress.Intent, []byte, error) {
@@ -260,8 +259,15 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 		}
 		return client.Write(ctx, ref, payload)
 	}
+	holder, debit := s.distribution.reserve(ref.Bytes)
+	sent := false
+	defer func() {
+		if !sent {
+			s.distribution.refund(debit)
+		}
+	}()
 	origin, destination := s.Client, s.companion
-	if s.next.Add(1)%2 == 0 {
+	if holder == 1 {
 		origin, destination = destination, origin
 	}
 	e := origin.Check(ctx, ref)
@@ -282,9 +288,14 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 			return false, e
 		}
 	}
+	sent = true
+	start := time.Now()
 	created, e := origin.Write(ctx, ref, payload)
 	if e != nil {
 		return false, e
+	}
+	if created {
+		s.distribution.observe(holder, ref.Bytes, time.Since(start))
 	}
 	if e = destination.PullStaged(ctx, origin, ref); e != nil {
 		return false, e
