@@ -264,6 +264,9 @@ func (g *Registry) AdvanceCoverage(ctx context.Context, paused func(string) bool
 		if err != nil {
 			return false, err
 		}
+		if err = s.checkPublication(bounded, s.state.Catalog, refs); err != nil {
+			return false, err
+		}
 		for s.assemblyNext < len(refs) {
 			object := refs[s.assemblyNext]
 			if s.has(object) {

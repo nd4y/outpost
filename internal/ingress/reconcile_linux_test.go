@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nd4y/outpost/internal/diskbudget"
+	"github.com/nd4y/outpost/internal/filekit"
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
@@ -126,4 +129,62 @@ func TestRegistryRejectsCapacityBeforeFencingAndKeepsExactReplay(t *testing.T) {
 	full.Store(true)
 	must(t, f.client.Ready(ctx))
 	must(t, f.client.Begin(ctx))
+}
+
+func TestGenerationCapacityReportsOverlapAndCreditsRetainedObjects(t *testing.T) {
+	f := registryNetwork(t)
+	ctx := t.Context()
+	f.registry.mu.Lock()
+	f.registry.options.CheckPublication = func(_ context.Context, peak diskbudget.Peak) error {
+		return &diskbudget.PeakError{Required: peak}
+	}
+	f.registry.mu.Unlock()
+	must(t, f.client.Begin(ctx))
+	version, err := f.source.Backup(ctx, f.input, filekit.BackupOptions{Names: []string{"private/data"}})
+	must(t, err)
+	raw, roots := f.catalog(t, []string{version.Version})
+	refs, err := generation.Dependencies(raw, f.authority.Trust)
+	must(t, err)
+	if len(refs) == 0 || len(roots) == 0 {
+		t.Fatal("test needs staged dependencies and a missing root")
+	}
+	var replica, unstaged int64
+	for _, ref := range refs {
+		replica += diskbudget.WriteCharge(ref.Bytes)
+		if _, ok := roots[ref.ID]; ok {
+			unstaged += diskbudget.WriteCharge(ref.Bytes)
+		}
+	}
+	_, _, err = f.client.FinishStep(ctx, raw)
+	var short *diskbudget.PeakError
+	if !errors.As(err, &short) || short.Required.Data != replica+unstaged || short.Required.Spool == 0 {
+		t.Fatal("estimate omitted staging or publication overlap", err)
+	}
+	status, err := f.options.Replica.Status(ctx)
+	must(t, err)
+	if len(status.Receiving) != 0 || status.LatestComplete != "" {
+		t.Fatal("capacity check published or fenced a replica", status)
+	}
+	for id, b := range roots {
+		_, err = f.client.Write(ctx, filekit.Object{ID: id, Bytes: len(b)}, b)
+		must(t, err)
+	}
+	ref := refs[0]
+	payload, err := f.client.Read(ctx, filekit.Object{ID: ref.ID, Bytes: ref.Bytes})
+	must(t, err)
+	id, err := f.options.Replica.Begin(ctx, raw)
+	must(t, err)
+	must(t, f.options.Replica.Put(ctx, id, ref.ID, payload))
+	_, _, err = f.client.FinishStep(ctx, raw)
+	if !errors.As(err, &short) || short.Required.Data != replica-diskbudget.WriteCharge(ref.Bytes) || short.Required.Spool == 0 {
+		t.Fatal("restart estimate counted an already staged or retained object", err)
+	}
+	f.registry.mu.Lock()
+	f.registry.session.admitPublication = func(context.Context, diskbudget.Peak) error { return nil }
+	f.registry.mu.Unlock()
+	_, receipt, err := f.client.FinishStep(ctx, raw)
+	must(t, err)
+	if receipt == nil || receipt.Generation != id {
+		t.Fatal("restored capacity did not allow exact publication", receipt)
+	}
 }

@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/peer"
@@ -59,6 +60,11 @@ func statusError(e error) int {
 }
 func fail(w http.ResponseWriter, e error) {
 	status := statusError(e)
+	var detail *diskbudget.PeakError
+	if status == http.StatusInsufficientStorage && errors.As(e, &detail) {
+		jsonReply(w, status, detail)
+		return
+	}
 	http.Error(w, http.StatusText(status), status)
 }
 func readBody(w http.ResponseWriter, r *http.Request, max int) ([]byte, error) {
@@ -404,6 +410,15 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		return 0, nil, nil, ErrProtocol
 	}
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusAccepted {
+		if response.StatusCode == http.StatusInsufficientStorage && response.Header.Get("Content-Type") == "application/json" {
+			body, err := io.ReadAll(io.LimitReader(response.Body, 4096))
+			c.ReadbackBytes.Add(int64(len(body)))
+			var detail diskbudget.PeakError
+			if err == nil && len(body) < 4096 && decodeReply(body, &detail) == nil && detail.Shortfall() {
+				return 0, nil, nil, &detail
+			}
+			return 0, nil, nil, statefile.ErrCapacity
+		}
 		n, _ := io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 		c.ReadbackBytes.Add(n)
 		switch response.StatusCode {

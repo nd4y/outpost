@@ -123,6 +123,28 @@ func TestCheckWriteCountsPendingSpoolWithoutReserving(t *testing.T) {
 		t.Fatal("readiness changed capacity accounting", before, after)
 	}
 }
+
+func TestCheckPeakReportsConcurrentShortfallWithoutReservation(t *testing.T) {
+	b, _ := newBudget(t)
+	ctx := t.Context()
+	need := Peak{Data: WriteCharge(2 << 20), Spool: WriteCharge(512 << 10)}
+	must(t, b.CheckPeak(ctx, need))
+	finish, err := b.Reserve(ctx, "objects/inflight", 1<<20)
+	must(t, err)
+	defer func() { must(t, finish(false)) }()
+	before, err := b.Status(ctx)
+	must(t, err)
+	var short *PeakError
+	err = b.CheckPeak(ctx, need)
+	if !errors.Is(err, ErrCapacity) || !errors.As(err, &short) || short.Required != need || short.Available.Data >= need.Data || !short.Shortfall() {
+		t.Fatal("peak estimate ignored outstanding data or omitted the shortfall", err)
+	}
+	after, err := b.Status(ctx)
+	must(t, err)
+	if before.Revision != after.Revision || len(after.Pending) != 1 {
+		t.Fatal("peak observation changed the ledger", before, after)
+	}
+}
 func TestReconciliationWaitsForActiveWriterAndNeverDeletesFiles(t *testing.T) {
 	b, root := newBudget(t)
 	finish, e := b.Reserve(context.Background(), "objects/keep", 1<<20)

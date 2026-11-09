@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"io/fs"
@@ -361,6 +362,81 @@ func (b *Budget) free() (int64, error) {
 	return int64(s.Bavail) * s.Bsize, nil
 }
 
+// Peak is the extra charged space needed while retained and new files coexist.
+type Peak struct {
+	Data  int64 `json:"dataBytes"`
+	Spool int64 `json:"spoolBytes"`
+}
+
+func WriteCharge(size int) int64 {
+	return (int64(size)+4095)/4096*4096 + overhead
+}
+
+type PeakError struct {
+	Required  Peak  `json:"required"`
+	Available Peak  `json:"available"`
+	Shared    int64 `json:"sharedBytes"`
+}
+
+func (e *PeakError) Error() string {
+	return fmt.Sprintf("generation capacity: data %d/%d bytes, metadata %d/%d bytes, combined %d/%d bytes",
+		e.Required.Data, e.Available.Data, e.Required.Spool, e.Available.Spool,
+		e.Required.Data+e.Required.Spool, e.Shared)
+}
+
+func (e *PeakError) Unwrap() error { return ErrCapacity }
+
+func (p Peak) valid() bool {
+	return p.Data >= 0 && p.Data <= 1<<60 && p.Spool >= 0 && p.Spool <= 1<<60
+}
+
+func (e *PeakError) Shortfall() bool {
+	return e.Required.valid() && e.Available.valid() && e.Shared >= 0 && e.Shared <= 1<<60 &&
+		(e.Required.Data > e.Available.Data || e.Required.Spool > e.Available.Spool ||
+			e.Required.Data+e.Required.Spool > e.Shared)
+}
+
+// CheckPeak observes the shared ledger and filesystem at one instant.
+// Every subsequent write still reserves space through the usual admission.
+func (b *Budget) CheckPeak(ctx context.Context, need Peak) error {
+	if !need.valid() {
+		return ErrInvalid
+	}
+	return b.store.WithLock(ctx, func() error {
+		s, err := b.load()
+		if err != nil {
+			return err
+		}
+		var pending Peak
+		var pendingTotal int64
+		total := ledgerReserve
+		for _, used := range s.Used {
+			total += used
+		}
+		for _, r := range s.Pending {
+			pendingTotal += r.Bytes
+			switch r.Class {
+			case "data":
+				pending.Data += r.Bytes
+			case "spool":
+				pending.Spool += r.Bytes
+			}
+		}
+		free, err := b.free()
+		if err != nil && !errors.Is(err, ErrCapacity) {
+			return err
+		}
+		short := &PeakError{Required: need, Available: Peak{
+			Data:  max(0, s.Limits.maximum("data")-s.Used["data"]-pending.Data),
+			Spool: max(0, s.Limits.maximum("spool")-s.Used["spool"]-pending.Spool),
+		}, Shared: max(0, min(s.Limits.Capacity-total-pendingTotal, free-ledgerReserve-pendingTotal)-s.Limits.Reserve)}
+		if short.Shortfall() {
+			return short
+		}
+		return nil
+	})
+}
+
 // CheckWrite observes whether a write could reserve space now. A later
 // Reserve must still account for concurrent writers and filesystem changes.
 func (b *Budget) CheckWrite(ctx context.Context, name string, size int) error {
@@ -396,7 +472,7 @@ func (b *Budget) checkWrite(s State, name string, size int) (int64, error) {
 			classPending += r.Bytes
 		}
 	}
-	amount := (int64(size)+4095)/4096*4096 + overhead
+	amount := WriteCharge(size)
 	if s.Used[class]+classPending+amount > s.Limits.maximum(class) ||
 		total+pending+amount > s.Limits.Capacity-s.Limits.Reserve {
 		return 0, ErrCapacity

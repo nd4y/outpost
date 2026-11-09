@@ -40,6 +40,7 @@ func (w *Worker) openSettlements(v *view) error {
 			Admission: func(prefix string) statefile.Admission {
 				return w.admission(filepath.ToSlash(filepath.Join(relative, prefix)))
 			},
+			CheckPublication: w.checkPublication,
 			RemoveObject: func(ctx context.Context, name string, size int64) error {
 				if e := w.check(ctx); e != nil {
 					return e

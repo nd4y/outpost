@@ -22,6 +22,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/observation"
@@ -118,25 +119,29 @@ func runCaptureWorker(t *testing.T, ctx context.Context, w *worker.Worker) func(
 }
 
 func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
-	testPairedCapture(t, "", false)
+	testPairedCapture(t, "", false, false)
 }
 
 func TestSourceCoverageReleasesBeforePublicationAndWorkersResume(t *testing.T) {
-	testPairedCapture(t, capture.TwoHolderCoverage, false)
+	testPairedCapture(t, capture.TwoHolderCoverage, false, false)
 }
 
 func TestSourcePartitionCoverageAssemblesFromPeersAfterRelease(t *testing.T) {
-	testPairedCapture(t, capture.PairedSplitCoverage, false)
+	testPairedCapture(t, capture.PairedSplitCoverage, false, false)
+}
+
+func TestSourceSplitReusesInitialCiphertextAfterInterruptedDelivery(t *testing.T) {
+	testPairedCapture(t, capture.PairedSplitCoverage, false, true)
 }
 
 func TestExpiredPairedCoveragePublishesAndSettlesOfflineSource(t *testing.T) {
 	if os.Getenv("OUTPOST_EXPIRY_INTEGRATION") != "1" {
 		t.Skip("real expiry integration is exercised on the dedicated HDD")
 	}
-	testPairedCapture(t, capture.PairedSplitCoverage, true)
+	testPairedCapture(t, capture.PairedSplitCoverage, true, false)
 }
 
-func testPairedCapture(t *testing.T, releasePolicy string, expire bool) {
+func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDelivery bool) {
 	t.Helper()
 	coverage := releasePolicy != ""
 	split := releasePolicy == capture.PairedSplitCoverage
@@ -173,7 +178,7 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire bool) {
 	traffic := &captureTraffic{initial: map[string]int{}, payload: map[string]bool{}, together: make(chan struct{})}
 	aHandler := traffic.watch(aID, aWorker)
 	var attemptedDrop, dropped atomic.Bool
-	var allowCoverage, allowPublication atomic.Bool
+	var allowCoverage, allowPublication, refuseInitial atomic.Bool
 	var peerImports atomic.Int64
 	allowCoverage.Store(!coverage)
 	allowPublication.Store(!coverage)
@@ -199,6 +204,10 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire bool) {
 	}
 	f.intercept = func(out http.ResponseWriter, r *http.Request) bool {
 		if peerRead(out, r) {
+			return true
+		}
+		if r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/objects/") && refuseInitial.CompareAndSwap(true, false) {
+			http.Error(out, "staging quota", http.StatusInsufficientStorage)
 			return true
 		}
 		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/catalog") && attemptedDrop.CompareAndSwap(false, true) {
@@ -308,6 +317,10 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire bool) {
 	f.a, e = Open(ctx, f.b, true)
 	must(t, e)
 	must(t, f.a.Next(ctx))
+	if interruptedDelivery {
+		testSplitDelivery(t, ctx, f.a, traffic, &allowPublication, &refuseInitial)
+		return
+	}
 	started := time.Now()
 	pause := errors.New("pause before receiver publication")
 	f.a.Fault = func(point string) error {
@@ -594,6 +607,85 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire bool) {
 		}
 	}
 	t.Logf("concurrent source uploads, %d single initial sends, %d pre-seal peer reads, three independent restores with the outbound follower admitted after source release", initial, relayed)
+}
+
+func testSplitDelivery(t *testing.T, ctx context.Context, a *Agent, traffic *captureTraffic, allow, refuse *atomic.Bool) {
+	t.Helper()
+	state, err := a.load()
+	must(t, err)
+	i, err := a.stateIntent(state)
+	must(t, err)
+	companion, raw, err := a.companionIntent(i, a.companionAuthority)
+	must(t, err)
+	open := func(replaying bool) *parallelSink {
+		primary, err := ingress.NewClient(a.b.Endpoint, a.authority, state.Intent, a.b.Local.Owner, a.cert, a.roots, sourceFixtureLimits)
+		must(t, err)
+		t.Cleanup(primary.Close)
+		other, err := ingress.NewClient(a.b.Companion.Endpoint, a.companionAuthority, raw, a.b.Local.Owner, a.cert, a.roots, sourceFixtureLimits)
+		must(t, err)
+		t.Cleanup(other.Close)
+		sink := &parallelSink{Client: primary, companion: other, primary: i.Ingress, intention: companion, split: true, replaying: replaying}
+		must(t, sink.Begin(ctx))
+		return sink
+	}
+	sink := open(false)
+	object := func(seed byte) ([]byte, filekit.Object) {
+		t.Helper()
+		payload := make([]byte, minIngressSample)
+		payload[1] = seed
+		for n := range 256 {
+			payload[0] = byte(n)
+			ref := filekit.Object{ID: storage.Hash(payload), Bytes: len(payload)}
+			if sink.splitOwner(ref) == 1 {
+				return payload, ref
+			}
+		}
+		t.Fatal("test object has no companion ownership")
+		return nil, filekit.Object{}
+	}
+	preferPrimary := func(s *parallelSink) {
+		s.distribution.observe(0, minIngressSample, time.Second)
+		s.distribution.observe(1, minIngressSample, 4*time.Second)
+	}
+	payload, ref := object(1)
+	preferPrimary(sink)
+	if _, err = sink.Write(ctx, ref, payload); !errors.Is(err, ingress.ErrUnavailable) {
+		t.Fatal("did not interrupt delivery after durable source PUT", err)
+	}
+	must(t, sink.Client.Check(ctx, ref))
+	if err = sink.companion.Check(ctx, ref); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("stable owner unexpectedly accepted the object", err)
+	}
+	sink.Client.Close()
+	sink.companion.Close()
+	allow.Store(true)
+	resumed := open(true)
+	created, err := resumed.Write(ctx, ref, payload)
+	must(t, err)
+	if created {
+		t.Fatal("resume sent source bytes again")
+	}
+	got, err := resumed.Read(ctx, ref)
+	must(t, err)
+	traffic.mu.Lock()
+	initial := traffic.initial[ref.ID]
+	traffic.mu.Unlock()
+	if initial != 1 || !bytes.Equal(got, payload) {
+		t.Fatal("handoff did not recover exact ciphertext with one source PUT", initial)
+	}
+	capped := open(false)
+	preferPrimary(capped)
+	payload, ref = object(2)
+	refuse.Store(true)
+	created, err = capped.Write(ctx, ref, payload)
+	must(t, err)
+	if !created || refuse.Load() {
+		t.Fatal("adaptive staging refusal did not fall back to the owner")
+	}
+	must(t, capped.companion.Check(ctx, ref))
+	if err = capped.Client.Check(ctx, ref); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("refused origin unexpectedly accepted a duplicate", err)
+	}
 }
 
 func TestParallelIngressRenewsBothAuthoritiesAtomically(t *testing.T) {

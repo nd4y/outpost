@@ -234,6 +234,15 @@ func (w *Worker) check(ctx context.Context) error {
 	}
 	return nil
 }
+func (w *Worker) checkPublication(ctx context.Context, peak diskbudget.Peak) error {
+	if err := w.check(ctx); err != nil {
+		return err
+	}
+	if w.budget == nil {
+		return ErrDenied
+	}
+	return w.budget.CheckPeak(ctx, peak)
+}
 func (w *Worker) relative(dir string) string {
 	rel, e := filepath.Rel(w.dir, dir)
 	if e != nil {
@@ -457,7 +466,7 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 					return ErrDenied
 				}
 				return w.budget.CheckWrite(ctx, filepath.ToSlash(filepath.Join(relative, "registry.json")), size)
-			}, RemoveObject: func(ctx context.Context, name string, size int64) error {
+			}, CheckPublication: w.checkPublication, RemoveObject: func(ctx context.Context, name string, size int64) error {
 				if e := w.check(ctx); e != nil {
 					return e
 				}

@@ -43,3 +43,24 @@ func TestPairedIngressAdaptsInitialCiphertextBytes(t *testing.T) {
 		t.Fatal("allocation did not follow the new faster holder within its cap", sends)
 	}
 }
+
+func TestSplitIngressKeepsOwnerUntilRatesDiverge(t *testing.T) {
+	const size = 1 << 20
+	var d ingressDistribution
+	if holder, debit := d.reservePreferred(size, 1); holder != 1 || debit != 0 {
+		t.Fatal("warm-up did not use the stable owner", holder, debit)
+	}
+	d.observe(0, size, time.Second)
+	d.observe(1, size, 4*time.Second)
+	if holder, debit := d.reservePreferred(minIngressSample-1, 1); holder != 1 || debit != 0 {
+		t.Fatal("small object did not use the stable owner", holder, debit)
+	}
+	var sends [2]int
+	for range 100 {
+		holder, _ := d.reservePreferred(size, 1)
+		sends[holder]++
+	}
+	if sends != [2]int{80, 20} {
+		t.Fatal("split ingress did not allocate measured throughput", sends)
+	}
+}

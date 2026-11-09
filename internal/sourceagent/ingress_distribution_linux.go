@@ -17,6 +17,12 @@ type ingressDistribution struct {
 const minIngressSample = 256 << 10
 
 func (d *ingressDistribution) reserve(size int) (holder int, debit int64) {
+	return d.reservePreferred(size, -1)
+}
+
+// The stable owner is preferred during split warm-up and for small writes.
+// Only a measured difference warrants an extra pre-seal peer transfer.
+func (d *ingressDistribution) reservePreferred(size, preferred int) (holder int, debit int64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -25,6 +31,9 @@ func (d *ingressDistribution) reserve(size int) (holder int, debit int64) {
 		for i := range weight {
 			weight[i] = max(1, int64(math.Round(min(4, d.rate[i]/d.rate[1-i]))))
 		}
+	}
+	if preferred >= 0 && (size < minIngressSample || weight[0] == weight[1]) {
+		return preferred, 0
 	}
 	// Reserving bytes before the HEAD checks keeps concurrent packs from
 	// making the same decision against an unchanged balance.

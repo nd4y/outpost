@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -44,6 +45,7 @@ type RegistryOptions struct {
 	Admission func(prefix string) statefile.Admission
 	// CheckRegistryWrite inspects capacity without reserving it.
 	CheckRegistryWrite func(context.Context, int) error
+	CheckPublication   func(context.Context, diskbudget.Peak) error
 	RemoveObject       func(context.Context, string, int64) error
 }
 type registryState struct {
@@ -251,7 +253,7 @@ func (g *Registry) sessionOptions(raw []byte) SessionOptions {
 	if bytes.Equal(raw, g.state.Intent) {
 		authority = g.intentAuthority()
 	}
-	return SessionOptions{Parent: g.root, Directory: "current", Authority: authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject}
+	return SessionOptions{Parent: g.root, Directory: "current", Authority: authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject, CheckPublication: g.options.CheckPublication}
 }
 
 func (g *Registry) sessionServer() (*http.Server, error) {

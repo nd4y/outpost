@@ -49,9 +49,15 @@ The `two-holder-coverage` policy requires two holders for every dependency.
 
 Set `profile.releasePolicy` to `paired-split-coverage` to accept one staged copy per dependency before release. New object ownership is stable across retries and derived from its opaque ID and the two holder identities. Both holders retain the final catalog. The source validates the union by recomputing the assigned dependency list for each holder. A required dependency cannot be covered by an unrelated holder or intent.
 
-After seal, each worker pulls missing dependencies only from its configured peer and verifies the entire generation before publication. Protect both holders until assembly completes. Failure of a holder can lose a newly captured object during the interval with only one staged copy. The [publication recovery workflow](source-settlement.md#finish-an-expired-staged-publication) covers accepted staging after expiry. Partition ownership stays deterministic for coverage verification. Asymmetric throughput acceptance remains open.
+Small objects and the first samples go to their assigned holders. When successful durable PUTs of at least 256 KiB show unequal rates, the source can send a large object to the other holder, using the same 4:1 cap as full-copy capture. The assigned holder then pulls the exact staged bytes over the signed peer route before that object counts toward coverage. After an interruption between the PUT and the handoff, the source asks the assigned holder to import the peer's staged bytes before sending the object again. If the alternate origin reports a quota refusal and the import confirms the object is absent, the source sends directly to the assigned holder.
+
+After seal, each worker pulls missing dependencies only from its configured peer and verifies the entire generation before publication. Protect both holders until assembly completes. Failure of a holder can lose a newly captured object during the interval with only one staged copy. The [publication recovery workflow](source-settlement.md#finish-an-expired-staged-publication) covers accepted staging after expiry. Asymmetric throughput acceptance remains open.
 
 Keep the source and workers on a version that understands the pending coverage journal until both complete receipts have been acknowledged. Pausing preserves the staged data and generation pins.
+
+## Space for a full generation
+
+Before assembling or publishing a full capture, the worker estimates extra space from the signed catalog's unique dependencies. Already present staging and replica objects are credited separately. The estimate includes overlapping staging and replica writes, the catalog, index, session and verification journals. The shared ledger accounts for retained history, pins, outstanding writes and the filesystem reserve. A ledger shortfall returns required and available bytes for data, metadata and the shared limit. The estimate applies to the current publication attempt. Writes still reserve space individually and verify ciphertext. Split coverage can release the source view on its own durable receipts while full publication waits for space.
 
 ## Standby before admission
 

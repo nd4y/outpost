@@ -363,6 +363,14 @@
           "name": "TestPairedIngressAdaptsInitialCiphertextBytes"
         },
         {
+          "path": "internal/sourceagent/ingress_distribution_linux_test.go",
+          "name": "TestSplitIngressKeepsOwnerUntilRatesDiverge"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourceSplitReusesInitialCiphertextAfterInterruptedDelivery"
+        },
+        {
           "path": "internal/ingress/reconcile_linux_test.go",
           "name": "TestActiveInspectionDistinguishesDurableFenceFromNonAdmission"
         },
@@ -5428,6 +5436,8 @@
         "internal/managementservice",
         "internal/worker",
         "internal/diskbudget",
+        "internal/ingress",
+        "internal/generation",
         "cmd/outpost",
         "internal/isolation",
         "internal/telemetry",
@@ -5436,6 +5446,14 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestCheckPeakReportsConcurrentShortfallWithoutReservation"
+        },
+        {
+          "path": "internal/ingress/reconcile_linux_test.go",
+          "name": "TestGenerationCapacityReportsOverlapAndCreditsRetainedObjects"
+        },
         {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation"

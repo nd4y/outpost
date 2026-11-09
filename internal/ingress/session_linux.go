@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -31,6 +32,7 @@ type SessionOptions struct {
 	Initialize              bool
 	AdmitState, AdmitObject statefile.Admission
 	RemoveObject            func(context.Context, string, int64) error
+	CheckPublication        func(context.Context, diskbudget.Peak) error
 	publishGrant            []byte
 }
 
@@ -65,25 +67,27 @@ type Receipt struct {
 	VerifiedAt    int64  `json:"verifiedAt"`
 }
 type Session struct {
-	root          *os.Root
-	mu            sync.Mutex
-	state         sessionState
-	intent        Intent
-	owner         ed25519.PublicKey
-	meta, objects *statefile.Store
-	objectRoot    *os.Root
-	lease         *os.File
-	replica       *generation.Replica
-	refs, base    map[string]generation.Object
-	catalogRefs   []generation.Object
-	assemblyNext  int
-	baseID        string
-	bytes         int64
-	poisoned      bool
-	removeObject  func(context.Context, string, int64) error
-	publishGrant  []byte
-	inspection    bool
-	Fault         func(string) error
+	root             *os.Root
+	mu               sync.Mutex
+	state            sessionState
+	intent           Intent
+	owner            ed25519.PublicKey
+	meta, objects    *statefile.Store
+	objectRoot       *os.Root
+	lease            *os.File
+	replica          *generation.Replica
+	refs, base       map[string]generation.Object
+	catalogRefs      []generation.Object
+	assemblyNext     int
+	baseID           string
+	bytes            int64
+	poisoned         bool
+	removeObject     func(context.Context, string, int64) error
+	admitPublication func(context.Context, diskbudget.Peak) error
+	estimatedCatalog string
+	publishGrant     []byte
+	inspection       bool
+	Fault            func(string) error
 }
 
 func (s *Session) point(name string) error {
@@ -249,7 +253,7 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		return nil, ErrConflict
 	}
 	owned = true
-	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, inspection: inspection, publishGrant: bytes.Clone(o.publishGrant)}
+	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, admitPublication: o.CheckPublication, inspection: inspection, publishGrant: bytes.Clone(o.publishGrant)}
 	fail := func(e error) (*Session, error) { s.Close(); return nil, e }
 	s.meta, e = statefile.OpenAt(r, "state", maxSessionDocument, o.Initialize)
 	if e != nil {
@@ -588,6 +592,9 @@ func (s *Session) has(ref generation.Object) bool {
 func (s *Session) prepare(ctx context.Context, raw []byte) ([]generation.Object, error) {
 	refs, e := s.catalogDependencies(ctx, raw)
 	if e != nil {
+		return nil, e
+	}
+	if e = s.checkPublication(ctx, raw, refs); e != nil {
 		return nil, e
 	}
 	for _, ref := range refs {

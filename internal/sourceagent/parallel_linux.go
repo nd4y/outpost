@@ -187,23 +187,32 @@ func (s *parallelSink) Begin(ctx context.Context) error {
 	return s.companion.Begin(ctx)
 }
 
-func (s *parallelSink) selected(ref filekit.Object) *ingress.Client {
+func (s *parallelSink) splitOwner(ref filekit.Object) int {
 	if ingress.CoverageHolder(ref.ID, s.primary, s.intention.Ingress) == s.primary {
-		return s.Client
+		return 0
 	}
-	return s.companion
+	return 1
 }
 
 func (s *parallelSink) Read(ctx context.Context, ref filekit.Object) ([]byte, error) {
+	if s.split {
+		holders := [2]*ingress.Client{s.Client, s.companion}
+		owner := s.splitOwner(ref)
+		b, err := holders[owner].Read(ctx, ref)
+		if !s.replaying || !errors.Is(err, os.ErrNotExist) {
+			return b, err
+		}
+		if err = holders[owner].PullStaged(ctx, holders[1-owner], ref); err != nil {
+			return nil, err
+		}
+		return holders[owner].Read(ctx, ref)
+	}
 	// Reusing a cached version reads its encrypted descriptor parts. Confirm
 	// those parts on the new route before the catalog can reference them.
 	if s.recoverRoute {
 		if err := s.Check(ctx, ref); err != nil {
 			return nil, err
 		}
-	}
-	if s.split {
-		return s.selected(ref).Read(ctx, ref)
 	}
 	return s.Client.Read(ctx, ref)
 }
@@ -226,16 +235,21 @@ func (s *parallelSink) RecoverSealed(ctx context.Context, refs []generation.Obje
 }
 
 func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
-	primary, other := s.Client, s.companion
-	if s.split && s.selected(ref) == s.companion {
-		primary, other = other, primary
+	if s.split {
+		holders := [2]*ingress.Client{s.Client, s.companion}
+		owner := s.splitOwner(ref)
+		err := holders[owner].Check(ctx, ref)
+		if s.replaying && errors.Is(err, os.ErrNotExist) {
+			// A previous source PUT may have completed before delivery to the
+			// stable owner. Import the exact staged bytes before resending.
+			return holders[owner].PullStaged(ctx, holders[1-owner], ref)
+		}
+		return err
 	}
+	primary, other := s.Client, s.companion
 	err := primary.Check(ctx, ref)
 	if err != nil && (!s.recoverRoute || !errors.Is(err, os.ErrNotExist)) {
 		return err
-	}
-	if err == nil && s.split {
-		return nil
 	}
 	otherErr := other.Check(ctx, ref)
 	if err == nil && s.recoverRoute && errors.Is(otherErr, os.ErrNotExist) {
@@ -249,15 +263,40 @@ func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
 
 func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []byte) (bool, error) {
 	if s.split {
-		client := s.selected(ref)
-		e := client.Check(ctx, ref)
-		if e == nil {
+		if err := s.Check(ctx, ref); err == nil {
 			return false, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return false, err
 		}
-		if !errors.Is(e, os.ErrNotExist) {
-			return false, e
+		holders := [2]*ingress.Client{s.Client, s.companion}
+		owner := s.splitOwner(ref)
+		origin, debit := s.distribution.reservePreferred(ref.Bytes, owner)
+		start := time.Now()
+		created, err := holders[origin].Write(ctx, ref, payload)
+		if origin != owner && errors.Is(err, statefile.ErrCapacity) {
+			// The faster holder may be unable to stage this extra object.
+			// Confirm the result before trying the stable owner directly.
+			s.distribution.refund(debit)
+			err = holders[owner].PullStaged(ctx, holders[origin], ref)
+			if errors.Is(err, os.ErrNotExist) {
+				return holders[owner].Write(ctx, ref, payload)
+			}
+			return false, err
 		}
-		return client.Write(ctx, ref, payload)
+		if err != nil {
+			return false, err
+		}
+		if created {
+			s.distribution.observe(origin, ref.Bytes, time.Since(start))
+		} else {
+			s.distribution.refund(debit)
+		}
+		if origin != owner {
+			if err = holders[owner].PullStaged(ctx, holders[origin], ref); err != nil {
+				return false, err
+			}
+		}
+		return created, nil
 	}
 	holder, debit := s.distribution.reserve(ref.Bytes)
 	sent := false
