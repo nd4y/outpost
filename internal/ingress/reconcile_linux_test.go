@@ -1,11 +1,14 @@
 package ingress
 
 import (
+	"context"
 	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -87,4 +90,40 @@ func TestRegistryReadinessLeavesNoFenceAndRequiresExactParent(t *testing.T) {
 	if len(f.registry.state.Intent) != 0 {
 		t.Fatal("readiness or rejected admission fenced the receiver")
 	}
+}
+
+func TestRegistryRejectsCapacityBeforeFencingAndKeepsExactReplay(t *testing.T) {
+	f := registryNetwork(t)
+	ctx := t.Context()
+	var full atomic.Bool
+	full.Store(true)
+	f.registry.mu.Lock()
+	f.registry.options.CheckRegistryWrite = func(_ context.Context, size int) error {
+		if size <= len(f.fixture.options.Intent) {
+			return ErrProtocol
+		}
+		if full.Load() {
+			return statefile.ErrCapacity
+		}
+		return nil
+	}
+	f.registry.mu.Unlock()
+	if err := f.client.Ready(ctx); !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatal("readiness did not report exhausted metadata capacity", err)
+	}
+	if err := f.client.Begin(ctx); !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatal("admission did not reject exhausted metadata capacity", err)
+	}
+	f.registry.mu.Lock()
+	fenced := len(f.registry.state.Intent) != 0 || f.registry.poisoned
+	f.registry.mu.Unlock()
+	if fenced {
+		t.Fatal("capacity rejection modified the receiver fence")
+	}
+	full.Store(false)
+	must(t, f.client.Ready(ctx))
+	must(t, f.client.Begin(ctx))
+	full.Store(true)
+	must(t, f.client.Ready(ctx))
+	must(t, f.client.Begin(ctx))
 }

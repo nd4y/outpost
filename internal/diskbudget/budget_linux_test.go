@@ -103,6 +103,26 @@ func TestConcurrentReservationsShareQuotaAndKeepSeparateSpool(t *testing.T) {
 		t.Fatal("reconciliation did not measure actual retained files")
 	}
 }
+
+func TestCheckWriteCountsPendingSpoolWithoutReserving(t *testing.T) {
+	b, _ := newBudget(t)
+	ctx := t.Context()
+	must(t, b.CheckWrite(ctx, "registry.json", 1<<20))
+	finish, err := b.Reserve(ctx, "pending.json", 1<<20)
+	must(t, err)
+	defer func() { must(t, finish(false)) }()
+	before, err := b.Status(ctx)
+	must(t, err)
+	must(t, b.CheckWrite(ctx, "registry.json", 1024))
+	if err = b.CheckWrite(ctx, "registry.json", 1<<20); !errors.Is(err, ErrCapacity) {
+		t.Fatal("readiness ignored pending spool bytes", err)
+	}
+	after, err := b.Status(ctx)
+	must(t, err)
+	if after.Revision != before.Revision || len(after.Pending) != 1 {
+		t.Fatal("readiness changed capacity accounting", before, after)
+	}
+}
 func TestReconciliationWaitsForActiveWriterAndNeverDeletesFiles(t *testing.T) {
 	b, root := newBudget(t)
 	finish, e := b.Reserve(context.Background(), "objects/keep", 1<<20)

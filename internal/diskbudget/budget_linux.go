@@ -361,6 +361,56 @@ func (b *Budget) free() (int64, error) {
 	return int64(s.Bavail) * s.Bsize, nil
 }
 
+// CheckWrite observes whether a write could reserve space now. A later
+// Reserve must still account for concurrent writers and filesystem changes.
+func (b *Budget) CheckWrite(ctx context.Context, name string, size int) error {
+	if !validPath(name) || size < 1 || size > 64<<20 {
+		return ErrInvalid
+	}
+	return b.store.WithLock(ctx, func() error {
+		s, err := b.load()
+		if err != nil {
+			return err
+		}
+		_, err = b.checkWrite(s, name, size)
+		return err
+	})
+}
+
+func (b *Budget) checkWrite(s State, name string, size int) (int64, error) {
+	if len(s.Pending) >= 128 {
+		return 0, ErrCapacity
+	}
+	class := category(name)
+	total := ledgerReserve
+	var pending, classPending int64
+	for _, used := range s.Used {
+		total += used
+	}
+	for _, r := range s.Pending {
+		if r.Path == name {
+			return 0, ErrBusy
+		}
+		pending += r.Bytes
+		if r.Class == class {
+			classPending += r.Bytes
+		}
+	}
+	amount := (int64(size)+4095)/4096*4096 + overhead
+	if s.Used[class]+classPending+amount > s.Limits.maximum(class) ||
+		total+pending+amount > s.Limits.Capacity-s.Limits.Reserve {
+		return 0, ErrCapacity
+	}
+	free, err := b.free()
+	if err != nil {
+		return 0, err
+	}
+	if free < s.Limits.Reserve+pending+amount+ledgerReserve {
+		return 0, ErrCapacity
+	}
+	return amount, nil
+}
+
 // Reserve returns a completion function that MUST run after the filesystem
 // operation, even on failure. Success means the rename and directory fsync
 // finished. Uncertain failures conservatively charge the full reservation.
@@ -378,47 +428,20 @@ func (b *Budget) Reserve(ctx context.Context, name string, size int) (func(bool)
 		return nil, e
 	}
 	id := hex.EncodeToString(random[:])
-	amount := (int64(size)+4095)/4096*4096 + overhead
 	e = b.store.WithLock(ctx, func() error {
 		s, e := b.load()
 		if e != nil {
 			return e
 		}
-		if len(s.Pending) >= 128 {
-			return ErrCapacity
-		}
-		reserved := map[string]int64{}
-		total := ledgerReserve
-		for _, used := range s.Used {
-			total += used
-		}
-		for _, r := range s.Pending {
-			if r.Path == name {
-				return ErrBusy
-			}
-			reserved[r.Class] += r.Bytes
-			total += r.Bytes
-		}
-		class := category(name)
-		if s.Used[class]+reserved[class]+amount > s.Limits.maximum(class) || total+amount > s.Limits.Capacity-s.Limits.Reserve {
-			return ErrCapacity
-		}
-		free, e := b.free()
+		amount, e := b.checkWrite(s, name, size)
 		if e != nil {
 			return e
-		}
-		var pending int64
-		for _, n := range reserved {
-			pending += n
-		}
-		if free < s.Limits.Reserve+pending+amount+ledgerReserve {
-			return ErrCapacity
 		}
 		previous, e := b.size(name)
 		if e != nil {
 			return e
 		}
-		s.Pending[id] = Reservation{name, class, amount, previous}
+		s.Pending[id] = Reservation{name, category(name), amount, previous}
 		return b.save(s)
 	})
 	if e != nil {

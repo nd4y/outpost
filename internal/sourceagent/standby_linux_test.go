@@ -27,11 +27,12 @@ import (
 )
 
 func TestSourceStandbySelectionIsDurableBeforeAdmission(t *testing.T) {
-	t.Run("unavailable-while-planning", func(t *testing.T) { testStandby(t, false) })
-	t.Run("unavailable-before-first-write", func(t *testing.T) { testStandby(t, true) })
+	t.Run("unavailable-while-planning", func(t *testing.T) { testStandby(t, false, http.StatusServiceUnavailable) })
+	t.Run("unavailable-before-first-write", func(t *testing.T) { testStandby(t, true, http.StatusServiceUnavailable) })
+	t.Run("metadata-capacity-while-planning", func(t *testing.T) { testStandby(t, false, http.StatusInsufficientStorage) })
 }
 
-func testStandby(t *testing.T, initiallyReady bool) {
+func testStandby(t *testing.T, initiallyReady bool, refusal int) {
 	t.Helper()
 	f := newFixture(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 180*time.Second)
@@ -67,7 +68,7 @@ func testStandby(t *testing.T, initiallyReady bool) {
 				}
 				_ = json.NewEncoder(out).Encode(map[string]any{"operation": i.Operation, "sequence": i.Sequence})
 			} else {
-				http.Error(out, "primary unavailable", http.StatusServiceUnavailable)
+				http.Error(out, "primary not ready", refusal)
 			}
 			return true
 		}

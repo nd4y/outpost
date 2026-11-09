@@ -8,6 +8,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -45,7 +46,7 @@ func (a *Agent) selectReceiver(ctx context.Context, selected ingress.Intent, raw
 	}
 	var network *net.OpError
 	if ctx.Err() != nil || !(errors.Is(err, ingress.ErrUnavailable) || errors.Is(err, ingress.ErrConflict) ||
-		errors.Is(err, context.DeadlineExceeded) || errors.As(err, &network)) {
+		errors.Is(err, statefile.ErrCapacity) || errors.Is(err, context.DeadlineExceeded) || errors.As(err, &network)) {
 		return nil, err
 	}
 	selected.Ingress, selected.Authority = otherID, storage.Hash(otherAuthority)

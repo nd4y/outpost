@@ -41,8 +41,10 @@ type RegistryOptions struct {
 	// initialize a registry or authorize any payload route.
 	Settlement, SettlementIntent []byte
 	// Prefix is relative to the caller's shared capacity ledger.
-	Admission    func(prefix string) statefile.Admission
-	RemoveObject func(context.Context, string, int64) error
+	Admission func(prefix string) statefile.Admission
+	// CheckRegistryWrite inspects capacity without reserving it.
+	CheckRegistryWrite func(context.Context, int) error
+	RemoveObject       func(context.Context, string, int64) error
 }
 type registryState struct {
 	Format            string          `json:"format"`
@@ -339,6 +341,16 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	}
 	return s, e
 }
+func (g *Registry) nextRegistryState(raw []byte) registryState {
+	next := g.state
+	next.Intent = bytes.Clone(raw)
+	if next.Format == RenewedRegistryFormat {
+		next.IntentAuthority = bytes.Clone(g.options.Authority)
+	}
+	next.ObservedUnix = time.Now().Unix()
+	return next
+}
+
 func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	if g.poisoned || time.Now().Unix() < g.state.ObservedUnix {
 		return Intent{}, ErrConflict
@@ -359,11 +371,7 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 			g.handler = nil
 		}
 		before := g.state
-		g.state.Intent = bytes.Clone(raw)
-		if g.state.Format == RenewedRegistryFormat {
-			g.state.IntentAuthority = bytes.Clone(g.options.Authority)
-		}
-		g.state.ObservedUnix = time.Now().Unix()
+		g.state = g.nextRegistryState(raw)
 		if e = g.save(); e != nil {
 			g.state = before
 			return i, e

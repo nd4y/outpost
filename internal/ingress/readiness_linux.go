@@ -3,6 +3,7 @@ package ingress
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -33,6 +34,20 @@ func (g *Registry) checkAdmission(ctx context.Context, raw []byte, i Intent) err
 		}
 		return err
 	}
+	if err := g.checkNewIntent(ctx, i, now); err != nil {
+		return err
+	}
+	if g.options.CheckRegistryWrite == nil {
+		return nil
+	}
+	next, err := json.Marshal(g.nextRegistryState(raw))
+	if err != nil {
+		return err
+	}
+	return g.options.CheckRegistryWrite(ctx, len(next))
+}
+
+func (g *Registry) checkNewIntent(ctx context.Context, i Intent, now int64) error {
 	if err := g.checkPredecessor(ctx, i); err != nil {
 		return err
 	}

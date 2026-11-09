@@ -343,6 +343,14 @@
           "name": "TestSourceStandbySelectionIsDurableBeforeAdmission"
         },
         {
+          "path": "internal/ingress/reconcile_linux_test.go",
+          "name": "TestRegistryRejectsCapacityBeforeFencingAndKeepsExactReplay"
+        },
+        {
+          "path": "internal/diskbudget/budget_linux_test.go",
+          "name": "TestCheckWriteCountsPendingSpoolWithoutReserving"
+        },
+        {
           "path": "internal/sourceagent/receiver_route_linux_test.go",
           "name": "TestSourceActiveReceiverReplacement"
         },

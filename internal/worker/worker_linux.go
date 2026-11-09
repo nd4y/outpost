@@ -449,6 +449,14 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 			var e error
 			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Parent: w.root, Directory: w.relative(dir), Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Staging: captureStagingRoutes(c, a.Trust.Domain), Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
 				return w.admission(filepath.ToSlash(filepath.Join(relative, prefix)))
+			}, CheckRegistryWrite: func(ctx context.Context, size int) error {
+				if e := w.check(ctx); e != nil {
+					return e
+				}
+				if w.budget == nil {
+					return ErrDenied
+				}
+				return w.budget.CheckWrite(ctx, filepath.ToSlash(filepath.Join(relative, "registry.json")), size)
 			}, RemoveObject: func(ctx context.Context, name string, size int64) error {
 				if e := w.check(ctx); e != nil {
 					return e
