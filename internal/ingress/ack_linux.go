@@ -2,15 +2,30 @@ package ingress
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/nd4y/outpost/internal/storage"
 )
 
 func (r Receipt) matches(i Intent) bool {
-	return r.Operation == i.Operation && r.Ingress == i.Ingress && r.Tenant == i.Tenant && r.Domain == i.Domain && storage.ID(r.Generation) && r.NewBytes >= 0 && r.NewBytes <= i.MaxBytes && r.NewObjects >= 0 && r.NewObjects <= i.MaxObjects && r.VerifiedAt >= i.NotBefore && r.VerifiedAt < i.ExpiresUnix
+	return r.Operation == i.Operation && r.Ingress == i.Ingress && r.Tenant == i.Tenant && r.Domain == i.Domain && storage.ID(r.Generation) && r.NewBytes >= 0 && r.NewBytes <= i.MaxBytes && r.NewObjects >= 0 && r.NewObjects <= i.MaxObjects && r.VerifiedAt >= i.NotBefore
+}
+
+// VerifyReceipt retains the real verification timestamp and requires the
+// original owner grant for a publication completed after capture expiry.
+func VerifyReceipt(r Receipt, i Intent, authority, intent []byte, owner ed25519.PublicKey) bool {
+	if !r.matches(i) {
+		return false
+	}
+	if r.VerifiedAt < i.ExpiresUnix {
+		return r.PublishedWith == ""
+	}
+	g, err := VerifySettlement([]byte(r.PublishedWith), authority, intent, owner, time.Unix(r.VerifiedAt, 0))
+	return err == nil && g.Purpose == SettlementPublish && g.Generation == r.Generation
 }
 
 // Acknowledgement is administrative progress, never a new verification receipt.
@@ -43,6 +58,7 @@ func (s *Session) Acknowledge(ctx context.Context, receipt Receipt, maxObjects i
 		s.state.Catalog = nil
 		s.state.Coverage = nil
 		s.state.CoveragePeer = nil
+		s.state.PublicationGrants = nil
 		if e := s.save(); e != nil {
 			s.state = old
 			return result, e

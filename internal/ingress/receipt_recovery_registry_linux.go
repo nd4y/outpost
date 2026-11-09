@@ -56,7 +56,7 @@ func (g *Registry) readReceiptRecovery(name string, item ReceiptRecoveryAdmissio
 		return record, false, ErrConflict
 	}
 	var intent Intent
-	if canonicalIntent(item.Intent, item.Authority, g.options.Owner, &intent) != nil || !record.Receipt.matches(intent) {
+	if canonicalIntent(item.Intent, item.Authority, g.options.Owner, &intent) != nil || !VerifyReceipt(record.Receipt, intent, item.Authority, item.Intent, g.options.Owner) {
 		return record, false, ErrConflict
 	}
 	for _, grant := range []struct {
@@ -173,9 +173,9 @@ func RecoverReceipt(ctx context.Context, o RegistryOptions, item ReceiptRecovery
 	if e != nil {
 		return result, e
 	}
-	result = Receipt{Operation: s.intent.Operation, Ingress: s.intent.Ingress, Tenant: s.intent.Tenant, Domain: s.intent.Domain, Generation: selected.Generation, NewBytes: s.bytes, NewObjects: len(s.refs), VerifiedAt: proof.VerifiedAt}
-	if !result.matches(s.intent) {
-		return Receipt{}, ErrConflict
+	result, e = s.originalReceipt(selected.Generation, proof.VerifiedAt)
+	if e != nil {
+		return Receipt{}, e
 	}
 	before, e := json.Marshal(s.state)
 	if e != nil {

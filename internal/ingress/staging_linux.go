@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -62,7 +63,12 @@ func (g *Registry) stagingSession(ctx context.Context) (*Session, error) {
 	}
 	options := g.sessionOptions(g.state.Intent)
 	options.Initialize = false
-	session, e := OpenSession(ctx, options)
+	mode := sessionActive
+	if g.settlementPurpose == SettlementPublish {
+		mode = sessionPublish
+		options.publishGrant = g.options.Settlement
+	}
+	session, e := openSessionFor(ctx, options, mode)
 	if e != nil {
 		return nil, e
 	}
@@ -103,7 +109,7 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	remote := r.TLS.PeerCertificates[0]
 	identity := peer.Identity(remote)
 	if read && (r.Method != http.MethodGet || r.ContentLength != 0 || !g.options.Staging.Readers[identity]) ||
-		!read && (r.Method != http.MethodPut || identity != g.authority.Source) {
+		!read && (r.Method != http.MethodPut || identity != g.authority.Source || len(g.options.Settlement) != 0) {
 		fail(w, ErrDenied)
 		return true
 	}
@@ -133,7 +139,7 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	}
 	g.mu.Lock()
 	raw := bytes.Clone(g.state.Intent)
-	i, _, e := VerifyIntent(raw, g.options.Authority, g.options.Owner, now)
+	i, expiry, e := g.stagingIntent(now)
 	if g.poisoned || now.Unix() < g.state.ObservedUnix || e != nil ||
 		parts[0] != i.Operation || r.Header.Get("Outpost-Authority") != i.Authority {
 		g.mu.Unlock()
@@ -141,7 +147,29 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	deadline := now.Add(g.options.Limits.Timeout)
-	for _, limit := range []time.Time{remote.NotAfter, g.leaf.NotAfter, time.Unix(i.ExpiresUnix, 0)} {
+	var peerGrant []byte
+	if g.settlementPurpose == SettlementPublish {
+		encoded := r.Header.Values("Outpost-Publication-Grant")
+		if len(encoded) != 1 || len(encoded[0]) > base64.RawStdEncoding.EncodedLen(MaxSettlementDocument) {
+			g.mu.Unlock()
+			fail(w, ErrDenied)
+			return true
+		}
+		var err error
+		peerGrant, err = base64.RawStdEncoding.DecodeString(encoded[0])
+		var preview Settlement
+		if err != nil || canonical(peerGrant, &preview) != nil || !active(now, preview.NotBefore, preview.ExpiresUnix) {
+			g.mu.Unlock()
+			fail(w, ErrDenied)
+			return true
+		}
+		if candidate := time.Unix(preview.ExpiresUnix, 0); candidate.Before(deadline) {
+			deadline = candidate
+		}
+		// Verify the signed peer grant against the frozen slot below. The
+		// untrusted preview above can only shorten this request's lifetime.
+	}
+	for _, limit := range []time.Time{remote.NotAfter, g.leaf.NotAfter, expiry} {
 		if limit.Before(deadline) {
 			deadline = limit
 		}
@@ -157,7 +185,12 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		s, e := g.stagingSession(ctx)
 		var b []byte
 		if e == nil {
-			b, e = s.readStaged(ctx, ref)
+			if g.settlementPurpose == SettlementPublish {
+				e = s.permitsFinalizationRead(ctx, identity, ref, peerGrant)
+			}
+			if e == nil {
+				b, e = s.readStaged(ctx, ref)
+			}
 		}
 		g.mu.Unlock()
 		if e != nil {
@@ -186,7 +219,16 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (g *Registry) stagingPeer(target Intent, origin stagingOrigin) (Intent, string, error) {
+	if g.options.Staging == nil {
+		return Intent{}, "", ErrDenied
+	}
 	i, authority, e := VerifyIntent(origin.Intent, origin.Authority, g.options.Owner, time.Now())
+	if g.settlementPurpose == SettlementPublish {
+		e = canonicalIntent(origin.Intent, origin.Authority, g.options.Owner, &i)
+		if e == nil {
+			authority, e = VerifyAuthorityDocument(origin.Authority, g.options.Owner)
+		}
+	}
 	endpoint := g.options.Staging.Origins[i.Ingress]
 	authority.Ingress = target.Ingress
 	if e != nil || endpoint == "" || i.Ingress == target.Ingress || !sameCapture(i, target) ||
@@ -219,6 +261,14 @@ func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []
 	}
 	defer client.Close()
 	client.stagingReader = true
+	if g.settlementPurpose == SettlementPublish {
+		grant, err := VerifySettlement(g.options.Settlement, g.options.Authority, g.options.SettlementIntent, g.options.Owner, time.Now())
+		if err != nil {
+			return err
+		}
+		client.peerPublicationDeadline = time.Unix(grant.ExpiresUnix, 0)
+		client.peerPublicationGrant = g.options.Settlement
+	}
 	b, e := client.readObjectResource(ctx, ref, "staged/")
 	if e != nil {
 		return e

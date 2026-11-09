@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"net/http"
 	"time"
 
@@ -16,7 +17,8 @@ import (
 // NewSettlementClient cannot Begin, fetch ciphertext, upload or publish a
 // catalog. Its fresh owner capability is separate from the immutable intent.
 func NewSettlementClient(endpoint string, authority, intent, grant []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*Client, error) {
-	if _, e := VerifySettlement(grant, authority, intent, owner, time.Now()); e != nil {
+	selected, e := VerifySettlement(grant, authority, intent, owner, time.Now())
+	if e != nil {
 		return nil, e
 	}
 	c, e := newClient(endpoint, authority, intent, owner, cert, roots, limits, true)
@@ -24,15 +26,16 @@ func NewSettlementClient(endpoint string, authority, intent, grant []byte, owner
 		return nil, e
 	}
 	c.settlement = append([]byte(nil), grant...)
+	c.inspection = selected.inspect()
 	return c, nil
 }
 
 func (c *Client) SettlementReceipt(ctx context.Context) (Receipt, error) {
 	var out Receipt
-	if len(c.settlement) == 0 {
+	if len(c.settlement) == 0 || c.inspection {
 		return out, ErrDenied
 	}
-	_, _, raw, e := c.request(ctx, http.MethodGet, "receipt", nil, nil, 4096)
+	_, _, raw, e := c.request(ctx, http.MethodGet, "receipt", nil, nil, MaxReceiptDocument)
 	if e != nil {
 		return out, e
 	}
@@ -40,13 +43,13 @@ func (c *Client) SettlementReceipt(ctx context.Context) (Receipt, error) {
 	if e != nil {
 		return out, e
 	}
-	if decodeReply(raw, &out) != nil || !out.matches(c.intent) || out.Generation != g.Generation || out.VerifiedAt < c.intent.NotBefore || out.VerifiedAt > time.Now().Unix() {
+	if decodeReply(raw, &out) != nil || !VerifyReceipt(out, c.intent, c.authority, c.intentRaw, c.owner) || out.Generation != g.Generation || out.VerifiedAt < c.intent.NotBefore || out.VerifiedAt > time.Now().Unix() {
 		return Receipt{}, ErrProtocol
 	}
 	return out, nil
 }
 
-func settlementRequest(r *http.Request, leaf *x509.Certificate, i Intent, grant []byte, now time.Time) bool {
+func settlementRequest(r *http.Request, leaf *x509.Certificate, i Intent, grant []byte, purpose string, now time.Time) bool {
 	if r.TLS == nil || r.TLS.Version < tls.VersionTLS13 || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.PeerCertificates) == 0 {
 		return false
 	}
@@ -59,6 +62,9 @@ func settlementRequest(r *http.Request, leaf *x509.Certificate, i Intent, grant 
 	}
 	if r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.RawPath != "" || r.URL.Path != r.URL.EscapedPath() {
 		return false
+	}
+	if purpose == SettlementInspect || purpose == SettlementRetire {
+		return r.Method == http.MethodGet && r.URL.Path == route(i)+"/reconcile" && r.ContentLength == 0 && len(r.TransferEncoding) == 0
 	}
 	if r.Method == http.MethodGet && r.URL.Path == route(i)+"/receipt" {
 		return r.ContentLength == 0 && len(r.TransferEncoding) == 0
@@ -99,7 +105,7 @@ func newSettlementServer(s *Session, grant []byte, cert tls.Certificate, roots *
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		now := time.Now()
 		g, e := VerifySettlement(grant, authority, intentRaw, owner, now)
-		if e != nil || !settlementRequest(r, leaf, s.intent, grant, now) {
+		if e != nil || !settlementRequest(r, leaf, s.intent, grant, g.Purpose, now) {
 			fail(w, ErrDenied)
 			return
 		}
@@ -128,7 +134,7 @@ func newSettlementServer(s *Session, grant []byte, cert tls.Certificate, roots *
 			jsonReply(w, http.StatusOK, receipt)
 			return
 		}
-		raw, e := readBody(w, r, 4096)
+		raw, e := readBody(w, r, MaxReceiptDocument)
 		var selected Receipt
 		if e != nil || decodeReply(raw, &selected) != nil || selected != receipt {
 			fail(w, ErrDenied)
@@ -155,7 +161,8 @@ func (g *Registry) serveSettlement(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	grant, e := VerifySettlement(g.options.Settlement, g.options.Authority, g.options.SettlementIntent, g.options.Owner, now)
 	var intent Intent
-	if e != nil || canonicalIntent(g.state.Intent, g.options.Authority, g.options.Owner, &intent) != nil || !settlementRequest(r, g.leaf, intent, g.options.Settlement, now) {
+	if e != nil || canonicalIntent(g.options.SettlementIntent, g.options.Authority, g.options.Owner, &intent) != nil ||
+		!settlementRequest(r, g.leaf, intent, g.options.Settlement, grant.Purpose, now) {
 		fail(w, ErrDenied)
 		return
 	}
@@ -169,12 +176,32 @@ func (g *Registry) serveSettlement(w http.ResponseWriter, r *http.Request) {
 			deadline = expiry
 		}
 	}
-	ctx, cancel := context.WithDeadline(r.Context(), deadline)
+	ctx, cancel, e := requestLifetime(w, r.Context(), deadline)
+	if e != nil {
+		fail(w, e)
+		return
+	}
 	defer cancel()
+	if grant.inspect() {
+		result, e := g.reconcile(ctx, intent, grant)
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		jsonReply(w, http.StatusOK, result)
+		return
+	}
 	if g.session == nil {
 		o := g.sessionOptions(g.state.Intent)
 		o.Initialize = false
-		g.session, e = openSession(ctx, o, true)
+		if grant.Purpose == SettlementPublish {
+			g.session, e = g.stagingSession(ctx)
+			if errors.Is(e, ErrDenied) {
+				g.session, e = openSession(ctx, o, true)
+			}
+		} else {
+			g.session, e = openSession(ctx, o, true)
+		}
 		if e != nil {
 			fail(w, e)
 			return

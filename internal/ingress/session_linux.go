@@ -31,32 +31,37 @@ type SessionOptions struct {
 	Initialize              bool
 	AdmitState, AdmitObject statefile.Admission
 	RemoveObject            func(context.Context, string, int64) error
+	publishGrant            []byte
 }
 
-const maxSessionDocument = generation.MaxCatalog + 4*MaxDocument + 4096
+const maxPublicationGrants = 16
+const MaxReceiptDocument = 8192
+const maxSessionDocument = generation.MaxCatalog + 4*MaxDocument + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
 
 type sessionState struct {
-	Format       string           `json:"format"`
-	Intent       json.RawMessage  `json:"intent"`
-	Authority    json.RawMessage  `json:"authority"`
-	LastObserved int64            `json:"lastObserved"`
-	Catalog      json.RawMessage  `json:"catalog,omitempty"`
-	CoveragePeer *stagingOrigin   `json:"coveragePeer,omitempty"`
-	Coverage     *CoverageReceipt `json:"coverage,omitempty"`
-	Complete     bool             `json:"complete"`
-	CompletedAt  int64            `json:"completedAt,omitempty"`
-	Receipt      *Receipt         `json:"receipt,omitempty"`
-	Acknowledged bool             `json:"acknowledged,omitempty"`
+	Format            string            `json:"format"`
+	Intent            json.RawMessage   `json:"intent"`
+	Authority         json.RawMessage   `json:"authority"`
+	LastObserved      int64             `json:"lastObserved"`
+	Catalog           json.RawMessage   `json:"catalog,omitempty"`
+	CoveragePeer      *stagingOrigin    `json:"coveragePeer,omitempty"`
+	Coverage          *CoverageReceipt  `json:"coverage,omitempty"`
+	PublicationGrants []json.RawMessage `json:"publicationGrants,omitempty"`
+	Complete          bool              `json:"complete"`
+	CompletedAt       int64             `json:"completedAt,omitempty"`
+	Receipt           *Receipt          `json:"receipt,omitempty"`
+	Acknowledged      bool              `json:"acknowledged,omitempty"`
 }
 type Receipt struct {
-	Operation  string `json:"operation"`
-	Ingress    string `json:"ingress"`
-	Tenant     string `json:"tenant"`
-	Domain     string `json:"domain"`
-	Generation string `json:"generation"`
-	NewBytes   int64  `json:"newBytes"`
-	NewObjects int    `json:"newObjects"`
-	VerifiedAt int64  `json:"verifiedAt"`
+	PublishedWith string `json:"publishedWith,omitempty"`
+	Operation     string `json:"operation"`
+	Ingress       string `json:"ingress"`
+	Tenant        string `json:"tenant"`
+	Domain        string `json:"domain"`
+	Generation    string `json:"generation"`
+	NewBytes      int64  `json:"newBytes"`
+	NewObjects    int    `json:"newObjects"`
+	VerifiedAt    int64  `json:"verifiedAt"`
 }
 type Session struct {
 	root          *os.Root
@@ -75,6 +80,7 @@ type Session struct {
 	bytes         int64
 	poisoned      bool
 	removeObject  func(context.Context, string, int64) error
+	publishGrant  []byte
 	inspection    bool
 	Fault         func(string) error
 }
@@ -123,7 +129,11 @@ func (s *Session) guardMode(ctx context.Context, cleanup bool) error {
 		}
 		checkTime = time.Unix(s.intent.NotBefore, 0)
 	}
-	if _, _, e := VerifyIntent(s.state.Intent, s.state.Authority, s.owner, checkTime); e != nil {
+	if !cleanup && len(s.publishGrant) != 0 {
+		if _, e := s.publicationGrant(now); e != nil {
+			return e
+		}
+	} else if _, _, e := VerifyIntent(s.state.Intent, s.state.Authority, s.owner, checkTime); e != nil {
 		return e
 	}
 	if now.Unix() > s.state.LastObserved {
@@ -166,6 +176,7 @@ const (
 	sessionComplete
 	sessionAcknowledged
 	sessionInspect
+	sessionPublish
 )
 
 // Inspection is private to explicit local receipt recovery. It validates
@@ -173,6 +184,9 @@ const (
 func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode) (*Session, error) {
 	historical := mode != sessionActive
 	inspection := mode == sessionInspect
+	if (mode == sessionPublish) != (len(o.publishGrant) != 0) {
+		return nil, ErrDenied
+	}
 	acknowledgedOnly := mode == sessionComplete || mode == sessionAcknowledged
 	requireAcknowledged := mode == sessionAcknowledged
 	checkTime := time.Now()
@@ -216,7 +230,11 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		return nil, ErrDenied
 	}
 
-	lease, e := localfs.OpenFile(r, ".capture-lock", os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
+	flags := os.O_RDWR | unix.O_NOFOLLOW | unix.O_NONBLOCK
+	if o.Initialize {
+		flags |= os.O_CREATE
+	}
+	lease, e := localfs.OpenFile(r, ".capture-lock", flags, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -230,7 +248,7 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		return nil, ErrConflict
 	}
 	owned = true
-	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, inspection: inspection}
+	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, inspection: inspection, publishGrant: bytes.Clone(o.publishGrant)}
 	fail := func(e error) (*Session, error) { s.Close(); return nil, e }
 	s.meta, e = statefile.OpenAt(r, "state", maxSessionDocument, o.Initialize)
 	if e != nil {
@@ -300,9 +318,17 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 			return fail(ErrConflict)
 		}
 	}
+	if len(s.state.PublicationGrants) > maxPublicationGrants || len(s.state.PublicationGrants) != 0 && len(s.state.Catalog) == 0 {
+		return fail(ErrConflict)
+	}
+	if mode == sessionPublish {
+		if _, e = s.publicationGrant(time.Now()); e != nil {
+			return fail(e)
+		}
+	}
 	if s.state.Receipt != nil {
 		r := *s.state.Receipt
-		if !s.state.Complete || !r.matches(i) || r.VerifiedAt != s.state.CompletedAt || (!s.state.Acknowledged && r.Generation != storage.Hash(s.state.Catalog)) {
+		if !s.state.Complete || !VerifyReceipt(r, i, o.Authority, o.Intent, o.Owner) || r.VerifiedAt != s.state.CompletedAt || (!s.state.Acknowledged && r.Generation != storage.Hash(s.state.Catalog)) {
 			return fail(ErrConflict)
 		}
 	} else if s.state.Complete {
@@ -595,6 +621,11 @@ func (s *Session) FinishBatch(ctx context.Context, raw []byte, maxObjects int, m
 	if e != nil {
 		return result, Receipt{}, e
 	}
+	if len(s.publishGrant) != 0 {
+		if e = s.recordPublicationGrant(); e != nil {
+			return result, Receipt{}, e
+		}
+	}
 	if s.state.Coverage != nil {
 		if e = s.point("capture-coverage-before-publication"); e != nil {
 			return result, Receipt{}, e
@@ -627,10 +658,12 @@ func (s *Session) accepted(ctx context.Context, id string, refs []generation.Obj
 	if verifiedAt < s.intent.NotBefore || verifiedAt > s.state.LastObserved {
 		return result, ErrConflict
 	}
-	s.state.Complete = true
 	if !wasComplete {
-		s.state.CompletedAt = verifiedAt
-		s.state.Receipt = &Receipt{Operation: s.intent.Operation, Ingress: s.intent.Ingress, Tenant: s.intent.Tenant, Domain: s.intent.Domain, Generation: id, NewBytes: s.bytes, NewObjects: len(s.refs), VerifiedAt: verifiedAt}
+		receipt, err := s.originalReceipt(id, verifiedAt)
+		if err != nil {
+			return result, err
+		}
+		s.state.Complete, s.state.CompletedAt, s.state.Receipt = true, verifiedAt, &receipt
 	}
 	if e = s.save(); e != nil {
 		s.state.Complete = wasComplete

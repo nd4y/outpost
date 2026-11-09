@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -143,7 +144,7 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 		}
 		defer cancel()
 		if resource == "ack" && r.Method == http.MethodPut {
-			raw, e := readBody(w, r, 4096)
+			raw, e := readBody(w, r, MaxReceiptDocument)
 			var receipt Receipt
 			if e != nil || decodeReply(raw, &receipt) != nil {
 				fail(w, ErrProtocol)
@@ -256,6 +257,9 @@ type Client struct {
 	owner                        ed25519.PublicKey
 	cleanup                      bool
 	stagingReader                bool
+	peerPublicationDeadline      time.Time
+	peerPublicationGrant         []byte
+	inspection                   bool
 	settlement                   []byte
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
@@ -314,6 +318,10 @@ func clientWithIdentity(endpoint, self string, i Intent, authority, intent []byt
 }
 func (c *Client) IntentID() string { return storage.Hash(c.intentRaw) }
 
+func (c *Client) ValidReceipt(r Receipt) bool {
+	return r.VerifiedAt <= time.Now().Unix() && VerifyReceipt(r, c.intent, c.authority, c.intentRaw, c.owner)
+}
+
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	now := time.Now()
@@ -322,7 +330,11 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 	if c.stagingReader && (method != http.MethodGet || !strings.HasPrefix(resource, "staged/")) {
 		return 0, nil, nil, ErrDenied
 	}
-	if (c.cleanup || settling) && !ack && !(settling && resource == "receipt" && method == http.MethodGet) {
+	if c.inspection {
+		if resource != "reconcile" || method != http.MethodGet {
+			return 0, nil, nil, ErrDenied
+		}
+	} else if (c.cleanup || settling) && !ack && !(settling && resource == "receipt" && method == http.MethodGet) {
 		return 0, nil, nil, ErrDenied
 	}
 	var grant Settlement
@@ -333,7 +345,7 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 			return 0, nil, nil, e
 		}
 	}
-	if !ack && !settling {
+	if !ack && !settling && c.peerPublicationDeadline.IsZero() {
 		if _, _, e := VerifyIntent(c.intentRaw, c.authority, c.owner, now); e != nil {
 			return 0, nil, nil, e
 		}
@@ -342,6 +354,12 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		return 0, nil, nil, ErrDenied
 	}
 	deadline := time.Unix(c.intent.ExpiresUnix, 0)
+	if !c.peerPublicationDeadline.IsZero() {
+		if !c.stagingReader || !now.Before(c.peerPublicationDeadline) {
+			return 0, nil, nil, ErrDenied
+		}
+		deadline = c.peerPublicationDeadline
+	}
 	if ack || settling {
 		deadline = c.cert.NotAfter
 	}
@@ -364,6 +382,9 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		r.Body = http.NoBody
 	}
 	r.Header.Set("Outpost-Authority", c.intent.Authority)
+	if len(c.peerPublicationGrant) != 0 {
+		r.Header.Set("Outpost-Publication-Grant", base64.RawStdEncoding.EncodeToString(c.peerPublicationGrant))
+	}
 	if settling {
 		r.Header.Set("Outpost-Settlement", storage.Hash(c.settlement))
 	}
@@ -539,14 +560,14 @@ func (c *Client) FinishStep(ctx context.Context, raw []byte) (generation.BatchRe
 // receipt. A lost reply is retried with that identical receipt, never FinishStep.
 func (c *Client) AcknowledgeStep(ctx context.Context, receipt Receipt) (Acknowledgement, error) {
 	var result Acknowledgement
-	if !receipt.matches(c.intent) || receipt.VerifiedAt > time.Now().Unix() {
+	if !VerifyReceipt(receipt, c.intent, c.authority, c.intentRaw, c.owner) || receipt.VerifiedAt > time.Now().Unix() {
 		return result, ErrDenied
 	}
 	raw, e := json.Marshal(receipt)
 	if e != nil {
 		return result, e
 	}
-	status, _, body, e := c.request(ctx, http.MethodPut, "ack", nil, raw, 4096)
+	status, _, body, e := c.request(ctx, http.MethodPut, "ack", nil, raw, MaxReceiptDocument+1024)
 	if e != nil {
 		return result, e
 	}

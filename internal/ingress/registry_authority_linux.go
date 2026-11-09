@@ -117,7 +117,9 @@ func (g *Registry) loadRegistry(raw []byte) error {
 		}
 	}
 	if len(g.options.Settlement) != 0 {
-		if !bytes.Equal(g.options.Authority, s.IntentAuthority) {
+		grant, err := VerifySettlement(g.options.Settlement, g.options.Authority, g.options.SettlementIntent, g.options.Owner, time.Now())
+		if err != nil || !bytes.Equal(g.options.Authority, s.IntentAuthority) &&
+			(!grant.inspect() || !bytes.Equal(g.options.Authority, s.CurrentAuthority)) {
 			return ErrConflict
 		}
 	} else if !bytes.Equal(g.options.Authority, s.CurrentAuthority) {

@@ -116,6 +116,15 @@ func (a *Agent) verifyCompanionState(s state, current, prior ingress.Authority) 
 	return a.verifyCompanionAuthority(prior, s.IntentCompanionAuthority)
 }
 func (a *Agent) intentAuthority(s state) []byte {
+	if a.b.Standby {
+		var i ingress.Intent
+		if storage.Decode(s.Intent, &i, ingress.MaxDocument) == nil && a.standbySelected(i.Ingress) {
+			if s.Format == renewedFormat {
+				return s.IntentCompanionAuthority
+			}
+			return a.companionAuthority
+		}
+	}
 	if s.Format == renewedFormat {
 		return s.IntentAuthority
 	}

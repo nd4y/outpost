@@ -14,7 +14,7 @@ func (j *Job) settlementState(s State) error {
 	if e != nil {
 		return e
 	}
-	if phase(s.Phase) < phase("SEALED") || s.Generation != g.Generation {
+	if (g.Purpose != "" && g.Purpose != ingress.SettlementPublish) || phase(s.Phase) < phase("SEALED") || s.Generation != g.Generation {
 		return ErrInvalid
 	}
 	return nil
@@ -46,7 +46,8 @@ func (j *Job) settleReceipt(ctx context.Context, s *State) error {
 	if e = j.guard(ctx); e != nil {
 		return e
 	}
-	if r.Operation != i.Operation || r.Ingress != i.Ingress || r.Tenant != i.Tenant || r.Domain != i.Domain || r.Generation != s.Generation || r.NewBytes < 0 || r.NewBytes > i.MaxBytes || r.NewObjects < 0 || r.NewObjects > i.MaxObjects || r.VerifiedAt < i.NotBefore || r.VerifiedAt >= i.ExpiresUnix || r.VerifiedAt > time.Now().Unix() {
+	if r.Generation != s.Generation || r.VerifiedAt > time.Now().Unix() ||
+		!ingress.VerifyReceipt(r, i, j.options.Authority, j.options.Intent, j.options.Owner) {
 		return ErrInvalid
 	}
 	if s.Receipt != nil && *s.Receipt != r {

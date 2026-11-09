@@ -67,6 +67,7 @@ type Registry struct {
 	session                  *Session
 	handler                  http.Handler
 	leaf                     *x509.Certificate
+	settlementPurpose        string
 	poisoned                 bool
 	gate                     chan struct{}
 	stageReads, stageImports chan struct{}
@@ -155,7 +156,11 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 		return nil, ErrDenied
 	}
 
-	lease, e := localfs.OpenFile(r, ".registry-lock", os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0600)
+	flags := os.O_RDWR | unix.O_NOFOLLOW | unix.O_NONBLOCK
+	if o.Initialize {
+		flags |= os.O_CREATE
+	}
+	lease, e := localfs.OpenFile(r, ".registry-lock", flags, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -197,8 +202,12 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 			return fail(e)
 		}
 	}
-	if len(o.Settlement) != 0 && !bytes.Equal(g.state.Intent, o.SettlementIntent) {
-		return fail(ErrConflict)
+	if len(o.Settlement) != 0 {
+		grant, err := VerifySettlement(o.Settlement, o.Authority, o.SettlementIntent, o.Owner, time.Now())
+		if err != nil || !grant.inspect() && !bytes.Equal(g.state.Intent, o.SettlementIntent) {
+			return fail(ErrConflict)
+		}
+		g.settlementPurpose = grant.Purpose
 	}
 	if e = ctx.Err(); e != nil {
 		return fail(e)
@@ -291,8 +300,11 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	}
 	defer old.Close()
 	var next Intent
-	if canonical(raw, &next) != nil || next.Sequence <= old.intent.Sequence || next.Parent != old.state.Receipt.Generation {
+	if canonical(raw, &next) != nil || next.Sequence <= old.intent.Sequence {
 		return nil, ErrConflict
+	}
+	if e = g.checkPredecessor(ctx, next); e != nil {
+		return nil, e
 	}
 	ack, e := old.cleanupAcknowledged(ctx, 256)
 	if e != nil {
@@ -344,37 +356,9 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	if e != nil {
 		return i, e
 	}
-	if len(g.state.Intent) > 0 && !bytes.Equal(g.state.Intent, raw) {
-		var previous Intent
-		if canonicalIntent(g.state.Intent, g.intentAuthority(), g.options.Owner, &previous) != nil || i.Sequence <= previous.Sequence {
-			return i, ErrConflict
-		}
-		if g.session == nil {
-			o := g.sessionOptions(g.state.Intent)
-			o.Initialize = false
-			g.session, e = openSession(ctx, o, true)
-			if e != nil {
-				return i, e
-			}
-		}
-		g.session.mu.Lock()
-		acked := g.session.state.Acknowledged && g.session.state.Receipt != nil && time.Now().Unix() >= g.session.state.LastObserved
-		parent := ""
-		if acked {
-			parent = g.session.state.Receipt.Generation
-		}
-		g.session.mu.Unlock()
-		if !acked || i.Parent != parent || i.Sequence != previous.Sequence+1 {
-			return i, ErrConflict
-		}
-	}
 	if !bytes.Equal(g.state.Intent, raw) {
-		status, e := g.options.Replica.Status(ctx)
-		if e != nil {
+		if e = g.checkAdmission(ctx, raw, i); e != nil {
 			return i, e
-		}
-		if i.Sequence <= status.HighestSequence || status.HighestSequence > 0 && (i.Sequence != status.HighestSequence+1 || i.Parent != status.LatestComplete) {
-			return i, ErrConflict
 		}
 		if g.session != nil {
 			if e = g.session.Close(); e != nil {
@@ -415,7 +399,7 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	return i, nil
 }
 func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if g.options.Staging != nil && len(g.options.Settlement) == 0 && g.serveStaging(w, r) {
+	if g.options.Staging != nil && (len(g.options.Settlement) == 0 || g.settlementPurpose == SettlementPublish) && g.serveStaging(w, r) {
 		return
 	}
 	select {
@@ -462,7 +446,7 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), g.options.Limits.Timeout)
 	defer cancel()
-	if len(parts) == 2 && parts[1] == "intent" && r.Method == http.MethodPut {
+	if len(parts) == 2 && (parts[1] == "intent" || parts[1] == "readiness") && r.Method == http.MethodPut {
 		deadline, _ := ctx.Deadline()
 		for _, expiry := range []time.Time{g.leaf.NotAfter, remote.NotAfter, time.Unix(g.authority.ExpiresUnix, 0)} {
 			if expiry.Before(deadline) {
@@ -486,7 +470,15 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, ErrDenied)
 			return
 		}
-		i, e := g.begin(ctx, raw)
+		var i Intent
+		if parts[1] == "readiness" {
+			i, _, e = VerifyIntent(raw, g.options.Authority, g.options.Owner, time.Now())
+			if e == nil {
+				e = g.checkAdmission(ctx, raw, i)
+			}
+		} else {
+			i, e = g.begin(ctx, raw)
+		}
 		if e != nil {
 			fail(w, e)
 			return

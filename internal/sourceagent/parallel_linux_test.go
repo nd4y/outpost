@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -117,24 +118,35 @@ func runCaptureWorker(t *testing.T, ctx context.Context, w *worker.Worker) func(
 }
 
 func TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth(t *testing.T) {
-	testPairedCapture(t, "")
+	testPairedCapture(t, "", false)
 }
 
 func TestSourceCoverageReleasesBeforePublicationAndWorkersResume(t *testing.T) {
-	testPairedCapture(t, capture.TwoHolderCoverage)
+	testPairedCapture(t, capture.TwoHolderCoverage, false)
 }
 
 func TestSourcePartitionCoverageAssemblesFromPeersAfterRelease(t *testing.T) {
-	testPairedCapture(t, capture.PairedSplitCoverage)
+	testPairedCapture(t, capture.PairedSplitCoverage, false)
 }
 
-func testPairedCapture(t *testing.T, releasePolicy string) {
+func TestExpiredPairedCoveragePublishesAndSettlesOfflineSource(t *testing.T) {
+	if os.Getenv("OUTPOST_EXPIRY_INTEGRATION") != "1" {
+		t.Skip("real expiry integration is exercised on the dedicated HDD")
+	}
+	testPairedCapture(t, capture.PairedSplitCoverage, true)
+}
+
+func testPairedCapture(t *testing.T, releasePolicy string, expire bool) {
 	t.Helper()
 	coverage := releasePolicy != ""
 	split := releasePolicy == capture.PairedSplitCoverage
 	var followerCert tls.Certificate
-	f := newFixtureWithPeer(t, 1800, &followerCert)
-	ctx, cancel := context.WithTimeout(t.Context(), 240*time.Second)
+	lifetime, timeout := int64(1800), 240*time.Second
+	if expire {
+		lifetime, timeout = 155, 425*time.Second
+	}
+	f := newFixtureWithPeer(t, lifetime, &followerCert)
+	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	defer cancel()
 	leaf, e := x509.ParseCertificate(f.replicaCertificate.Certificate[0])
 	must(t, e)
@@ -253,12 +265,16 @@ func testPairedCapture(t *testing.T, releasePolicy string) {
 	raw, e := control.Sign(cfg, f.ownerSigner)
 	must(t, e)
 	must(t, aWorker.Accept(ctx, raw))
+	aConfig := cfg
+	aConfig.Domains = append([]control.Domain(nil), cfg.Domains...)
 	cfg.Node, cfg.Ingress = bID, []json.RawMessage{companion}
 	cfg.Replication = nil
 	cfg.Domains[0].CaptureStagingPeers = []string{aID}
 	raw, e = control.Sign(cfg, f.ownerSigner)
 	must(t, e)
 	must(t, bWorker.Accept(ctx, raw))
+	bConfig := cfg
+	bConfig.Domains = append([]control.Domain(nil), cfg.Domains...)
 	cfg.Node, cfg.Ingress, cfg.Observations = cID, nil, nil
 	cfg.Limits.AttemptMillis = 60000
 	cfg.Domains[0].CaptureStagingPeers = nil
@@ -409,6 +425,39 @@ func testPairedCapture(t *testing.T, releasePolicy string) {
 				t.Fatal("coverage published a full replica before verification")
 			}
 		}
+		var primary, companion control.SettlementAdmission
+		if expire {
+			deadline := time.NewTimer(time.Until(time.Unix(f.grant.ExpiresUnix, 0)) + 20*time.Millisecond)
+			defer deadline.Stop()
+			select {
+			case <-deadline.C:
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+			f.a, e = Open(ctx, f.b, false)
+			must(t, e)
+			if e = f.a.Run(ctx); !errors.Is(e, ingress.ErrDenied) {
+				t.Fatal("expired original capture unexpectedly resumed", e)
+			}
+			provision := func(receiver string, cfg control.Config, node *worker.Worker) control.SettlementAdmission {
+				req, err := f.a.SettlementPreviewFor(ctx, ingress.SettlementPublish, receiver)
+				must(t, err)
+				grant, err := SignSettlementAdmission(req, f.ownerSigner)
+				must(t, err)
+				cfg.Ingress, cfg.Observations, cfg.Settlements = nil, nil, []control.SettlementAdmission{grant}
+				cfg.Revision++
+				cfg.NotBefore = time.Now().Unix()
+				cfg.ExpiresUnix = cfg.NotBefore + 300
+				raw, err := control.Sign(cfg, f.ownerSigner)
+				must(t, err)
+				must(t, node.Accept(ctx, raw))
+				return grant
+			}
+			primary = provision(aID, aConfig, aWorker)
+			companion = provision(bID, bConfig, bWorker)
+			must(t, f.a.Close())
+			f.a = nil
+		}
 		allowPublication.Store(true)
 		runCaptureWorker(t, ctx, aWorker)
 		runCaptureWorker(t, ctx, bWorker)
@@ -440,7 +489,46 @@ func testPairedCapture(t *testing.T, releasePolicy string) {
 		if split && peerImports.Load() < int64(initial) {
 			t.Fatal("split coverage did not retrieve all initially disjoint objects from the peer", peerImports.Load(), initial)
 		}
-		t.Logf("withheld coverage blocked release; signed checkpoint survived source restart; both restarted workers restored independently with the source offline (%d background peer reads)", peerImports.Load())
+		lateReads := peerImports.Load()
+		if expire {
+			endpoint, node, reader, authority, wrong := f.server.URL, aID, f.replicaCertificate, f.authority, primary
+			if ingress.CoverageHolder(object, aID, bID) == bID {
+				endpoint, node, reader, authority, wrong = bServer.URL, bID, f.destination, companion.Authority, companion
+			}
+			readerLeaf, e := x509.ParseCertificate(reader.Certificate[0])
+			must(t, e)
+			wire, _, e := peer.AuthenticatedHTTP(endpoint, reader, f.roots, peer.Identity(readerLeaf), node, sourceFixtureLimits)
+			must(t, e)
+			defer wire.CloseIdleConnections()
+			for _, grant := range [][]byte{nil, wrong.Grant} {
+				req, e := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/v1/tenants/"+f.grant.Tenant+
+					"/domains/"+f.grant.Trust.Domain+"/captures/"+s.Operation+"/staged/"+object, nil)
+				must(t, e)
+				req.Header.Set("Outpost-Authority", storage.Hash(authority))
+				req.Header.Set("Outpost-Bytes", length)
+				if len(grant) != 0 {
+					req.Header.Set("Outpost-Publication-Grant", base64.RawStdEncoding.EncodeToString(grant))
+				}
+				reply, e := wire.Do(req)
+				must(t, e)
+				must(t, reply.Body.Close())
+				if reply.StatusCode != http.StatusForbidden {
+					t.Fatal("late peer read accepted an absent or mismatched requester grant", reply.StatusCode)
+				}
+			}
+			f.a, e = Open(ctx, f.b, false)
+			must(t, e)
+			must(t, f.a.SettleWithCompanion(ctx, primary, &companion))
+			raw, e := f.a.Checkpoint(ctx)
+			must(t, e)
+			checkpoint, e := capture.VerifyCheckpoint(raw, f.grant.Trust)
+			must(t, e)
+			if checkpoint.Receipt.PublishedWith == "" || len(checkpoint.Copies) != 2 || checkpoint.Receipt.VerifiedAt < f.grant.ExpiresUnix {
+				t.Fatal("late receipt lost its provenance or bypassed the full-copy threshold", checkpoint)
+			}
+			t.Log("both receivers independently restored after original expiry; source accepted the late receipts with their original verification times")
+		}
+		t.Logf("withheld coverage blocked release; signed checkpoint survived source restart; both restarted workers restored independently with the source offline (%d background peer reads)", lateReads)
 		return
 	}
 	must(t, os.Remove(input))

@@ -34,6 +34,7 @@ func (w *Worker) openSettlements(v *view) error {
 		local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{
 			Parent: w.root, Directory: w.relative(dir), Authority: item.Authority,
 			Settlement: item.Grant, SettlementIntent: item.Intent, Owner: w.owner,
+			Staging: captureStagingRoutes(v.cfg, g.Domain),
 			Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: false,
 			Limits: peer.Limits{Concurrency: v.cfg.Limits.Parallel, Timeout: time.Duration(v.cfg.Limits.AttemptMillis) * time.Millisecond, Attempts: 2},
 			Admission: func(prefix string) statefile.Admission {

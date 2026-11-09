@@ -2,7 +2,7 @@
 
 [Русский](../ru/source-settlement.md)
 
-An immutable capture intent cannot be renewed. When the receiver durably completed a generation but the source lost its reply or stopped before saving its checkpoint, a fresh `outpost-source-settlement-1` owner grant can authorize retrieval and acknowledgement of that original receipt. The source must already have a sealed, signed catalog for that exact generation. The grant does not authorize reading or writing ciphertext, starting a capture, or publishing a catalog.
+An immutable capture intent cannot be renewed. When the receiver durably completed a generation but the source lost its reply or stopped before saving its checkpoint, a fresh `outpost-source-settlement-1` owner grant can authorize retrieval and acknowledgement of that original receipt. The source must already have a sealed, signed catalog for that exact generation. The default receipt-only grant authorizes no payload transfer, capture or publication.
 
 ## Owner workflow
 
@@ -50,11 +50,25 @@ Success requires `COMPLETE`, the selected generation, the original receipt verif
 
 No receipt, a mismatched generation, revoked policy, expired TLS identity, expired settlement grant, unavailable volume or missing required copy leaves the operation pending. A settlement grant cannot extend an observation grant or lower `minimumCopies`. Original verification age is never replaced with settlement time. If the fresh grant expires mid-operation, retain the journal and obtain another explicit grant for the same original documents and generation.
 
-The receiver must already have persisted its complete receipt. A replica head by itself, a sealed local catalog, or absence of a receipt cannot prove that publication completed or that it is safe to abandon the operation. When publication is complete but the ingress receipt is missing, use the separate [local receipt recovery](receipt-recovery.md) workflow first. Expired captures that reached the ACTIVE fence and lost active journals still need separate reconciliation.
+For the receipt-only purpose, the receiver must already have persisted its complete receipt. A replica head by itself, a sealed local catalog, or absence of a receipt cannot prove that publication completed or that it is safe to abandon the operation. When publication is complete but the ingress receipt is missing, use the separate [local receipt recovery](receipt-recovery.md) workflow first. A lost source or receiver journal remains an unknown state.
+
+## Finish an expired staged publication
+
+When a receiver already accepted the exact catalog before expiry, prepare a request for that holder with `source-settlement-preview --purpose publish-staged --node RECEIVER_ID`. Sign and install each request using the owner workflow above. A local complete dependency set can be verified without a peer. For a partitioned capture, prepare and install a separate request at each holder and keep the signed staging peer rules and pull edges in both current policies.
+
+The workers reopen the existing staged slots and finish without the source. A paired worker can pull only the missing catalog dependencies from the recorded peer over authenticated HTTPS. Both workers verify their current publication permissions. Source payload, new intents, changed catalogs and additional peers are refused. No full receipt is issued until the entire generation verifies. The receipt records the actual publication verification time and retains the owner grant that authorized it. Up to 16 distinct publication grants may be retained for an unfinished slot.
+
+After publication, run `source-settle` with the primary admission in `--input` and, for a pair, the second admission in `--companion`. The source verifies the required original receipts before advancing its checkpoint or acknowledging cleanup. A missing required receipt or revoked policy keeps the operation pending.
+
+## Reconcile an expired ACTIVE operation
+
+Use `source-settlement-preview --purpose inspect-active --node RECEIVER_ID`, then sign and apply the admission above. Run `source-reconcile --bootstrap FILE --input SIGNED_ADMISSION` separately for each configured holder involved in the operation. The source records each authenticated observation. The receiver distinguishes a durable intent fence, admitted staging, a sealed catalog, independently proven publication without a receipt and an existing receipt. It reports `NOT_ADMITTED` only with compatible durable registry history and an exact predecessor. Missing or contradictory evidence stays unknown.
+
+If a source job is still `PLANNED` and every involved holder proves `NOT_ADMITTED`, the owner can issue new `retire-unadmitted` grants through the same workflow. Run `source-retire-active` with the primary grant in `--input` and the paired grant in `--companion` when applicable. The source rechecks all receivers under its execution lease, saves the signed evidence and records `ABANDONED`. It preserves the previous generation and local history. Unavailable receivers, admitted work and lost journals cannot authorize this transition.
 
 ## Retire an expired unstarted intent
 
-The source agent can retire an exact expired intent while its signed journal is still `PREPARING`, including after successful local job preparation. At execution the agent checks validity again and durably saves `ACTIVE` before making its first receiver request. Preview and retirement take the same execution lease as capture. The owner permit binds the exact source, intent, previous checkpoint and expiry. Existing and new `ACTIVE` intents require separate reconciliation even without a receipt.
+The source agent can retire an exact expired intent while its signed journal is still `PREPARING`, including after successful local job preparation. At execution the agent checks validity again and durably saves `ACTIVE` before its first receiver admission request. Preview and retirement take the same execution lease as capture. The owner permit binds the exact source, intent, previous checkpoint and expiry. Existing and new `ACTIVE` intents require separate reconciliation even without a receipt.
 
 ```sh
 outpost source-unstarted-preview --bootstrap /private/source.json \
@@ -71,7 +85,7 @@ The original source authority remains expired after settlement. A subsequent cap
 
 ## Compatibility and acceptance
 
-`outpost-control-1` retains its original signature domain and remains readable. The `settlements` field is forbidden in version 1. Version 2 uses a distinct signature domain so an older worker rejects it. Source/capture and ingress journal formats are unchanged: the fresh grant is supplied separately and never rewrites the original intent. Downgrading an executable does not add settlement support.
+`outpost-control-1` retains its original signature domain and remains readable. The `settlements` field is forbidden in version 1. Version 2 uses a distinct signature domain so an older worker rejects it. The original intent remains immutable. Late receipts and retirement evidence add fields that older readers may refuse. Keep a compatible executable while the recovered operation is pending. Downgrading an executable does not add settlement support.
 
 Short tests cover the fresh capability, same-directory HTTPS registry reopening, exact receipt replay, payload denial, current worker policy withdrawal, missing receipt and expired independent-copy authorization. The complete CLI preview/sign/config-apply/settle workflow runs against a current worker; a selected previous executable accepts control1 and refuses control2. Three actual `SIGKILL` boundaries cover receipt observation, checkpoint persistence and final source head. A queued grant is rechecked after the execution lease is acquired. Both 393,216-byte source generations restore byte-for-byte after settlement, including the ten-byte change, with the source tree unavailable.
 

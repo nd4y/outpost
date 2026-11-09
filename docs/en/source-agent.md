@@ -23,7 +23,7 @@ outpost source-status --bootstrap /private/source.json
 outpost source-checkpoint --bootstrap /private/source.json --output /private/checkpoint.json
 ```
 
-`source-next` signs an operation from the durable generation head and prepares its local job. Repeating it reuses the exact pending intent. `source-prepare --bootstrap FILE --input SIGNED_INTENT` accepts a supplied intent under the same fence. A successful local preparation leaves the source in `PREPARING` and sends no receiver request. `source-run` persists `ACTIVE` before contacting the receiver. It reuses the prepared operation and remains idempotent after completion.
+`source-next` signs an operation from the durable generation head and prepares its local job. Repeating it reuses the exact pending intent. `source-prepare --bootstrap FILE --input SIGNED_INTENT` accepts a supplied intent under the same fence. A successful local preparation leaves the source in `PREPARING` and sends no admission request. `source-run` persists `ACTIVE` before requesting admission. It reuses the prepared operation and remains idempotent after completion.
 
 Signed agent state fences the operation before provider preparation. Signed file results and encrypted accepted-pack progress survive restart. The source is never reopened after sealing. A lost final head update resumes the completed job and exports its verified checkpoint/lineage. The cache holds encrypted metadata/progress rather than a complete payload copy. Quotas and reconciliation preserve unaccepted files instead of deleting them.
 
@@ -37,7 +37,7 @@ Apply `outpost-control-2` to both receivers with the other receiver's ID in `cap
 
 The source keeps at most two payload packs in flight. With the default full-copy policy and the two-holder coverage policy, it alternates initial recipients. A receiver reads an accepted object directly from its peer over mTLS. The object is durable before the destination confirms it. The source records pack progress after both writes and seals the generation only after all required packs and metadata are available. An accepted exact ciphertext object can be reused on retry. The two holders verify the complete catalog independently in bounded steps. After a transient publication timeout the source replays the same catalog with a limited number of attempts. By default, snapshot release waits for the verified two-copy checkpoint.
 
-The bootstrap anchors and signed companion receipt are private installation state. Preserve them and both receiver histories across restart. This candidate requires the two configured holders. Automatic receiver substitution remains open.
+The bootstrap anchors and signed companion receipt are private installation state. Preserve them and both receiver histories across restart. The two-holder policies retain their configured holders throughout an operation.
 
 ### Release on durable coverage from both holders
 
@@ -49,9 +49,17 @@ The `two-holder-coverage` policy requires two holders for every dependency.
 
 Set `profile.releasePolicy` to `paired-split-coverage` to accept one staged copy per dependency before release. New object ownership is stable across retries and derived from its opaque ID and the two holder identities. Both holders retain the final catalog. The source validates the union by recomputing the assigned dependency list for each holder. A required dependency cannot be covered by an unrelated holder or intent.
 
-After seal, each worker pulls missing dependencies only from its configured peer and verifies the entire generation before publication. Protect both holders until assembly completes. Failure of a holder can lose a newly captured object during the interval with only one staged copy. Automatic receiver substitution, publication after intent expiry, adaptive weighting and throughput acceptance remain open.
+After seal, each worker pulls missing dependencies only from its configured peer and verifies the entire generation before publication. Protect both holders until assembly completes. Failure of a holder can lose a newly captured object during the interval with only one staged copy. The [publication recovery workflow](source-settlement.md#finish-an-expired-staged-publication) covers accepted staging after expiry. Adaptive weighting, replacement after admission and throughput acceptance remain open.
 
 Keep the source and workers on a version that understands the pending coverage journal until both complete receipts have been acknowledged. Pausing preserves the staged data and generation pins.
+
+## Standby before admission
+
+A single-copy installation can set `standby` to `true` and supply the standby endpoint and separate owner-signed grant in `companionIngress`. List both receiver IDs in `profile.copyTargets` and configure each holder with the same scope and its own push admission. The standby must have the exact previous complete generation before it accepts an incremental capture.
+
+For a fresh operation, `source-next` probes the primary with an authenticated, read-only readiness request. It checks the standby when the primary is unavailable or has a conflicting predecessor or slot. The source records the selected receiver in its signed intent before any write request. `source-status` exposes that receiver. Before entering `ACTIVE`, `source-run` checks the selected receiver again. A readiness failure can select the other authorized receiver while preserving the local view and predecessor. Renewal of a standby installation uses both grants.
+
+Once `ACTIVE` is durable, a failed admission or transfer stays with that receiver. A missing reply can conceal a durable admission, so this mode does not switch an existing operation or lower a two-copy threshold.
 
 ## Renewing source authority
 
@@ -85,7 +93,7 @@ The [expired-operation settlement workflow](source-settlement.md) retrieves only
 
 An expired intent still in `PREPARING` can use [owner-authorized retirement](source-settlement.md#retire-an-expired-unstarted-intent). A later capture starts under renewed authority from the previous completed checkpoint.
 
-For a pending intent, `source-status` reports its signed expiry as `result.pending.intentExpiresUnix` and an action in `result.pending.action`. `RESUME` identifies an intent still within its validity window. `RETIRE_UNSTARTED` identifies expired `PREPARING` work that requires the owner's retirement permit. `RECONCILE_RECEIVER` identifies expired `ACTIVE` work. Check the receiver for a durable receipt or publication proof before choosing settlement or receipt recovery. A missing receipt alone gives no assurance about publication. The action describes local state and carries no execution authority.
+For a pending intent, `source-status` reports its signed expiry as `result.pending.intentExpiresUnix` and an action in `result.pending.action`. `RESUME` identifies an intent still within its validity window. `RETIRE_UNSTARTED` identifies expired `PREPARING` work that requires the owner's retirement permit. `RECONCILE_RECEIVER` identifies expired `ACTIVE` work. Use [authenticated receiver reconciliation](source-settlement.md#reconcile-an-expired-active-operation) to distinguish the durable fence, catalog and receipt before choosing a recovery action. A missing receipt alone gives no assurance about publication. The action describes local state and carries no execution authority.
 
 The [receiver renewal workflow](receiver-renewal.md) admits a fresh same-scope grant in the existing registry after explicit quiescent maintenance. It preserves historical receipts and generations, fences previous readers and uses the current receiver policy and disk budget.
 

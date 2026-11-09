@@ -125,7 +125,7 @@ func (a *Agent) selectPrepared(ctx context.Context, s state) (capture.PreparedEx
 	return m, raw, nil
 }
 func (a *Agent) freezePrepared(ctx context.Context, manifest, intent []byte) error {
-	i, _, e := ingress.VerifyIntent(intent, a.authority, a.b.Local.Owner, time.Now())
+	i, e := a.intent(intent, true)
 	if e != nil {
 		return e
 	}
@@ -140,7 +140,7 @@ func (a *Agent) freezePrepared(ctx context.Context, manifest, intent []byte) err
 		if e := a.guard(ctx); e != nil {
 			return e
 		}
-		_, _, e := ingress.VerifyIntent(intent, a.authority, a.b.Local.Owner, time.Now())
+		_, e := a.intent(intent, true)
 		return e
 	}
 	if e = guard(); e != nil {

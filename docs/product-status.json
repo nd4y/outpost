@@ -337,10 +337,30 @@
         {
           "path": "internal/ingress/session_linux_test.go",
           "name": "TestStagedCoverageRejectsMissingDependencyAndNeverPublishes"
+        },
+        {
+          "path": "internal/sourceagent/standby_linux_test.go",
+          "name": "TestSourceStandbySelectionIsDurableBeforeAdmission"
+        },
+        {
+          "path": "internal/ingress/reconcile_linux_test.go",
+          "name": "TestActiveInspectionDistinguishesDurableFenceFromNonAdmission"
+        },
+        {
+          "path": "internal/sourceagent/active_retirement_linux_test.go",
+          "name": "TestExpiredActiveRetirementRequiresAllAdmissionProofs"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestExpiredPairedCoveragePublishesAndSettlesOfflineSource"
+        },
+        {
+          "path": "internal/ingress/publication_resume_linux_test.go",
+          "name": "TestPublicationGrantResumesFrozenLocalCatalogWithoutPeer"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Adaptive weighting, automatic substitution, cross-expiry staged publication and measured asymmetric 500/500/100 acceptance remain open."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, expired truly unpublished operation resolution, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection or retirement of a proven unadmitted ACTIVE. Replacement after the durable source fence, paired standby, adaptive weighting and measured asymmetric 500/500/100 acceptance remain open."
     },
     {
       "id": "REQ-06",

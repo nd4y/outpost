@@ -11,9 +11,15 @@ import (
 const SettlementFormat = "outpost-source-settlement-1"
 const MaxSettlementDocument = 4096
 
-// Settlement grants only retrieval and acknowledgement of an already durable
-// completed receipt for one exact immutable intent and generation. It never
-// renews the original authority or permits payload capture/publication.
+const (
+	SettlementPublish = "publish-staged"
+	SettlementInspect = "inspect-active"
+	SettlementRetire  = "retire-unadmitted"
+)
+
+// Settlement is bound to an immutable intent. The legacy purpose retrieves
+// and acknowledges a receipt. Other purposes permit only the exact staged
+// publication or read-only inspection described by the signed grant.
 type Settlement struct {
 	Format      string `json:"format"`
 	ID          string `json:"id"`
@@ -26,6 +32,7 @@ type Settlement struct {
 	Domain      string `json:"domain"`
 	Repository  string `json:"repository"`
 	Epoch       uint64 `json:"writerEpoch"`
+	Purpose     string `json:"purpose,omitempty"`
 	Generation  string `json:"generation"`
 	NotBefore   int64  `json:"notBefore"`
 	ExpiresUnix int64  `json:"expiresUnix"`
@@ -37,10 +44,28 @@ func (s Settlement) validate(authority, intent []byte, owner ed25519.PublicKey, 
 	if canonicalIntent(intent, authority, owner, &i) != nil {
 		return ErrDenied
 	}
-	if s.Format != SettlementFormat || !storage.ID(s.ID) || s.Authority != storage.Hash(authority) || s.Intent != storage.Hash(intent) || s.Operation != i.Operation || s.Source != i.Source || s.Ingress != i.Ingress || s.Tenant != i.Tenant || s.Domain != i.Domain || s.Repository != i.Repository || s.Epoch != i.Epoch || !storage.ID(s.Generation) || s.NotBefore < 1 || s.ExpiresUnix <= s.NotBefore || s.ExpiresUnix > 1<<40 || !active(now, s.NotBefore, s.ExpiresUnix) {
+	if s.Format != SettlementFormat || !storage.ID(s.ID) || s.Authority != storage.Hash(authority) || s.Intent != storage.Hash(intent) || s.Operation != i.Operation || s.Source != i.Source || s.Ingress != i.Ingress || s.Tenant != i.Tenant || s.Domain != i.Domain || s.Repository != i.Repository || s.Epoch != i.Epoch || s.NotBefore < 1 || s.ExpiresUnix <= s.NotBefore || s.ExpiresUnix > 1<<40 || !active(now, s.NotBefore, s.ExpiresUnix) {
+		return ErrDenied
+	}
+	switch s.Purpose {
+	case "":
+		if !storage.ID(s.Generation) {
+			return ErrDenied
+		}
+	case SettlementPublish, SettlementInspect, SettlementRetire:
+		if s.NotBefore < i.ExpiresUnix || s.ExpiresUnix-s.NotBefore > 86400 ||
+			s.Purpose == SettlementPublish && !storage.ID(s.Generation) ||
+			s.inspect() && s.Generation != "" {
+			return ErrDenied
+		}
+	default:
 		return ErrDenied
 	}
 	return nil
+}
+
+func (s Settlement) inspect() bool {
+	return s.Purpose == SettlementInspect || s.Purpose == SettlementRetire
 }
 
 func SignSettlement(s Settlement, authority, intent []byte, key ed25519.PrivateKey, now time.Time) ([]byte, error) {

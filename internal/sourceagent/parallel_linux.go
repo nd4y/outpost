@@ -36,7 +36,7 @@ func (a *Agent) loadCompanion() error {
 	}
 	selected := *a.b.Companion
 	a.b.Companion = &selected
-	if a.b.Profile.MinimumCopies != 2 || !policy.Endpoint(selected.Endpoint) || selected.Endpoint == a.b.Endpoint {
+	if a.b.Profile.MinimumCopies != 2 && !a.b.Standby || !policy.Endpoint(selected.Endpoint) || selected.Endpoint == a.b.Endpoint {
 		return ErrInvalid
 	}
 	raw, e := worker.ReadPrivate(selected.AuthorityFile, ingress.MaxDocument)
@@ -50,7 +50,7 @@ func (a *Agent) loadCompanion() error {
 	if !sameReceiverPair(a.anchor, companion) {
 		return ErrInvalid
 	}
-	if a.b.Profile.ReleasePolicy != "" {
+	if a.b.Profile.ReleasePolicy != "" || a.b.Standby {
 		targets := a.b.Profile.CopyTargets
 		if len(targets) != 2 ||
 			!(targets[0] == a.anchor.Ingress && targets[1] == companion.Ingress ||
@@ -102,21 +102,29 @@ type parallelSink struct {
 	binding                 string
 	records                 *statefile.Store
 	writer                  ed25519.PrivateKey
+	settling                bool
 	split                   bool
 	replaying               bool
 	next                    atomic.Uint64
 }
 
-func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []byte, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool) (*parallelSink, error) {
-	primaryID := i.Ingress
+func (a *Agent) companionIntent(i ingress.Intent, authority []byte) (ingress.Intent, []byte, error) {
 	i.Ingress = a.companion.Ingress
 	i.Authority = storage.Hash(authority)
-	raw, e := ingress.SignIntent(i, authority, a.b.Local.Owner, a.writer, time.Unix(i.NotBefore, 0))
+	raw, err := ingress.SignIntent(i, authority, a.b.Local.Owner, a.writer, time.Unix(i.NotBefore, 0))
+	return i, raw, err
+}
+
+func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []byte, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool, settlement []byte) (*parallelSink, error) {
+	primaryID := i.Ingress
+	i, raw, e := a.companionIntent(i, authority)
 	if e != nil {
 		return nil, e
 	}
 	var companion *ingress.Client
-	if cleanup {
+	if len(settlement) != 0 {
+		companion, e = ingress.NewSettlementClient(a.b.Companion.Endpoint, authority, raw, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
+	} else if cleanup {
 		companion, e = ingress.NewCleanupClient(a.b.Companion.Endpoint, authority, raw, a.b.Local.Owner, a.cert, a.roots, limits)
 	} else {
 		companion, e = ingress.NewClient(a.b.Companion.Endpoint, authority, raw, a.b.Local.Owner, a.cert, a.roots, limits)
@@ -131,7 +139,7 @@ func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []by
 		return nil, e
 	}
 	store.Admit = a.admission(dir)
-	return &parallelSink{Client: primary, companion: companion, intention: i, primary: primaryID, primaryBinding: primary.IntentID(), binding: storage.Hash(raw), records: store, writer: a.writer, split: a.b.Profile.ReleasePolicy == capture.PairedSplitCoverage, replaying: !initialize}, nil
+	return &parallelSink{Client: primary, companion: companion, intention: i, primary: primaryID, primaryBinding: primary.IntentID(), binding: storage.Hash(raw), records: store, writer: a.writer, settling: len(settlement) != 0, split: a.b.Profile.ReleasePolicy == capture.PairedSplitCoverage, replaying: !initialize}, nil
 }
 
 func (s *parallelSink) Close() {
@@ -249,7 +257,7 @@ func (s *parallelSink) loadReceipt(generation string) (ingress.Receipt, error) {
 	if e != nil {
 		return record.Receipt, e
 	}
-	if storage.Decode(raw, &record, 4096) != nil || record.Format != companionReceiptFormat || record.Intent != s.binding {
+	if storage.Decode(raw, &record, ingress.MaxReceiptDocument+1024) != nil || record.Format != companionReceiptFormat || record.Intent != s.binding {
 		return record.Receipt, ErrInvalid
 	}
 	canonical, _ := json.Marshal(record)
@@ -262,10 +270,8 @@ func (s *parallelSink) loadReceipt(generation string) (ingress.Receipt, error) {
 	if !ed25519.Verify(s.writer.Public().(ed25519.PublicKey), payload, sig) {
 		return record.Receipt, ErrInvalid
 	}
-	r, i := record.Receipt, s.intention
-	if r.Generation != generation || r.Operation != i.Operation || r.Ingress != i.Ingress || r.Tenant != i.Tenant || r.Domain != i.Domain ||
-		r.NewBytes < 0 || r.NewBytes > i.MaxBytes || r.NewObjects < 0 || r.NewObjects > i.MaxObjects ||
-		r.VerifiedAt < i.NotBefore || r.VerifiedAt >= i.ExpiresUnix || r.VerifiedAt > time.Now().Unix() {
+	r := record.Receipt
+	if r.Generation != generation || !s.companion.ValidReceipt(r) {
 		return r, ErrInvalid
 	}
 	return r, nil
@@ -345,14 +351,18 @@ func (s *parallelSink) finishStep(ctx context.Context, catalog []byte) (generati
 	if other.err != nil || other.receipt == nil {
 		return progress, nil, errors.Join(e, other.err)
 	}
-	record := companionReceipt{Format: companionReceiptFormat, Intent: s.binding, Receipt: *other.receipt}
-	payload, _ := json.Marshal(record)
-	record.Signature = ed25519.Sign(s.writer, payload)
-	raw, _ := json.Marshal(record)
-	if err := s.records.Write("companion-receipt.json", raw); err != nil {
+	if err := s.saveCompanionReceipt(*other.receipt); err != nil {
 		return progress, nil, errors.Join(e, err)
 	}
 	return progress, primary, e
+}
+
+func (s *parallelSink) saveCompanionReceipt(r ingress.Receipt) error {
+	record := companionReceipt{Format: companionReceiptFormat, Intent: s.binding, Receipt: r}
+	payload, _ := json.Marshal(record)
+	record.Signature = ed25519.Sign(s.writer, payload)
+	raw, _ := json.Marshal(record)
+	return s.records.Write("companion-receipt.json", raw)
 }
 
 func (s *parallelSink) SettlementReceipt(ctx context.Context) (ingress.Receipt, error) {
@@ -360,10 +370,42 @@ func (s *parallelSink) SettlementReceipt(ctx context.Context) (ingress.Receipt, 
 	if e != nil {
 		return ingress.Receipt{}, e
 	}
-	if _, e = s.loadReceipt(receipt.Generation); e != nil {
+	known, e := s.loadReceipt(receipt.Generation)
+	if e == nil && !s.settling {
+		return receipt, nil
+	}
+	if e != nil && (!errors.Is(e, os.ErrNotExist) || !s.settling) {
 		return ingress.Receipt{}, e
 	}
+	other, err := s.companion.SettlementReceipt(ctx)
+	if err != nil {
+		return ingress.Receipt{}, err
+	}
+	if other.Generation != receipt.Generation || e == nil && known != other {
+		return ingress.Receipt{}, ErrInvalid
+	}
+	if e != nil {
+		if err = s.saveCompanionReceipt(other); err != nil {
+			return ingress.Receipt{}, err
+		}
+	}
 	return receipt, nil
+}
+
+func (s *parallelSink) settlementCopies(ctx context.Context, id string) ([]capture.CopyReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	receipt, err := s.loadReceipt(id)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := s.records.Read("companion-receipt.json")
+	if err != nil {
+		return nil, err
+	}
+	return []capture.CopyReceipt{{Target: receipt.Ingress, Generation: id, Verification: "ciphertext-readback",
+		ObservedUnix: receipt.VerifiedAt, SignedObservation: string(raw)}}, nil
 }
 
 func (s *parallelSink) AcknowledgeStep(ctx context.Context, primary ingress.Receipt) (ingress.Acknowledgement, error) {

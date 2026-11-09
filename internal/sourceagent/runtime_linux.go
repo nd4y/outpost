@@ -50,6 +50,7 @@ type Bootstrap struct {
 	Endpoint        string              `json:"endpoint"`
 	Limits          diskbudget.Limits   `json:"limits"`
 	Prepared        *PreparedSource     `json:"prepared,omitempty"`
+	Standby         bool                `json:"standby,omitempty"`
 	Companion       *CompanionIngress   `json:"companionIngress,omitempty"`
 }
 
@@ -82,6 +83,7 @@ type state struct {
 	CompanionAuthority       []byte            `json:"companionAuthority,omitempty"`
 	IntentCompanionAuthority []byte            `json:"intentCompanionAuthority,omitempty"`
 	LegacyDigest             string            `json:"legacyDigest,omitempty"`
+	RetirementKind           string            `json:"retirementKind,omitempty"`
 	Retirement               string            `json:"retirement,omitempty"`
 }
 
@@ -89,6 +91,7 @@ type Status struct {
 	Format            string          `json:"format"`
 	Profile           string          `json:"profile"`
 	Phase             string          `json:"phase"`
+	Receiver          string          `json:"receiver,omitempty"`
 	Operation         string          `json:"operation,omitempty"`
 	Sequence          uint64          `json:"sequence"`
 	Generation        string          `json:"generation,omitempty"`
@@ -160,6 +163,9 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		p := *b.Prepared
 		p.Trust.Producer = bytes.Clone(p.Trust.Producer)
 		b.Prepared = &p
+	}
+	if b.Standby && (b.Companion == nil || b.Profile.MinimumCopies != 1 || b.Profile.ReleasePolicy != "" || b.ObservationFile != "") {
+		return nil, ErrUnsupported
 	}
 	a := &Agent{b: b, runtimeDirectory: directory, Fault: fault}
 	var e error
@@ -427,7 +433,7 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 		}
 	}
 	if s.Phase != "IDLE" && s.Phase != "PREPARING" && s.Phase != "ACTIVE" && s.Phase != "COMPLETE" && s.Phase != "ABANDONED" ||
-		s.Phase != "ABANDONED" && s.Retirement != "" {
+		s.Phase != "ABANDONED" && (s.Retirement != "" || s.RetirementKind != "") {
 		return s, ErrInvalid
 	}
 	if s.Sequence == 0 && (s.Generation != "" || len(s.Previous) != 0 || len(s.Checkpoint) != 0) || s.Sequence > 0 && !storage.ID(s.Generation) {
@@ -452,8 +458,18 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 			return s, ErrInvalid
 		}
 		if s.Phase == "ABANDONED" {
-			record, err := a.readUnstartedArchive(s, i, s.Retirement)
-			if err != nil || record.RecordedUnix > s.ObservedUnix {
+			switch s.RetirementKind {
+			case "":
+				record, err := a.readUnstartedArchive(s, i, s.Retirement)
+				if err != nil || record.RecordedUnix > s.ObservedUnix {
+					return s, ErrInvalid
+				}
+			case ingress.SettlementRetire:
+				record, err := a.readActiveRetirement(s, i, s.Retirement)
+				if err != nil || record.RecordedUnix > s.ObservedUnix {
+					return s, ErrInvalid
+				}
+			default:
 				return s, ErrInvalid
 			}
 		}
@@ -477,7 +493,11 @@ func (a *Agent) intent(raw []byte, current bool) (ingress.Intent, error) {
 	if !current {
 		now = time.Unix(i.NotBefore, 0)
 	}
-	i, _, e := ingress.VerifyIntent(raw, a.authority, a.b.Local.Owner, now)
+	authority := a.authority
+	if a.standbySelected(i.Ingress) {
+		authority = a.companionAuthority
+	}
+	i, _, e := ingress.VerifyIntent(raw, authority, a.b.Local.Owner, now)
 	return i, e
 }
 
@@ -529,6 +549,12 @@ func (a *Agent) next(ctx context.Context) error {
 	if e != nil {
 		return e
 	}
+	if a.b.Standby {
+		raw, e = a.selectReceiver(ctx, i, raw)
+		if e != nil {
+			return e
+		}
+	}
 	if manifest != nil {
 		if e = a.freezePrepared(ctx, manifest, raw); e != nil {
 			return e
@@ -569,7 +595,7 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 			}
 		}
 		s.Phase, s.Intent = "PREPARING", bytes.Clone(raw)
-		s.Retirement = ""
+		s.Retirement, s.RetirementKind = "", ""
 		if s.Format == renewedFormat {
 			s.IntentAuthority = bytes.Clone(a.authority)
 			s.IntentCompanionAuthority = bytes.Clone(a.companionAuthority)
@@ -597,7 +623,7 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), error) {
 	return a.openJobMode(ctx, s, false, nil)
 }
-func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settlement []byte) (*capture.Job, func(), error) {
+func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settlement []byte, companionSettlement ...[]byte) (*capture.Job, func(), error) {
 	if s.Phase == "PREPARING" && (inspect || len(settlement) != 0) {
 		return nil, nil, ErrInvalid
 	}
@@ -607,16 +633,17 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	}
 	limits := peer.Limits{Concurrency: 1, Timeout: 30 * time.Second, Attempts: 1}
 	authority := a.intentAuthority(s)
+	endpoint := a.receiverEndpoint(i.Ingress)
 	var client *ingress.Client
 	cleanup := inspect || len(settlement) != 0
 	if len(settlement) != 0 {
-		client, e = ingress.NewSettlementClient(a.b.Endpoint, authority, s.Intent, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
+		client, e = ingress.NewSettlementClient(endpoint, authority, s.Intent, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
 	} else if inspect {
-		client, e = ingress.NewCleanupClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+		client, e = ingress.NewCleanupClient(endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
 	} else {
-		client, e = ingress.NewClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+		client, e = ingress.NewClient(endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
 		if e != nil && s.Phase != "PREPARING" {
-			client, e = ingress.NewCleanupClient(a.b.Endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
+			client, e = ingress.NewCleanupClient(endpoint, authority, s.Intent, a.b.Local.Owner, a.cert, a.roots, limits)
 			cleanup = true
 		}
 	}
@@ -624,20 +651,28 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		return nil, nil, e
 	}
 	initialize := s.Phase == "PREPARING"
-	prefix := path.Join("operations", i.Operation)
-	provider, e := a.openProvider(ctx, prefix, i, initialize)
+	operationPrefix := path.Join("operations", i.Operation)
+	prefix := operationPrefix
+	if a.b.Standby {
+		prefix = path.Join(operationPrefix, "receiver-"+i.Ingress)
+	}
+	provider, e := a.openProvider(ctx, operationPrefix, i, initialize)
 	if e != nil {
 		client.Close()
 		return nil, nil, e
 	}
 	var sink capture.Sink = client
 	closeSink := client.Close
-	if a.b.Companion != nil {
+	if a.b.Companion != nil && !a.b.Standby {
 		companionAuthority := a.companionAuthority
 		if s.Format == renewedFormat {
 			companionAuthority = s.IntentCompanionAuthority
 		}
-		group, err := a.openParallelSink(i, prefix, companionAuthority, client, limits, initialize, cleanup)
+		var grant []byte
+		if len(companionSettlement) != 0 {
+			grant = companionSettlement[0]
+		}
+		group, err := a.openParallelSink(i, prefix, companionAuthority, client, limits, initialize, cleanup, grant)
 		if err != nil {
 			provider.Close()
 			client.Close()
@@ -695,7 +730,9 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		return nil, nil, e
 	}
 	var copies func(context.Context, string) ([]capture.CopyReceipt, error)
-	if len(a.observation) > 0 {
+	if group, ok := sink.(*parallelSink); ok && group.settling {
+		copies = group.settlementCopies
+	} else if len(a.observation) > 0 {
 		copies = a.copies
 	}
 	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, ReadOnly: inspect, Settlement: settlement, Profile: p, Authority: authority, Intent: s.Intent, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: sink, Cache: cache, Previous: previous, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
@@ -715,7 +752,7 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) run(ctx context.Context) error {
 	return a.runSettlement(ctx, nil)
 }
-func (a *Agent) runSettlement(ctx context.Context, grant []byte) error {
+func (a *Agent) runSettlement(ctx context.Context, grant []byte, companion ...[]byte) error {
 	if e := a.guard(ctx); e != nil {
 		return e
 	}
@@ -748,7 +785,26 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte) error {
 		}
 	}()
 	defer func() { cancel(nil); <-joined }()
-	job, close, e := a.openJobMode(ctx, s, false, grant)
+	if a.b.Standby && s.Phase == "PREPARING" {
+		i, err := a.stateIntent(s)
+		if err != nil {
+			return err
+		}
+		selected, err := a.selectReceiver(ctx, i, s.Intent)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(selected, s.Intent) {
+			s.Intent = selected
+			if err = a.save(s); err != nil {
+				return err
+			}
+			if err = a.point("source-agent-standby-route-durable"); err != nil {
+				return err
+			}
+		}
+	}
+	job, close, e := a.openJobMode(ctx, s, false, grant, companion...)
 	if e != nil {
 		return e
 	}
@@ -814,6 +870,7 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 				return e
 			}
 			out.Operation = i.Operation
+			out.Receiver = i.Ingress
 			if s.Phase == "PREPARING" || s.Phase == "ACTIVE" {
 				action := "RESUME"
 				if time.Now().Unix() >= i.ExpiresUnix {

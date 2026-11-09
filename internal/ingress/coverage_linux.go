@@ -119,6 +119,9 @@ func (s *Session) stageCoverage(ctx context.Context, raw []byte, origin *staging
 }
 
 func (g *Registry) coverageEnabled() bool {
+	if g.settlementPurpose == SettlementPublish {
+		return true
+	}
 	if routes := g.options.Staging; routes != nil && len(g.options.Settlement) == 0 {
 		for origin := range routes.Origins {
 			if routes.Readers[origin] {
@@ -238,18 +241,18 @@ func (g *Registry) AdvanceCoverage(ctx context.Context, paused func(string) bool
 		return false, nil
 	}
 	now := time.Now()
-	i, _, err := VerifyIntent(g.state.Intent, g.options.Authority, g.options.Owner, now)
+	i, deadline, err := g.stagingIntent(now)
 	if err != nil || now.Unix() < g.state.ObservedUnix || paused(i.Operation) {
 		return false, nil
 	}
-	bounded, cancel := context.WithDeadline(ctx, time.Unix(i.ExpiresUnix, 0))
+	bounded, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	s, err := g.stagingSession(bounded)
 	if err != nil {
 		return false, err
 	}
 	// All access to a registry-owned session is serialized by g.mu.
-	if s.state.Coverage == nil || s.state.Complete || s.state.Acknowledged {
+	if s.state.Complete || s.state.Acknowledged || s.state.Coverage == nil && len(s.publishGrant) == 0 {
 		return false, nil
 	}
 	if origin := s.state.CoveragePeer; origin != nil {
