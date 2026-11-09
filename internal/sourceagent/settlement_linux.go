@@ -122,7 +122,10 @@ func (a *Agent) SettleWithCompanion(ctx context.Context, item control.Settlement
 			return ErrInvalid
 		}
 		g, e := ingress.VerifySettlement(item.Grant, item.Authority, item.Intent, a.b.Local.Owner, time.Now())
-		if e != nil || g.Purpose != "" && g.Purpose != ingress.SettlementPublish {
+		if e != nil {
+			return e
+		}
+		if g.Purpose != "" && g.Purpose != ingress.SettlementPublish {
 			return ErrInvalid
 		}
 		if s.Phase == "COMPLETE" {
@@ -142,7 +145,10 @@ func (a *Agent) SettleWithCompanion(ctx context.Context, item control.Settlement
 				return ErrInvalid
 			}
 			other, e := ingress.VerifySettlement(companion.Grant, authority, intent, a.b.Local.Owner, time.Now())
-			if e != nil || other.Purpose != g.Purpose || other.Generation != g.Generation {
+			if e != nil {
+				return e
+			}
+			if other.Purpose != g.Purpose || other.Generation != g.Generation {
 				return ErrInvalid
 			}
 			paired = append(paired, bytes.Clone(companion.Grant))
