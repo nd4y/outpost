@@ -196,6 +196,13 @@ func (s *parallelSink) selected(ref filekit.Object) *ingress.Client {
 }
 
 func (s *parallelSink) Read(ctx context.Context, ref filekit.Object) ([]byte, error) {
+	// Reusing a cached version reads its encrypted descriptor parts. Confirm
+	// those parts on the new route before the catalog can reference them.
+	if s.recoverRoute {
+		if err := s.Check(ctx, ref); err != nil {
+			return nil, err
+		}
+	}
 	if s.split {
 		return s.selected(ref).Read(ctx, ref)
 	}

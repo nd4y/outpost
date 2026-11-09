@@ -26,7 +26,7 @@ The [source and recovery components](docs/en/product-development.md) include bou
 
 The `source-status` command reports the expiry of pending work and indicates whether the operator can resume it or needs owner action or receiver reconciliation. An expired operation prepared locally can be retired with owner approval until execution reaches the receiver fence.
 
-[Automatic receiver replacement](docs/en/source-agent.md#automatic-replacement-after-active) supports an authorized standby for single-copy capture and a reserve for two copies. [Scoped recovery](docs/en/source-settlement.md) lets both holders finish staged publication after expiry and distinguishes an unadmitted source operation from retained receiver work.
+[Automatic receiver replacement](docs/en/source-agent.md#automatic-replacement-after-active) supports an authorized standby for single-copy capture and a reserve for two copies, including reuse of encrypted descriptor parts. [Scoped recovery](docs/en/source-settlement.md) lets both holders finish staged publication after expiry and distinguishes an unadmitted source operation from retained receiver work.
 
 Worker bootstrap now requires [runtime volume admission](docs/en/runtime-volume.md). Missing markers or replaced paths stop work, while opened descriptors keep writes on the admitted tree. Encrypted per-file progress reuses accepted packs after a crash; the source is still reread. The [source job lifecycle](docs/en/source-jobs.md) defines enforced checkpoint/release ordering and the remaining network copy-threshold integration.
 

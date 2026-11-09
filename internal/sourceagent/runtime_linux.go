@@ -728,7 +728,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 			client.Close()
 			return nil, nil, err
 		}
-		group.recoverRoute = len(s.Superseded) != 0
+		group.recoverRoute = len(s.Superseded) != 0 && !cleanup
 		group.replaying = group.replaying || group.recoverRoute
 		sink, closeSink = group, group.Close
 	}
