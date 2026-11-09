@@ -33,7 +33,10 @@ func retirementID(items []control.SettlementAdmission) string {
 	return storage.Hash(raw)
 }
 
-func (a *Agent) activeReceivers(i ingress.Intent) []string {
+func (a *Agent) activeReceivers(s state, i ingress.Intent) []string {
+	if a.routed() {
+		return s.Route
+	}
 	if a.b.Companion != nil && !a.b.Standby {
 		return []string{i.Ingress, a.companion.Ingress}
 	}
@@ -41,7 +44,7 @@ func (a *Agent) activeReceivers(i ingress.Intent) []string {
 }
 
 func (a *Agent) verifyActiveRetirement(s state, i ingress.Intent, record activeRetirement, now int64) error {
-	targets := a.activeReceivers(i)
+	targets := a.activeReceivers(s, i)
 	if record.Binding != a.binding || record.Operation != i.Operation || record.Checkpoint != storage.Hash(s.Checkpoint) ||
 		record.RecordedUnix < i.ExpiresUnix || record.RecordedUnix > now ||
 		len(record.Admissions) != len(targets) || len(record.Observations) != len(targets) {
@@ -90,6 +93,11 @@ func (a *Agent) RetireActive(ctx context.Context, primary control.SettlementAdmi
 		if err != nil {
 			return err
 		}
+		if len(s.Superseded) != 0 {
+			// A superseded receiver may have accepted data. An absence proof
+			// from the replacement pair cannot retire that admission.
+			return ingress.ErrConflict
+		}
 		i, err := a.stateIntent(s)
 		if err != nil {
 			return err
@@ -102,7 +110,7 @@ func (a *Agent) RetireActive(ctx context.Context, primary control.SettlementAdmi
 		if s.Phase == "ABANDONED" && s.RetirementKind == ingress.SettlementRetire && s.Retirement == id {
 			return nil
 		}
-		targets := a.activeReceivers(i)
+		targets := a.activeReceivers(s, i)
 		if s.Phase != "ACTIVE" || len(items) != len(targets) || time.Now().Unix() < i.ExpiresUnix {
 			return ErrInvalid
 		}

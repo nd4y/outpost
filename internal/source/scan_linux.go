@@ -254,7 +254,14 @@ func (p Plan) Recheck(ctx context.Context, root *os.Root) error {
 func (p Plan) CaptureEntry(ctx context.Context, root *os.Root, entry Entry, s *filekit.Store, file, previous string) (filekit.Stats, error) {
 	return p.CaptureEntryProgress(ctx, root, entry, s, file, previous, "")
 }
-func (p Plan) CaptureEntryProgress(ctx context.Context, root *os.Root, entry Entry, s *filekit.Store, file, previous, operation string) (filekit.Stats, error) {
+func (p Plan) CaptureEntryProgress(ctx context.Context, root *os.Root, entry Entry, s *filekit.Store, file, previous, operation string, prior ...string) (filekit.Stats, error) {
+	if len(prior) > 1 {
+		return filekit.Stats{}, filekit.ErrInvalid
+	}
+	var previousProgress string
+	if len(prior) != 0 {
+		previousProgress = prior[0]
+	}
 	if s == nil || entry.Domain != s.Owner.Domain || len(entry.Names) == 0 {
 		return filekit.Stats{}, policy.ErrDenied
 	}
@@ -283,7 +290,7 @@ func (p Plan) CaptureEntryProgress(ctx context.Context, root *os.Root, entry Ent
 	if e := check(); e != nil {
 		return filekit.Stats{}, e
 	}
-	stats, e := s.BackupEntry(ctx, root, entry.Names[0], filekit.BackupOptions{File: file, Previous: previous, Names: entry.Names, Expected: &entry.Identity, Progress: operation})
+	stats, e := s.BackupEntry(ctx, root, entry.Names[0], filekit.BackupOptions{File: file, Previous: previous, Names: entry.Names, Expected: &entry.Identity, Progress: operation, PreviousProgress: previousProgress})
 	if e != nil {
 		return stats, e
 	}

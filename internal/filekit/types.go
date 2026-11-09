@@ -98,6 +98,8 @@ type BackupOptions struct {
 	// Progress is an opaque capture operation ID. A stable explicit File is
 	// required; partial progress is available only for metadata-only stores.
 	Progress string
+	// PreviousProgress identifies authenticated hints from a superseded route.
+	PreviousProgress string
 }
 
 // Fault is an optional test hook. A caller may inject a failure or stop its own

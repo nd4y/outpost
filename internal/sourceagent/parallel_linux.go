@@ -50,7 +50,7 @@ func (a *Agent) loadCompanion() error {
 	if !sameReceiverPair(a.anchor, companion) {
 		return ErrInvalid
 	}
-	if a.b.Profile.ReleasePolicy != "" || a.b.Standby {
+	if a.b.Reserve == nil && (a.b.Profile.ReleasePolicy != "" || a.b.Standby) {
 		targets := a.b.Profile.CopyTargets
 		if len(targets) != 2 ||
 			!(targets[0] == a.anchor.Ingress && targets[1] == companion.Ingress ||
@@ -104,30 +104,35 @@ type parallelSink struct {
 	writer                  ed25519.PrivateKey
 	settling                bool
 	split                   bool
+	recoverRoute            bool
 	replaying               bool
 	next                    atomic.Uint64
 }
 
 func (a *Agent) companionIntent(i ingress.Intent, authority []byte) (ingress.Intent, []byte, error) {
-	i.Ingress = a.companion.Ingress
+	return a.receiverIntent(i, a.companion.Ingress, authority)
+}
+
+func (a *Agent) receiverIntent(i ingress.Intent, receiver string, authority []byte) (ingress.Intent, []byte, error) {
+	i.Ingress = receiver
 	i.Authority = storage.Hash(authority)
 	raw, err := ingress.SignIntent(i, authority, a.b.Local.Owner, a.writer, time.Unix(i.NotBefore, 0))
 	return i, raw, err
 }
 
-func (a *Agent) openParallelSink(i ingress.Intent, prefix string, authority []byte, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool, settlement []byte) (*parallelSink, error) {
+func (a *Agent) openParallelSink(i ingress.Intent, prefix, companionID, endpoint string, authority []byte, primary *ingress.Client, limits peer.Limits, initialize, cleanup bool, settlement []byte) (*parallelSink, error) {
 	primaryID := i.Ingress
-	i, raw, e := a.companionIntent(i, authority)
+	i, raw, e := a.receiverIntent(i, companionID, authority)
 	if e != nil {
 		return nil, e
 	}
 	var companion *ingress.Client
 	if len(settlement) != 0 {
-		companion, e = ingress.NewSettlementClient(a.b.Companion.Endpoint, authority, raw, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
+		companion, e = ingress.NewSettlementClient(endpoint, authority, raw, settlement, a.b.Local.Owner, a.cert, a.roots, limits)
 	} else if cleanup {
-		companion, e = ingress.NewCleanupClient(a.b.Companion.Endpoint, authority, raw, a.b.Local.Owner, a.cert, a.roots, limits)
+		companion, e = ingress.NewCleanupClient(endpoint, authority, raw, a.b.Local.Owner, a.cert, a.roots, limits)
 	} else {
-		companion, e = ingress.NewClient(a.b.Companion.Endpoint, authority, raw, a.b.Local.Owner, a.cert, a.roots, limits)
+		companion, e = ingress.NewClient(endpoint, authority, raw, a.b.Local.Owner, a.cert, a.roots, limits)
 	}
 	if e != nil {
 		return nil, e
@@ -198,13 +203,25 @@ func (s *parallelSink) Read(ctx context.Context, ref filekit.Object) ([]byte, er
 }
 
 func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
-	if s.split {
-		return s.selected(ref).Check(ctx, ref)
+	primary, other := s.Client, s.companion
+	if s.split && s.selected(ref) == s.companion {
+		primary, other = other, primary
 	}
-	if e := s.Client.Check(ctx, ref); e != nil {
-		return e
+	err := primary.Check(ctx, ref)
+	if err != nil && (!s.recoverRoute || !errors.Is(err, os.ErrNotExist)) {
+		return err
 	}
-	return s.companion.Check(ctx, ref)
+	if err == nil && s.split {
+		return nil
+	}
+	otherErr := other.Check(ctx, ref)
+	if err == nil && s.recoverRoute && errors.Is(otherErr, os.ErrNotExist) {
+		return other.PullStaged(ctx, primary, ref)
+	}
+	if errors.Is(err, os.ErrNotExist) && otherErr == nil {
+		return primary.PullStaged(ctx, other, ref)
+	}
+	return otherErr
 }
 
 func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []byte) (bool, error) {

@@ -51,7 +51,8 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	}
 	defer unlock()
 	s.Stats = Stats{}
-	if opt.Progress != "" && (!validID(opt.Progress) || !validID(opt.File) || s.backend == nil) {
+	if opt.Progress != "" && (!validID(opt.Progress) || !validID(opt.File) || s.backend == nil) ||
+		opt.PreviousProgress != "" && (opt.Progress == "" || !validID(opt.PreviousProgress) || opt.PreviousProgress == opt.Progress) {
 		return s.Stats, ErrInvalid
 	}
 	if opt.File == "" {
@@ -122,6 +123,11 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 			return s.Stats, err
 		}
 		defer progress.file.Close()
+		if opt.PreviousProgress != "" {
+			if err = s.reusePreviousProgress(ctx, opt, identity(observed), meta, reuse, accepted); err != nil {
+				return s.Stats, err
+			}
+		}
 		for hash, block := range accepted {
 			reuse[hash] = block
 		}

@@ -36,7 +36,7 @@ func sameObservationScope(a, b observation.Grant) bool {
 }
 func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	if s.Format == Format {
-		if len(s.Authority)+len(s.Observation)+len(s.IntentAuthority)+len(s.CompanionAuthority)+len(s.IntentCompanionAuthority) != 0 || s.LegacyDigest != "" {
+		if len(s.Authority)+len(s.Observation)+len(s.IntentAuthority)+len(s.CompanionAuthority)+len(s.IntentCompanionAuthority)+len(s.ReserveAuthority)+len(s.IntentReserveAuthority) != 0 || s.LegacyDigest != "" {
 			return ingress.Authority{}, ErrInvalid
 		}
 		return a.grant, nil
@@ -45,7 +45,7 @@ func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	if e != nil || !sameAuthorityScope(current, a.anchor) || current.Revision <= a.anchor.Revision || !storage.ID(s.LegacyDigest) {
 		return current, ErrInvalid
 	}
-	if a.b.Profile.MinimumCopies == 2 {
+	if a.b.Profile.MinimumCopies == 2 && a.b.Reserve == nil {
 		initialRaw := a.initialObservation
 		initial, e := observation.VerifyGrant(initialRaw, a.b.Local.Owner)
 		if e != nil {
@@ -87,8 +87,11 @@ func (a *Agent) stateScope(s state, adopt bool) (ingress.Authority, error) {
 	if e = a.verifyCompanionState(s, current, prior); e != nil {
 		return current, e
 	}
+	if e = a.verifyReserveState(s, current, prior); e != nil {
+		return current, e
+	}
 	if !adopt && (!bytes.Equal(a.authority, s.Authority) || !bytes.Equal(a.observation, s.Observation) ||
-		!bytes.Equal(a.companionAuthority, s.CompanionAuthority)) {
+		!bytes.Equal(a.companionAuthority, s.CompanionAuthority) || !bytes.Equal(a.reserveAuthority, s.ReserveAuthority)) {
 		return current, ErrAuthorityChanged
 	}
 	return current, nil
@@ -115,6 +118,39 @@ func (a *Agent) verifyCompanionState(s state, current, prior ingress.Authority) 
 	}
 	return a.verifyCompanionAuthority(prior, s.IntentCompanionAuthority)
 }
+func (a *Agent) verifyReserveAuthority(primary ingress.Authority, raw []byte) error {
+	reserve, err := ingress.VerifyAuthorityDocument(raw, a.b.Local.Owner)
+	if err != nil {
+		return err
+	}
+	if reserve.Ingress != a.reserve.Ingress || !sameReceiverPair(primary, reserve) {
+		return ingress.ErrDenied
+	}
+	return nil
+}
+
+func (a *Agent) verifyReserveState(s state, current, prior ingress.Authority) error {
+	if a.b.Reserve == nil {
+		if len(s.ReserveAuthority)+len(s.IntentReserveAuthority) != 0 {
+			return ErrInvalid
+		}
+		return nil
+	}
+	if err := a.verifyReserveAuthority(current, s.ReserveAuthority); err != nil {
+		return err
+	}
+	if s.Phase == "IDLE" {
+		if len(s.IntentReserveAuthority) != 0 {
+			return ErrInvalid
+		}
+		return nil
+	}
+	if prior.Revision == current.Revision && !bytes.Equal(s.IntentReserveAuthority, s.ReserveAuthority) {
+		return ErrInvalid
+	}
+	return a.verifyReserveAuthority(prior, s.IntentReserveAuthority)
+}
+
 func (a *Agent) intentAuthority(s state) []byte {
 	if a.b.Standby {
 		var i ingress.Intent
@@ -160,8 +196,13 @@ func (a *Agent) Renew(ctx context.Context, authority, observed []byte) (Renewal,
 // RenewPair commits both matching owner grants in the same signed source
 // journal. The receiver registries are renewed separately before new capture.
 func (a *Agent) RenewPair(ctx context.Context, authority, companion, observed []byte) (Renewal, error) {
+	return a.RenewReceivers(ctx, authority, companion, nil, observed)
+}
+
+// RenewReceivers commits all configured owner grants as one source revision.
+func (a *Agent) RenewReceivers(ctx context.Context, authority, companion, reserve, observed []byte) (Renewal, error) {
 	var out Renewal
-	if (a.b.Companion != nil) != (len(companion) != 0) {
+	if (a.b.Companion != nil) != (len(companion) != 0) || (a.b.Reserve != nil) != (len(reserve) != 0) {
 		return out, ErrUnsupported
 	}
 	next, e := ingress.VerifyAuthority(authority, a.b.Local.Owner, time.Now())
@@ -176,10 +217,15 @@ func (a *Agent) RenewPair(ctx context.Context, authority, companion, observed []
 			return out, e
 		}
 	}
+	if len(reserve) != 0 {
+		if e = a.verifyReserveAuthority(next, reserve); e != nil {
+			return out, e
+		}
+	}
 	if observed == nil {
 		observed = bytes.Clone(a.observation)
 	}
-	if a.b.Profile.MinimumCopies == 2 {
+	if a.b.Profile.MinimumCopies == 2 && a.b.Reserve == nil {
 		old, e := observation.VerifyGrant(a.observation, a.b.Local.Owner)
 		if e != nil {
 			return out, e
@@ -201,7 +247,7 @@ func (a *Agent) RenewPair(ctx context.Context, authority, companion, observed []
 		if _, e := ingress.VerifyAuthority(authority, a.b.Local.Owner, time.Now()); e != nil {
 			return e
 		}
-		if a.b.Profile.MinimumCopies == 2 {
+		if a.b.Profile.MinimumCopies == 2 && a.b.Reserve == nil {
 			g, e := observation.VerifyGrant(observed, a.b.Local.Owner)
 			now := time.Now().Unix()
 			if e != nil || now < g.NotBefore || now >= g.ExpiresUnix {
@@ -212,7 +258,7 @@ func (a *Agent) RenewPair(ctx context.Context, authority, companion, observed []
 		if e != nil {
 			return e
 		}
-		same := bytes.Equal(authority, a.authority) && bytes.Equal(observed, a.observation) && bytes.Equal(companion, a.companionAuthority)
+		same := bytes.Equal(authority, a.authority) && bytes.Equal(observed, a.observation) && bytes.Equal(companion, a.companionAuthority) && bytes.Equal(reserve, a.reserveAuthority)
 		if next.Revision < a.grant.Revision || next.Revision == a.grant.Revision && !same {
 			return ingress.ErrConflict
 		}
@@ -245,11 +291,13 @@ func (a *Agent) RenewPair(ctx context.Context, authority, companion, observed []
 			if len(s.Intent) > 0 {
 				s.IntentAuthority = bytes.Clone(a.authority)
 				s.IntentCompanionAuthority = bytes.Clone(a.companionAuthority)
+				s.IntentReserveAuthority = bytes.Clone(a.reserveAuthority)
 			}
 		}
 		s.Format = renewedFormat
 		s.Authority = bytes.Clone(authority)
 		s.CompanionAuthority = bytes.Clone(companion)
+		s.ReserveAuthority = bytes.Clone(reserve)
 		s.Observation = bytes.Clone(observed)
 		if e = a.save(s); e != nil {
 			return e

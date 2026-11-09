@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
@@ -25,6 +26,16 @@ func (a *Agent) settlementReceiver(s state, receiver string) (ingress.Intent, []
 	i, err := a.stateIntent(s)
 	if err != nil {
 		return i, nil, nil, "", err
+	}
+	if a.routed() {
+		if receiver == "" {
+			receiver = s.Route[0]
+		}
+		if !slices.Contains(s.Route, receiver) && !slices.Contains(s.Superseded, receiver) {
+			return i, nil, nil, "", ErrInvalid
+		}
+		r, err := a.routeReceiver(s, i, receiver)
+		return r.intent, r.authority, r.raw, r.endpoint, err
 	}
 	if receiver == "" || receiver == i.Ingress {
 		return i, a.intentAuthority(s), s.Intent, a.receiverEndpoint(i.Ingress), nil
@@ -54,6 +65,9 @@ func (a *Agent) SettlementPreviewFor(ctx context.Context, purpose, receiver stri
 			return e
 		}
 		if s.Phase != "ACTIVE" {
+			return ErrInvalid
+		}
+		if a.routed() && receiver != "" && purpose != ingress.SettlementInspect && !slices.Contains(s.Route, receiver) {
 			return ErrInvalid
 		}
 		i, authority, intent, _, e := a.settlementReceiver(s, receiver)
@@ -118,7 +132,11 @@ func (a *Agent) SettleWithCompanion(ctx context.Context, item control.Settlement
 		if e != nil {
 			return e
 		}
-		if (s.Phase != "ACTIVE" && s.Phase != "COMPLETE") || !bytes.Equal(item.Authority, a.intentAuthority(s)) || !bytes.Equal(item.Intent, s.Intent) {
+		if s.Phase != "ACTIVE" && s.Phase != "COMPLETE" {
+			return ErrInvalid
+		}
+		_, authority, intent, _, e := a.settlementReceiver(s, "")
+		if e != nil || !bytes.Equal(item.Authority, authority) || !bytes.Equal(item.Intent, intent) {
 			return ErrInvalid
 		}
 		g, e := ingress.VerifySettlement(item.Grant, item.Authority, item.Intent, a.b.Local.Owner, time.Now())
@@ -140,7 +158,11 @@ func (a *Agent) SettleWithCompanion(ctx context.Context, item control.Settlement
 			if a.b.Companion == nil || a.b.Standby {
 				return ErrInvalid
 			}
-			_, authority, intent, _, e := a.settlementReceiver(s, a.companion.Ingress)
+			target := a.companion.Ingress
+			if a.b.Reserve != nil {
+				target = s.Route[1]
+			}
+			_, authority, intent, _, e := a.settlementReceiver(s, target)
 			if e != nil || !bytes.Equal(authority, companion.Authority) || !bytes.Equal(intent, companion.Intent) {
 				return ErrInvalid
 			}

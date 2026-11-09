@@ -66,9 +66,10 @@ type CopyReceipt struct {
 	SignedObservation string `json:"signedObservation,omitempty"`
 }
 type Options struct {
-	Parent     *os.Root
-	Directory  string
-	Initialize bool
+	ProgressScope, PreviousProgress, RoutePlan string
+	Parent                                     *os.Root
+	Directory                                  string
+	Initialize                                 bool
 	// ReadOnly permits inspecting authenticated expired local history only.
 	ReadOnly bool
 	// Settlement is a fresh, exact receipt-only capability, never an intent renewal.
@@ -211,6 +212,11 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 			return nil, ErrInvalid
 		}
 	}
+	if o.ProgressScope != "" && !storage.ID(o.ProgressScope) ||
+		o.RoutePlan != "" && (!storage.ID(o.RoutePlan) || o.ProgressScope == "") ||
+		o.PreviousProgress != "" && (!storage.ID(o.PreviousProgress) || o.ProgressScope == "" || o.PreviousProgress == o.ProgressScope) {
+		return nil, ErrInvalid
+	}
 	if o.Guard != nil {
 		if e = o.Guard(ctx); e != nil {
 			return nil, e
@@ -220,7 +226,10 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 		Profile           Profile
 		Authority, Intent []byte
 		Previous          map[string]string
-	}{p, o.Authority, o.Intent, o.Previous})
+		ProgressScope     string `json:",omitempty"`
+		PreviousProgress  string `json:",omitempty"`
+		RoutePlan         string `json:",omitempty"`
+	}{p, o.Authority, o.Intent, o.Previous, o.ProgressScope, o.PreviousProgress, o.RoutePlan})
 	j := &Job{options: o, intent: i, authority: a, binding: storage.Hash(raw)}
 	// Freeze caller-owned slices/maps through their private JSON contract.
 	var frozen struct {
@@ -463,6 +472,14 @@ func (j *Job) prepare(ctx context.Context) error {
 			mac.Write([]byte("outpost-source-lineage-1\x00"))
 			mac.Write(raw)
 			id = hex.EncodeToString(mac.Sum(nil))
+		} else if j.options.ProgressScope != "" {
+			// Without reliable cross-generation lineage, retain the file ID
+			// within this operation only, including during route changes.
+			mac := hmac.New(sha256.New, j.options.Data.Master)
+			mac.Write([]byte("outpost-source-operation-file-1\x00" + j.intent.Operation))
+			raw, _ := json.Marshal(entry)
+			mac.Write(raw)
+			id = hex.EncodeToString(mac.Sum(nil))
 		} else {
 			var nonce [32]byte
 			if _, e = rand.Read(nonce[:]); e != nil {
@@ -471,6 +488,9 @@ func (j *Job) prepare(ctx context.Context) error {
 			id = hex.EncodeToString(nonce[:])
 		}
 		j.plan.Files = append(j.plan.Files, filePlan{Entry: entry, File: id, Previous: j.options.Previous[id], ReliableLineage: known})
+	}
+	if j.options.RoutePlan != "" && j.RoutePlanDigest() != j.options.RoutePlan {
+		return source.ErrChanged
 	}
 	if len(j.plan.Files) < 1 || len(j.plan.Files) > generation.MaxKits {
 		return statefile.ErrCapacity
@@ -679,8 +699,13 @@ func (j *Job) Run(ctx context.Context) error {
 				return e
 			}
 			for _, file := range j.plan.Files {
-				if e = j.options.Cache.DiscardCaptureProgress(ctx, j.intent.Operation, file.File); e != nil {
+				if e = j.options.Cache.DiscardCaptureProgress(ctx, j.progressScope(), file.File); e != nil {
 					return e
+				}
+				if j.options.PreviousProgress != "" {
+					if e = j.options.Cache.DiscardCaptureProgress(ctx, j.options.PreviousProgress, file.File); e != nil {
+						return e
+					}
 				}
 			}
 			s.Phase = "COMPLETE"
@@ -759,6 +784,45 @@ func (j *Job) verifyCopies(copies []CopyReceipt, generationID string) ([]CopyRec
 	}
 	return out, nil
 }
+
+// RoutePlanDigest binds the source selection and file identities across routes.
+func (j *Job) RoutePlanDigest() string {
+	raw, _ := json.Marshal(struct {
+		Source source.Plan
+		Files  []filePlan
+	}{j.plan.Source, j.plan.Files})
+	return storage.Hash(raw)
+}
+
+// CanChangeReceivers is intentionally stricter than a phase check. A crash
+// can leave the signed catalog durable before the SEALED state is committed.
+func (j *Job) CanChangeReceivers(ctx context.Context) (bool, error) {
+	var allowed bool
+	err := j.lease.WithLock(ctx, func() error {
+		state, err := j.Status(ctx)
+		if err != nil {
+			return err
+		}
+		if state.Phase != "PLANNED" && state.Phase != "CAPTURING" {
+			return nil
+		}
+		_, err = j.state.Read("catalog.json")
+		if errors.Is(err, os.ErrNotExist) {
+			allowed = true
+			return nil
+		}
+		return err
+	})
+	return allowed, err
+}
+
+func (j *Job) progressScope() string {
+	if j.options.ProgressScope != "" {
+		return j.options.ProgressScope
+	}
+	return j.intent.Operation
+}
+
 func (j *Job) capture(ctx context.Context, root *os.Root, s *State) error {
 	if e := j.plan.Source.Recheck(ctx, root); e != nil {
 		return e
@@ -778,7 +842,7 @@ func (j *Job) capture(ctx context.Context, root *os.Root, s *State) error {
 			if index < s.CompletedFiles {
 				return ErrInvalid
 			}
-			result, e = j.plan.Source.CaptureEntryProgress(ctx, root, file.Entry, j.options.Cache, file.File, file.Previous, j.intent.Operation)
+			result, e = j.plan.Source.CaptureEntryProgress(ctx, root, file.Entry, j.options.Cache, file.File, file.Previous, j.progressScope(), j.options.PreviousProgress)
 			if e != nil {
 				return e
 			}

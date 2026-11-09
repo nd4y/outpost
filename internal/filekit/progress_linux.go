@@ -215,6 +215,39 @@ func (p *captureProgress) append(ctx context.Context, blocks []Block) error {
 	return p.store.checkpoint("capture-progress-durable")
 }
 
+func (s *Store) reusePreviousProgress(ctx context.Context, opt BackupOptions, observed SourceIdentity, meta Metadata, reuse, current map[string]Block) error {
+	opt.Progress = opt.PreviousProgress
+	if _, err := s.root.Lstat(progressName(opt.Progress, opt.File)); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	old, accepted, err := s.openProgress(ctx, opt, observed, meta)
+	if err != nil {
+		return err
+	}
+	if err = old.file.Close(); err != nil {
+		return err
+	}
+	checked := make(map[string]bool)
+	for hash, block := range accepted {
+		if _, ok := current[hash]; ok {
+			continue
+		}
+		if _, ok := checked[block.Object.ID]; !ok {
+			err = s.checkObjectContext(ctx, block.Object)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			checked[block.Object.ID] = err == nil
+		}
+		if checked[block.Object.ID] {
+			reuse[hash] = block
+		}
+	}
+	return nil
+}
+
 // DiscardCaptureProgress is a source-journal transition after durable receipt
 // and provider release. It removes local resume metadata only, never payload.
 // Remote maintenance is still owned by the receiving replica.
