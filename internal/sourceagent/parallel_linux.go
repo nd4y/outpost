@@ -209,6 +209,23 @@ func (s *parallelSink) Read(ctx context.Context, ref filekit.Object) ([]byte, er
 	return s.Client.Read(ctx, ref)
 }
 
+// RecoverSealed imports the exact closure before submitting a migrated
+// catalog. Neither the source view nor a new catalog signature is needed.
+func (s *parallelSink) RecoverSealed(ctx context.Context, refs []generation.Object) error {
+	if !s.recoverRoute || s.split {
+		return ErrInvalid
+	}
+	if err := s.Begin(ctx); err != nil {
+		return err
+	}
+	for _, ref := range refs {
+		if err := s.Check(ctx, filekit.Object{ID: ref.ID, Bytes: ref.Bytes}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
 	primary, other := s.Client, s.companion
 	if s.split && s.selected(ref) == s.companion {

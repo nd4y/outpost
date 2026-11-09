@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/nd4y/outpost/internal/localfs"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -283,7 +282,7 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 		return nil, e
 	}
 	var state sessionState
-	if storage.Decode(prior, &state, maxSessionDocument) != nil || !state.Acknowledged {
+	if storage.Decode(prior, &state, maxSessionDocument) != nil || !state.Acknowledged && len(state.Reclaimed) == 0 {
 		return nil, ErrConflict
 	}
 	oldOptions := o
@@ -294,7 +293,11 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	oldOptions.Authority = bytes.Clone(state.Authority)
 	oldOptions.Intent = state.Intent
 	oldOptions.Initialize = false
-	old, e := openSession(ctx, oldOptions, true)
+	mode := sessionComplete
+	if len(state.Reclaimed) != 0 {
+		mode = sessionInspect
+	}
+	old, e := openSessionFor(ctx, oldOptions, mode)
 	if e != nil {
 		return nil, e
 	}
@@ -306,26 +309,14 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	if e = g.checkPredecessor(ctx, next); e != nil {
 		return nil, e
 	}
-	ack, e := old.cleanupAcknowledged(ctx, 256)
-	if e != nil {
+	if e = old.cleanupStaged(ctx, 256); e != nil {
 		return nil, e
 	}
-	if !ack.Clean {
+	if len(old.refs) != 0 {
 		return nil, ErrUnavailable
 	}
-	// No accepted objects remain. Unknown or interrupted temporary files must
-	// be reconciled explicitly; they never silently become another job's data.
-	d, e := old.objectRoot.Open(".")
-	if e != nil {
-		return nil, e
-	}
-	names, e := d.ReadDir(1)
-	d.Close()
-	if e != nil && !errors.Is(e, os.ErrNotExist) && !errors.Is(e, io.EOF) {
-		return nil, e
-	}
-	if len(names) != 0 {
-		return nil, ErrConflict
+	if empty, err := old.slotEmpty(); err != nil || !empty {
+		return nil, errors.Join(ErrConflict, err)
 	}
 	old.state = sessionState{Format: SessionFormat, Authority: bytes.Clone(o.Authority), Intent: bytes.Clone(raw), LastObserved: time.Now().Unix()}
 	if e = old.save(); e != nil {
@@ -356,10 +347,10 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	if e != nil {
 		return i, e
 	}
+	if e = g.checkAdmission(ctx, raw, i); e != nil {
+		return i, e
+	}
 	if !bytes.Equal(g.state.Intent, raw) {
-		if e = g.checkAdmission(ctx, raw, i); e != nil {
-			return i, e
-		}
 		if g.session != nil {
 			if e = g.session.Close(); e != nil {
 				return i, e
@@ -426,7 +417,7 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	remote := r.TLS.PeerCertificates[0]
-	if peer.Identity(remote) != g.authority.Source || now.Before(remote.NotBefore) || !now.Before(remote.NotAfter) || now.Before(g.leaf.NotBefore) || !now.Before(g.leaf.NotAfter) || r.Header.Get("Outpost-Authority") != g.state.Authority {
+	if peer.Identity(remote) != g.authority.Source || now.Before(remote.NotBefore) || !now.Before(remote.NotAfter) || now.Before(g.leaf.NotBefore) || !now.Before(g.leaf.NotAfter) {
 		fail(w, ErrDenied)
 		return
 	}
@@ -446,6 +437,14 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), g.options.Limits.Timeout)
 	defer cancel()
+	if len(parts) == 2 && parts[1] == "reclaim" && r.Method == http.MethodPut {
+		g.serveReclaim(w, r.WithContext(ctx), parts[0])
+		return
+	}
+	if r.Header.Get("Outpost-Authority") != g.state.Authority {
+		fail(w, ErrDenied)
+		return
+	}
 	if len(parts) == 2 && (parts[1] == "intent" || parts[1] == "readiness") && r.Method == http.MethodPut {
 		deadline, _ := ctx.Deadline()
 		for _, expiry := range []time.Time{g.leaf.NotAfter, remote.NotAfter, time.Unix(g.authority.ExpiresUnix, 0)} {

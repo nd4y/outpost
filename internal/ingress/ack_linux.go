@@ -76,13 +76,23 @@ func (s *Session) cleanupAcknowledged(ctx context.Context, maxObjects int) (Ackn
 	if !s.state.Acknowledged || s.state.Receipt == nil {
 		return result, ErrConflict
 	}
+	if err := s.cleanupStaged(ctx, maxObjects); err != nil {
+		return result, err
+	}
+	// Interrupted atomic writes are not accepted objects. They remain visible
+	// to shared budget reconciliation until explicit orphan maintenance.
+	result = Acknowledgement{Receipt: *s.state.Receipt, RemainingObjects: len(s.refs), RemainingBytes: s.bytes, Clean: len(s.refs) == 0}
+	return result, nil
+}
+
+func (s *Session) cleanupStaged(ctx context.Context, maxObjects int) error {
 	for _, kind := range []string{"base", "receipt"} {
 		if e := s.replica.ReleasePin(ctx, s.pin(kind)); e != nil {
-			return result, e
+			return e
 		}
 	}
 	if e := s.point("capture-ack-unpinned"); e != nil {
-		return result, e
+		return e
 	}
 	ids := make([]string, 0, len(s.refs))
 	for id := range s.refs {
@@ -94,16 +104,16 @@ func (s *Session) cleanupAcknowledged(ctx context.Context, maxObjects int) (Ackn
 	}
 	for _, id := range ids {
 		if e := ctx.Err(); e != nil {
-			return result, e
+			return e
 		}
 		// Never follow a substituted link, recurse or remove unknown names.
 		info, e := s.objectRoot.Lstat(id)
 		if e != nil && !errors.Is(e, os.ErrNotExist) {
-			return result, e
+			return e
 		}
 		if e == nil {
 			if !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || info.Size() != int64(s.refs[id].Bytes) {
-				return result, ErrConflict
+				return ErrConflict
 			}
 			if s.removeObject != nil {
 				e = s.removeObject(ctx, id, info.Size())
@@ -111,25 +121,22 @@ func (s *Session) cleanupAcknowledged(ctx context.Context, maxObjects int) (Ackn
 				e = s.objectRoot.Remove(id)
 			}
 			if e != nil {
-				return result, e
+				return e
 			}
 		}
 		s.bytes -= int64(s.refs[id].Bytes)
 		delete(s.refs, id)
 		if e = s.point("capture-staged-object-removed"); e != nil {
-			return result, e
+			return e
 		}
 	}
 	d, e := s.objectRoot.Open(".")
 	if e != nil {
-		return result, e
+		return e
 	}
 	e = errors.Join(d.Sync(), d.Close())
 	if e != nil {
-		return result, e
+		return e
 	}
-	// Interrupted atomic writes are not accepted objects. They remain visible
-	// to shared budget reconciliation until explicit orphan maintenance.
-	result = Acknowledgement{Receipt: *s.state.Receipt, RemainingObjects: len(s.refs), RemainingBytes: s.bytes, Clean: len(s.refs) == 0}
-	return result, nil
+	return nil
 }

@@ -32,6 +32,14 @@ func (j *Job) Export(ctx context.Context) ([]byte, map[string]string, error) {
 		if e != nil {
 			return e
 		}
+		if j.options.InheritedCatalog != "" {
+			raw, err := j.state.Read("catalog.json")
+			if err != nil {
+				return err
+			}
+			heads, err = j.sealedHeads(raw, s.Generation)
+			return err
+		}
 		for _, file := range j.plan.Files {
 			raw, e := j.files.Read(file.File)
 			if e != nil {

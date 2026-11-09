@@ -3,6 +3,7 @@ package ingress
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -26,7 +27,11 @@ func (g *Registry) checkAdmission(ctx context.Context, raw []byte, i Intent) err
 		return ErrConflict
 	}
 	if bytes.Equal(g.state.Intent, raw) {
-		return nil
+		reclaimed, err := g.slotReclaimed(raw)
+		if reclaimed {
+			return ErrConflict
+		}
+		return err
 	}
 	if err := g.checkPredecessor(ctx, i); err != nil {
 		return err
@@ -51,6 +56,17 @@ func (g *Registry) checkAdmission(ctx context.Context, raw []byte, i Intent) err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len(s.state.Reclaimed) != 0 {
+		grant, err := verifyReclaim(s.state.Reclaimed, g.state.Intent, g.authority.Trust.Writer)
+		if err != nil || now < s.state.LastObserved || i.Sequence == previous.Sequence+1 && i.Parent != grant.Generation {
+			return ErrConflict
+		}
+		empty, err := s.slotEmpty()
+		if err != nil || !empty {
+			return errors.Join(ErrConflict, err)
+		}
+		return nil
+	}
 	if !s.state.Acknowledged || s.state.Receipt == nil || now < s.state.LastObserved ||
 		i.Sequence == previous.Sequence+1 && i.Parent != s.state.Receipt.Generation {
 		return ErrConflict

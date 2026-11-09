@@ -104,7 +104,7 @@ jobs:
           go test -count=1 -timeout=180s -run '^TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations$' \
             -v ./internal/sourceagent
           go test -count=1 -timeout=180s -skip '^TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations$' \
-            -run 'Settlement|SourceUnstartedRetirement|SourceAgentSIGKILLChild|SourceStandbySelection|SourceActiveReceiverReplacement|ActiveInspectionDistinguishes|RegistryReadinessLeavesNoFence|PublicationGrantResumesFrozenLocalCatalog' \
+            -run 'Settlement|SourceUnstartedRetirement|SourceAgentSIGKILLChild|SourceStandbySelection|SourceActiveReceiverReplacement|SourceSealedReceiverReplacement|ActiveInspectionDistinguishes|RegistryReadinessLeavesNoFence|PublicationGrantResumesFrozenLocalCatalog' \
             -v ./internal/sourceagent ./internal/worker ./internal/control ./internal/ingress
       - name: Renew the existing receiver through the selected native CLI
         env:

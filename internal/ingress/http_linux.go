@@ -285,8 +285,8 @@ func NewClient(endpoint string, authority, intent []byte, owner ed25519.PublicKe
 	return newClient(endpoint, authority, intent, owner, cert, roots, limits, false)
 }
 
-// NewCleanupClient admits only acknowledgement of an already verified receipt.
-// It cannot begin, read, upload or publish an operation, including before expiry.
+// NewCleanupClient admits acknowledgement and signed slot reclamation. It
+// cannot begin, read, upload or publish an operation, including before expiry.
 func NewCleanupClient(endpoint string, authority, intent []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*Client, error) {
 	return newClient(endpoint, authority, intent, owner, cert, roots, limits, true)
 }
@@ -326,6 +326,7 @@ func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	now := time.Now()
 	ack := resource == "ack" && method == http.MethodPut
+	reclaim := c.cleanup && !c.inspection && resource == "reclaim" && method == http.MethodPut
 	settling := len(c.settlement) != 0
 	if c.stagingReader && (method != http.MethodGet || !strings.HasPrefix(resource, "staged/")) {
 		return 0, nil, nil, ErrDenied
@@ -334,7 +335,7 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		if resource != "reconcile" || method != http.MethodGet {
 			return 0, nil, nil, ErrDenied
 		}
-	} else if (c.cleanup || settling) && !ack && !(settling && resource == "receipt" && method == http.MethodGet) {
+	} else if (c.cleanup || settling) && !ack && !reclaim && !(settling && resource == "receipt" && method == http.MethodGet) {
 		return 0, nil, nil, ErrDenied
 	}
 	var grant Settlement
@@ -345,7 +346,7 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 			return 0, nil, nil, e
 		}
 	}
-	if !ack && !settling && c.peerPublicationDeadline.IsZero() {
+	if !ack && !reclaim && !settling && c.peerPublicationDeadline.IsZero() {
 		if _, _, e := VerifyIntent(c.intentRaw, c.authority, c.owner, now); e != nil {
 			return 0, nil, nil, e
 		}
@@ -360,7 +361,7 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		}
 		deadline = c.peerPublicationDeadline
 	}
-	if ack || settling {
+	if ack || reclaim || settling {
 		deadline = c.cert.NotAfter
 	}
 	if settling && time.Unix(grant.ExpiresUnix, 0).Before(deadline) {

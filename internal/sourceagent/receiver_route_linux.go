@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/capture"
+	"github.com/nd4y/outpost/internal/filekit"
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/policy"
@@ -49,7 +51,7 @@ func routeScope(operation string, route []string) string {
 
 func (a *Agent) validateRoute(s state, i ingress.Intent) error {
 	if !a.routed() {
-		if len(s.Route)+len(s.Superseded) != 0 || s.RoutePreparing || s.RoutePlan != "" {
+		if len(s.Route)+len(s.Superseded) != 0 || s.RoutePreparing || s.RoutePlan != "" || s.RouteCatalog != "" {
 			return ErrInvalid
 		}
 		return nil
@@ -66,6 +68,10 @@ func (a *Agent) validateRoute(s state, i ingress.Intent) error {
 		return true
 	}
 	if !valid(s.Route) || s.RoutePlan != "" && !storage.ID(s.RoutePlan) || len(s.Superseded) != 0 && s.RoutePlan == "" || s.RoutePreparing && (s.Phase != "ACTIVE" || len(s.Superseded) == 0) {
+		return ErrInvalid
+	}
+	if s.RouteCatalog != "" && (!storage.ID(s.RouteCatalog) || len(s.Superseded) != 2 ||
+		s.Phase == "COMPLETE" && s.Generation != s.RouteCatalog) {
 		return ErrInvalid
 	}
 	if len(s.Superseded) != 0 {
@@ -188,12 +194,28 @@ func (a *Agent) replacementRoute(ctx context.Context, s state) ([]string, error)
 
 func (a *Agent) switchRoute(ctx context.Context, s *state, job *capture.Job) (bool, error) {
 	allowed, err := job.CanChangeReceivers(ctx)
-	if err != nil || !allowed {
+	if err != nil {
 		return false, err
+	}
+	var sealed *capture.SealedTransfer
+	if !allowed {
+		if a.b.Reserve == nil || s.Phase != "ACTIVE" {
+			return false, nil
+		}
+		sealed, err = job.SealedTransfer(ctx)
+		if err != nil || sealed == nil {
+			return false, err
+		}
 	}
 	route, err := a.replacementRoute(ctx, *s)
 	if err != nil || len(route) == 0 {
 		return false, err
+	}
+	if sealed != nil {
+		if err = a.checkSealedDonor(ctx, *s, route, sealed.Catalog); err != nil {
+			return false, err
+		}
+		s.RouteCatalog = storage.Hash(sealed.Catalog)
 	}
 	if err = a.guard(ctx); err != nil {
 		return false, err
@@ -207,6 +229,41 @@ func (a *Agent) switchRoute(ctx context.Context, s *state, job *capture.Job) (bo
 		return false, err
 	}
 	return true, a.point("source-agent-receiver-route-durable")
+}
+
+// checkSealedDonor refuses a route change when the survivor cannot confirm
+// the entire closure. In particular a split capture can lose unique objects.
+func (a *Agent) checkSealedDonor(ctx context.Context, s state, route []string, catalog []byte) error {
+	i, err := a.stateIntent(s)
+	if err != nil {
+		return err
+	}
+	refs, err := generation.Dependencies(catalog, a.anchor.Trust)
+	if err != nil {
+		return err
+	}
+	for _, id := range s.Route {
+		if !slices.Contains(route, id) {
+			continue
+		}
+		r, err := a.routeReceiver(s, i, id)
+		if err != nil {
+			return err
+		}
+		client, err := ingress.NewClient(r.endpoint, r.authority, r.raw, a.b.Local.Owner, a.cert, a.roots,
+			peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1})
+		if err != nil {
+			return err
+		}
+		defer client.Close()
+		for _, ref := range refs {
+			if err = client.Check(ctx, filekit.Object{ID: ref.ID, Bytes: ref.Bytes}); err != nil {
+				return errors.Join(ingress.ErrIncomplete, err)
+			}
+		}
+		return nil
+	}
+	return ErrInvalid
 }
 
 // The source execution lease covers the old job, the signed route decision

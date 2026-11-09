@@ -67,6 +67,8 @@ type CopyReceipt struct {
 }
 type Options struct {
 	ProgressScope, PreviousProgress, RoutePlan string
+	InheritedCatalog                           string
+	Sealed                                     *SealedTransfer
 	Parent                                     *os.Root
 	Directory                                  string
 	Initialize                                 bool
@@ -213,6 +215,8 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 		}
 	}
 	if o.ProgressScope != "" && !storage.ID(o.ProgressScope) ||
+		o.InheritedCatalog != "" && (!storage.ID(o.InheritedCatalog) || o.RoutePlan == "") ||
+		o.Sealed != nil && (!o.Initialize || o.InheritedCatalog == "") ||
 		o.RoutePlan != "" && (!storage.ID(o.RoutePlan) || o.ProgressScope == "") ||
 		o.PreviousProgress != "" && (!storage.ID(o.PreviousProgress) || o.ProgressScope == "" || o.PreviousProgress == o.ProgressScope) {
 		return nil, ErrInvalid
@@ -229,7 +233,8 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 		ProgressScope     string `json:",omitempty"`
 		PreviousProgress  string `json:",omitempty"`
 		RoutePlan         string `json:",omitempty"`
-	}{p, o.Authority, o.Intent, o.Previous, o.ProgressScope, o.PreviousProgress, o.RoutePlan})
+		InheritedCatalog  string `json:",omitempty"`
+	}{p, o.Authority, o.Intent, o.Previous, o.ProgressScope, o.PreviousProgress, o.RoutePlan, o.InheritedCatalog})
 	j := &Job{options: o, intent: i, authority: a, binding: storage.Hash(raw)}
 	// Freeze caller-owned slices/maps through their private JSON contract.
 	var frozen struct {
@@ -270,6 +275,9 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 	e = j.lease.WithLock(ctx, func() error {
 		raw, e := j.state.Read("job.json")
 		if errors.Is(e, os.ErrNotExist) && o.Initialize {
+			if o.InheritedCatalog != "" {
+				return j.prepareSealed(o.Sealed)
+			}
 			return j.prepare(ctx)
 		}
 		if e != nil {
@@ -287,6 +295,9 @@ func Open(ctx context.Context, o Options) (*Job, error) {
 			return ErrInvalid
 		}
 		if len(j.plan.Files) > generation.MaxKits || len(j.plan.Files) == 0 || s.CompletedFiles > len(j.plan.Files) {
+			return ErrInvalid
+		}
+		if o.InheritedCatalog != "" && (phase(s.Phase) < phase("SEALED") || s.Generation != o.InheritedCatalog) {
 			return ErrInvalid
 		}
 		if phase(s.Phase) >= phase("SEALED") && s.CompletedFiles != len(j.plan.Files) {
@@ -555,6 +566,11 @@ func (j *Job) Run(ctx context.Context) error {
 				return e
 			}
 		}
+		if s.Phase == "CAPTURING" {
+			if e = j.recoverCatalogState(&s); e != nil {
+				return e
+			}
+		}
 		if phase(s.Phase) < phase("SEALED") {
 			if e = j.options.Sink.Begin(ctx); e != nil {
 				return e
@@ -577,7 +593,19 @@ func (j *Job) Run(ctx context.Context) error {
 			if storage.Hash(raw) != s.Generation {
 				return ErrInvalid
 			}
-			if j.options.Profile.ReleasePolicy != "" {
+			if j.options.InheritedCatalog != "" {
+				receiver, ok := j.options.Sink.(sealedReceiver)
+				if !ok {
+					return ErrInvalid
+				}
+				refs, err := generation.Dependencies(raw, j.authority.Trust)
+				if err != nil {
+					return err
+				}
+				if e = receiver.RecoverSealed(ctx, refs); e != nil {
+					return e
+				}
+			} else if j.options.Profile.ReleasePolicy != "" {
 				if e = j.releaseWithCoverage(ctx, &s, raw); e != nil {
 					return e
 				}

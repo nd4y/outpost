@@ -69,30 +69,33 @@ func Load(path string) (Bootstrap, error) {
 }
 
 type state struct {
-	Format                   string            `json:"format"`
-	Binding                  string            `json:"binding"`
-	Phase                    string            `json:"phase"`
-	ObservedUnix             int64             `json:"observedUnix"`
-	Sequence                 uint64            `json:"sequence"`
-	Generation               string            `json:"generation,omitempty"`
-	Intent                   []byte            `json:"intent,omitempty"`
-	Previous                 map[string]string `json:"previous"`
-	Checkpoint               []byte            `json:"checkpoint,omitempty"`
-	Signature                []byte            `json:"signature,omitempty"`
-	Authority                []byte            `json:"authority,omitempty"`
-	Observation              []byte            `json:"observation,omitempty"`
-	IntentAuthority          []byte            `json:"intentAuthority,omitempty"`
-	CompanionAuthority       []byte            `json:"companionAuthority,omitempty"`
-	IntentCompanionAuthority []byte            `json:"intentCompanionAuthority,omitempty"`
-	ReserveAuthority         []byte            `json:"reserveAuthority,omitempty"`
-	IntentReserveAuthority   []byte            `json:"intentReserveAuthority,omitempty"`
-	Route                    []string          `json:"route,omitempty"`
-	Superseded               []string          `json:"superseded,omitempty"`
-	RoutePreparing           bool              `json:"routePreparing,omitempty"`
-	RoutePlan                string            `json:"routePlan,omitempty"`
-	LegacyDigest             string            `json:"legacyDigest,omitempty"`
-	RetirementKind           string            `json:"retirementKind,omitempty"`
-	Retirement               string            `json:"retirement,omitempty"`
+	Format                   string                            `json:"format"`
+	Binding                  string                            `json:"binding"`
+	Phase                    string                            `json:"phase"`
+	ObservedUnix             int64                             `json:"observedUnix"`
+	Sequence                 uint64                            `json:"sequence"`
+	Generation               string                            `json:"generation,omitempty"`
+	Intent                   []byte                            `json:"intent,omitempty"`
+	Previous                 map[string]string                 `json:"previous"`
+	Checkpoint               []byte                            `json:"checkpoint,omitempty"`
+	Signature                []byte                            `json:"signature,omitempty"`
+	Authority                []byte                            `json:"authority,omitempty"`
+	Observation              []byte                            `json:"observation,omitempty"`
+	IntentAuthority          []byte                            `json:"intentAuthority,omitempty"`
+	CompanionAuthority       []byte                            `json:"companionAuthority,omitempty"`
+	IntentCompanionAuthority []byte                            `json:"intentCompanionAuthority,omitempty"`
+	ReserveAuthority         []byte                            `json:"reserveAuthority,omitempty"`
+	IntentReserveAuthority   []byte                            `json:"intentReserveAuthority,omitempty"`
+	Route                    []string                          `json:"route,omitempty"`
+	Superseded               []string                          `json:"superseded,omitempty"`
+	RoutePreparing           bool                              `json:"routePreparing,omitempty"`
+	RoutePlan                string                            `json:"routePlan,omitempty"`
+	RouteCatalog             string                            `json:"routeCatalog,omitempty"`
+	Reclaims                 map[string]ingress.ReclaimRequest `json:"reclaims,omitempty"`
+	ReclaimRecorded          bool                              `json:"reclaimRecorded,omitempty"`
+	LegacyDigest             string                            `json:"legacyDigest,omitempty"`
+	RetirementKind           string                            `json:"retirementKind,omitempty"`
+	Retirement               string                            `json:"retirement,omitempty"`
 }
 
 type Status struct {
@@ -101,6 +104,7 @@ type Status struct {
 	Phase             string          `json:"phase"`
 	Receivers         []string        `json:"receivers,omitempty"`
 	Superseded        []string        `json:"supersededReceivers,omitempty"`
+	PendingReclaims   []string        `json:"pendingReclaims,omitempty"`
 	Receiver          string          `json:"receiver,omitempty"`
 	Operation         string          `json:"operation,omitempty"`
 	Sequence          uint64          `json:"sequence"`
@@ -447,6 +451,9 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 	if e != nil {
 		return s, e
 	}
+	if e = a.validateReclaims(s); e != nil {
+		return s, e
+	}
 	for f, v := range s.Previous {
 		if !storage.ID(f) || !storage.ID(v) {
 			return s, ErrInvalid
@@ -496,7 +503,7 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 				return s, ErrInvalid
 			}
 		}
-	} else if len(s.Intent) != 0 || s.Sequence != 0 || len(s.Route)+len(s.Superseded) != 0 || s.RoutePreparing || s.RoutePlan != "" {
+	} else if len(s.Intent) != 0 || s.Sequence != 0 || len(s.Route)+len(s.Superseded) != 0 || s.RoutePreparing || s.RoutePlan != "" || s.RouteCatalog != "" {
 		return s, ErrInvalid
 	}
 	if adopt && s.Format == renewedFormat {
@@ -546,6 +553,11 @@ func (a *Agent) next(ctx context.Context) error {
 	}
 	if s.Phase == "ACTIVE" || s.Phase == "PREPARING" {
 		return a.prepare(ctx, s.Intent)
+	}
+	if s.Phase == "COMPLETE" {
+		if e = a.reconcileReclaims(ctx, &s); e != nil {
+			return e
+		}
 	}
 	if s.Sequence == ^uint64(0) {
 		return ErrInvalid
@@ -619,14 +631,14 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 			}
 		}
 		s.Phase, s.Intent = "PREPARING", bytes.Clone(raw)
-		s.Route, s.Superseded, s.RoutePreparing, s.RoutePlan = nil, nil, false, ""
+		s.Route, s.Superseded, s.RoutePreparing, s.RoutePlan, s.RouteCatalog = nil, nil, false, "", ""
 		if a.routed() {
 			s.Route = []string{i.Ingress}
 			if a.b.Reserve != nil {
 				s.Route = append(s.Route, a.companion.Ingress)
 			}
 		}
-		s.Retirement, s.RetirementKind = "", ""
+		s.Retirement, s.RetirementKind, s.ReclaimRecorded = "", "", false
 		if s.Format == renewedFormat {
 			s.IntentAuthority = bytes.Clone(a.authority)
 			s.IntentCompanionAuthority = bytes.Clone(a.companionAuthority)
@@ -672,6 +684,21 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		}
 		i, authority, intentRaw, endpoint = route.intent, route.authority, route.raw, route.endpoint
 	}
+	var sealed *capture.SealedTransfer
+	if s.RoutePreparing && s.RouteCatalog != "" && !inspect {
+		prior := s
+		prior.Route = s.Superseded
+		prior.Superseded, prior.RoutePreparing, prior.RoutePlan, prior.RouteCatalog = nil, false, "", ""
+		job, closeJob, err := a.openJobMode(ctx, prior, true, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		sealed, err = job.SealedTransfer(ctx)
+		closeJob()
+		if err != nil || sealed == nil {
+			return nil, nil, errors.Join(ErrInvalid, err)
+		}
+	}
 	var client *ingress.Client
 	cleanup := inspect || len(settlement) != 0
 	if len(settlement) != 0 {
@@ -696,7 +723,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	} else if a.b.Standby {
 		prefix = path.Join(operationPrefix, "receiver-"+i.Ingress)
 	}
-	provider, e := a.openProvider(ctx, operationPrefix, i, initialize)
+	provider, e := a.openProvider(ctx, operationPrefix, i, initialize && s.RouteCatalog == "")
 	if e != nil {
 		client.Close()
 		return nil, nil, e
@@ -730,6 +757,9 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		}
 		group.recoverRoute = len(s.Superseded) != 0 && !cleanup
 		group.replaying = group.replaying || group.recoverRoute
+		if s.RouteCatalog != "" {
+			group.split = false
+		}
 		sink, closeSink = group, group.Close
 	}
 	cache, e := filekit.OpenStreamingStoreAt(a.root, "cache", a.owner, initialize, sink)
@@ -797,7 +827,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	} else if len(a.observation) > 0 {
 		copies = a.copies
 	}
-	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, ReadOnly: inspect, Settlement: settlement, Profile: p, Authority: authority, Intent: intentRaw, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: sink, Cache: cache, Previous: previous, ProgressScope: progress, PreviousProgress: priorProgress, RoutePlan: s.RoutePlan, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
+	job, e := capture.Open(ctx, capture.Options{Parent: a.root, Directory: prefix + "/job", Initialize: initialize, ReadOnly: inspect, Settlement: settlement, Profile: p, Authority: authority, Intent: intentRaw, Owner: a.b.Local.Owner, Data: a.owner, Writer: a.writer, Provider: provider, Sink: sink, Cache: cache, Previous: previous, ProgressScope: progress, PreviousProgress: priorProgress, RoutePlan: s.RoutePlan, InheritedCatalog: s.RouteCatalog, Sealed: sealed, Copies: copies, Guard: a.guard, Admission: func(p string) statefile.Admission { return a.admission(prefix + "/job/" + p) }})
 	if e != nil {
 		cache.Close()
 		provider.Close()
@@ -826,7 +856,7 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte, companion ...[]
 		return ErrInvalid
 	}
 	if s.Phase == "COMPLETE" {
-		return nil
+		return a.reconcileReclaims(ctx, &s)
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	joined := make(chan struct{})
@@ -890,7 +920,13 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte, companion ...[]
 			return e
 		}
 	}
-	return a.save(s)
+	if _, e = a.queueReclaim(&s); e != nil {
+		return e
+	}
+	if e = a.save(s); e != nil {
+		return e
+	}
+	return a.reconcileReclaims(ctx, &s)
 }
 
 func (a *Agent) fenceCapture(ctx context.Context, s *state) error {
@@ -924,7 +960,7 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 		if e != nil {
 			return e
 		}
-		out = Status{Format: s.Format, Profile: a.b.Profile.ID, Phase: s.Phase, Sequence: s.Sequence, Generation: s.Generation}
+		out = Status{Format: s.Format, Profile: a.b.Profile.ID, Phase: s.Phase, Sequence: s.Sequence, Generation: s.Generation, PendingReclaims: reclaimTargets(s)}
 		if s.Format == renewedFormat {
 			out.AuthorityRevision = a.grant.Revision
 		}

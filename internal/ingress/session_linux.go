@@ -51,6 +51,7 @@ type sessionState struct {
 	CompletedAt       int64             `json:"completedAt,omitempty"`
 	Receipt           *Receipt          `json:"receipt,omitempty"`
 	Acknowledged      bool              `json:"acknowledged,omitempty"`
+	Reclaimed         []byte            `json:"reclaimed,omitempty"`
 }
 type Receipt struct {
 	PublishedWith string `json:"publishedWith,omitempty"`
@@ -112,7 +113,7 @@ func (s *Session) guardMode(ctx context.Context, cleanup bool) error {
 	if s.inspection {
 		return ErrDenied
 	}
-	if s.poisoned {
+	if s.poisoned || len(s.state.Reclaimed) != 0 {
 		return ErrConflict
 	}
 	if e := ctx.Err(); e != nil {
@@ -284,7 +285,8 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		}
 	}
 	if historical {
-		if acknowledgedOnly && !s.state.Complete || requireAcknowledged && !s.state.Acknowledged || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
+		if acknowledgedOnly && !s.state.Complete || requireAcknowledged && !s.state.Acknowledged ||
+			!inspection && len(s.state.Reclaimed) != 0 || s.state.LastObserved > time.Now().Unix() || ctx.Err() != nil {
 			return fail(ErrConflict)
 		}
 	} else {
@@ -336,6 +338,13 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 	}
 	if s.state.Acknowledged && (!s.state.Complete || len(s.state.Catalog) != 0) {
 		return fail(ErrConflict)
+	}
+	if len(s.state.Reclaimed) != 0 {
+		grant, err := verifyReclaim(s.state.Reclaimed, o.Intent, a.Trust.Writer)
+		if err != nil || len(s.state.Catalog) != 0 && storage.Hash(s.state.Catalog) != grant.Generation ||
+			s.state.Receipt != nil && s.state.Receipt.Generation != grant.Generation {
+			return fail(ErrConflict)
+		}
 	}
 	s.baseID = i.Parent
 	if s.state.Complete {

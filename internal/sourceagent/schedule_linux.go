@@ -420,9 +420,16 @@ func (a *Agent) RunSchedule(ctx context.Context) error {
 	}
 	defer lease.Close()
 	return lease.WithLock(ctx, func() error {
+		var nextReclaim time.Time
 		for {
 			if e := a.scheduleStep(ctx); e != nil {
 				return e
+			}
+			if !time.Now().Before(nextReclaim) {
+				if e := a.reclaimScheduled(ctx); e != nil {
+					return e
+				}
+				nextReclaim = time.Now().Add(30 * time.Second)
 			}
 			timer := time.NewTimer(time.Second)
 			select {
