@@ -75,7 +75,11 @@ The `replication` array checks each directed edge in the reference. For push, th
 
 A receiver can serve an object it previously imported and durably accepted into the same capture. Each adjacent hop uses its own admitted intent, explicit origin and reader, and mutually authenticated HTTPS. The registry keeps a fixed copy of its admitted routes for the lifetime of that view.
 
-An isolated check stages ciphertext at the first receiver, imports it at the bridge, then closes the first receiver and reopens the bridge on its retained state. The source requests the second hop using the bridge. The last receiver refuses an undeclared shortcut, keeps the unsealed capture out of complete inventory and publishes only after verifying the signed catalog. It restores independently after the first receiver and bridge are offline. This scenario uses explicit source requests for each hop. Automatic forwarding across several hops remains open.
+An isolated check stages ciphertext at the first receiver, imports it at the bridge, then closes the first receiver and reopens the bridge on its retained state. The source requests the second hop using the bridge. The last receiver refuses an undeclared shortcut, keeps the unsealed capture out of complete inventory and publishes only after verifying the signed catalog. It restores independently after the first receiver and bridge are offline.
+
+The source can queue one object import per admitted capture with `Client.QueueStaged`. The `queued-imports` endpoint returns HTTP 202 after durable acceptance or when the exact object is already available. Check object availability separately. Repeating the same request reuses the pending record. A second pending object or origin returns HTTP 409.
+
+The worker retries the queued import over its current authorized route while the capture is active and unpaused. A reopened receiver reuses the accepted object if it was written before the request finished. The signed catalog still controls publication. If the capture is sealed, publication owns the remaining work. Complete publication or signed retirement clears any pending import. Before downgrading the receiver, finish the queued import, publish, or retire the capture using this version. Scheduling a whole chain without source admission for each hop remains open.
 
 ## Transfer and publication
 

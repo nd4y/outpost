@@ -176,7 +176,11 @@ func (w *Worker) jobs(v *view) error {
 			go func() {
 				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
 				defer cancel()
-				advanced, err := local.ingress.AdvanceCoverage(ctx, func(op string) bool { return v.paused(domain, op) })
+				paused := func(op string) bool { return v.paused(domain, op) }
+				advanced, err := local.ingress.AdvanceCoverage(ctx, paused)
+				if err == nil && !advanced {
+					advanced, err = local.ingress.AdvanceStagedImport(ctx, paused)
+				}
 				results <- result{coverage: domain, advanced: advanced, err: err}
 			}()
 		}

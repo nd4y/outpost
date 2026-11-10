@@ -38,23 +38,24 @@ type SessionOptions struct {
 
 const maxPublicationGrants = 16
 const MaxReceiptDocument = 8192
-const maxSessionDocument = generation.MaxCatalog + 4*MaxDocument + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
+const maxSessionDocument = generation.MaxCatalog + 6*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
 
 type sessionState struct {
-	Format            string            `json:"format"`
-	Intent            json.RawMessage   `json:"intent"`
-	Authority         json.RawMessage   `json:"authority"`
-	LastObserved      int64             `json:"lastObserved"`
-	Catalog           json.RawMessage   `json:"catalog,omitempty"`
-	CoveragePeer      *stagingOrigin    `json:"coveragePeer,omitempty"`
-	Coverage          *CoverageReceipt  `json:"coverage,omitempty"`
-	PublicationGrants []json.RawMessage `json:"publicationGrants,omitempty"`
-	Complete          bool              `json:"complete"`
-	CompletedAt       int64             `json:"completedAt,omitempty"`
-	Receipt           *Receipt          `json:"receipt,omitempty"`
-	Acknowledged      bool              `json:"acknowledged,omitempty"`
-	Reclaimed         []byte            `json:"reclaimed,omitempty"`
-	Retired           json.RawMessage   `json:"retired,omitempty"`
+	Format            string               `json:"format"`
+	Intent            json.RawMessage      `json:"intent"`
+	Authority         json.RawMessage      `json:"authority"`
+	LastObserved      int64                `json:"lastObserved"`
+	Catalog           json.RawMessage      `json:"catalog,omitempty"`
+	CoveragePeer      *stagingOrigin       `json:"coveragePeer,omitempty"`
+	PendingImport     *queuedStagingImport `json:"pendingImport,omitempty"`
+	Coverage          *CoverageReceipt     `json:"coverage,omitempty"`
+	PublicationGrants []json.RawMessage    `json:"publicationGrants,omitempty"`
+	Complete          bool                 `json:"complete"`
+	CompletedAt       int64                `json:"completedAt,omitempty"`
+	Receipt           *Receipt             `json:"receipt,omitempty"`
+	Acknowledged      bool                 `json:"acknowledged,omitempty"`
+	Reclaimed         []byte               `json:"reclaimed,omitempty"`
+	Retired           json.RawMessage      `json:"retired,omitempty"`
 }
 type Receipt struct {
 	PublishedWith string `json:"publishedWith,omitempty"`
@@ -309,6 +310,14 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		}
 	} else if s.state.Complete && !s.state.Acknowledged {
 		return fail(ErrConflict)
+	}
+	if pending := s.state.PendingImport; pending != nil {
+		var origin Intent
+		if s.state.Complete || len(s.state.Retired) != 0 || !validObject(pending.Object) ||
+			canonicalIntent(pending.Origin.Intent, pending.Origin.Authority, o.Owner, &origin) != nil ||
+			origin.Ingress == i.Ingress || !sameCapture(origin, i) {
+			return fail(ErrConflict)
+		}
 	}
 	if s.state.CoveragePeer != nil {
 		origin := s.state.CoveragePeer
@@ -672,6 +681,7 @@ func (s *Session) accepted(ctx context.Context, id string, refs []generation.Obj
 	wasComplete := s.state.Complete
 	oldTime := s.state.CompletedAt
 	oldReceipt := s.state.Receipt
+	oldPending := s.state.PendingImport
 	if e := s.guard(ctx); e != nil {
 		return result, e
 	}
@@ -684,11 +694,13 @@ func (s *Session) accepted(ctx context.Context, id string, refs []generation.Obj
 			return result, err
 		}
 		s.state.Complete, s.state.CompletedAt, s.state.Receipt = true, verifiedAt, &receipt
+		s.state.PendingImport = nil
 	}
 	if e = s.save(); e != nil {
 		s.state.Complete = wasComplete
 		s.state.CompletedAt = oldTime
 		s.state.Receipt = oldReceipt
+		s.state.PendingImport = oldPending
 		return result, e
 	}
 	if s.intent.Parent != "" {

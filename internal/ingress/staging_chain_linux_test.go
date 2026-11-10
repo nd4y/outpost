@@ -66,7 +66,7 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 			Replica: replica, Certificate: cert, Roots: ca.roots, Limits: limits, Initialize: true, Staging: staging,
 		}, raw
 	}
-	open := func(o RegistryOptions, intent []byte, id string) (*Client, string, func()) {
+	open := func(o RegistryOptions, intent []byte, id string) (*Client, *Registry, string, func()) {
 		t.Helper()
 		registry, err := OpenRegistry(ctx, o)
 		must(t, err)
@@ -86,7 +86,7 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		client, err := NewClient(server.URL, o.Authority, intent, o.Owner, sourceCert, ca.roots, limits)
 		must(t, err)
 		t.Cleanup(client.Close)
-		return client, server.URL, stop
+		return client, registry, server.URL, stop
 	}
 	newReplica := func(name string) (*generation.Replica, string) {
 		t.Helper()
@@ -100,11 +100,11 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 
 	firstOptions, firstIntent := newOptions("first", firstID, firstCert, f.options.Replica,
 		&StagingRoutes{Readers: map[string]bool{bridgeID: true}})
-	first, firstURL, stopFirst := open(firstOptions, firstIntent, firstID)
+	first, _, firstURL, stopFirst := open(firstOptions, firstIntent, firstID)
 	bridgeReplica, _ := newReplica("bridge")
 	bridgeRoutes := &StagingRoutes{Origins: map[string]string{firstID: firstURL}, Readers: map[string]bool{finalID: true}}
 	bridgeOptions, bridgeIntent := newOptions("bridge", bridgeID, bridgeCert, bridgeReplica, bridgeRoutes)
-	bridge, _, stopBridge := open(bridgeOptions, bridgeIntent, bridgeID)
+	bridge, _, _, stopBridge := open(bridgeOptions, bridgeIntent, bridgeID)
 	must(t, first.Begin(ctx))
 	must(t, bridge.Begin(ctx))
 	for id, data := range objects {
@@ -117,12 +117,12 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	stopBridge()
 
 	bridgeOptions.Initialize = false
-	bridge, bridgeURL, stopBridge := open(bridgeOptions, bridgeIntent, bridgeID)
+	bridge, _, bridgeURL, stopBridge := open(bridgeOptions, bridgeIntent, bridgeID)
 	delete(bridgeRoutes.Readers, finalID)
 	finalReplica, finalDir := newReplica("final")
 	finalRoutes := &StagingRoutes{Origins: map[string]string{bridgeID: bridgeURL}}
 	finalOptions, finalIntent := newOptions("final", finalID, finalCert, finalReplica, finalRoutes)
-	final, _, stopFinal := open(finalOptions, finalIntent, finalID)
+	final, finalRegistry, _, stopFinal := open(finalOptions, finalIntent, finalID)
 	finalRoutes.Origins[firstID] = firstURL
 	must(t, final.Begin(ctx))
 	if err := final.PullStaged(ctx, first, probe); !errors.Is(err, ErrDenied) {
@@ -131,8 +131,48 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	if _, receipt, err := final.FinishStep(ctx, catalog); !errors.Is(err, ErrIncomplete) || receipt != nil {
 		t.Fatalf("incomplete capture published: receipt %v, error %v", receipt, err)
 	}
+	if err := final.QueueStaged(ctx, first, probe); !errors.Is(err, ErrDenied) {
+		t.Fatalf("queued request used a forbidden shortcut: %v", err)
+	}
+	must(t, final.QueueStaged(ctx, bridge, probe))
+	must(t, final.QueueStaged(ctx, bridge, probe))
+	if err := final.QueueStaged(ctx, bridge, filekit.Object{ID: extraID, Bytes: len(extra)}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("second request replaced the pending import: %v", err)
+	}
+	if err := final.Check(ctx, probe); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("queued acceptance was mistaken for object presence: %v", err)
+	}
+	stopFinal()
+	delete(finalRoutes.Origins, firstID)
+	finalOptions.Initialize = false
+	unpaused := func(string) bool { return false }
+	delete(finalRoutes.Origins, bridgeID)
+	_, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || advanced {
+		t.Fatalf("withdrawn route was used: %v, %v", advanced, err)
+	}
+	stopFinal()
+	finalRoutes.Origins[bridgeID] = bridgeURL
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, func(op string) bool { return op == f.intent.Operation }); err != nil || advanced {
+		t.Fatalf("paused capture advanced: %v, %v", advanced, err)
+	}
+	interrupted := errors.New("fixture interruption after durable object")
+	finalRegistry.Fault = func(stage string) error {
+		if stage == "capture-object-durable" {
+			return interrupted
+		}
+		return nil
+	}
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err == nil || advanced {
+		t.Fatalf("lost completion was accepted: %v, %v", advanced, err)
+	}
+	finalRegistry.Fault = nil
+	must(t, final.Check(ctx, probe))
 	for id, data := range objects {
-		must(t, final.PullStaged(ctx, bridge, filekit.Object{ID: id, Bytes: len(data)}))
+		if id != probe.ID {
+			must(t, final.PullStaged(ctx, bridge, filekit.Object{ID: id, Bytes: len(data)}))
+		}
 	}
 	inventory, err := finalReplica.Inventory(ctx)
 	must(t, err)
@@ -140,6 +180,14 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatal("unsealed ciphertext was listed as a complete generation")
 	}
 	stopBridge()
+	stopFinal()
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
+		t.Fatalf("pending receipt did not replay with bridge offline: %v, %v", advanced, err)
+	}
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || advanced {
+		t.Fatalf("completed request did not leave the queue: %v, %v", advanced, err)
+	}
 	must(t, final.PullStaged(ctx, bridge, probe))
 	var receipt *Receipt
 	for range len(required) + 1 {

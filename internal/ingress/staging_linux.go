@@ -41,6 +41,16 @@ func sameCapture(a, b Intent) bool {
 }
 
 func (c *Client) PullStaged(ctx context.Context, origin *Client, ref filekit.Object) error {
+	return c.requestStagedImport(ctx, origin, ref, "imports/", http.StatusOK)
+}
+
+// QueueStaged acknowledges a durable request, which the receiving worker may
+// fulfill later. Check confirms whether the object is available for the capture.
+func (c *Client) QueueStaged(ctx context.Context, origin *Client, ref filekit.Object) error {
+	return c.requestStagedImport(ctx, origin, ref, "queued-imports/", http.StatusAccepted)
+}
+
+func (c *Client) requestStagedImport(ctx context.Context, origin *Client, ref filekit.Object, resource string, expected int) error {
 	if origin == nil || origin.intent.Ingress == c.intent.Ingress || !sameCapture(c.intent, origin.intent) || !validObject(ref) {
 		return ErrDenied
 	}
@@ -48,8 +58,8 @@ func (c *Client) PullStaged(ctx context.Context, origin *Client, ref filekit.Obj
 	if e != nil {
 		return e
 	}
-	status, _, _, e := c.request(ctx, http.MethodPut, "imports/"+ref.ID, &ref, raw, 0)
-	if e == nil && status != http.StatusOK {
+	status, _, _, e := c.request(ctx, http.MethodPut, resource+ref.ID, &ref, raw, 0)
+	if e == nil && status != expected {
 		return ErrProtocol
 	}
 	return e
@@ -95,7 +105,7 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, prefix), "/")
-	if len(parts) != 3 || parts[1] != "imports" && parts[1] != "staged" {
+	if len(parts) != 3 || parts[1] != "imports" && parts[1] != "queued-imports" && parts[1] != "staged" {
 		return false
 	}
 	read := parts[1] == "staged"
@@ -208,6 +218,14 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	var origin stagingOrigin
 	if e != nil || decodeReply(body, &origin) != nil {
 		fail(w, ErrDenied)
+		return true
+	}
+	if parts[1] == "queued-imports" {
+		if e = g.queueStagedImport(ctx, i, raw, origin, ref); e != nil {
+			fail(w, e)
+			return true
+		}
+		w.WriteHeader(http.StatusAccepted)
 		return true
 	}
 	if e = g.importStaged(ctx, i, raw, origin, ref, false); e != nil {
