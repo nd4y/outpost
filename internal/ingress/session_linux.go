@@ -685,30 +685,25 @@ func (s *Session) accepted(ctx context.Context, id string, refs []generation.Obj
 	if e = s.point("capture-replica-complete"); e != nil {
 		return result, e
 	}
-	wasComplete := s.state.Complete
-	oldTime := s.state.CompletedAt
-	oldReceipt := s.state.Receipt
-	oldPending := s.state.PendingImport
 	if e := s.guard(ctx); e != nil {
 		return result, e
 	}
 	if verifiedAt < s.intent.NotBefore || verifiedAt > s.state.LastObserved {
 		return result, ErrConflict
 	}
-	if !wasComplete {
+	if !s.state.Complete {
 		receipt, err := s.originalReceipt(id, verifiedAt)
 		if err != nil {
 			return result, err
 		}
+		oldTime, oldReceipt, oldPending := s.state.CompletedAt, s.state.Receipt, s.state.PendingImport
 		s.state.Complete, s.state.CompletedAt, s.state.Receipt = true, verifiedAt, &receipt
 		s.state.PendingImport = nil
-	}
-	if e = s.save(); e != nil {
-		s.state.Complete = wasComplete
-		s.state.CompletedAt = oldTime
-		s.state.Receipt = oldReceipt
-		s.state.PendingImport = oldPending
-		return result, e
+		if e = s.save(); e != nil {
+			s.state.Complete, s.state.CompletedAt, s.state.Receipt = false, oldTime, oldReceipt
+			s.state.PendingImport = oldPending
+			return result, e
+		}
 	}
 	if s.intent.Parent != "" {
 		if e = s.replica.ReleasePin(ctx, s.pin("base")); e != nil {

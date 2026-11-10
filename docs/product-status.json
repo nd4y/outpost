@@ -413,6 +413,10 @@
         {
           "path": "internal/ingress/publication_resume_linux_test.go",
           "name": "TestPublicationGrantResumesFrozenLocalCatalogWithoutPeer"
+        },
+        {
+          "path": "internal/ingress/session_linux_test.go",
+          "name": "TestLostReceiptPreservesActualVerificationTime"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],

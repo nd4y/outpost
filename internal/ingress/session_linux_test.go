@@ -435,4 +435,21 @@ func TestLostReceiptPreservesActualVerificationTime(t *testing.T) {
 	if receipt.VerifiedAt != first.VerifiedAt || second.VerifiedAt != first.VerifiedAt || second.ReadBytes != 0 {
 		t.Fatal("restart fabricated fresh verification", first, second, receipt)
 	}
+
+	f.reopen(t)
+	lastObserved := f.session.state.LastObserved
+	f.session.meta.Admit = func(name string, _ int) (func(bool) error, error) {
+		// Clock advances can be persisted during replay. An unchanged
+		// receipt must not reserve space for another session write.
+		if name != "session.json" || f.session.state.LastObserved <= lastObserved {
+			return nil, errors.New("unexpected write during receipt replay")
+		}
+		lastObserved = f.session.state.LastObserved
+		return func(bool) error { return nil }, nil
+	}
+	replay, exact, e := f.session.FinishBatch(ctx, raw, 256, 256<<20)
+	must(t, e)
+	if !replay.Complete || replay.ReadBytes != 0 || exact != receipt {
+		t.Fatal("durable receipt changed on replay", replay, exact)
+	}
 }
