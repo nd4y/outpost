@@ -259,6 +259,9 @@ func (a *Agent) attemptSchedule(ctx context.Context, expected Schedule) error {
 		if e != nil {
 			return e
 		}
+		if len(head.WriterFence) != 0 {
+			return ErrWriterFenced
+		}
 		status, e := a.ScheduleStatus(ctx)
 		if e != nil {
 			return e
@@ -377,6 +380,9 @@ func (a *Agent) scheduleStep(ctx context.Context) error {
 		return nil
 	}
 	e = errors.Join(e, cause)
+	if errors.Is(e, ErrWriterFenced) {
+		return e
+	}
 	// Cancellation can follow a committed source head. The next pass reconciles
 	// that signed head before preparing another operation. Do not erase progress.
 	save, stop := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
@@ -411,6 +417,14 @@ func (a *Agent) scheduleStep(ctx context.Context) error {
 	return nil
 }
 func (a *Agent) RunSchedule(ctx context.Context) error {
+	if e := a.guard(ctx); e != nil {
+		return e
+	}
+	if head, e := a.load(); e != nil {
+		return e
+	} else if len(head.WriterFence) != 0 {
+		return ErrWriterFenced
+	}
 	if _, e := a.ScheduleStatus(ctx); e != nil {
 		return e
 	}

@@ -97,24 +97,27 @@ type state struct {
 	LegacyDigest             string                            `json:"legacyDigest,omitempty"`
 	RetirementKind           string                            `json:"retirementKind,omitempty"`
 	Retirement               string                            `json:"retirement,omitempty"`
+	WriterFence              []byte                            `json:"writerFence,omitempty"`
+	WriterFencedUnix         int64                             `json:"writerFencedUnix,omitempty"`
 }
 
 type Status struct {
-	Format            string          `json:"format"`
-	Profile           string          `json:"profile"`
-	Phase             string          `json:"phase"`
-	Receivers         []string        `json:"receivers,omitempty"`
-	Superseded        []string        `json:"supersededReceivers,omitempty"`
-	PendingReclaims   []string        `json:"pendingReclaims,omitempty"`
-	Receiver          string          `json:"receiver,omitempty"`
-	Operation         string          `json:"operation,omitempty"`
-	Sequence          uint64          `json:"sequence"`
-	Generation        string          `json:"generation,omitempty"`
-	Job               *capture.State  `json:"job,omitempty"`
-	AuthorityRevision uint64          `json:"authorityRevision,omitempty"`
-	Prepared          *PreparedStatus `json:"prepared,omitempty"`
-	Pending           *PendingStatus  `json:"pending,omitempty"`
-	Milestones        *Milestones     `json:"milestones,omitempty"`
+	Format            string             `json:"format"`
+	Profile           string             `json:"profile"`
+	Phase             string             `json:"phase"`
+	Receivers         []string           `json:"receivers,omitempty"`
+	Superseded        []string           `json:"supersededReceivers,omitempty"`
+	PendingReclaims   []string           `json:"pendingReclaims,omitempty"`
+	Receiver          string             `json:"receiver,omitempty"`
+	Operation         string             `json:"operation,omitempty"`
+	Sequence          uint64             `json:"sequence"`
+	Generation        string             `json:"generation,omitempty"`
+	Job               *capture.State     `json:"job,omitempty"`
+	AuthorityRevision uint64             `json:"authorityRevision,omitempty"`
+	Prepared          *PreparedStatus    `json:"prepared,omitempty"`
+	Pending           *PendingStatus     `json:"pending,omitempty"`
+	Milestones        *Milestones        `json:"milestones,omitempty"`
+	WriterFence       *WriterFenceStatus `json:"writerFence,omitempty"`
 }
 
 type Milestones struct {
@@ -522,6 +525,14 @@ func (a *Agent) decodeState(raw []byte, adopt bool) (state, error) {
 			return s, ErrInvalid
 		}
 	}
+	if (len(s.WriterFence) == 0) != (s.WriterFencedUnix == 0) || s.WriterFencedUnix > s.ObservedUnix {
+		return s, ErrInvalid
+	}
+	if len(s.WriterFence) != 0 {
+		if _, e = a.writerFence(s, s.WriterFence, s.WriterFencedUnix); e != nil {
+			return s, e
+		}
+	}
 	if s.Phase != "IDLE" {
 		i, e := a.stateIntent(s)
 		if e != nil {
@@ -601,6 +612,9 @@ func (a *Agent) next(ctx context.Context) error {
 	if e != nil {
 		return e
 	}
+	if len(s.WriterFence) != 0 {
+		return ErrWriterFenced
+	}
 	if s.Phase == "ACTIVE" || s.Phase == "PREPARING" {
 		return a.prepare(ctx, s.Intent)
 	}
@@ -655,6 +669,9 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 	s, e := a.load()
 	if e != nil {
 		return e
+	}
+	if len(s.WriterFence) != 0 {
+		return ErrWriterFenced
 	}
 	if s.Phase == "PREPARING" || s.Phase == "ACTIVE" {
 		if !bytes.Equal(s.Intent, raw) {
@@ -902,6 +919,9 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte, companion ...[]
 	if e != nil {
 		return e
 	}
+	if len(s.WriterFence) != 0 {
+		return ErrWriterFenced
+	}
 	if s.Phase == "IDLE" || s.Phase == "ABANDONED" {
 		return ErrInvalid
 	}
@@ -1011,6 +1031,13 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 			return e
 		}
 		out = Status{Format: s.Format, Profile: a.b.Profile.ID, Phase: s.Phase, Sequence: s.Sequence, Generation: s.Generation, PendingReclaims: reclaimTargets(s)}
+		if len(s.WriterFence) != 0 {
+			fence, e := a.writerFence(s, s.WriterFence, s.WriterFencedUnix)
+			if e != nil {
+				return e
+			}
+			out.WriterFence = &fence
+		}
 		if s.Format == renewedFormat {
 			out.AuthorityRevision = a.grant.Revision
 		}

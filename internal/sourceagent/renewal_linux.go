@@ -258,6 +258,9 @@ func (a *Agent) RenewReceivers(ctx context.Context, authority, companion, reserv
 		if e != nil {
 			return e
 		}
+		if len(s.WriterFence) != 0 {
+			return ErrWriterFenced
+		}
 		same := bytes.Equal(authority, a.authority) && bytes.Equal(observed, a.observation) && bytes.Equal(companion, a.companionAuthority) && bytes.Equal(reserve, a.reserveAuthority)
 		if next.Revision < a.grant.Revision || next.Revision == a.grant.Revision && !same {
 			return ingress.ErrConflict

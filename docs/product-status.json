@@ -470,6 +470,10 @@
       ],
       "checks": [
         {
+          "path": "internal/sourceagent/epoch_fence_linux_test.go",
+          "name": "TestWriterFencePreservesOldCheckpointAndBlocksNewCaptureAfterRestart"
+        },
+        {
           "path": "internal/recoverybundle/epoch_linux_test.go",
           "name": "TestOwnerEpochInitialPreparationRequiresPrivateVolumeAndSeparateKeys"
         },
@@ -611,7 +615,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Offline epoch preparation authenticates the preceding package and checkpoint and creates distinct keys and repository trust. Complete the old-writer fence, live transition and retirement of superseded key material under the admitted policy, and verify recovery at scale."
+      "remaining": "Offline epoch preparation authenticates the preceding package and checkpoint and creates distinct keys and repository trust. The old source accepts an exact owner-signed local writer fence after successor proof. Complete the live transition, revoke old credentials at holders, admit retirement of superseded key material and verify recovery at scale."
     },
     {
       "id": "REQ-09",

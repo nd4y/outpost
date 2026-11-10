@@ -29,7 +29,10 @@ func TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations(t 
 	f := newFixture(t)
 	ctx := context.Background()
 	c := testSchedule()
+	// The acknowledgement/replay contract does not depend on HDD latency.
+	c.AttemptSeconds = 150
 	must(t, f.a.ConfigureSchedule(ctx, c))
+	started := time.Now()
 	f.a.Fault = func(point string) error {
 		if point == "source-schedule-head-observed" {
 			return errors.New("lost scheduling acknowledgement")
@@ -45,8 +48,9 @@ func TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations(t 
 	first, e := f.a.Status(ctx)
 	must(t, e)
 	if first.Sequence != 1 || first.Phase != "COMPLETE" {
-		t.Fatal("head not durable", first)
+		t.Fatalf("head not durable after %s, schedule error=%s, source phase=%s, capture=%+v", time.Since(started), state.ErrorCode, first.Phase, first.Job)
 	}
+	t.Logf("first scheduled checkpoint durable after %s", time.Since(started))
 	initial, e := os.ReadFile(filepath.Join(f.tree, "private.bin"))
 	must(t, e)
 	f.reopen(t)
