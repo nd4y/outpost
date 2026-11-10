@@ -152,6 +152,9 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	final, finalRegistry, _, stopFinal := open(finalOptions, finalIntent, finalID)
 	finalRoutes.Origins[firstID] = firstURL
 	must(t, final.Begin(ctx))
+	if _, err := finalRegistry.readStagedInventory(ctx, final.intent, bridgeID, stagedCursor{}); !errors.Is(err, ErrDenied) {
+		t.Fatalf("an ordinary staged reader could enumerate the bridge: %v", err)
+	}
 	if err := final.PullStaged(ctx, first, probe); !errors.Is(err, ErrDenied) {
 		t.Fatalf("caller mutation enabled a direct shortcut: %v", err)
 	}

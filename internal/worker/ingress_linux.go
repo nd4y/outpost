@@ -15,7 +15,10 @@ func captureStagingRoutes(c control.Config, domain string) *ingress.StagingRoute
 	if !ok || len(d.CaptureStagingPeers) == 0 {
 		return nil
 	}
-	routes := &ingress.StagingRoutes{Origins: map[string]string{}, Readers: map[string]bool{}}
+	routes := &ingress.StagingRoutes{Origins: map[string]string{}, Readers: map[string]bool{}, AutomaticPeers: map[string]bool{}}
+	for _, id := range d.CaptureAutomaticPeers {
+		routes.AutomaticPeers[id] = true
+	}
 	for _, edge := range d.Placement.Edges {
 		if edge.Mode != "pull" {
 			continue

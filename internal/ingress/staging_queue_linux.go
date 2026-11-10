@@ -125,9 +125,12 @@ func (g *Registry) AdvanceStagedImport(ctx context.Context, paused func(string) 
 		return false, err
 	}
 	imports := s.state.stagedImports()
-	if len(imports) == 0 || s.state.Complete || len(s.state.Catalog) != 0 {
+	if s.state.Complete || len(s.state.Catalog) != 0 {
 		g.mu.Unlock()
 		return false, nil
+	}
+	if len(imports) == 0 {
+		return g.advanceAutomaticStaging(bounded, intent)
 	}
 	// Rotate even after a failed attempt so an unavailable route cannot hold up
 	// other admitted objects. The requests themselves remain on disk.

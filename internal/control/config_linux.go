@@ -47,6 +47,7 @@ func (l Limits) Validate() error {
 type Domain struct {
 	RetirementMinimumCopies      int               `json:"retirementMinimumCopies,omitempty"`
 	CaptureStagingPeers          []string          `json:"captureStagingPeers,omitempty"`
+	CaptureAutomaticPeers        []string          `json:"captureAutomaticPeers,omitempty"`
 	ScrubIntervalSeconds         int64             `json:"scrubIntervalSeconds,omitempty"`
 	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
@@ -164,6 +165,14 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		for i, id := range d.CaptureStagingPeers {
 			if id == c.Node || !slices.Contains(d.Placement.Holders, id) || slices.Contains(d.CaptureStagingPeers[:i], id) ||
 				(!d.Placement.HasEdge(id, c.Node, "pull") && !d.Placement.HasEdge(c.Node, id, "pull")) {
+				return ErrDenied
+			}
+		}
+		if len(d.CaptureAutomaticPeers) > len(d.CaptureStagingPeers) {
+			return ErrDenied
+		}
+		for i, id := range d.CaptureAutomaticPeers {
+			if !slices.Contains(d.CaptureStagingPeers, id) || slices.Contains(d.CaptureAutomaticPeers[:i], id) {
 				return ErrDenied
 			}
 		}

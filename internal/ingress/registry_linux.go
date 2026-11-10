@@ -85,6 +85,7 @@ type Registry struct {
 	gate                     chan struct{}
 	stageReads, stageImports chan struct{}
 	nextStagedImport         string
+	stagedPull               automaticStaging
 	Fault                    func(string) error
 }
 
@@ -201,11 +202,12 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 	o.SettlementIntent = bytes.Clone(o.SettlementIntent)
 	if o.Staging != nil {
 		// Each registry view owns the routes from its admitted configuration.
-		o.Staging = &StagingRoutes{Origins: maps.Clone(o.Staging.Origins), Readers: maps.Clone(o.Staging.Readers)}
+		o.Staging = &StagingRoutes{Origins: maps.Clone(o.Staging.Origins), Readers: maps.Clone(o.Staging.Readers), AutomaticPeers: maps.Clone(o.Staging.AutomaticPeers)}
 	}
 	owned = true
 	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
 	if o.Staging != nil {
+		g.stagedPull = newAutomaticStaging(o.Staging)
 		g.stageReads = make(chan struct{}, o.Limits.Concurrency)
 		g.stageImports = make(chan struct{}, o.Limits.Concurrency)
 	}

@@ -24,8 +24,9 @@ import (
 // StagingRoutes is derived from the current signed placement configuration.
 // Imports dial only Origins. Readers may retrieve only durable staged objects.
 type StagingRoutes struct {
-	Origins map[string]string
-	Readers map[string]bool
+	Origins        map[string]string
+	Readers        map[string]bool
+	AutomaticPeers map[string]bool
 }
 
 type stagingOrigin struct {
@@ -136,10 +137,11 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, prefix), "/")
-	if len(parts) != 3 || parts[1] != "imports" && parts[1] != "queued-imports" && parts[1] != "staged" {
+	inventory := len(parts) == 2 && parts[1] == "staged-inventory"
+	if !inventory && (len(parts) != 3 || parts[1] != "imports" && parts[1] != "queued-imports" && parts[1] != "staged") {
 		return false
 	}
-	read := parts[1] == "staged"
+	read := inventory || parts[1] == "staged"
 	if r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.RawPath != "" || r.URL.Path != r.URL.EscapedPath() ||
 		r.TLS == nil || r.TLS.Version < tls.VersionTLS13 || len(r.TLS.VerifiedChains) == 0 || len(r.TLS.PeerCertificates) == 0 {
 		fail(w, ErrDenied)
@@ -150,16 +152,20 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	remote := r.TLS.PeerCertificates[0]
 	identity := peer.Identity(remote)
 	if read && (r.Method != http.MethodGet || r.ContentLength != 0 || !g.options.Staging.Readers[identity]) ||
+		inventory && (!g.options.Staging.AutomaticPeers[identity] || len(g.options.Settlement) != 0) ||
 		!read && (r.Method != http.MethodPut || identity != g.authority.Source || len(g.options.Settlement) != 0) {
 		fail(w, ErrDenied)
 		return true
 	}
-	length := r.Header.Get("Outpost-Bytes")
-	size, e := strconv.Atoi(length)
-	ref := filekit.Object{ID: parts[2], Bytes: size}
-	if e != nil || strconv.Itoa(size) != length || !validObject(ref) {
-		fail(w, ErrDenied)
-		return true
+	var ref filekit.Object
+	if !inventory {
+		length := r.Header.Get("Outpost-Bytes")
+		size, e := strconv.Atoi(length)
+		ref = filekit.Object{ID: parts[2], Bytes: size}
+		if e != nil || strconv.Itoa(size) != length || !validObject(ref) {
+			fail(w, ErrDenied)
+			return true
+		}
 	}
 	slots := g.stageImports
 	if read {
@@ -182,7 +188,8 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	raw := bytes.Clone(g.state.Intent)
 	i, expiry, e := g.stagingIntent(now)
 	if g.poisoned || now.Unix() < g.state.ObservedUnix || e != nil ||
-		parts[0] != i.Operation || r.Header.Get("Outpost-Authority") != i.Authority {
+		parts[0] != i.Operation || !inventory && r.Header.Get("Outpost-Authority") != i.Authority ||
+		inventory && r.Header.Get("Outpost-Capture") != stagingBinding(i) {
 		g.mu.Unlock()
 		fail(w, ErrDenied)
 		return true
@@ -222,6 +229,20 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	defer stop()
+	if inventory {
+		s, err := g.stagingSession(ctx)
+		var page stagedInventoryPage
+		if err == nil {
+			page, err = s.inventoryPage(ctx, r.Header.Get("Outpost-Staged-Epoch"), r.Header.Get("Outpost-Staged-Offset"))
+		}
+		g.mu.Unlock()
+		if err != nil {
+			fail(w, err)
+		} else {
+			jsonReply(w, http.StatusOK, page)
+		}
+		return true
+	}
 	if read {
 		s, e := g.stagingSession(ctx)
 		var b []byte

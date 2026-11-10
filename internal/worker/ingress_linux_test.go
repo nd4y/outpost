@@ -178,6 +178,16 @@ func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
 	f := newFixture(t)
 	ctx := t.Context()
 	source, bridge, target := f.nodes[0], f.nodes[1], f.nodes[2]
+	durable := make(chan struct{}, 3)
+	target.Fault = func(point string) error {
+		if point == "capture-object-durable" {
+			select {
+			case durable <- struct{}{}:
+			default:
+			}
+		}
+		return nil
+	}
 	_, first := f.jobs()
 	second := first
 	second.Operation = storage.Hash([]byte("second ordinary transfer"))
@@ -229,6 +239,7 @@ func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
 		must(t, err)
 		f.cfg.Ingress = []json.RawMessage{grant}
 		f.domain.CaptureStagingPeers = []string{stagingPeer}
+		f.domain.CaptureAutomaticPeers = []string{stagingPeer}
 		f.config(t, index, jobs)
 		client, err := ingress.NewClient(endpoint, grant, signed, owner, source.cert, f.ca.pool, peer.Limits{Concurrency: 1, Timeout: 60 * time.Second, Attempts: 1})
 		must(t, err)
@@ -267,7 +278,39 @@ func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
 	if err = destination.Check(ctx, object); err != nil {
 		t.Fatalf("next ordinary transfer took the slot before the pending import: %v", err)
 	}
+	select {
+	case <-durable:
+	default:
+		t.Fatal("explicit import did not reach durable storage")
+	}
+	awaitImport := func(ref filekit.Object) {
+		t.Helper()
+		select {
+		case <-durable:
+			must(t, destination.Check(ctx, ref))
+		case <-time.After(60 * time.Second):
+			t.Fatal("automatic import did not reach durable storage")
+		}
+	}
+	// After initial capture admission, the source writes only to the bridge.
+	// The receiver finds later objects without a per-object source request.
+	automatic := []byte("ciphertext available only on the bridge")
+	autoRef := filekit.Object{ID: storage.Hash(automatic), Bytes: len(automatic)}
+	_, err = origin.Write(ctx, autoRef, automatic)
+	must(t, err)
+	if err = destination.Check(ctx, autoRef); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("automatic import ran while the second pull occupied the slot: %v", err)
+	}
 	close(releaseSecond)
+	awaitImport(autoRef)
+	stopBridge()
+	stopBridge = start(t, bridge)
+	wait(t, func() bool { bridge.mu.Lock(); defer bridge.mu.Unlock(); return bridge.active != nil })
+	newData := []byte("ciphertext accepted after bridge reopen")
+	newRef := filekit.Object{ID: storage.Hash(newData), Bytes: len(newData)}
+	_, err = origin.Write(ctx, newRef, newData)
+	must(t, err)
+	awaitImport(newRef)
 	stopTarget()
 	stopBridge()
 }

@@ -80,6 +80,7 @@ type Session struct {
 	lease            *os.File
 	replica          *generation.Replica
 	refs, base       map[string]generation.Object
+	stagedInventory  *stagedInventory
 	catalogRefs      []generation.Object
 	assemblyNext     int
 	baseID           string
@@ -583,6 +584,9 @@ func (s *Session) write(ctx context.Context, ref filekit.Object, b []byte, assem
 		return false, e
 	}
 	s.refs[ref.ID] = generation.Object{ID: ref.ID, Bytes: ref.Bytes}
+	if s.stagedInventory != nil {
+		s.stagedInventory.objects = append(s.stagedInventory.objects, ref)
+	}
 	s.bytes += int64(ref.Bytes)
 	return true, s.point("capture-object-durable")
 }
