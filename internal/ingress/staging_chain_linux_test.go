@@ -203,14 +203,18 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	stopFinal()
 	killStagedImport(t, ctx, finalOptions, finalDir, ca.cert.Raw, nil)
 	stopBridge()
+	delete(finalRoutes.Origins, bridgeID)
 	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
 	must(t, final.Check(ctx, probe))
 	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
-		t.Fatalf("pending receipt did not replay with bridge offline: %v, %v", advanced, err)
+		t.Fatalf("verified local object did not clear the queue after route withdrawal: %v, %v", advanced, err)
 	}
 	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || advanced {
 		t.Fatalf("completed request did not leave the queue: %v, %v", advanced, err)
 	}
+	stopFinal()
+	finalRoutes.Origins[bridgeID] = bridgeURL
+	final, _, _, stopFinal = open(finalOptions, finalIntent, finalID)
 	must(t, final.PullStaged(ctx, bridge, probe))
 
 	extraRef := filekit.Object{ID: extraID, Bytes: len(extra)}

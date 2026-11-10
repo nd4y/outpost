@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/filekit"
+	"github.com/nd4y/outpost/internal/generation"
 )
 
 type queuedStagingImport struct {
@@ -69,7 +70,7 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 // AdvanceStagedImport executes one source-admitted request under the current
 // worker view. Retrying after a lost response reuses the accepted object.
 func (g *Registry) AdvanceStagedImport(ctx context.Context, paused func(string) bool) (bool, error) {
-	if g.options.Staging == nil || len(g.options.Staging.Origins) == 0 || len(g.options.Settlement) != 0 || !g.mu.TryLock() {
+	if g.options.Staging == nil || len(g.options.Settlement) != 0 || !g.mu.TryLock() {
 		return false, nil
 	}
 	now := time.Now()
@@ -94,20 +95,35 @@ func (g *Registry) AdvanceStagedImport(ctx context.Context, paused func(string) 
 		g.mu.Unlock()
 		return false, nil
 	}
-	select {
-	case g.stageImports <- struct{}{}:
-		defer func() { <-g.stageImports }()
-	default:
-		g.mu.Unlock()
-		return false, nil
-	}
 	raw := bytes.Clone(g.state.Intent)
-	g.mu.Unlock()
-
-	if err = g.importStaged(bounded, intent, raw, pending.Origin, pending.Fallback, pending.Object, false); err != nil {
-		return false, err
+	// The previous attempt may have stored the object before losing its
+	// reply or crashing. Completing that record needs no network route.
+	err = os.ErrNotExist
+	if s.has(generation.Object{ID: pending.Object.ID, Bytes: pending.Object.Bytes}) {
+		_, err = s.Read(bounded, pending.Object)
 	}
-	g.mu.Lock()
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			g.mu.Unlock()
+			return false, err
+		}
+		if len(g.options.Staging.Origins) == 0 {
+			g.mu.Unlock()
+			return false, nil
+		}
+		select {
+		case g.stageImports <- struct{}{}:
+			defer func() { <-g.stageImports }()
+		default:
+			g.mu.Unlock()
+			return false, nil
+		}
+		g.mu.Unlock()
+		if err = g.importStaged(bounded, intent, raw, pending.Origin, pending.Fallback, pending.Object, false); err != nil {
+			return false, err
+		}
+		g.mu.Lock()
+	}
 	defer g.mu.Unlock()
 	err = g.withStagingSession(bounded, raw, func(s *Session) error {
 		s.mu.Lock()
