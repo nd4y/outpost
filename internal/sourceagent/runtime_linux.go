@@ -824,6 +824,9 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		}
 		group.recoverRoute = len(s.Superseded) != 0 && !cleanup
 		group.replaying = group.replaying || group.recoverRoute
+		if group.recoverRoute {
+			group.alternate = a.openPreviousHolder(s, i, limits)
+		}
 		if s.RouteCatalog != "" {
 			group.split = false
 		}

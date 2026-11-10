@@ -96,6 +96,7 @@ type companionReceipt struct {
 type parallelSink struct {
 	*ingress.Client
 	companion               *ingress.Client
+	alternate               *ingress.Client
 	intention               ingress.Intent
 	primary, primaryBinding string
 	binding                 string
@@ -149,6 +150,9 @@ func (a *Agent) openParallelSink(i ingress.Intent, prefix, companionID, endpoint
 func (s *parallelSink) Close() {
 	s.Client.Close()
 	s.companion.Close()
+	if s.alternate != nil {
+		s.alternate.Close()
+	}
 	_ = s.records.Close()
 }
 
@@ -253,10 +257,10 @@ func (s *parallelSink) Check(ctx context.Context, ref filekit.Object) error {
 	}
 	otherErr := other.Check(ctx, ref)
 	if err == nil && s.recoverRoute && errors.Is(otherErr, os.ErrNotExist) {
-		return other.PullStaged(ctx, primary, ref)
+		return s.relayAcceptedStaged(ctx, other, primary, ref)
 	}
 	if errors.Is(err, os.ErrNotExist) && otherErr == nil {
-		return primary.PullStaged(ctx, other, ref)
+		return s.relayAcceptedStaged(ctx, primary, other, ref)
 	}
 	return otherErr
 }
@@ -292,7 +296,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 			s.distribution.refund(debit)
 		}
 		if origin != owner {
-			if err = relayAcceptedStaged(ctx, holders[owner], holders[origin], ref); err != nil {
+			if err = s.relayAcceptedStaged(ctx, holders[owner], holders[origin], ref); err != nil {
 				return false, err
 			}
 		}
@@ -311,7 +315,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 	}
 	e := origin.Check(ctx, ref)
 	if e == nil {
-		return false, relayAcceptedStaged(ctx, destination, origin, ref)
+		return false, s.relayAcceptedStaged(ctx, destination, origin, ref)
 	}
 	if !errors.Is(e, os.ErrNotExist) {
 		return false, e
@@ -321,7 +325,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 	if s.replaying {
 		e = destination.Check(ctx, ref)
 		if e == nil {
-			return false, relayAcceptedStaged(ctx, origin, destination, ref)
+			return false, s.relayAcceptedStaged(ctx, origin, destination, ref)
 		}
 		if !errors.Is(e, os.ErrNotExist) {
 			return false, e
@@ -336,20 +340,29 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 	if created {
 		s.distribution.observe(holder, ref.Bytes, time.Since(start))
 	}
-	if e = relayAcceptedStaged(ctx, destination, origin, ref); e != nil {
+	if e = s.relayAcceptedStaged(ctx, destination, origin, ref); e != nil {
 		return false, e
 	}
 	return created, nil
 }
 
-func relayAcceptedStaged(ctx context.Context, destination, origin *ingress.Client, ref filekit.Object) error {
+func (s *parallelSink) relayAcceptedStaged(ctx context.Context, destination, origin *ingress.Client, ref filekit.Object) error {
 	err := destination.PullStaged(ctx, origin, ref)
-	if ctx.Err() == nil && (errors.Is(err, ingress.ErrUnavailable) || errors.Is(err, context.DeadlineExceeded)) {
-		// The origin already confirmed this object. Preserve the synchronous
-		// result because a queue acknowledgement does not confirm delivery.
-		// A busy queue or a receiver without this endpoint leaves normal retry intact.
-		_ = destination.QueueStaged(ctx, origin, ref)
+	if ctx.Err() != nil || !errors.Is(err, ingress.ErrUnavailable) && !errors.Is(err, context.DeadlineExceeded) {
+		return err
 	}
+	// A queue acknowledgement does not confirm delivery. Keep the original
+	// transfer result and let the normal capture retry check both copies.
+	if s.alternate != nil {
+		probe, cancel := context.WithTimeout(ctx, time.Second)
+		confirmed := s.alternate.Check(probe, ref) == nil
+		cancel()
+		if confirmed && destination.QueueStagedWithFallback(ctx, origin, s.alternate, ref) == nil {
+			return err
+		}
+	}
+	// A withdrawn alternate or an older receiver can still accept the primary.
+	_ = destination.QueueStaged(ctx, origin, ref)
 	return err
 }
 

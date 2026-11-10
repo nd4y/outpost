@@ -130,6 +130,23 @@ func (a *Agent) routeReceiver(s state, i ingress.Intent, id string) (captureRece
 	return r, err
 }
 
+// An unchanged route has no third holder that already participated in the
+// capture. After one replacement, only the removed holder is a candidate.
+func (a *Agent) openPreviousHolder(s state, i ingress.Intent, limits peer.Limits) *ingress.Client {
+	for _, id := range s.Superseded {
+		if slices.Contains(s.Route, id) {
+			continue
+		}
+		r, err := a.routeReceiver(s, i, id)
+		if err != nil {
+			return nil
+		}
+		client, _ := ingress.NewClient(r.endpoint, r.authority, r.raw, a.b.Local.Owner, a.cert, a.roots, limits)
+		return client
+	}
+	return nil
+}
+
 func receiverUnavailable(err error) bool {
 	if err == nil {
 		return false

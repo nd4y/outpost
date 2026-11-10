@@ -22,10 +22,12 @@ import (
 
 	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/policy"
+	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/worker"
 )
 
@@ -250,5 +252,109 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 		if !bytes.Equal(got, payload) {
 			t.Fatal("restore differs", h.id)
 		}
+	}
+}
+
+func TestSourceSelectsPreviousStagedHolder(t *testing.T) {
+	var previousCert tls.Certificate
+	f := newFixtureWithPeer(t, 1800, &previousCert)
+	ctx, cancel := context.WithTimeout(t.Context(), 80*time.Second)
+	defer cancel()
+	a := f.a
+	raw := f.intent(t, 1, "")
+	i, _, err := ingress.VerifyIntent(raw, f.authority, a.b.Local.Owner, time.Now())
+	must(t, err)
+	identity := func(cert tls.Certificate) string {
+		t.Helper()
+		leaf, err := x509.ParseCertificate(cert.Certificate[0])
+		must(t, err)
+		return peer.Identity(leaf)
+	}
+	targetID := identity(f.replicaCertificate)
+
+	openHolder := func(cert tls.Certificate, routes *ingress.StagingRoutes) (*ingress.Client, *ingress.Registry, string, ingress.Authority, []byte) {
+		t.Helper()
+		grant := f.grant
+		grant.Ingress = identity(cert)
+		authority, err := ingress.SignAuthority(grant, f.ownerSigner)
+		must(t, err)
+		_, signed, err := a.receiverIntent(i, grant.Ingress, authority)
+		must(t, err)
+
+		dir := filepath.Join(f.base, grant.Ingress)
+		replicaDir := filepath.Join(dir, "replica")
+		must(t, os.MkdirAll(replicaDir, 0700))
+		replica, err := generation.Open(replicaDir, grant.Trust, true)
+		must(t, err)
+		t.Cleanup(func() { must(t, replica.Close()) })
+		registry, err := ingress.OpenRegistry(ctx, ingress.RegistryOptions{
+			Directory: filepath.Join(dir, "registry"), Authority: authority, Owner: a.b.Local.Owner,
+			Replica: replica, Certificate: cert, Roots: f.roots, Limits: sourceFixtureLimits,
+			Initialize: true, Staging: routes,
+		})
+		must(t, err)
+		t.Cleanup(func() { must(t, registry.Close()) })
+		server := httptest.NewUnstartedServer(registry)
+		server.TLS, err = peer.AuthenticatedServerTLS(cert, f.roots, grant.Ingress)
+		must(t, err)
+		server.StartTLS()
+		t.Cleanup(server.Close)
+		client, err := ingress.NewClient(server.URL, authority, signed, a.b.Local.Owner, a.cert, a.roots, sourceFixtureLimits)
+		must(t, err)
+		t.Cleanup(client.Close)
+		must(t, client.Begin(ctx))
+		return client, registry, server.URL, grant, authority
+	}
+
+	previous, _, previousURL, previousGrant, previousAuthority := openHolder(previousCert, &ingress.StagingRoutes{
+		Readers: map[string]bool{targetID: true},
+	})
+	target, registry, _, _, _ := openHolder(f.replicaCertificate, &ingress.StagingRoutes{
+		Origins: map[string]string{i.Ingress: f.server.URL, previousGrant.Ingress: previousURL},
+	})
+	a.b.Companion = &CompanionIngress{Endpoint: previousURL}
+	a.companion, a.companionAuthority = previousGrant, previousAuthority
+	route := state{Route: []string{i.Ingress, targetID}, Superseded: []string{i.Ingress, previousGrant.Ingress}}
+	alternate := a.openPreviousHolder(route, i, sourceFixtureLimits)
+	if alternate == nil || alternate.IntentID() != previous.IntentID() {
+		t.Fatal("capture route did not select the removed holder")
+	}
+	t.Cleanup(alternate.Close)
+
+	primary, err := ingress.NewClient(f.server.URL, f.authority, raw, a.b.Local.Owner, a.cert, a.roots, sourceFixtureLimits)
+	must(t, err)
+	t.Cleanup(primary.Close)
+	f.registryMu.Lock()
+	f.intercept = func(out http.ResponseWriter, req *http.Request) bool {
+		if req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/staged/") {
+			http.Error(out, "survivor staged reads unavailable", http.StatusServiceUnavailable)
+			return true
+		}
+		return false
+	}
+	f.registryMu.Unlock()
+	must(t, primary.Begin(ctx))
+	payload := []byte("same exact staged ciphertext on two holders")
+	ref := filekit.Object{ID: storage.Hash(payload), Bytes: len(payload)}
+	_, err = primary.Write(ctx, ref, payload)
+	must(t, err)
+	_, err = previous.Write(ctx, ref, payload)
+	must(t, err)
+
+	sink := &parallelSink{Client: primary, companion: target, alternate: alternate, recoverRoute: true}
+	if err := sink.Check(ctx, ref); !errors.Is(err, ingress.ErrUnavailable) {
+		t.Fatalf("queued import was treated as delivery: %v", err)
+	}
+	if err := target.Check(ctx, ref); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("target already held the object: %v", err)
+	}
+	if advanced, err := registry.AdvanceStagedImport(ctx, func(string) bool { return false }); err != nil || !advanced {
+		t.Fatalf("recipient did not use the confirmed alternate: %v, %v", advanced, err)
+	}
+	must(t, sink.Check(ctx, ref))
+	got, err := target.Read(ctx, ref)
+	must(t, err)
+	if !bytes.Equal(got, payload) {
+		t.Fatal("alternate delivered different ciphertext")
 	}
 }
