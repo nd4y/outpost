@@ -19,7 +19,7 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-func maintenanceCommandFixture(t *testing.T, f *fixture) (*generation.Replica, string, func([]byte, string, uint64) []byte) {
+func maintenanceReplica(t *testing.T, f *fixture) (*generation.Replica, string) {
 	t.Helper()
 	w := f.nodes[0]
 	ctx := context.Background()
@@ -43,6 +43,14 @@ func maintenanceCommandFixture(t *testing.T, f *fixture) (*generation.Replica, s
 		return r.ReadObject(ctx, f.generation, ref)
 	})
 	must(t, e)
+	return r, head
+}
+
+func maintenanceCommandFixture(t *testing.T, f *fixture) (*generation.Replica, string, func([]byte, string, uint64) []byte) {
+	t.Helper()
+	r, head := maintenanceReplica(t, f)
+	w := f.nodes[0]
+	ctx := context.Background()
 	service, signer := key(t)
 	cfg := f.cfg
 	cfg.Node = w.node

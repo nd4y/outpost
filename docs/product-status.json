@@ -3063,6 +3063,10 @@
           "name": "TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases"
         },
         {
+          "path": "internal/worker/retention_plan_linux_test.go",
+          "name": "TestWorkerExecutesStagedRetentionPlan"
+        },
+        {
           "path": "internal/worker/retention_command_linux_test.go",
           "name": "TestWorkerRetentionCommandReplaysOriginalProofAfterRestart"
         },
@@ -3243,6 +3247,10 @@
         {
           "path": "internal/management/retention_draft_linux_test.go",
           "name": "TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases"
+        },
+        {
+          "path": "internal/worker/retention_plan_linux_test.go",
+          "name": "TestWorkerExecutesStagedRetentionPlan"
         },
         {
           "path": "internal/worker/retention_command_linux_test.go",
@@ -5975,6 +5983,10 @@
         {
           "path": "internal/management/retention_draft_linux_test.go",
           "name": "TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases"
+        },
+        {
+          "path": "internal/worker/retention_plan_linux_test.go",
+          "name": "TestWorkerExecutesStagedRetentionPlan"
         },
         {
           "path": "internal/worker/retention_command_linux_test.go",
