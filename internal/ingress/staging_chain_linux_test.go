@@ -169,8 +169,8 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		Origin: stagingOrigin{Authority: bridgeOptions.Authority, Intent: bridgeIntent}, OriginEndpoint: bridgeURL, Object: probe,
 	})
 	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
-	if err := final.QueueStaged(ctx, bridge, filekit.Object{ID: extraID, Bytes: len(extra)}); !errors.Is(err, ErrConflict) {
-		t.Fatalf("second request replaced the pending import: %v", err)
+	if err := final.QueueStaged(ctx, bridge, filekit.Object{ID: probe.ID, Bytes: probe.Bytes + 1}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("second request changed the length of the pending object: %v", err)
 	}
 	if err := final.Check(ctx, probe); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("queued acceptance was mistaken for object presence: %v", err)
@@ -234,9 +234,9 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	if err := final.QueueStaged(ctx, bridge, extraRef); !errors.Is(err, ErrDenied) {
 		t.Fatalf("withdrawn origin still admitted a request: %v", err)
 	}
-	other := filekit.Object{ID: storage.Hash([]byte("different object")), Bytes: len("different object")}
+	other := filekit.Object{ID: extraRef.ID, Bytes: extraRef.Bytes + 1}
 	if err := final.QueueStaged(ctx, first, other); !errors.Is(err, ErrConflict) {
-		t.Fatalf("replacement changed the queued object: %v", err)
+		t.Fatalf("replacement changed the length of the queued object: %v", err)
 	}
 	must(t, final.QueueStaged(ctx, first, extraRef))
 	stopFinal()
@@ -289,13 +289,38 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	delete(bridgeRoutes.Readers, finalID)
 	bridge, _, bridgeURL, stopBridge = open(bridgeOptions, bridgeIntent, bridgeID)
 	finalRoutes.Origins[bridgeID] = bridgeURL
-	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	final, _, _, stopFinal = open(finalOptions, finalIntent, finalID)
 	must(t, final.QueueStagedWithFallback(ctx, bridge, first, withdrawnRef))
+	ready := make([]filekit.Object, 0, maxQueuedStagingImports-1)
+	for _, text := range []string{"first ready ciphertext", "second ready ciphertext", "third ready ciphertext"} {
+		data := []byte(text)
+		ref := filekit.Object{ID: storage.Hash(data), Bytes: len(data)}
+		_, err := first.Write(ctx, ref, data)
+		must(t, err)
+		must(t, final.QueueStaged(ctx, first, ref))
+		ready = append(ready, ref)
+	}
+	must(t, final.QueueStaged(ctx, first, ready[0]))
+	overflow := []byte("extra request beyond capacity")
+	if err := final.QueueStaged(ctx, first, filekit.Object{ID: storage.Hash(overflow), Bytes: len(overflow)}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("request exceeded durable queue capacity: %v", err)
+	}
+	stopFinal()
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
 	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); !errors.Is(err, ErrDenied) || advanced {
 		t.Fatalf("remote denial should stop the queued import: %v, %v", advanced, err)
 	}
 	if err := final.Check(ctx, withdrawnRef); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("remote denial allowed fallback: %v", err)
+	}
+	for _, ref := range ready {
+		if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
+			t.Fatalf("ready queued object did not advance after reopening: %v, %v", advanced, err)
+		}
+		must(t, final.Check(ctx, ref))
+	}
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); !errors.Is(err, ErrDenied) || advanced {
+		t.Fatalf("first entry did not remain queued after denial: %v, %v", advanced, err)
 	}
 	stopFinal()
 	delete(finalRoutes.Origins, bridgeID)

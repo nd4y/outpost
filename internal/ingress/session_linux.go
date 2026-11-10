@@ -38,24 +38,25 @@ type SessionOptions struct {
 
 const maxPublicationGrants = 16
 const MaxReceiptDocument = 8192
-const maxSessionDocument = generation.MaxCatalog + 8*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
+const maxSessionDocument = generation.MaxCatalog + (4+4*maxQueuedStagingImports)*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
 
 type sessionState struct {
-	Format            string               `json:"format"`
-	Intent            json.RawMessage      `json:"intent"`
-	Authority         json.RawMessage      `json:"authority"`
-	LastObserved      int64                `json:"lastObserved"`
-	Catalog           json.RawMessage      `json:"catalog,omitempty"`
-	CoveragePeer      *stagingOrigin       `json:"coveragePeer,omitempty"`
-	PendingImport     *queuedStagingImport `json:"pendingImport,omitempty"`
-	Coverage          *CoverageReceipt     `json:"coverage,omitempty"`
-	PublicationGrants []json.RawMessage    `json:"publicationGrants,omitempty"`
-	Complete          bool                 `json:"complete"`
-	CompletedAt       int64                `json:"completedAt,omitempty"`
-	Receipt           *Receipt             `json:"receipt,omitempty"`
-	Acknowledged      bool                 `json:"acknowledged,omitempty"`
-	Reclaimed         []byte               `json:"reclaimed,omitempty"`
-	Retired           json.RawMessage      `json:"retired,omitempty"`
+	Format            string                 `json:"format"`
+	Intent            json.RawMessage        `json:"intent"`
+	Authority         json.RawMessage        `json:"authority"`
+	LastObserved      int64                  `json:"lastObserved"`
+	Catalog           json.RawMessage        `json:"catalog,omitempty"`
+	CoveragePeer      *stagingOrigin         `json:"coveragePeer,omitempty"`
+	PendingImport     *queuedStagingImport   `json:"pendingImport,omitempty"`
+	AdditionalImports []*queuedStagingImport `json:"additionalImports,omitempty"`
+	Coverage          *CoverageReceipt       `json:"coverage,omitempty"`
+	PublicationGrants []json.RawMessage      `json:"publicationGrants,omitempty"`
+	Complete          bool                   `json:"complete"`
+	CompletedAt       int64                  `json:"completedAt,omitempty"`
+	Receipt           *Receipt               `json:"receipt,omitempty"`
+	Acknowledged      bool                   `json:"acknowledged,omitempty"`
+	Reclaimed         []byte                 `json:"reclaimed,omitempty"`
+	Retired           json.RawMessage        `json:"retired,omitempty"`
 }
 type Receipt struct {
 	PublishedWith string `json:"publishedWith,omitempty"`
@@ -311,9 +312,14 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 	} else if s.state.Complete && !s.state.Acknowledged {
 		return fail(ErrConflict)
 	}
-	if pending := s.state.PendingImport; pending != nil {
+	if len(s.state.AdditionalImports) >= maxQueuedStagingImports ||
+		len(s.state.AdditionalImports) != 0 && s.state.PendingImport == nil {
+		return fail(ErrConflict)
+	}
+	queued := make(map[string]bool)
+	for _, pending := range s.state.stagedImports() {
 		var origin Intent
-		if s.state.Complete || len(s.state.Retired) != 0 || !validObject(pending.Object) ||
+		if pending == nil || s.state.Complete || len(s.state.Retired) != 0 || !validObject(pending.Object) || queued[pending.Object.ID] ||
 			canonicalIntent(pending.Origin.Intent, pending.Origin.Authority, o.Owner, &origin) != nil ||
 			origin.Ingress == i.Ingress || !sameCapture(origin, i) {
 			return fail(ErrConflict)
@@ -325,6 +331,7 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 				return fail(ErrConflict)
 			}
 		}
+		queued[pending.Object.ID] = true
 	}
 	if s.state.CoveragePeer != nil {
 		origin := s.state.CoveragePeer
@@ -697,11 +704,12 @@ func (s *Session) accepted(ctx context.Context, id string, refs []generation.Obj
 			return result, err
 		}
 		oldTime, oldReceipt, oldPending := s.state.CompletedAt, s.state.Receipt, s.state.PendingImport
+		oldAdditional := s.state.AdditionalImports
 		s.state.Complete, s.state.CompletedAt, s.state.Receipt = true, verifiedAt, &receipt
-		s.state.PendingImport = nil
+		s.state.PendingImport, s.state.AdditionalImports = nil, nil
 		if e = s.save(); e != nil {
 			s.state.Complete, s.state.CompletedAt, s.state.Receipt = false, oldTime, oldReceipt
-			s.state.PendingImport = oldPending
+			s.state.PendingImport, s.state.AdditionalImports = oldPending, oldAdditional
 			return result, e
 		}
 	}

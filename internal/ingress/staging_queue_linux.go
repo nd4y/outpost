@@ -5,16 +5,44 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
 )
 
+const maxQueuedStagingImports = 4
+
 type queuedStagingImport struct {
 	Origin   stagingOrigin  `json:"origin"`
 	Object   filekit.Object `json:"object"`
 	Fallback *stagingOrigin `json:"fallback,omitempty"`
+}
+
+func (s *sessionState) stagedImports() []*queuedStagingImport {
+	if s.PendingImport == nil {
+		return nil
+	}
+	return append([]*queuedStagingImport{s.PendingImport}, s.AdditionalImports...)
+}
+
+func stagedImportIndex(imports []*queuedStagingImport, id string) int {
+	return slices.IndexFunc(imports, func(pending *queuedStagingImport) bool { return pending.Object.ID == id })
+}
+
+func (s *Session) saveStagedImports(imports []*queuedStagingImport) error {
+	head, tail := s.state.PendingImport, s.state.AdditionalImports
+	s.state.PendingImport, s.state.AdditionalImports = nil, nil
+	if len(imports) != 0 {
+		s.state.PendingImport = imports[0]
+		s.state.AdditionalImports = imports[1:]
+	}
+	if err := s.save(); err != nil {
+		s.state.PendingImport, s.state.AdditionalImports = head, tail
+		return err
+	}
+	return nil
 }
 
 func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []byte, request queuedStagingImport) error {
@@ -42,8 +70,10 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 		if _, err := s.read(ctx, request.Object); !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		pending := s.state.PendingImport
-		if pending != nil {
+		imports := s.state.stagedImports()
+		index := stagedImportIndex(imports, request.Object.ID)
+		if index >= 0 {
+			pending := imports[index]
 			if pending.Object != request.Object {
 				return ErrConflict
 			}
@@ -57,10 +87,14 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 				g.options.Staging.Origins[previous.Ingress] != "" {
 				return ErrConflict
 			}
+			imports[index] = &request
+		} else {
+			if len(imports) == maxQueuedStagingImports {
+				return ErrConflict
+			}
+			imports = append(imports, &request)
 		}
-		s.state.PendingImport = &request
-		if err := s.save(); err != nil {
-			s.state.PendingImport = pending
+		if err := s.saveStagedImports(imports); err != nil {
 			return err
 		}
 		return s.point("capture-staged-import-queued")
@@ -90,11 +124,16 @@ func (g *Registry) AdvanceStagedImport(ctx context.Context, paused func(string) 
 		g.mu.Unlock()
 		return false, err
 	}
-	pending := s.state.PendingImport
-	if pending == nil || s.state.Complete || len(s.state.Catalog) != 0 {
+	imports := s.state.stagedImports()
+	if len(imports) == 0 || s.state.Complete || len(s.state.Catalog) != 0 {
 		g.mu.Unlock()
 		return false, nil
 	}
+	// Rotate even after a failed attempt so an unavailable route cannot hold up
+	// other admitted objects. The requests themselves remain on disk.
+	index := max(0, stagedImportIndex(imports, g.nextStagedImport))
+	g.nextStagedImport = imports[(index+1)%len(imports)].Object.ID
+	pending := imports[index]
 	raw := bytes.Clone(g.state.Intent)
 	// The previous attempt may have stored the object before losing its
 	// reply or crashing. Completing that record needs no network route.
@@ -125,21 +164,23 @@ func (g *Registry) AdvanceStagedImport(ctx context.Context, paused func(string) 
 		g.mu.Lock()
 	}
 	defer g.mu.Unlock()
+	removed := false
 	err = g.withStagingSession(bounded, raw, func(s *Session) error {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		if s.state.PendingImport != pending {
+		imports := s.state.stagedImports()
+		index := slices.Index(imports, pending)
+		if index < 0 {
 			return nil
 		}
 		if err := s.guard(bounded); err != nil {
 			return err
 		}
-		s.state.PendingImport = nil
-		if err := s.save(); err != nil {
-			s.state.PendingImport = pending
+		if err := s.saveStagedImports(slices.Delete(imports, index, index+1)); err != nil {
 			return err
 		}
+		removed = true
 		return nil
 	})
-	return err == nil, err
+	return removed, err
 }

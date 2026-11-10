@@ -84,6 +84,7 @@ type Registry struct {
 	journalReconstructed     bool
 	gate                     chan struct{}
 	stageReads, stageImports chan struct{}
+	nextStagedImport         string
 	Fault                    func(string) error
 }
 
