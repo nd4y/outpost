@@ -20,7 +20,7 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
+func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *testing.T) {
 	h := newHTTPFixture(t)
 	f := h.f
 	f.enroll(t)
@@ -145,6 +145,25 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	if status, _ = h.request(t, h.viewer, "GET", planPath+"/"+op, nil); status != 403 {
 		t.Fatal("viewer can access a retirement plan", status)
 	}
+	closeGrant, e := generation.SignRetentionProtection(generation.RetentionProtection{
+		Format: generation.RetentionProtectionFormat, Node: f.e.Node, Domain: trust.Domain,
+		Repository: trust.Repository, Epoch: trust.Epoch, Operation: op, Action: "CLOSE",
+		NotBefore: now - 60, ExpiresUnix: now + 300,
+	}, signer)
+	must(t, e)
+	closeReq := command.Request{Operation: id("close"), Reason: "OWNER_MAINTENANCE", Tenant: f.e.Tenant,
+		Domain: trust.Domain, Kind: "retention", ExpectedRevision: 1, Authority: targetAuthority,
+		ExpiresUnix: now + 300, RetentionGrant: closeGrant}
+	closeStep := RetentionStepRequest{Format: RetentionStepRequestFormat, Node: f.e.Node, Command: closeReq}
+	status, raw = h.request(t, h.owner, "POST", planPath+"/"+op+"/steps", closeStep)
+	if status != 200 {
+		t.Fatalf("stage %d %s", status, raw)
+	}
+	var staged RetentionStepReceipt
+	must(t, json.Unmarshal(raw, &staged))
+	if staged.Operation != closeReq.Operation || staged.Plan != op {
+		t.Fatal(staged)
+	}
 	f.reopen(t)
 	plan, e := f.r.RegisterRetentionPlan(ctx, f.p, f.e.Tenant, trust.Domain, planInput)
 	must(t, e)
@@ -165,6 +184,29 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 			t.Fatal(result)
 		}
 		return result
+	}
+
+	stage := func(peer *fixture, req command.Request) RetentionStepReceipt {
+		t.Helper()
+		in := RetentionStepRequest{Format: RetentionStepRequestFormat, Node: peer.e.Node, Command: req}
+		receipt, e := f.r.StageRetentionStep(ctx, f.p, f.e.Tenant, trust.Domain, op, in)
+		must(t, e)
+		return receipt
+	}
+	requireReconcile := func(actors []Principal, operation, expected string) {
+		t.Helper()
+		result, e := f.r.Reconcile(ctx, actors, 0, 16)
+		must(t, e)
+		for _, item := range result.Items {
+			if item.Operation == operation && item.State == expected {
+				return
+			}
+		}
+		t.Fatalf("expected %s for %s, got %+v", expected, operation, result.Items)
+	}
+	requireReconcile([]Principal{f.p}, closeReq.Operation, "WAITING_PREREQUISITE")
+	if replay := stage(f, closeReq); replay != staged {
+		t.Fatal("stage replay changed original receipt", replay)
 	}
 
 	protection := func(peer *fixture, operation, action string) generation.RetentionProtection {
@@ -233,7 +275,22 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 		_, e = f.r.PublishReport(ctx, peer.e.Node, f.e.Tenant, peer.e.Node, raw)
 		must(t, e)
 	}
-	a1, ack, node := hold(a, ra, authorityA, "a1")
+	a1Req := requestProtection(authorityA, "hold-a1", holdGrant(a, "a1"))
+	a1Step := RetentionStepRequest{Format: RetentionStepRequestFormat, Node: a.e.Node, Command: a1Req}
+	f.r.Fault = func(point string) error {
+		if point == "management-retention-step-durable" {
+			return lost
+		}
+		return nil
+	}
+	if _, e = f.r.StageRetentionStep(ctx, f.p, f.e.Tenant, trust.Domain, op, a1Step); !errors.Is(e, lost) {
+		t.Fatal("staging fault was not reached", e)
+	}
+	f.reopen(t)
+	stage(a, a1Req)
+	requireReconcile(nil, a1Req.Operation, "BLOCKED")
+	requireReconcile([]Principal{f.p}, a1Req.Operation, "PUBLISHED")
+	a1, ack, node := queue(a, ra, a1Req)
 	_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, a.e.Node, a1.Operation, ack)
 	must(t, e)
 	a2, ack, node := hold(a, ra, authorityA, "a2")
@@ -295,19 +352,17 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 		t.Fatal("planned operation accepted a different replica revision", e)
 	}
 	req.MaintenancePermit = signed
+	stage(f, req)
 	f.r.Fault = func(point string) error {
 		if point == "management-command-intent-durable" {
 			return lost
 		}
 		return nil
 	}
-	if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req); !errors.Is(e, lost) {
-		t.Fatal("command intent fault not reached", e)
-	}
+	requireReconcile([]Principal{f.p}, req.Operation, "BLOCKED")
 	f.reopen(t)
 	checkPlan("RETIREMENT_INTENT_RECORDED", false)
-	_, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req)
-	must(t, e)
+	requireReconcile([]Principal{f.p}, req.Operation, "PUBLISHED")
 	checkPlan("RETIREMENT_QUEUED", false)
 	targetNode := Principal{Actor: f.e.Node, Roles: []string{"node"}, Scopes: []Scope{{f.e.Tenant, trust.Domain}}}
 	list, _, e := f.r.Commands(ctx, targetNode, f.e.Tenant, f.e.Node, 0, 32)
@@ -329,7 +384,8 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	_, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, a.e.Node, undelivered)
 	must(t, e)
 	targetReplica := openCopy(f)
-	closeObservation, closeAck, closeNode := queue(f, targetReplica, requestProtection(targetAuthority, "close", protection(f, op, "CLOSE")))
+	requireReconcile([]Principal{f.p}, closeReq.Operation, "PUBLISHED")
+	closeObservation, closeAck, closeNode := queue(f, targetReplica, closeReq)
 	checkPlan("CLOSURE_PENDING", true)
 	state, e := f.r.retentionState(ctx)
 	must(t, e)
@@ -361,17 +417,17 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	}
 	closure, e := generation.VerifyRetentionProtectionReceipt(closed.Closure.Proof, f.e.Node)
 	must(t, e)
-	release := func(peer *fixture, r *generation.Replica, authority []byte, old CommandObservation) (CommandObservation, []byte, Principal) {
+	releaseRequest := func(peer *fixture, authority []byte, old CommandObservation) command.Request {
 		t.Helper()
 		pin, e := generation.VerifyRetentionProtectionReceipt(old.RetentionProof, peer.e.Node)
 		must(t, e)
 		g := protection(peer, pin.Operation, "RELEASE")
 		g.Generation, g.HoldDigest, g.Retirement, g.Closure = pin.Generation, pin.HoldDigest, pin.Retirement, &closure
-		return queue(peer, r, requestProtection(authority, "release-"+old.Operation, g))
+		return requestProtection(authority, "release-"+old.Operation, g)
 	}
 	releasedA := []CommandObservation{a1, a2, a3}
 	for _, old := range []CommandObservation{a1, a2, a3} {
-		c, ack, node := release(a, ra, authorityA, old)
+		c, ack, node := queue(a, ra, releaseRequest(a, authorityA, old))
 		_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, a.e.Node, c.Operation, ack)
 		must(t, e)
 		releasedA = append(releasedA, c)
@@ -386,7 +442,10 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 		t.Fatal("late delivery recreated a settled hold", e)
 	}
 	releasedA = append(releasedA, fenced)
-	c, ack, node := release(b, rb, authorityB, b1)
+	releaseB := releaseRequest(b, authorityB, b1)
+	stage(b, releaseB)
+	requireReconcile([]Principal{f.p}, releaseB.Operation, "PUBLISHED")
+	c, ack, node := queue(b, rb, releaseB)
 	observe(a, 3, releasedA...)
 	observe(b, 4, b1, c)
 	f.reopen(t)

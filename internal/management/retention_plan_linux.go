@@ -97,10 +97,11 @@ func (r *Registry) RegisterRetentionPlan(ctx context.Context, p Principal, tenan
 			return nil
 		}
 		_, commandUsed := s.CommandOperations[permit.Operation]
+		_, stepUsed := s.RetentionSteps[permit.Operation]
 		_, enrollmentUsed := s.Operations[permit.Operation]
 		_, configurationUsed := s.ConfigOperations[permit.Operation]
 		now := time.Now()
-		if commandUsed || enrollmentUsed || configurationUsed || resolutionID(s, permit.Operation) || permit.Window.ExpiresUnix <= now.Unix() {
+		if commandUsed || stepUsed || enrollmentUsed || configurationUsed || resolutionID(s, permit.Operation) || permit.Window.ExpiresUnix <= now.Unix() {
 			return ErrConflict
 		}
 		f, ok := s.Domains[domain]

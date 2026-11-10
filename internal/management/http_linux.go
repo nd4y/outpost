@@ -383,6 +383,20 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeHTTP(w, 200, out)
 			return
 		}
+		if len(parts) == 10 && parts[9] == "steps" && r.Method == http.MethodPost {
+			var input RetentionStepRequest
+			if e := readHTTP(w, r, &input, maxRetentionStepBytes); e != nil {
+				failHTTP(w, e)
+				return
+			}
+			out, e := h.registry.StageRetentionStep(ctx, p, tenant, parts[5], parts[8], input)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
 		if len(parts) == 9 && r.Method == http.MethodGet {
 			out, e := h.registry.RetentionPlanStatus(ctx, p, tenant, parts[5], parts[8], h.maxAge)
 			if e != nil {

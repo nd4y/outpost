@@ -1946,6 +1946,139 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans/{operationId}/steps": {
+      "post": {
+        "operationId": "stageRetentionPlanStep",
+        "summary": "Stage an exact signed retention step for periodic reconciliation",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionStepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original staging receipt without worker execution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionStepReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan unavailable in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Command differs from the plan or occupied operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans/{operationId}": {
       "get": {
         "operationId": "readRetentionPlanStatus",
@@ -2908,6 +3041,62 @@
       "ID": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$"
+      },
+      "RetentionStepRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-step-request-1"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          }
+        },
+        "required": ["format", "node", "command"]
+      },
+      "RetentionStepReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-step-1"
+          },
+          "planOperationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "requestDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "stagedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "stagingRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "format",
+          "planOperationId",
+          "operationId",
+          "actor",
+          "requestDigest",
+          "stagedUnix",
+          "stagingRevision"
+        ]
       },
       "RetentionPlanRequest": {
         "type": "object",

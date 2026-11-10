@@ -70,6 +70,7 @@ type registryState struct {
 	ConfigOperations  map[string]configOperation     `json:"configOperations"`
 	CommandOperations map[string]commandOperation    `json:"commandOperations,omitempty"`
 	RetentionPlans    map[string]retentionPlanRecord `json:"retentionPlans,omitempty"`
+	RetentionSteps    map[string]retentionStepRecord `json:"retentionSteps,omitempty"`
 	Resolutions       map[string]intentResolution    `json:"resolutions,omitempty"`
 	LegacyCheckpoint  string                         `json:"legacyCheckpoint,omitempty"`
 	JournalCopy       bool                           `json:"journalCopy,omitempty"`
@@ -317,6 +318,9 @@ func validateRegistry(raw []byte, owner, signer ed25519.PublicKey) (registryStat
 	if e := validateRetentionPlans(s); e != nil {
 		return s, e
 	}
+	if e := validateRetentionSteps(s); e != nil {
+		return s, e
+	}
 	return s, nil
 }
 func (r *Registry) save(s registryState) error {
@@ -434,6 +438,9 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 			return ErrConflict
 		}
 		if _, used := s.RetentionPlans[operation]; used {
+			return ErrConflict
+		}
+		if _, used := s.RetentionSteps[operation]; used {
 			return ErrConflict
 		}
 		if exists {

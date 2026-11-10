@@ -389,6 +389,9 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 		if _, exists := s.RetentionPlans[input.Operation]; exists {
 			return ErrConflict
 		}
+		if _, used := s.RetentionSteps[input.Operation]; used {
+			return ErrConflict
+		}
 		op, exists := s.ConfigOperations[input.Operation]
 		if exists {
 			if op.Receipt.RequestDigest != requestDigest {

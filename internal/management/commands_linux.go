@@ -169,6 +169,14 @@ func (r *Registry) admitCommandPolicy(ctx context.Context, s registryState, p Pr
 			return enrollment, "", e
 		}
 	}
+	if step, exists := s.RetentionSteps[input.Operation]; exists {
+		if step.Input.Node != node || step.Receipt.RequestDigest != commandRequestDigest(p, node, input) {
+			return enrollment, "", ErrConflict
+		}
+		if e = r.admitStagedRetentionStep(ctx, s, step); e != nil {
+			return enrollment, "", e
+		}
+	}
 	return enrollment, storage.Hash(raw), nil
 }
 

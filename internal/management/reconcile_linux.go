@@ -80,6 +80,11 @@ func (r *Registry) Reconcile(ctx context.Context, principals []Principal, after 
 				add(v.Audit)
 			}
 		}
+		for id, v := range s.RetentionSteps {
+			if _, sent := s.CommandOperations[id]; !sent {
+				add(Audit{Operation: id, Sequence: v.Receipt.StagingRevision, Action: "RETENTION_STEP"})
+			}
+		}
 		return nil
 	})
 	if e != nil {
@@ -102,8 +107,12 @@ func (r *Registry) Reconcile(ctx context.Context, principals []Principal, after 
 			if ctx.Err() != nil {
 				return out, ctx.Err()
 			}
-			item.State = "BLOCKED"
-			item.ErrorCode = reconcileCode(e)
+			if errors.Is(e, errRetentionStepWaiting) {
+				item.State = "WAITING_PREREQUISITE"
+			} else {
+				item.State = "BLOCKED"
+				item.ErrorCode = reconcileCode(e)
+			}
 		} else {
 			item.State = state
 		}
@@ -132,6 +141,7 @@ func (r *Registry) reconcileOne(ctx context.Context, acl map[string]Principal, i
 	var enrollment enrollmentOperation
 	var config configOperation
 	var cmd commandOperation
+	var step retentionStepRecord
 	var candidate []byte
 	var request command.Request
 	var historical string
@@ -156,6 +166,12 @@ func (r *Registry) reconcileOne(ctx context.Context, acl map[string]Principal, i
 			}
 			if enrollment.Receipt.State != "ADMITTED" {
 				historical = enrollment.Receipt.State
+			}
+		case "RETENTION_STEP":
+			var ok bool
+			step, ok = s.RetentionSteps[item.Operation]
+			if !ok || step.Receipt.StagingRevision != item.Sequence {
+				return ErrConflict
 			}
 		case "APPLY_CONFIG":
 			var ok bool
@@ -239,6 +255,16 @@ func (r *Registry) reconcileOne(ctx context.Context, acl map[string]Principal, i
 			return "", ErrDenied
 		}
 		receipt, e := r.ApplyEnrollment(ctx, p, item.Operation, enrollment.Audit.Reason, enrollment.Document, enrollment.Expected)
+		return receipt.State, e
+	case "RETENTION_STEP":
+		p, ok := acl[step.Receipt.Actor]
+		if !ok || !p.Role("owner") {
+			return "", ErrDenied
+		}
+		receipt, e := r.AdmitCommand(ctx, p, step.Input.Command.Tenant, step.Input.Node, step.Input.Command)
+		if e == nil && receipt.State == "ADMITTED" {
+			return "PUBLISHED", nil
+		}
 		return receipt.State, e
 	case "APPLY_CONFIG":
 		p, ok := acl[config.Audit.Actor]
