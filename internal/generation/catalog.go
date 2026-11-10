@@ -36,6 +36,7 @@ var (
 	ErrIncomplete        = errors.New("generation dependencies unavailable or corrupt")
 	ErrMigrationRequired = errors.New("explicit local replica migration required")
 	ErrMaintenanceWindow = errors.New("maintenance node or window does not permit deletion")
+	ErrRetirementClosed  = errors.New("retirement operation is durably closed")
 )
 
 type Object struct {

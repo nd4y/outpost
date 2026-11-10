@@ -227,7 +227,7 @@ func TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome(t *testing.T)
 	r, head, makeCommand := maintenanceCommandFixture(t, f)
 	w := f.nodes[0]
 	ctx := context.Background()
-	for n, kind := range []string{"wrong-key", "wrong-operation", "protected", "valid"} {
+	for n, kind := range []string{"wrong-key", "wrong-operation", "protected", "closed", "valid"} {
 		op := storage.Hash([]byte(kind))
 		permitOp := op
 		signer := f.maintenance
@@ -242,6 +242,17 @@ func TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome(t *testing.T)
 			retire = head
 		}
 		permission := maintenancePermit(t, f, r, permitOp, signer, retire)
+		if kind == "closed" {
+			trust := f.domain.Trust
+			now := time.Now().Unix()
+			grant, e := generation.SignRetentionProtection(generation.RetentionProtection{
+				Format: generation.RetentionProtectionFormat, Node: w.node, Domain: trust.Domain, Repository: trust.Repository,
+				Epoch: trust.Epoch, Operation: op, Action: "CLOSE", NotBefore: now - 60, ExpiresUnix: now + 60,
+			}, f.maintenance)
+			must(t, e)
+			_, e = w.ApplyRetentionProtection(ctx, trust.Domain, grant)
+			must(t, e)
+		}
 		raw := makeCommand(permission, op, uint64(n+1))
 		ack, e := w.ExecuteCommand(ctx, raw)
 		must(t, e)
@@ -265,6 +276,13 @@ func TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome(t *testing.T)
 		a := verifyWorkerAck(t, w, raw, record.Ack)
 		if kind == "protected" {
 			if a.State != "FAILED" || a.ErrorCode != "MAINTENANCE_BLOCKED" {
+				t.Fatal(a)
+			}
+			must(t, r.VerifyComplete(ctx, f.generation))
+			continue
+		}
+		if kind == "closed" {
+			if a.State != "FAILED" || a.ErrorCode != "EFFECT_UNCONFIRMED" {
 				t.Fatal(a)
 			}
 			must(t, r.VerifyComplete(ctx, f.generation))

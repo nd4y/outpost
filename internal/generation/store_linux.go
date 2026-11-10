@@ -32,22 +32,23 @@ type Pin struct {
 	Kind       string `json:"kind"`
 }
 type state struct {
-	Format               string                               `json:"format"`
-	Trust                Trust                                `json:"trust"`
-	Revision             uint64                               `json:"revision"`
-	HighestSequence      uint64                               `json:"highestSequence"`
-	HighestID            string                               `json:"highestId"`
-	Latest               string                               `json:"latestComplete"`
-	Generations          map[string]entry                     `json:"generations"`
-	Pins                 map[string]Pin                       `json:"pins"`
-	RetentionProtections map[string]retentionProtectionRecord `json:"retentionProtections,omitempty"`
-	Receipts             map[string]string                    `json:"maintenanceReceipts"`
-	GC                   map[string]gcRecord                  `json:"gc,omitempty"`
-	Damage               map[string]DamageRecord              `json:"damage,omitempty"`
-	Repairs              map[string]RepairRecord              `json:"repairs,omitempty"`
-	CatalogDamage        map[string]DamageRecord              `json:"catalogDamage,omitempty"`
-	CatalogRepairs       map[string]RepairRecord              `json:"catalogRepairs,omitempty"`
-	IndexNode            string                               `json:"indexNode,omitempty"`
+	Format               string                                `json:"format"`
+	Trust                Trust                                 `json:"trust"`
+	Revision             uint64                                `json:"revision"`
+	HighestSequence      uint64                                `json:"highestSequence"`
+	HighestID            string                                `json:"highestId"`
+	Latest               string                                `json:"latestComplete"`
+	Generations          map[string]entry                      `json:"generations"`
+	Pins                 map[string]Pin                        `json:"pins"`
+	RetentionProtections map[string]retentionProtectionRecord  `json:"retentionProtections,omitempty"`
+	RetentionClosures    map[string]RetentionProtectionReceipt `json:"retentionClosures,omitempty"`
+	Receipts             map[string]string                     `json:"maintenanceReceipts"`
+	GC                   map[string]gcRecord                   `json:"gc,omitempty"`
+	Damage               map[string]DamageRecord               `json:"damage,omitempty"`
+	Repairs              map[string]RepairRecord               `json:"repairs,omitempty"`
+	CatalogDamage        map[string]DamageRecord               `json:"catalogDamage,omitempty"`
+	CatalogRepairs       map[string]RepairRecord               `json:"catalogRepairs,omitempty"`
+	IndexNode            string                                `json:"indexNode,omitempty"`
 }
 type Status struct {
 	Revision        uint64         `json:"revision"`

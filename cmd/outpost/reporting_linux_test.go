@@ -186,7 +186,7 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 			must(e)
 			receipt, e := generation.VerifyRetentionProtectionReceipt(raw, node)
 			must(e)
-			if receipt.State != state || receipt.Operation != grant.Operation || receipt.Generation != id {
+			if receipt.State != state || receipt.Operation != grant.Operation || receipt.Generation != grant.Generation {
 				t.Fatal(receipt)
 			}
 			return receipt
@@ -196,6 +196,12 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 		released := apply("release", "RELEASED")
 		if released.Revision <= held.Revision {
 			t.Fatal("release did not advance the replica revision")
+		}
+		grant.Action, grant.Generation, grant.HoldDigest = "CLOSE", "", ""
+		grant.Operation = storage.Hash([]byte("retirement operation"))
+		closed := apply("close", "CLOSED")
+		if closed.Revision <= released.Revision {
+			t.Fatal("closure did not advance the replica revision")
 		}
 	}
 	checkCLICommands(t, base, bootstrap, ownerFile, cfg, ownerKey)

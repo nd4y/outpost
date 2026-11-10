@@ -38,7 +38,15 @@ Prepare an `outpost-retention-protection-1` grant with `node`, `domain`, `reposi
 
 The holder rereads and verifies the complete ciphertext before committing the pin and its signed `HELD` receipt together. The pin prevents local retirement even after a restart or grant expiry. To remove it, sign and apply a `RELEASE` grant for the same scope, operation and generation, with `holdDigest` copied from the `HELD` receipt. The holder records a signed `RELEASED` receipt. Identical retries return the original signed receipt with its original observation time while that action remains current. A released operation cannot be held again. The index retains up to 256 operation records, including released ones. Keep a reader that supports these records when reopening the replica.
 
-These local operations prepare protection on individual holders. The distributed coordinator must still prove sufficient pinned survivors and keep their holds in force throughout retirement.
+#### Close an operation before releasing its survivor holds
+
+For a survivor hold bound to a retirement operation, add `retirement` with the retiring holder's `node` and the exact maintenance `operationId`. The binding appears in the `HELD` receipt and stays fixed for that hold.
+
+When retirement has finished or must be abandoned, apply a separate `CLOSE` grant on the stopped retiring holder. Use that holder's node and maintenance operation ID. Leave `generation`, `holdDigest`, `retirement` and `closure` empty. The node records the fence under the same lock as retirement and returns its signed `CLOSED` receipt. The fence blocks new execution and unfinished replay after restart. A finished result remains readable. Closing a partially executed operation can leave unreferenced bytes for a new maintenance permit. Up to 256 closure records are retained per replica.
+
+A bound `RELEASE` carries the same `retirement` and the exact signed `CLOSED` receipt in `closure`. The survivor verifies the retiring node, operation, domain, repository and epoch before removing the pin. A missing proof, a receipt from another operation or a modified receipt leaves the hold in force. Keep the hold until the retiring node can produce the closure receipt.
+
+The distributed coordinator still needs to verify sufficient survivor holds before authorizing retirement. These commands provide the durable closure and release steps for that protocol.
 
 The interface has three primary journeys: inspect backup coverage and the last verified copy, preview/apply an owner-signed policy, and select a generation for authorized recovery with a visible result. Russian and English share the same state model. Native form controls, keyboard focus, non-color status labels, zoom and narrow-screen layout are required. Empty/offline/stale/forbidden/error states are tested independently. Restore selection never silently substitutes the latest generation.
 

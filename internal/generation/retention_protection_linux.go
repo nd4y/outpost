@@ -15,15 +15,18 @@ type retentionProtectionRecord struct {
 }
 
 func (r *Replica) validateRetentionProtections(s state) error {
-	if len(s.RetentionProtections) > maxRetentionProtectionRecords {
+	if len(s.RetentionProtections) > maxRetentionProtectionRecords || len(s.RetentionClosures) > maxRetentionProtectionRecords {
 		return ErrInvalid
+	}
+	for operation, close := range s.RetentionClosures {
+		if !close.valid() || close.State != "CLOSED" || close.Operation != operation || !r.retentionReceiptMatches(s, close) {
+			return ErrInvalid
+		}
 	}
 	activePins := make(map[string]bool, len(s.RetentionProtections))
 	for operation, record := range s.RetentionProtections {
 		hold := record.Hold
-		if !hold.valid() || hold.State != "HELD" || hold.Operation != operation || hold.Domain != r.trust.Domain ||
-			hold.Repository != r.trust.Repository || hold.Epoch != r.trust.Epoch || hold.Revision > s.Revision ||
-			r.indexNode != "" && hold.Node != r.indexNode || s.IndexNode != "" && hold.Node != s.IndexNode {
+		if !hold.valid() || hold.State != "HELD" || hold.Operation != operation || !r.retentionReceiptMatches(s, hold) {
 			return ErrInvalid
 		}
 		id := retentionPin(operation)
@@ -38,7 +41,7 @@ func (r *Replica) validateRetentionProtections(s state) error {
 		if !release.valid() || release.State != "RELEASED" || release.Node != hold.Node || release.Domain != hold.Domain ||
 			release.Repository != hold.Repository || release.Epoch != hold.Epoch || release.Operation != operation ||
 			release.Generation != hold.Generation || release.HoldDigest != hold.GrantDigest || release.Revision <= hold.Revision ||
-			release.Revision > s.Revision || release.ObservedUnix < hold.ObservedUnix {
+			release.Revision > s.Revision || release.ObservedUnix < hold.ObservedUnix || !sameRetirement(release.Retirement, hold.Retirement) {
 			return ErrInvalid
 		}
 	}
@@ -48,6 +51,11 @@ func (r *Replica) validateRetentionProtections(s state) error {
 		}
 	}
 	return nil
+}
+
+func (r *Replica) retentionReceiptMatches(s state, receipt RetentionProtectionReceipt) bool {
+	return receipt.Domain == r.trust.Domain && receipt.Repository == r.trust.Repository && receipt.Epoch == r.trust.Epoch &&
+		receipt.Revision <= s.Revision && (r.indexNode == "" || receipt.Node == r.indexNode) && (s.IndexNode == "" || receipt.Node == s.IndexNode)
 }
 
 // ApplyRetentionProtection verifies the complete ciphertext before adding a
@@ -75,7 +83,18 @@ func (r *Replica) ApplyRetentionProtection(ctx context.Context, raw []byte, admi
 				return nil
 			})
 		}
-		if grant.Action == "HOLD" {
+		switch grant.Action {
+		case "CLOSE":
+			if receipt, closed := s.RetentionClosures[grant.Operation]; closed {
+				if receipt.GrantDigest != digest {
+					return ErrConflict
+				}
+				return readback(receipt)
+			}
+			if len(s.RetentionClosures) >= maxRetentionProtectionRecords {
+				return statefile.ErrCapacity
+			}
+		case "HOLD":
 			if exists {
 				if record.Release != nil || record.Hold.GrantDigest != digest {
 					return ErrConflict
@@ -94,8 +113,9 @@ func (r *Replica) ApplyRetentionProtection(ctx context.Context, raw []byte, admi
 			if e := r.verifyComplete(ctx, s, grant.Generation); e != nil {
 				return e
 			}
-		} else {
-			if !exists || record.Hold.Generation != grant.Generation || record.Hold.GrantDigest != grant.HoldDigest {
+		case "RELEASE":
+			if !exists || record.Hold.Generation != grant.Generation || record.Hold.GrantDigest != grant.HoldDigest ||
+				!sameRetirement(record.Hold.Retirement, grant.Retirement) {
 				return ErrConflict
 			}
 			if record.Release != nil {
@@ -132,27 +152,39 @@ func (r *Replica) commitRetentionProtection(ctx context.Context, s *state, grant
 	receipt := RetentionProtectionReceipt{
 		Format: RetentionProtectionReceiptFormat, Node: grant.Node, NodeKey: r.indexKey.Public().(ed25519.PublicKey),
 		Domain: grant.Domain, Repository: grant.Repository, Epoch: grant.Epoch, Operation: grant.Operation, Generation: grant.Generation,
-		State: "HELD", GrantDigest: digest, HoldDigest: digest, Revision: s.Revision + 1, ObservedUnix: now,
+		GrantDigest: digest, Retirement: grant.Retirement, Revision: s.Revision + 1, ObservedUnix: now,
 	}
-	if grant.Action == "RELEASE" {
+	switch grant.Action {
+	case "HOLD":
+		receipt.State, receipt.HoldDigest = "HELD", digest
+	case "RELEASE":
 		receipt.State, receipt.HoldDigest = "RELEASED", grant.HoldDigest
+	case "CLOSE":
+		receipt.State = "CLOSED"
 	}
 	unsigned, e := json.Marshal(receipt)
 	if e != nil {
 		return out, e
 	}
 	receipt.Signature = ed25519.Sign(r.indexKey, append([]byte(RetentionProtectionReceiptFormat+"\x00"), unsigned...))
-	if grant.Action == "HOLD" {
-		s.Pins[pin] = Pin{Generation: grant.Generation, Kind: retentionPinKind}
-		record.Hold = receipt
+	if grant.Action == "CLOSE" {
+		if s.RetentionClosures == nil {
+			s.RetentionClosures = make(map[string]RetentionProtectionReceipt)
+		}
+		s.RetentionClosures[grant.Operation] = receipt
 	} else {
-		delete(s.Pins, pin)
-		record.Release = &receipt
+		if grant.Action == "HOLD" {
+			s.Pins[pin] = Pin{Generation: grant.Generation, Kind: retentionPinKind}
+			record.Hold = receipt
+		} else {
+			delete(s.Pins, pin)
+			record.Release = &receipt
+		}
+		if s.RetentionProtections == nil {
+			s.RetentionProtections = make(map[string]retentionProtectionRecord)
+		}
+		s.RetentionProtections[grant.Operation] = record
 	}
-	if s.RetentionProtections == nil {
-		s.RetentionProtections = make(map[string]retentionProtectionRecord)
-	}
-	s.RetentionProtections[grant.Operation] = record
 	s.Revision = receipt.Revision
 	if e = r.save(*s); e != nil {
 		return out, e

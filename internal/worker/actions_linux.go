@@ -237,7 +237,7 @@ func (w *Worker) finishAction(ctx context.Context, v *view, out *actionResult) e
 			if out.envelope.Request.Kind == "maintenance" {
 				code = "EFFECT_UNCONFIRMED"
 			}
-		case errors.Is(out.err, generation.ErrMaintenanceWindow):
+		case errors.Is(out.err, generation.ErrMaintenanceWindow), errors.Is(out.err, generation.ErrRetirementClosed):
 			op.Work.Phase = "FAILED"
 			code = "EFFECT_UNCONFIRMED"
 		case errors.Is(out.err, recovery.ErrInvalid), errors.Is(out.err, recovery.ErrConflict), errors.Is(out.err, recovery.ErrStopped):

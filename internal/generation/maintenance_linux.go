@@ -75,6 +75,9 @@ func (r *Replica) maintain(ctx context.Context, raw []byte, node string, admit f
 		if replay && record.Result != nil {
 			return nil
 		}
+		if _, closed := s.RetentionClosures[p.Operation]; closed {
+			return ErrRetirementClosed
+		}
 		if replay {
 			if _, _, e := r.retention(s); e != nil {
 				return e

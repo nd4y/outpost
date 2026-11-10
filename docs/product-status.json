@@ -3055,6 +3055,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/generation/retention_closure_linux_test.go",
+          "name": "TestRetentionClosureFencesPendingCleanupAndUnlocksSurvivor"
+        },
+        {
           "path": "internal/generation/retention_protection_linux_test.go",
           "name": "TestRetentionProtectionSurvivesLostReplyAndBlocksRetirement"
         },
@@ -3216,6 +3220,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/generation/retention_closure_linux_test.go",
+          "name": "TestRetentionClosureFencesPendingCleanupAndUnlocksSurvivor"
+        },
         {
           "path": "cmd/outpost/reporting_linux_test.go",
           "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
