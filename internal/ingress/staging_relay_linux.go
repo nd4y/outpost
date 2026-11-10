@@ -254,7 +254,7 @@ func (g *Registry) readRelayOffer(ctx context.Context, origin string) (relayedIn
 	return relay, target, nil
 }
 
-// AdvanceRelayedIntent performs initial admission under the same durable
+// AdvanceRelayedIntent performs admission under the same durable
 // fence and predecessor rules as a direct source request.
 func (g *Registry) AdvanceRelayedIntent(ctx context.Context, paused func(string) bool) (bool, error) {
 	if len(g.relayOrigins) == 0 || len(g.options.Settlement) != 0 || !g.mu.TryLock() {
@@ -265,19 +265,6 @@ func (g *Registry) AdvanceRelayedIntent(ctx context.Context, paused func(string)
 		g.mu.Unlock()
 		return false, nil
 	}
-	if len(g.state.Intent) != 0 {
-		defer g.mu.Unlock()
-		// Replay an already durable local fence without needing the bridge.
-		if g.session == nil {
-			i, _, err := g.stagingIntent(now)
-			if err == nil && !paused(i.Operation) {
-				if _, err = g.begin(ctx, g.state.Intent); err != nil && !errors.Is(err, ErrConflict) {
-					return false, err
-				}
-			}
-		}
-		return false, nil
-	}
 	deadline := time.Unix(g.authority.ExpiresUnix, 0)
 	if g.leaf.NotAfter.Before(deadline) {
 		deadline = g.leaf.NotAfter
@@ -286,11 +273,17 @@ func (g *Registry) AdvanceRelayedIntent(ctx context.Context, paused func(string)
 		g.mu.Unlock()
 		return false, nil
 	}
+	bounded, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	ready, previous, err := g.relayAdmissionReady(bounded, now, paused)
+	if err != nil || !ready {
+		g.mu.Unlock()
+		return false, err
+	}
+	previousRaw := bytes.Clone(g.state.Intent)
 	origin := g.relayOrigins[g.nextRelayOrigin]
 	g.nextRelayOrigin = (g.nextRelayOrigin + 1) % len(g.relayOrigins)
 	g.mu.Unlock()
-	bounded, cancel := context.WithDeadline(ctx, deadline)
-	defer cancel()
 	relay, target, err := g.readRelayOffer(bounded, origin)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
@@ -300,9 +293,59 @@ func (g *Registry) AdvanceRelayedIntent(ctx context.Context, paused func(string)
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if len(g.state.Intent) != 0 {
+	if !bytes.Equal(g.state.Intent, previousRaw) || bytes.Equal(previousRaw, relay.Offer.Intent) {
 		return false, nil
+	}
+	if target.Sequence <= previous.Sequence || target.Operation == previous.Operation {
+		return false, ErrConflict
 	}
 	_, err = g.begin(bounded, relay.Offer.Intent)
 	return err == nil, err
+}
+
+// Called under the registry lock. A completed capture releases its slot only
+// after local acknowledgement and cleanup. The prior replica remains intact.
+func (g *Registry) relayAdmissionReady(ctx context.Context, now time.Time, paused func(string) bool) (bool, Intent, error) {
+	var previous Intent
+	if len(g.state.Intent) == 0 {
+		return true, previous, nil
+	}
+	if g.session != nil {
+		s := g.session
+		if s.state.Acknowledged && len(s.refs) != 0 && !active(now, s.intent.NotBefore, s.intent.ExpiresUnix) && !paused(s.intent.Operation) {
+			if _, err := s.Acknowledge(ctx, *s.state.Receipt, 256); err != nil {
+				return false, s.intent, err
+			}
+		}
+		return s.state.Acknowledged && len(s.refs) == 0, s.intent, nil
+	}
+	if canonicalIntent(g.state.Intent, g.intentAuthority(), g.options.Owner, &previous) != nil || paused(previous.Operation) {
+		return false, previous, nil
+	}
+	if active(now, previous.NotBefore, previous.ExpiresUnix) {
+		// A crash can leave a durable fence without an initialized session.
+		if _, err := g.begin(ctx, g.state.Intent); err != nil {
+			if errors.Is(err, ErrConflict) {
+				return false, previous, nil
+			}
+			return false, previous, err
+		}
+		return g.session.state.Acknowledged && len(g.session.refs) == 0, previous, nil
+	}
+	options := g.sessionOptions(g.state.Intent)
+	options.Initialize = false
+	options.Authority = g.intentAuthority()
+	s, err := openSessionFor(ctx, options, sessionAcknowledged)
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, ErrConflict) {
+		return false, previous, nil
+	}
+	if err != nil {
+		return false, previous, err
+	}
+	if len(s.refs) != 0 {
+		// This acknowledgement was already durable before expiry. Resume
+		// only its local cleanup, using the normal bounded acknowledgement.
+		_, err = s.Acknowledge(ctx, *s.state.Receipt, 256)
+	}
+	return len(s.refs) == 0 && err == nil, previous, errors.Join(err, s.Close())
 }

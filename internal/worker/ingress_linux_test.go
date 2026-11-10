@@ -474,13 +474,48 @@ func TestWorkerPublishesCaptureThroughOfflineBridge(t *testing.T) {
 	})
 	stopTarget()
 	stopBridge()
-	bridgeServer.Close()
 	out := filepath.Join(f.base, "restored-relay")
-	_, err = generation.RecoverMaterialized(ctx, filepath.Join(DomainDirectory(target.dir, f.domain.Trust), "replica"), receipt.Generation, f.domain.Trust, f.dataOwner, generation.RecoverySelection{}, out)
+	replicaDir := filepath.Join(DomainDirectory(target.dir, f.domain.Trust), "replica")
+	_, err = generation.RecoverMaterialized(ctx, replicaDir, receipt.Generation, f.domain.Trust, f.dataOwner, generation.RecoverySelection{}, out)
 	must(t, err)
 	got, err := os.ReadFile(filepath.Join(out, "data"))
 	must(t, err)
 	if string(got) != string(f.content) {
 		t.Fatal("standalone relay restore returned different bytes")
+	}
+
+	// Start a later capture from the published predecessor. The recipient is
+	// absent when the bridge accepts the next offer and first staged object.
+	intent.Operation, intent.Sequence, intent.Parent = storage.Hash([]byte("next relayed capture")), 2, receipt.Generation
+	intent.SnapshotUnix = time.Now().Unix()
+	bridgeGrant, bridgeIntent = proof(bridge.node)
+	targetGrant, targetIntent = proof(target.node)
+	next, err := ingress.NewClient(bridgeServer.URL, bridgeGrant, bridgeIntent, owner, source.cert, f.ca.pool, limits)
+	must(t, err)
+	t.Cleanup(next.Close)
+	stopBridge = start(t, bridge)
+	wait(t, func() bool { bridge.mu.Lock(); defer bridge.mu.Unlock(); return bridge.active != nil })
+	must(t, next.Begin(ctx))
+	must(t, next.OfferRelayIntent(ctx, targetGrant, targetIntent))
+	nextData := []byte("ciphertext staged for the second capture")
+	nextObject := filekit.Object{ID: storage.Hash(nextData), Bytes: len(nextData)}
+	_, err = next.Write(ctx, nextObject, nextData)
+	must(t, err)
+	next.Close()
+	stopTarget = start(t, target)
+	waitFor(t, 100*time.Second, func() bool {
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(path), nextObject.ID))
+		return err == nil && string(b) == string(nextData)
+	})
+	stopTarget()
+	stopBridge()
+	bridgeServer.Close()
+	out = filepath.Join(f.base, "restored-during-next-capture")
+	_, err = generation.RecoverMaterialized(ctx, replicaDir, receipt.Generation, f.domain.Trust, f.dataOwner, generation.RecoverySelection{}, out)
+	must(t, err)
+	got, err = os.ReadFile(filepath.Join(out, "data"))
+	must(t, err)
+	if string(got) != string(f.content) {
+		t.Fatal("the next capture changed the previous complete copy")
 	}
 }
