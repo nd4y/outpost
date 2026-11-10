@@ -18,6 +18,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -315,7 +316,7 @@ func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
 	stopBridge()
 }
 
-func TestWorkerAdmitsInitialCaptureThroughOfflineBridge(t *testing.T) {
+func TestWorkerPublishesCaptureThroughOfflineBridge(t *testing.T) {
 	f := newFixture(t)
 	ctx := t.Context()
 	source, bridge, target := f.nodes[0], f.nodes[1], f.nodes[2]
@@ -388,7 +389,10 @@ func TestWorkerAdmitsInitialCaptureThroughOfflineBridge(t *testing.T) {
 	durable := make(chan struct{}, 1)
 	target.Fault = func(point string) error {
 		if point == "capture-object-durable" {
-			durable <- struct{}{}
+			select {
+			case durable <- struct{}{}:
+			default:
+			}
 		}
 		return nil
 	}
@@ -410,5 +414,73 @@ func TestWorkerAdmitsInitialCaptureThroughOfflineBridge(t *testing.T) {
 		t.Fatal("ciphertext changed across the bridge")
 	}
 	stopTarget()
+	// Complete and acknowledge on the bridge during a second source-only
+	// window. Acknowledgement removes staging, leaving the complete replica.
+	store, err := filekit.OpenStreamingStore(filepath.Join(f.base, "relay-stream"), f.dataOwner, true, upstream)
+	must(t, err)
+	defer store.Close()
+	version, err := store.Backup(ctx, filepath.Join(f.base, "input"), filekit.BackupOptions{Names: []string{"data"}})
+	must(t, err)
+	catalog, roots, err := generation.BuildCatalog(ctx, store, []string{version.Version}, generation.Catalog{Format: generation.Format, Domain: intent.Domain, Repository: intent.Repository, Epoch: intent.Epoch, Sequence: intent.Sequence, SnapshotUnix: intent.SnapshotUnix, Policy: intent.Policy}, f.writer)
+	must(t, err)
+	for id, data := range roots {
+		_, err = upstream.Write(ctx, filekit.Object{ID: id, Bytes: len(data)}, data)
+		must(t, err)
+	}
+	var receipt *ingress.Receipt
+	for range intent.MaxObjects + 1 {
+		_, receipt, err = upstream.FinishStep(ctx, catalog)
+		must(t, err)
+		if receipt != nil {
+			break
+		}
+	}
+	if receipt == nil {
+		t.Fatal("bridge did not publish the signed generation")
+	}
+	var ack ingress.Acknowledgement
+	for range intent.MaxObjects + 1 {
+		ack, err = upstream.AcknowledgeStep(ctx, *receipt)
+		must(t, err)
+		if ack.Clean {
+			break
+		}
+	}
+	if !ack.Clean {
+		t.Fatal("bridge still held temporary objects after acknowledgement")
+	}
+	upstream.Close()
+	direct.Close()
+	// An admitted recipient can fetch only the signed closure after sealing.
+	h, endpoint, err := peer.AuthenticatedHTTP(bridgeServer.URL, target.cert, f.ca.pool, target.node, bridge.node, limits)
+	must(t, err)
+	defer h.CloseIdleConnections()
+	endpoint.Path = "/v1/tenants/" + intent.Tenant + "/domains/" + intent.Domain + "/captures/" + intent.Operation + "/relay-objects/" + object.ID
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	must(t, err)
+	request.Header.Set("Outpost-Bytes", strconv.Itoa(object.Bytes))
+	response, err := h.Do(request)
+	must(t, err)
+	response.Body.Close()
+	if response.StatusCode == http.StatusOK {
+		t.Fatal("bridge served staged bytes outside the verified generation")
+	}
 	stopBridge()
+	stopBridge = start(t, bridge)
+	stopTarget = start(t, target)
+	waitFor(t, 160*time.Second, func() bool {
+		objects, err := os.ReadDir(filepath.Dir(path))
+		return err == nil && len(objects) == 0
+	})
+	stopTarget()
+	stopBridge()
+	bridgeServer.Close()
+	out := filepath.Join(f.base, "restored-relay")
+	_, err = generation.RecoverMaterialized(ctx, filepath.Join(DomainDirectory(target.dir, f.domain.Trust), "replica"), receipt.Generation, f.domain.Trust, f.dataOwner, generation.RecoverySelection{}, out)
+	must(t, err)
+	got, err := os.ReadFile(filepath.Join(out, "data"))
+	must(t, err)
+	if string(got) != string(f.content) {
+		t.Fatal("standalone relay restore returned different bytes")
+	}
 }

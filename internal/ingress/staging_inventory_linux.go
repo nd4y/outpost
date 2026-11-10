@@ -140,6 +140,10 @@ func (g *Registry) readStagedInventory(ctx context.Context, target Intent, origi
 }
 
 func (g *Registry) readStagingDocument(ctx context.Context, origin, path string, headers http.Header, limit int) ([]byte, error) {
+	return g.readStagingResponse(ctx, origin, path, headers, "application/json", limit)
+}
+
+func (g *Registry) readStagingResponse(ctx context.Context, origin, path string, headers http.Header, media string, limit int) ([]byte, error) {
 	h, u, err := peer.AuthenticatedHTTP(g.options.Staging.Origins[origin], g.options.Certificate, g.options.Roots, g.authority.Ingress, origin, g.options.Limits)
 	if err != nil {
 		return nil, err
@@ -175,7 +179,7 @@ func (g *Registry) readStagingDocument(ctx context.Context, origin, path string,
 	default:
 		return nil, ErrUnavailable
 	}
-	if res.ContentLength > int64(limit) || res.Header.Get("Content-Encoding") != "" || res.Header.Get("Content-Type") != "application/json" {
+	if res.ContentLength > int64(limit) || res.Header.Get("Content-Encoding") != "" || res.Header.Get("Content-Type") != media {
 		return nil, ErrProtocol
 	}
 	raw, err := io.ReadAll(io.LimitReader(res.Body, int64(limit)+1))

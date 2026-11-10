@@ -46,7 +46,14 @@ func (w *Worker) jobs(v *view) error {
 					advanced, err = local.ingress.AdvanceCoverage(ctx, paused)
 				}
 				if err == nil && !advanced {
-					advanced, err = local.ingress.AdvanceStagedImport(ctx, paused)
+					advanced, err = local.ingress.AdvanceRelayedPublication(ctx, paused)
+					if !advanced {
+						publicationErr := err
+						advanced, err = local.ingress.AdvanceStagedImport(ctx, paused)
+						if !advanced {
+							err = errors.Join(publicationErr, err)
+						}
+					}
 				}
 				results <- result{coverage: domain, advanced: advanced, err: err}
 			}()

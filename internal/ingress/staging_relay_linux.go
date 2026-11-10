@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,8 +27,10 @@ type relayOffer struct {
 }
 
 type relayedIntent struct {
-	Origin stagingOrigin `json:"origin"`
-	Offer  relayOffer    `json:"offer"`
+	Origin       stagingOrigin `json:"origin"`
+	Offer        relayOffer    `json:"offer"`
+	Generation   string        `json:"generation,omitempty"`
+	Acknowledged bool          `json:"acknowledged,omitempty"`
 }
 
 func (o relayOffer) matches(target Intent, authority Authority, owner ed25519.PublicKey, now time.Time) bool {
@@ -81,8 +84,9 @@ func (g *Registry) serveRelayIntent(w http.ResponseWriter, r *http.Request) bool
 		return false
 	}
 	path := strings.TrimPrefix(r.URL.Path, g.relayPrefix())
-	get := path == relayIntentResource
 	operation, suffix, put := strings.Cut(path, "/")
+	payload := suffix == relayCatalogResource || strings.HasPrefix(suffix, relayObjectPrefix)
+	get := path == relayIntentResource || payload
 	if !get && (!put || suffix != relayIntentResource) {
 		return false
 	}
@@ -121,6 +125,12 @@ func (g *Registry) serveRelayIntent(w http.ResponseWriter, r *http.Request) bool
 			deadline = expiry
 		}
 	}
+	g.mu.Lock()
+	_, expires, intentErr := g.stagingIntent(now)
+	g.mu.Unlock()
+	if intentErr == nil && expires.Before(deadline) {
+		deadline = expires
+	}
 	ctx, stop, err := requestLifetime(w, r.Context(), deadline)
 	if err != nil {
 		fail(w, err)
@@ -129,6 +139,17 @@ func (g *Registry) serveRelayIntent(w http.ResponseWriter, r *http.Request) bool
 	defer stop()
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if payload {
+		raw, media, err := g.relayPayload(ctx, id, operation, suffix, r.Header.Get("Outpost-Bytes"))
+		if err != nil {
+			fail(w, err)
+		} else {
+			w.Header().Set("Content-Type", media)
+			w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
+			_, _ = w.Write(raw)
+		}
+		return true
+	}
 	var offered relayOffer
 	if !get {
 		body, err := readBody(w, r, maxRelayOffer)
@@ -173,22 +194,24 @@ func (g *Registry) relayIntent(ctx context.Context, get bool, reader, operation,
 	if err = s.guard(ctx); err != nil {
 		return response, err
 	}
-	if get && s.state.Acknowledged {
-		return response, os.ErrNotExist
+	if get {
+		previous, ok := s.currentRelayOffer(reader, g.authority, time.Now())
+		if !ok {
+			return response, os.ErrNotExist
+		}
+		response = relayedIntent{Origin: stagingOrigin{Authority: s.state.Authority, Intent: s.state.Intent}, Offer: previous, Acknowledged: s.state.Acknowledged}
+		if s.state.Receipt != nil {
+			response.Generation = s.state.Receipt.Generation
+		}
+		return response, nil
 	}
 	for _, previous := range s.state.RelayOffers {
-		if get && previous.Recipient == reader && previous.matches(i, g.authority, g.options.Owner, time.Now()) {
-			return relayedIntent{Origin: stagingOrigin{Authority: s.state.Authority, Intent: s.state.Intent}, Offer: previous}, nil
-		}
-		if !get && previous.Recipient == offered.Recipient {
+		if previous.Recipient == offered.Recipient {
 			if sameStagingOrigin(&previous.stagingOrigin, &offered.stagingOrigin) {
 				return response, nil
 			}
 			return response, ErrConflict
 		}
-	}
-	if get {
-		return response, os.ErrNotExist
 	}
 	if s.state.Acknowledged || len(s.state.RelayOffers) >= maxRelayOffers {
 		return response, ErrConflict
@@ -200,6 +223,35 @@ func (g *Registry) relayIntent(ctx context.Context, get bool, reader, operation,
 		return response, err
 	}
 	return response, s.point("capture-relay-offer-durable")
+}
+
+func (s *Session) currentRelayOffer(reader string, authority Authority, now time.Time) (relayOffer, bool) {
+	for _, offer := range s.state.RelayOffers {
+		if offer.Recipient == reader && offer.matches(s.intent, authority, s.owner, now) {
+			return offer, true
+		}
+	}
+	return relayOffer{}, false
+}
+
+func (g *Registry) readRelayOffer(ctx context.Context, origin string) (relayedIntent, Intent, error) {
+	var relay relayedIntent
+	raw, err := g.readStagingDocument(ctx, origin, g.relayPrefix()+relayIntentResource, nil, maxRelayReply)
+	if err != nil {
+		return relay, Intent{}, err
+	}
+	if decodeReply(raw, &relay) != nil || relay.Offer.Recipient != g.authority.Ingress || !bytes.Equal(relay.Offer.Authority, g.options.Authority) {
+		return relay, Intent{}, ErrDenied
+	}
+	target, _, err := VerifyIntent(relay.Offer.Intent, relay.Offer.Authority, g.options.Owner, time.Now())
+	if err != nil {
+		return relay, Intent{}, err
+	}
+	peerIntent, _, err := g.stagingPeer(target, relay.Origin)
+	if err != nil || peerIntent.Ingress != origin {
+		return relay, Intent{}, ErrDenied
+	}
+	return relay, target, nil
 }
 
 // AdvanceRelayedIntent performs initial admission under the same durable
@@ -239,24 +291,12 @@ func (g *Registry) AdvanceRelayedIntent(ctx context.Context, paused func(string)
 	g.mu.Unlock()
 	bounded, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	raw, err := g.readStagingDocument(bounded, origin, g.relayPrefix()+relayIntentResource, nil, maxRelayReply)
+	relay, target, err := g.readRelayOffer(bounded, origin)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
-	if err != nil {
-		return false, err
-	}
-	var relay relayedIntent
-	if decodeReply(raw, &relay) != nil || relay.Offer.Recipient != g.authority.Ingress || !bytes.Equal(relay.Offer.Authority, g.options.Authority) {
-		return false, ErrDenied
-	}
-	target, _, err := VerifyIntent(relay.Offer.Intent, relay.Offer.Authority, g.options.Owner, time.Now())
 	if err != nil || paused(target.Operation) {
 		return false, err
-	}
-	peerIntent, _, err := g.stagingPeer(target, relay.Origin)
-	if err != nil || peerIntent.Ingress != origin {
-		return false, ErrDenied
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
