@@ -184,15 +184,16 @@ func VerifyCatalog(raw []byte, t Trust) (Catalog, error) {
 }
 
 type Permit struct {
-	Format     string        `json:"format"`
-	Domain     string        `json:"domain"`
-	Repository string        `json:"repository"`
-	Epoch      uint64        `json:"epoch"`
-	Revision   uint64        `json:"revision"`
-	Operation  string        `json:"operation"`
-	Retire     []string      `json:"retire"`
-	Window     *PermitWindow `json:"window,omitempty"`
-	Signature  []byte        `json:"signature,omitempty"`
+	Format     string             `json:"format"`
+	Domain     string             `json:"domain"`
+	Repository string             `json:"repository"`
+	Epoch      uint64             `json:"epoch"`
+	Revision   uint64             `json:"revision"`
+	Operation  string             `json:"operation"`
+	Retire     []string           `json:"retire"`
+	Window     *PermitWindow      `json:"window,omitempty"`
+	Coverage   *RetentionCoverage `json:"coverage,omitempty"`
+	Signature  []byte             `json:"signature,omitempty"`
 }
 
 type PermitWindow struct {
@@ -205,12 +206,15 @@ func validPermit(p Permit) bool {
 	if !validID(p.Domain) || !validID(p.Repository) || p.Epoch == 0 || !validID(p.Operation) || len(p.Retire) > MaxGenerations {
 		return false
 	}
+	if p.Format != RetentionPermitFormat && p.Coverage != nil {
+		return false
+	}
 	switch p.Format {
 	case Format:
 		if p.Window != nil {
 			return false
 		}
-	case PermitWindowFormat:
+	case PermitWindowFormat, RetentionPermitFormat:
 		w := p.Window
 		if w == nil || !validID(w.Node) || w.StartUnix <= 0 || w.ExpiresUnix > 1<<40 || w.ExpiresUnix <= w.StartUnix || w.ExpiresUnix-w.StartUnix > 86400 {
 			return false
@@ -225,7 +229,7 @@ func validPermit(p Permit) bool {
 		}
 		last = id
 	}
-	return true
+	return p.Format != RetentionPermitFormat || p.validRetentionCoverage()
 }
 func SignPermit(p Permit, key ed25519.PrivateKey) ([]byte, error) {
 	if !validPermit(p) || len(key) != ed25519.PrivateKeySize {
@@ -234,7 +238,11 @@ func SignPermit(p Permit, key ed25519.PrivateKey) ([]byte, error) {
 	p.Signature = nil
 	b, _ := json.Marshal(p)
 	p.Signature = ed25519.Sign(key, append([]byte(p.Format+"\x00maintenance\x00"), b...))
-	return json.Marshal(p)
+	signed, e := json.Marshal(p)
+	if e != nil || len(signed) > MaxPermit {
+		return nil, ErrInvalid
+	}
+	return signed, nil
 }
 
 // VerifyPermit checks the separate maintenance authority. Execution additionally
@@ -248,14 +256,14 @@ func verifyPermit(raw []byte, t Trust) (Permit, error) {
 	if err := canonical(raw, &p, MaxPermit); err != nil {
 		return p, err
 	}
-	if !validPermit(p) || p.Domain != t.Domain || p.Repository != t.Repository || p.Epoch != t.Epoch {
+	if p.Domain != t.Domain || p.Repository != t.Repository || p.Epoch != t.Epoch {
 		return p, ErrInvalid
 	}
 	sig := p.Signature
 	p.Signature = nil
 	b, _ := json.Marshal(p)
 	p.Signature = sig
-	if !ed25519.Verify(t.Maintenance, append([]byte(p.Format+"\x00maintenance\x00"), b...), sig) {
+	if !ed25519.Verify(t.Maintenance, append([]byte(p.Format+"\x00maintenance\x00"), b...), sig) || !validPermit(p) {
 		return p, ErrInvalid
 	}
 	return p, nil

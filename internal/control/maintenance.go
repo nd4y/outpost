@@ -1,6 +1,8 @@
 package control
 
 import (
+	"slices"
+
 	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/generation"
 )
@@ -21,5 +23,24 @@ func (c Config) MaintenancePermit(request command.Request) (generation.Permit, e
 	if w := out.Window; w != nil && (w.Node != c.Node || w.StartUnix >= request.ExpiresUnix || w.StartUnix >= c.ExpiresUnix) {
 		return out, ErrDenied
 	}
+	if d.RetirementMinimumCopies > 0 && len(out.Retire) > 0 &&
+		(out.Coverage == nil || out.Coverage.MinimumCopies < d.RetirementMinimumCopies) {
+		return out, ErrDenied
+	}
+	if out.Coverage != nil {
+		if d.RetirementMinimumCopies == 0 || !c.trustedHolder(d, c.Node) {
+			return out, ErrDenied
+		}
+		for _, w := range out.Coverage.Witnesses {
+			if !c.trustedHolder(d, w.Node) {
+				return out, ErrDenied
+			}
+		}
+	}
 	return out, nil
+}
+
+func (c Config) trustedHolder(d Domain, id string) bool {
+	n, ok := c.NodeByID(id)
+	return ok && n.Class == "trusted" && slices.Contains(d.Placement.Holders, id)
 }

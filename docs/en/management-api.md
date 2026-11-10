@@ -46,7 +46,13 @@ When retirement has finished or must be abandoned, apply a separate `CLOSE` gran
 
 A bound `RELEASE` carries the same `retirement` and the exact signed `CLOSED` receipt in `closure`. The survivor verifies the retiring node, operation, domain, repository and epoch before removing the pin. A missing proof, a receipt from another operation or a modified receipt leaves the hold in force. Keep the hold until the retiring node can produce the closure receipt.
 
-The distributed coordinator still needs to verify sufficient survivor holds before authorizing retirement. These commands provide the durable closure and release steps for that protocol.
+#### Require surviving copies in the signed domain policy
+
+Set the optional `retirementMinimumCopies` field of the owner-signed domain configuration to 1–8. A positive value requires coverage for every generation retired by a maintenance command. Existing policies with the field omitted retain their prior behavior. An independently authorized collection of unreferenced objects can still use the existing permit formats with an empty `retire` list.
+
+Start with the local maintenance preview to obtain the replica revision, operation, retirement list and window. Obtain a bound `HELD` receipt on each required survivor for each generation. Set the permit format to `outpost-maintenance-permit-3` and include `coverage.minimumCopies` and `coverage.witnesses` with the signed receipts. Use the existing `maintenance-permit-sign` command. The configured minimum is a lower bound. Each generation must have receipts from enough distinct nodes, with at most 64 receipts and 64 KiB per permit. The worker checks every witness and the retiring holder against the trusted holders in the exact owner-signed policy used by the command. The witnesses must bind the same retiring node, operation, domain, repository and epoch.
+
+The usual checks for revision, window, local pins and protected references still apply. The bound pins stay in force until the retiring node closes the operation. Physical failure-domain independence and automated collection of proofs require separate acceptance. Use readers that support this permit before introducing its records into a replica.
 
 The interface has three primary journeys: inspect backup coverage and the last verified copy, preview/apply an owner-signed policy, and select a generation for authorized recovery with a visible result. Russian and English share the same state model. Native form controls, keyboard focus, non-color status labels, zoom and narrow-screen layout are required. Empty/offline/stale/forbidden/error states are tested independently. Restore selection never silently substitutes the latest generation.
 

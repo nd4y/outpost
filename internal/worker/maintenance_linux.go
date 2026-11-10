@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/command"
+	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/generation"
 )
 
@@ -28,7 +29,24 @@ func (w *Worker) executeMaintenance(ctx context.Context, v *view, env command.En
 		ctx, cancel = context.WithDeadline(ctx, time.Unix(p.Window.ExpiresUnix, 0))
 		defer cancel()
 	}
-	admit := func() error { return w.actionPolicy(ctx, v, env) }
+	admit := func() error {
+		// The envelope pins the exact signed configuration. Recheck that
+		// configuration and command authority without rehashing every
+		// survivor's signature for each removed object.
+		return w.cache.WithCurrent(ctx, time.Now(), func(cfg control.Config, raw []byte) error {
+			if cfg.Revision != v.cfg.Revision {
+				return ErrDenied
+			}
+			now := time.Now()
+			if e := w.commandAdmission(cfg, raw, env, now); e != nil {
+				return e
+			}
+			if p.Window != nil && now.Unix() >= p.Window.ExpiresUnix {
+				return generation.ErrMaintenanceWindow
+			}
+			return nil
+		})
+	}
 	if _, e := local.replica.MaintainOnNode(ctx, env.Request.MaintenancePermit, w.node, admit); e != nil {
 		return nil, e
 	}

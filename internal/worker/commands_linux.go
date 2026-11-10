@@ -14,12 +14,17 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-func (w *Worker) commandPolicy(ctx context.Context, cfg control.Config, raw []byte, env command.Envelope) error {
-	now := time.Now()
+func (w *Worker) commandAdmission(cfg control.Config, raw []byte, env command.Envelope, now time.Time) error {
 	if env.Node != w.node || cfg.Revision != env.Request.ExpectedRevision || storage.Hash(raw) != env.ConfigurationDigest || env.Active(now) != nil {
 		return ErrDenied
 	}
-	if _, e := cfg.CommandAuthority(env.Request.Authority, w.owner, now); e != nil {
+	_, e := cfg.CommandAuthority(env.Request.Authority, w.owner, now)
+	return e
+}
+
+func (w *Worker) commandPolicy(ctx context.Context, cfg control.Config, raw []byte, env command.Envelope) error {
+	now := time.Now()
+	if e := w.commandAdmission(cfg, raw, env, now); e != nil {
 		return e
 	}
 	if env.Request.Kind == "maintenance" {

@@ -3055,6 +3055,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/worker/retention_coverage_linux_test.go",
+          "name": "TestWorkerMaintenanceRequiresBoundSurvivorCopies"
+        },
+        {
           "path": "internal/generation/retention_closure_linux_test.go",
           "name": "TestRetentionClosureFencesPendingCleanupAndUnlocksSurvivor"
         },
@@ -3220,6 +3224,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/worker/retention_coverage_linux_test.go",
+          "name": "TestWorkerMaintenanceRequiresBoundSurvivorCopies"
+        },
         {
           "path": "internal/generation/retention_closure_linux_test.go",
           "name": "TestRetentionClosureFencesPendingCleanupAndUnlocksSurvivor"
