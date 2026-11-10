@@ -7464,9 +7464,26 @@
         "scripts/build-release.py",
         "scripts/verify-release.py"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "packaging/monitoring/rules.test.yml",
+          "name": "Original observation times distinguish current failures and missing telemetry"
+        },
+        {
+          "path": "packaging/monitoring/rules.test.yml",
+          "name": "The independent watchdog ages the receiver heartbeat even without primary metrics"
+        },
+        {
+          "path": "scripts/check-monitoring-delivery.py",
+          "name": "test_delivery"
+        },
+        {
+          "path": "internal/telemetry/scope_linux_test.go",
+          "name": "TestTelemetryQuietEventsHeartbeatAndRejectedSample"
+        }
+      ],
       "acceptance": ["AT-26", "AT-35"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "The primary rules distinguish current observations from missing telemetry. A separate evaluator detects stale authenticated heartbeat receipt, with firing and resolved notifications verified through separate paths in a synthetic lab. Admit real thresholds, endpoints and recipients and verify both actual delivery routes and the operational drills."
     },
     {
       "id": "REQ-53",

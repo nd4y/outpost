@@ -45,7 +45,17 @@ try {
     value.requirements
       .flatMap((r) => r.checks)
       .find((c) => c.path === "scripts/check-container.py");
-  assert(browser(original) && go(original) && artifact(original) && container(original));
+  const monitoring = (value) =>
+    value.requirements
+      .flatMap((r) => r.checks)
+      .find((c) => c.path === "packaging/monitoring/rules.test.yml");
+  assert(
+    browser(original) &&
+      go(original) &&
+      artifact(original) &&
+      container(original) &&
+      monitoring(original),
+  );
   for (const [name, accepted, mutate] of [
     ["valid", true, () => {}],
     [
@@ -110,6 +120,13 @@ try {
       false,
       (v) => {
         go(v).name = "TestNonexistentTraceabilityScenario";
+      },
+    ],
+    [
+      "missing-monitoring-scenario",
+      false,
+      (v) => {
+        monitoring(v).name = "Nonexistent watchdog scenario";
       },
     ],
     [

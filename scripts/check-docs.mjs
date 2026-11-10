@@ -76,6 +76,22 @@ for (const item of product.requirements) {
       );
       continue;
     }
+    if (check.path === "packaging/monitoring/rules.test.yml") {
+      assert(/^[A-Za-z0-9][A-Za-z0-9 -]{10,160}$/.test(check.name));
+      assert(
+        read(check.path).split(/\r?\n/).includes(`  - name: ${check.name}`),
+        `Stale monitoring scenario: ${item.id} ${check.name}`,
+      );
+      continue;
+    }
+    if (check.path === "scripts/check-monitoring-delivery.py") {
+      assert.equal(check.name, "test_delivery");
+      assert(
+        read(check.path).includes(`def ${check.name}(`),
+        `Stale delivery scenario: ${item.id}`,
+      );
+      continue;
+    }
     assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z_]+_test\.go$/.test(check.path));
     assert(/^Test[A-Za-z0-9]+$/.test(check.name));
     assert(

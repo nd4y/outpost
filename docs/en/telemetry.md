@@ -48,7 +48,7 @@ Successful acceptance requires a valid response. Partial acceptance records its 
 
 Generation verification keeps its original time through reporting and export. Missing measurements remain unknown. Source reads, unique physical occupancy, network traffic, throughput and billing require additional measurements.
 
-Local inventory state logs use a retained transition identity. An unchanged state does not generate another log. Metrics have a heartbeat interval. Alert coverage, recovery notices and independent monitoring-failure detection still require implementation and acceptance; external notices remain limited to explicitly authorized test destinations.
+Local inventory state logs use a retained transition identity. An unchanged state does not generate another log. Metrics have a heartbeat interval. The monitoring rules below preserve a stable alert identity across an unchanged failure. Validate actual notifications and recovery through an authorized test destination.
 
 Current worker projection covers configuration revision, bounded job-state counts, volume accounting, complete local generation count/sequence and original ciphertext-verification time for the latest complete local generation. Initial logs describe changes in that local inventory state. Unknown numeric values have a separate `_known` gauge. Metrics do not use operation IDs as labels. Per-operation audit and alert transitions remain open.
 
@@ -73,6 +73,16 @@ The separate telemetry process selects up to six opaque target IDs from the admi
 - Alert delivery, recovery, quiet unchanged state and independent monitoring-failure detection are exercised before AT-35 acceptance.
 
 The existing [management reporting](management-service.md) remains a separate signed protocol with its own acknowledgement. A collector's HTTP response must not be forged into a management receipt.
+
+## Monitoring rules and independent watchdog
+
+Load [the primary rules](../../packaging/monitoring/outpost.rules.yml) in a PromQL-compatible evaluator. Keep the original OTLP sample timestamp and normalize the point labels to `outpost_node`, `outpost_domain` and, for per-target metrics, `outpost_target`. Select one series for each admitted node/domain or node/domain/target. Build the expected inventory separately from received telemetry so a silent worker remains in scope. Set positive per-scope thresholds through `outpost_expected_telemetry_max_age_seconds`, `outpost_expected_free_bytes` and `outpost_expected_copy_max_age_seconds`. The owner chooses these values from the admitted heartbeat interval, disk reserve and verification window.
+
+Missing, stale or future reports trigger `OutpostTelemetryMissing`. Fresh reports distinguish unknown inventory and unknown space from observed resource pressure. Blocked jobs and low space use values from the same original report. The per-replica alert measures the age of successful ciphertext verification. External-audit failures require a current result inside its own validity window.
+
+Route `OutpostMonitorHeartbeat` only to a dedicated, authenticated heartbeat receiver. Give the primary evaluator a stable `outpost_monitor` label. The receiver exports `outpost_monitor_heartbeat_received_timestamp_seconds` using the time it received the delivery. Load [the watchdog rules](../../packaging/monitoring/watchdog.rules.yml) on an independent evaluator, supply `outpost_expected_monitor_max_age_seconds` for each primary monitor and route watchdog alarms separately from the primary path. A query of the primary service's own heartbeat metric cannot establish notification delivery.
+
+The [PromQL fixture](../../packaging/monitoring/rules.test.yml) tests rule states, timestamps and stable labels with `promtool test rules`. The [delivery fixture](../../scripts/check-monitoring-delivery.py) takes the paths and SHA-256 digests of Prometheus and Alertmanager executables, the rules directory and a writable test directory. Run it in an isolated environment. It checks first delivery, stable deduplication, resolved delivery, primary-path interruption and watchdog recovery through authenticated loopback webhooks. The private operations profile records the actual thresholds, routes, recipients and rollback paths for the separate operational drills. [Rule testing reference](https://prometheus.io/docs/prometheus/3.9/configuration/unit_testing_rules/)
 
 ## Reproducible component checks
 

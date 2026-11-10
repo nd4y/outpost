@@ -43,3 +43,11 @@ jobs:
           node scripts/check-format.mjs
       - name: Verify adoption rejection cases
         run: node scripts/check-standard-adoption.mjs
+      - name: Verify monitoring and independent watchdog rules
+        run: |
+          image=prom/prometheus@sha256:4a61322ac1103a0e3aea2a61ef1718422a48fa046441f299d71e660a3bc71ae9
+          timeout 60 docker pull "$image"
+          timeout 40 docker run --rm --pull never --network none --cpus 1 --memory 256m \
+            --cap-drop ALL --security-opt no-new-privileges --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,source=$PWD/packaging/monitoring,target=/rules,readonly" --workdir /rules \
+            --entrypoint /bin/promtool "$image" test rules rules.test.yml
