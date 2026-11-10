@@ -454,6 +454,14 @@
       ],
       "checks": [
         {
+          "path": "internal/recoverybundle/epoch_linux_test.go",
+          "name": "TestOwnerEpochInitialPreparationRequiresPrivateVolumeAndSeparateKeys"
+        },
+        {
+          "path": "internal/sourceagent/epoch_recovery_cli_linux_test.go",
+          "name": "TestOwnerEpochCLIProducesIndependentOldAndNewRecovery"
+        },
+        {
           "path": "internal/sourceagent/observations_linux_test.go",
           "name": "TestSourceWaitsForSignedSecondCopyAcrossOutboundOnlyRelay"
         },
@@ -587,7 +595,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Offline epoch preparation authenticates the preceding package and checkpoint and creates distinct keys and repository trust. Complete the old-writer fence, live transition and retirement of superseded key material under the admitted policy, and verify recovery at scale."
     },
     {
       "id": "REQ-09",

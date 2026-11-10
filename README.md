@@ -118,7 +118,7 @@ The [durable telemetry process](docs/en/telemetry.md) provides a signed bounded 
 
 The [monitoring rules](docs/en/telemetry.md#monitoring-rules-and-independent-watchdog) distinguish missing telemetry from measured failures and provide a separate watchdog for receipt of the monitoring heartbeat.
 
-The [owner recovery package](docs/en/owner-recovery-package.md) keeps read-only decryption material, original checkpoint age and selected offline tools in private owner storage. Export, digest-anchored inspection and atomic extraction leave signing authority out of the package. Selected-file and complete-replica recovery have separate small process checks; key lifecycle and full-scale acceptance remain open.
+The [owner recovery package](docs/en/owner-recovery-package.md) keeps read-only decryption material, original checkpoint age and selected offline tools in private owner storage. The [key epoch preparation](docs/en/owner-recovery-package.md#prepare-a-new-key-epoch) creates a separate domain and records the authenticated prior package and checkpoint. Activation, retirement and full-scale acceptance have separate gates.
 
 The [expired-operation settlement workflow](docs/en/source-settlement.md) retrieves only an already durable original receipt under fresh owner permission and current receiver policy. It preserves original verification age and the independent-copy threshold. Missing receipt or expired observation permission remains pending; an immutable write intent is never renewed by settlement.
 

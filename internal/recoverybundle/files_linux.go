@@ -324,29 +324,7 @@ func extract(ctx context.Context, input *os.File, expected, output string, fault
 			return Receipt{}, e
 		}
 	}
-	if e = ctx.Err(); e != nil {
-		return Receipt{}, e
-	}
-	if e = checkParent(root, output); e != nil {
-		return Receipt{}, e
-	}
-	a, e := root.Lstat(stage)
-	if e != nil {
-		return Receipt{}, e
-	}
-	b, e := destination.Stat(".")
-	if e != nil || !os.SameFile(a, b) || !a.IsDir() || a.Mode().Perm()&0077 != 0 {
-		return Receipt{}, ErrConflict
-	}
-	parent, e := root.Open(".")
-	if e != nil {
-		return Receipt{}, e
-	}
-	defer parent.Close()
-	if e = unix.Renameat2(int(parent.Fd()), stage, int(parent.Fd()), name, unix.RENAME_NOREPLACE); e != nil {
-		return Receipt{}, e
-	}
-	if e = parent.Sync(); e != nil {
+	if e = publishPrivateDirectory(ctx, root, destination, output, stage, name); e != nil {
 		return Receipt{}, e
 	}
 	if fault != nil {
@@ -355,4 +333,30 @@ func extract(ctx context.Context, input *os.File, expected, output string, fault
 		}
 	}
 	return out, nil
+}
+
+func publishPrivateDirectory(ctx context.Context, root, destination *os.Root, output, stage, name string) error {
+	if e := ctx.Err(); e != nil {
+		return e
+	}
+	if e := checkParent(root, output); e != nil {
+		return e
+	}
+	a, e := root.Lstat(stage)
+	if e != nil {
+		return e
+	}
+	b, e := destination.Stat(".")
+	if e != nil || !os.SameFile(a, b) || !a.IsDir() || a.Mode().Perm()&0077 != 0 {
+		return ErrConflict
+	}
+	parent, e := root.Open(".")
+	if e != nil {
+		return e
+	}
+	defer parent.Close()
+	if e = unix.Renameat2(int(parent.Fd()), stage, int(parent.Fd()), name, unix.RENAME_NOREPLACE); e != nil {
+		return e
+	}
+	return parent.Sync()
 }

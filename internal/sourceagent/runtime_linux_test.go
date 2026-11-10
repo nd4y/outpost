@@ -73,6 +73,16 @@ func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 }
 
 func newFixtureWithPeer(t *testing.T, seconds int64, extra *tls.Certificate) *fixture {
+	return newFixtureWithKeys(t, seconds, extra, nil)
+}
+
+type fixtureEpoch struct {
+	owner  filekit.Owner
+	trust  generation.Trust
+	writer ed25519.PrivateKey
+}
+
+func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epoch *fixtureEpoch) *fixture {
 	t.Helper()
 	ctx := context.Background()
 	f := &fixture{base: teststore.Root(t)}
@@ -120,14 +130,19 @@ func newFixtureWithPeer(t *testing.T, seconds int64, extra *tls.Certificate) *fi
 	ownerPub, ownerKey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	f.ownerSigner = ownerKey
-	writer, key, e := ed25519.GenerateKey(rand.Reader)
-	must(t, e)
-	f.writer = key
-	maint, _, e := ed25519.GenerateKey(rand.Reader)
-	must(t, e)
-	f.owner, e = filekit.NewOwner()
-	must(t, e)
-	trust := generation.Trust{Domain: f.owner.Domain, Repository: storage.Hash([]byte("repo")), Epoch: 1, Writer: writer, Maintenance: maint}
+	if epoch == nil {
+		writer, key, err := ed25519.GenerateKey(rand.Reader)
+		must(t, err)
+		maint, _, err := ed25519.GenerateKey(rand.Reader)
+		must(t, err)
+		owner, err := filekit.NewOwner()
+		must(t, err)
+		epoch = &fixtureEpoch{owner: owner, writer: key, trust: generation.Trust{
+			Domain: owner.Domain, Repository: storage.Hash([]byte("repo")), Epoch: 1, Writer: writer, Maintenance: maint,
+		}}
+	}
+	f.owner, f.writer = epoch.owner, epoch.writer
+	trust, key := epoch.trust, f.writer
 	f.grant = ingress.Authority{Format: ingress.AuthorityFormat, Tenant: storage.Hash([]byte("tenant")), Profile: storage.Hash([]byte("profile")), Source: id(src), Ingress: id(dst), Revision: 1, NotBefore: now.Unix() - 10, ExpiresUnix: now.Unix() + seconds, Trust: trust, MaxBytes: 32 << 20, MaxObjects: 128}
 	f.authority, e = ingress.SignAuthority(f.grant, ownerKey)
 	must(t, e)
@@ -185,7 +200,7 @@ func (f *fixture) intentUntil(t *testing.T, seq uint64, parent string, expiry in
 	t.Helper()
 	a := f.grant
 	now := time.Now()
-	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte(parent + "operation")), Authority: storage.Hash(f.authority), Tenant: a.Tenant, Profile: a.Profile, Source: a.Source, Ingress: a.Ingress, Domain: a.Trust.Domain, Repository: a.Trust.Repository, Epoch: 1, Sequence: seq, Parent: parent, Policy: 1, SnapshotUnix: now.Unix(), NotBefore: now.Unix() - 1, ExpiresUnix: expiry, MaxBytes: a.MaxBytes, MaxObjects: a.MaxObjects}
+	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte(parent + "operation")), Authority: storage.Hash(f.authority), Tenant: a.Tenant, Profile: a.Profile, Source: a.Source, Ingress: a.Ingress, Domain: a.Trust.Domain, Repository: a.Trust.Repository, Epoch: a.Trust.Epoch, Sequence: seq, Parent: parent, Policy: 1, SnapshotUnix: now.Unix(), NotBefore: now.Unix() - 1, ExpiresUnix: expiry, MaxBytes: a.MaxBytes, MaxObjects: a.MaxObjects}
 	raw, e := ingress.SignIntent(i, f.authority, f.b.Local.Owner, f.writer, now)
 	must(t, e)
 	return raw

@@ -51,7 +51,15 @@ For a complete materialized replica, use the extracted keys, an explicit retaine
   --store /ciphertext/replica --generation GENERATION_ID --output /restore/new
 ```
 
-For a separately exported file kit, use `restore-kit --key ... --store ... --version VERSION_ID --output ...`. The two workflows are distinct: selected-file recovery does not establish complete-replica recovery. Neither requires the original source private signing key. Keep the packages for retained key epochs until old and new data have both been independently restored; automatic data-key rotation and retirement are not implemented by these commands.
+For a separately exported file kit, use `restore-kit --key ... --store ... --version VERSION_ID --output ...`. Verify selected-file and complete-replica recovery separately. Both use the read-only recovery material.
+
+## Prepare a new key epoch
+
+On an offline owner host, enroll an owner-only volume with the SHA-256 of the raw Ed25519 authority public key as its scope. Create a private output parent on that volume. The private request `outpost-owner-epoch-request-1` contains the `volume` binding, the absolute `directory` of the parent, an opaque `operationId` and a `reason`. Use `initial` for a first epoch. For `scheduled-rotation`, `key-compromise` or `placement-change`, include `prior.path` and the independently retained `prior.sha256` of the previous recovery package with its verified checkpoint.
+
+Run `owner-epoch-create --input PRIVATE_REQUEST --key OWNER_AUTHORITY --output NEW_PRIVATE_DIRECTORY`. The authority file contains `privateKey`. The command publishes a new independent data domain and repository, separate data, writer and maintenance keys, `trust.json` and an owner-signed `preparation.json`. The receipt records the old checkpoint and age, operation and actor. The private files are written with mode 0600. Keep the maintenance key on the owner's host and provision only the keys each authorized component needs.
+
+If the reply is uncertain, verify the existing result with `owner-epoch-inspect --input PREPARATION_RECEIPT --trust OWNER_PUBLIC_KEY` and compare the operation. The trust file contains the independently held `publicKey`. A `PREPARED` receipt precedes the separate policy and source enrollment steps. Keep the previous recovery package and its ciphertext through the old epoch's full retention period. Before retiring its recovery material, restore retained versions from both epochs with the matching kits and verify the intended old writer fence.
 
 `checkpoint.json` preserves the original signed checkpoint and verification time. Export time does not renew copy health or establish the newest existing version. A missing or old checkpoint limits freshness knowledge without preventing decryption of an explicitly selected valid version with matching keys. The result reports only opaque identities, versions, sizes, hashes and that original checkpoint time.
 
