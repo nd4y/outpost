@@ -73,8 +73,33 @@ func TestManagementSnapshotStagePublishesExactFiles(t *testing.T) {
 			t.Fatal("unexpected staged dependency", ref.path)
 		}
 	}
+	retry, e := StageSnapshotFile(ctx, input, output, trust, 8<<20)
+	must(t, e)
+	if retry != receipt {
+		t.Fatal("retry changed the original receipt", retry)
+	}
+	alias := filepath.Join(base, "history-link")
+	must(t, os.Symlink(output, alias))
+	if _, e = StageSnapshotFile(ctx, input, alias, trust, 8<<20); !errors.Is(e, ErrConflict) {
+		t.Fatal("linked output accepted", e)
+	}
+	extra := filepath.Join(output, "blobs", "unexpected.json")
+	must(t, os.WriteFile(extra, []byte("extra"), 0600))
 	if _, e = StageSnapshotFile(ctx, input, output, trust, 8<<20); !errors.Is(e, ErrConflict) {
-		t.Fatal("staging replaced existing directory", e)
+		t.Fatal("additional dependency accepted", e)
+	}
+	must(t, os.Remove(extra))
+	changed := bytes.Clone(registry)
+	changed[len(changed)-1] ^= 1
+	file := filepath.Join(output, "registry.json")
+	must(t, os.WriteFile(file, changed, 0600))
+	if _, e = StageSnapshotFile(ctx, input, output, trust, 8<<20); !errors.Is(e, ErrConflict) {
+		t.Fatal("changed dependency accepted", e)
+	}
+	actual, e := os.ReadFile(file)
+	must(t, e)
+	if !bytes.Equal(actual, changed) {
+		t.Fatal("retry rewrote the conflicting directory")
 	}
 }
 

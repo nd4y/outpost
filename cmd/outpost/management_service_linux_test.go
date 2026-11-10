@@ -105,6 +105,11 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	if _, e := os.Stat(filepath.Join(historyDir, "registry.json")); e != nil {
 		t.Fatal(e)
 	}
+	retried, e := run(ctx, []string{"management-snapshot-stage", "--input", checkpointFile, "--trust", trustPath, "--output", historyDir})
+	must(e)
+	if retried.(management.SnapshotReceipt) != receipt {
+		t.Fatal(retried)
+	}
 	if _, e = run(ctx, []string{"management-snapshot", "--input", file, "--output", checkpointFile}); e == nil {
 		t.Fatal("CLI replaced snapshot")
 	}

@@ -18,7 +18,9 @@ The first command returns a checkpoint digest, registry revision, original obser
 
 Inspection needs only the selected snapshot and that public trust record. It does not load any private key, contact the center, source or peers, create a live registry, change authority or reconcile operations. It returns original audit records and effective receipts, including `ABANDONED`. Results always say `state: HISTORICAL`, `currentState: UNKNOWN`, `replayAllowed: false`. An admitted or published command remains unconfirmed without its original node acknowledgement.
 
-Staging uses the same checks to write the authenticated registry and its referenced files into a new directory under a private parent. It publishes that directory without replacement after verifying the entire stream and syncing the files and directories. Its receipt retains the historical status and replay restriction. Keep the staged directory outside the live runtime. An interrupted or rejected run may leave a private `.partial-management-*` directory for inspection. Retry with an unused output name if a previous result exists.
+Staging uses the same checks to write the authenticated registry and its referenced files into a new directory under a private parent. It publishes that directory without replacement after verifying the entire stream and syncing the files and directories. Its receipt retains the historical status and replay restriction. Keep the staged directory outside the live runtime. An interrupted or rejected run may leave a private `.partial-management-*` directory for inspection.
+
+If the receipt was lost, repeat the command with the same snapshot, trust record and output path. The command returns the original receipt after validating the complete private output tree against the authenticated stream and syncing its directory entry. A changed, missing, additional or linked entry causes a conflict. The existing tree is preserved for inspection.
 
 ## Durability and limits
 
