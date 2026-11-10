@@ -44,7 +44,7 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 			s.state.PendingImport = nil
 			return err
 		}
-		return nil
+		return s.point("capture-staged-import-queued")
 	})
 }
 

@@ -3,6 +3,7 @@ package ingress
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/tls"
 	"errors"
 	"net/http/httptest"
@@ -134,17 +135,23 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	if err := final.QueueStaged(ctx, first, probe); !errors.Is(err, ErrDenied) {
 		t.Fatalf("queued request used a forbidden shortcut: %v", err)
 	}
-	must(t, final.QueueStaged(ctx, bridge, probe))
-	must(t, final.QueueStaged(ctx, bridge, probe))
+	stopFinal()
+	delete(finalRoutes.Origins, firstID)
+	finalOptions.Initialize = false
+	killStagedImport(t, ctx, finalOptions, finalDir, ca.cert.Raw, &stagedImportAdmission{
+		Target: finalIntent, SourceCertificate: sourceCert.Certificate[0], SourcePrivateKey: sourceCert.PrivateKey.(ed25519.PrivateKey),
+		Origin: stagingOrigin{Authority: bridgeOptions.Authority, Intent: bridgeIntent}, OriginEndpoint: bridgeURL, Object: probe,
+	})
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
 	if err := final.QueueStaged(ctx, bridge, filekit.Object{ID: extraID, Bytes: len(extra)}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("second request replaced the pending import: %v", err)
 	}
 	if err := final.Check(ctx, probe); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("queued acceptance was mistaken for object presence: %v", err)
 	}
+	must(t, final.QueueStaged(ctx, bridge, probe))
+	must(t, final.QueueStaged(ctx, bridge, probe))
 	stopFinal()
-	delete(finalRoutes.Origins, firstID)
-	finalOptions.Initialize = false
 	unpaused := func(string) bool { return false }
 	delete(finalRoutes.Origins, bridgeID)
 	_, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
@@ -168,7 +175,7 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatal("unsealed ciphertext was listed as a complete generation")
 	}
 	stopFinal()
-	killStagedImportAfterWrite(t, ctx, finalOptions, finalDir, ca.cert.Raw)
+	killStagedImport(t, ctx, finalOptions, finalDir, ca.cert.Raw, nil)
 	stopBridge()
 	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
 	must(t, final.Check(ctx, probe))
