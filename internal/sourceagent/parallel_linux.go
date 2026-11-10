@@ -292,7 +292,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 			s.distribution.refund(debit)
 		}
 		if origin != owner {
-			if err = holders[owner].PullStaged(ctx, holders[origin], ref); err != nil {
+			if err = relayAcceptedStaged(ctx, holders[owner], holders[origin], ref); err != nil {
 				return false, err
 			}
 		}
@@ -311,7 +311,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 	}
 	e := origin.Check(ctx, ref)
 	if e == nil {
-		return false, destination.PullStaged(ctx, origin, ref)
+		return false, relayAcceptedStaged(ctx, destination, origin, ref)
 	}
 	if !errors.Is(e, os.ErrNotExist) {
 		return false, e
@@ -321,7 +321,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 	if s.replaying {
 		e = destination.Check(ctx, ref)
 		if e == nil {
-			return false, origin.PullStaged(ctx, destination, ref)
+			return false, relayAcceptedStaged(ctx, origin, destination, ref)
 		}
 		if !errors.Is(e, os.ErrNotExist) {
 			return false, e
@@ -336,10 +336,21 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 	if created {
 		s.distribution.observe(holder, ref.Bytes, time.Since(start))
 	}
-	if e = destination.PullStaged(ctx, origin, ref); e != nil {
+	if e = relayAcceptedStaged(ctx, destination, origin, ref); e != nil {
 		return false, e
 	}
 	return created, nil
+}
+
+func relayAcceptedStaged(ctx context.Context, destination, origin *ingress.Client, ref filekit.Object) error {
+	err := destination.PullStaged(ctx, origin, ref)
+	if ctx.Err() == nil && (errors.Is(err, ingress.ErrUnavailable) || errors.Is(err, context.DeadlineExceeded)) {
+		// The origin already confirmed this object. Preserve the synchronous
+		// result because a queue acknowledgement does not confirm delivery.
+		// A busy queue or a receiver without this endpoint leaves normal retry intact.
+		_ = destination.QueueStaged(ctx, origin, ref)
+	}
+	return err
 }
 
 func (s *parallelSink) loadReceipt(generation string) (ingress.Receipt, error) {

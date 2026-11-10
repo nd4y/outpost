@@ -2685,10 +2685,14 @@
         {
           "path": "internal/sourceagent/parallel_linux_test.go",
           "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourceSplitReusesInitialCiphertextAfterInterruptedDelivery"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
-      "remaining": "Installation, long-outage and complete process-level acceptance. Explicit pre-seal mTLS pulls preserve staged objects across two authorized hops and bridge reopen, with signed closure and independent recovery verified at the final receiver. An admitted source can queue one import per active capture and the worker resumes it on the same authorized route. Full chain scheduling, process crash and failover acceptance remain open. The offline CLI reports declared routes and unreachable holders, compares peer graphs and domain trust, checks all expected holder and transit documents against one signed domain reference, and reports exact autonomous rule mismatches and peer revision lag. Installed topology, runtime permissions and connectivity acceptance remain open."
+      "remaining": "Installation, long-outage and complete process-level acceptance. Explicit pre-seal mTLS pulls preserve staged objects across two authorized hops and bridge reopen, with signed closure and independent recovery verified at the final receiver. Paired source writes queue one confirmed-object import after a transient handoff failure, and the worker resumes it on the same authorized route without a new source upload. Full chain scheduling, process crash and failover acceptance remain open. The offline CLI reports declared routes and unreachable holders, compares peer graphs and domain trust, checks all expected holder and transit documents against one signed domain reference, and reports exact autonomous rule mismatches and peer revision lag. Installed topology, runtime permissions and connectivity acceptance remain open."
     },
     {
       "id": "REQ-26",

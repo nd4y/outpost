@@ -706,6 +706,24 @@ func testSplitDelivery(t *testing.T, ctx context.Context, a *Agent, traffic *cap
 	sink.companion.Close()
 	allow.Store(true)
 	resumed := open(true)
+	wait, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	// Only observe the destination until its worker finishes the queued pull.
+	// Retrying Write first would also succeed with a synchronous import.
+	for {
+		err = resumed.companion.Check(wait, ref)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("checking worker handoff", err)
+		}
+		select {
+		case <-wait.Done():
+			t.Fatal("receiver worker did not finish the queued handoff", wait.Err())
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 	created, err := resumed.Write(ctx, ref, payload)
 	must(t, err)
 	if created {

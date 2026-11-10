@@ -79,6 +79,8 @@ An isolated check stages ciphertext at the first receiver, imports it at the bri
 
 The source can queue one object import per admitted capture with `Client.QueueStaged`. The `queued-imports` endpoint returns HTTP 202 after durable acceptance or when the exact object is already available. Check object availability separately. Repeating the same request reuses the pending record. A second pending object or origin returns HTTP 409.
 
+During a paired capture, the source asks the destination to queue an import after a temporary synchronous failure if the origin already confirmed the object. The capture keeps the failed handoff pending until the destination confirms the object is available.
+
 The worker retries the queued import over its current authorized route while the capture is active and unpaused. A reopened receiver reuses the accepted object if it was written before the request finished. The signed catalog still controls publication. If the capture is sealed, publication owns the remaining work. Complete publication or signed retirement clears any pending import. Before downgrading the receiver, finish the queued import, publish, or retire the capture using this version. Scheduling a whole chain without source admission for each hop remains open.
 
 ## Transfer and publication
