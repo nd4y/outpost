@@ -71,6 +71,12 @@ The `replication` array checks each directed edge in the reference. For push, th
 
 `consistent` still describes placement and domain trust. Check `replication` separately for every edge intended for autonomous operation. The audit uses local documents. Before deployment, verify the revisions active on workers, their credentials and connectivity. Explicit per-generation jobs use separate authorizations.
 
+### Staged objects across two authorized hops
+
+A receiver can serve an object it previously imported and durably accepted into the same capture. Each adjacent hop uses its own admitted intent, explicit origin and reader, and mutually authenticated HTTPS. The registry keeps a fixed copy of its admitted routes for the lifetime of that view.
+
+An isolated check stages ciphertext at the first receiver, imports it at the bridge, then closes the first receiver and reopens the bridge on its retained state. The source requests the second hop using the bridge. The last receiver refuses an undeclared shortcut, keeps the unsealed capture out of complete inventory and publishes only after verifying the signed catalog. It restores independently after the first receiver and bridge are offline. This scenario uses explicit source requests for each hop. Automatic forwarding across several hops remains open.
+
 ## Transfer and publication
 
 `NewServer` returns an HTTP server with TLS configuration but opens no listener. An integrating caller supplies admitted replica/journal directories and credentials and explicitly serves TLS. `NewClient` supplies `Push` and `Pull`; workers need public verification material and ciphertext, not owner decryption or catalog signing keys. Journal initialization is explicit and requires an existing empty directory. The storage admission/UUID checks belong to the caller, as in G2.

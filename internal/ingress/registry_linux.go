@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"github.com/nd4y/outpost/internal/localfs"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -197,6 +198,10 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 	o.Owner = bytes.Clone(o.Owner)
 	o.Settlement = bytes.Clone(o.Settlement)
 	o.SettlementIntent = bytes.Clone(o.SettlementIntent)
+	if o.Staging != nil {
+		// Each registry view owns the routes from its admitted configuration.
+		o.Staging = &StagingRoutes{Origins: maps.Clone(o.Staging.Origins), Readers: maps.Clone(o.Staging.Readers)}
+	}
 	owned = true
 	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
 	if o.Staging != nil {
