@@ -29,6 +29,9 @@ func TestSignedReplicaIndexCopyRecoversExactPinsAndReceivingAfterLoss(t *testing
 	ok(t, e)
 	oldPin, latestPin := Hash([]byte("old restore pin")), Hash([]byte("current kit pin"))
 	ok(t, r.Pin(ctx, oldPin, old, "restore"))
+	indexPath := filepath.Join(dir, "state.json")
+	legacy, e := os.ReadFile(indexPath)
+	ok(t, e)
 	ok(t, r.EnableIndexCopy(ctx))
 	copyPath := filepath.Join(dir, indexCopyName)
 	stale, e := os.ReadFile(copyPath)
@@ -52,7 +55,6 @@ func TestSignedReplicaIndexCopyRecoversExactPinsAndReceivingAfterLoss(t *testing
 	if _, e = r.Status(ctx); !errors.Is(e, ErrIndexRecovery) {
 		t.Fatal("divergent index admitted more work", e)
 	}
-	indexPath := filepath.Join(dir, "state.json")
 	predecessor, e := os.ReadFile(indexPath)
 	ok(t, e)
 	ok(t, os.Remove(indexPath))
@@ -116,6 +118,11 @@ func TestSignedReplicaIndexCopyRecoversExactPinsAndReceivingAfterLoss(t *testing
 	}
 	ok(t, r.VerifyComplete(ctx, old))
 	ok(t, r.VerifyComplete(ctx, latest))
+	ok(t, os.WriteFile(indexPath, legacy, 0600))
+	ok(t, os.Remove(copyPath))
+	if _, e = r.Status(ctx); !errors.Is(e, ErrIndexRecovery) {
+		t.Fatal("surviving anchor did not reject pre-mirror index", e)
+	}
 }
 
 func TestSignedReplicaIndexRecoveryRequiresFrozenMaintenancePlan(t *testing.T) {

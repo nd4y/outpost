@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/ingress"
+	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 )
 
@@ -113,4 +115,32 @@ func (w *Worker) PreviewRetention(ctx context.Context, domain string, selection 
 		return err
 	})
 	return permit, e
+}
+
+func (w *Worker) IngressJournalCopy(ctx context.Context, domain string, authority []byte, recover bool) (bool, error) {
+	grant, e := ingress.VerifyAuthorityDocument(authority, w.owner)
+	if e != nil || grant.Ingress != w.node || grant.Trust.Domain != domain {
+		return false, ErrDenied
+	}
+	var reconstructed bool
+	e = w.withStoppedReplica(ctx, domain, func(root *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
+		r, e := w.openReplicaAt(path, trust, false)
+		if e != nil {
+			return e
+		}
+		defer r.Close()
+		r.Admit = admit
+		prefix := filepath.Join(filepath.Dir(path), "ingress")
+		options := ingress.RegistryOptions{Parent: root, Directory: prefix, Authority: authority, Owner: w.owner, Replica: r,
+			Certificate: w.cert, Roots: w.roots, Limits: peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1},
+			Admission: func(part string) statefile.Admission {
+				return w.admission(filepath.ToSlash(filepath.Join(prefix, part)))
+			}}
+		if !recover {
+			return ingress.EnableRegistryJournalCopy(ctx, options)
+		}
+		reconstructed, e = ingress.RecoverRegistryJournalCopy(ctx, options)
+		return e
+	})
+	return reconstructed, e
 }

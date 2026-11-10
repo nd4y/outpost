@@ -248,8 +248,10 @@ func (r *Replica) load() (state, error) {
 		return s, e
 	}
 	if s.IndexNode == "" {
-		if _, e = r.root.Lstat(indexCopyName); !errors.Is(e, os.ErrNotExist) {
-			return s, ErrIndexRecovery
+		for _, name := range []string{indexCopyName, indexAnchorName} {
+			if _, e = r.root.Lstat(name); !errors.Is(e, os.ErrNotExist) {
+				return s, ErrIndexRecovery
+			}
 		}
 		return s, nil
 	}

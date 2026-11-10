@@ -2039,6 +2039,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/ingress/registry_journal_linux_test.go",
+          "name": "TestRegistryJournalRestoresExactIntentAndReceiptAfterLoss"
+        },
+        {
           "path": "internal/peer/offline_history_linux_test.go",
           "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
         },

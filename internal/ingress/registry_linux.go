@@ -47,6 +47,7 @@ type RegistryOptions struct {
 	CheckRegistryWrite func(context.Context, int) error
 	CheckPublication   func(context.Context, diskbudget.Peak) error
 	RemoveObject       func(context.Context, string, int64) error
+	recoverJournal     bool
 }
 type registryState struct {
 	Format            string              `json:"format"`
@@ -59,6 +60,7 @@ type registryState struct {
 	PreviousAuthority json.RawMessage     `json:"previousAuthority,omitempty"`
 	LegacyDigest      string              `json:"legacyDigest,omitempty"`
 	LegacyRetirement  *registryRetirement `json:"legacyRetirement,omitempty"`
+	JournalNode       string              `json:"journalNode,omitempty"`
 }
 
 type registryRetirement struct {
@@ -78,6 +80,7 @@ type Registry struct {
 	leaf                     *x509.Certificate
 	settlementPurpose        string
 	poisoned                 bool
+	journalReconstructed     bool
 	gate                     chan struct{}
 	stageReads, stageImports chan struct{}
 	Fault                    func(string) error
@@ -100,7 +103,15 @@ func (g *Registry) save() error {
 	if e != nil {
 		return e
 	}
-	e = g.store.Write("registry.json", raw)
+	if len(raw) > maxRegistryState {
+		return statefile.ErrCapacity
+	}
+	if g.state.JournalNode != "" {
+		e = g.writeJournalCopy(raw)
+	}
+	if e == nil {
+		e = g.store.Write("registry.json", raw)
+	}
 	if e != nil {
 		g.poisoned = true
 	}
@@ -193,21 +204,37 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 		g.stageImports = make(chan struct{}, o.Limits.Concurrency)
 	}
 	fail := func(e error) (*Registry, error) { g.Close(); return nil, e }
-	g.store, e = statefile.OpenAt(r, "state", maxRegistryState, o.Initialize)
+	g.store, e = statefile.OpenAt(r, "state", maxRegistryJournal, o.Initialize)
 	if e != nil {
 		return fail(e)
 	}
 	g.store.Admit = g.admission("state")
 	raw, e := g.store.Read("registry.json")
+	if o.recoverJournal {
+		raw, g.journalReconstructed, e = g.recoverJournal(ctx, raw, e)
+	}
 	if errors.Is(e, os.ErrNotExist) && o.Initialize {
+		for _, name := range []string{registryJournalCopyName, registryJournalAnchorName} {
+			if _, err := g.store.Read(name); !errors.Is(err, os.ErrNotExist) {
+				return fail(ErrRegistryRecovery)
+			}
+		}
 		g.state = registryState{Format: RegistryFormat, Authority: storage.Hash(o.Authority), ObservedUnix: time.Now().Unix()}
 		if e = g.save(); e != nil {
 			return fail(e)
 		}
 	} else if e != nil {
+		if errors.Is(e, os.ErrNotExist) {
+			if _, err := g.store.Read(registryJournalCopyName); !errors.Is(err, os.ErrNotExist) {
+				return fail(errors.Join(ErrRegistryRecovery, e))
+			}
+		}
 		return fail(e)
 	} else {
 		if e = g.loadRegistry(raw); e != nil {
+			return fail(e)
+		}
+		if e = g.checkJournalCopy(raw); e != nil {
 			return fail(e)
 		}
 	}
