@@ -12,14 +12,15 @@ const SettlementFormat = "outpost-source-settlement-1"
 const MaxSettlementDocument = 4096
 
 const (
-	SettlementPublish = "publish-staged"
-	SettlementInspect = "inspect-active"
-	SettlementRetire  = "retire-unadmitted"
+	SettlementPublish        = "publish-staged"
+	SettlementInspect        = "inspect-active"
+	SettlementRetire         = "retire-unadmitted"
+	SettlementRetireUnsealed = "retire-unsealed"
 )
 
 // Settlement is bound to an immutable intent. The legacy purpose retrieves
 // and acknowledges a receipt. Other purposes permit only the exact staged
-// publication or read-only inspection described by the signed grant.
+// publication, inspection or retirement described by the signed grant.
 type Settlement struct {
 	Format      string `json:"format"`
 	ID          string `json:"id"`
@@ -52,7 +53,7 @@ func (s Settlement) validate(authority, intent []byte, owner ed25519.PublicKey, 
 		if !storage.ID(s.Generation) {
 			return ErrDenied
 		}
-	case SettlementPublish, SettlementInspect, SettlementRetire:
+	case SettlementPublish, SettlementInspect, SettlementRetire, SettlementRetireUnsealed:
 		if s.NotBefore < i.ExpiresUnix || s.ExpiresUnix-s.NotBefore > 86400 ||
 			s.Purpose == SettlementPublish && !storage.ID(s.Generation) ||
 			s.inspect() && s.Generation != "" {
@@ -65,7 +66,7 @@ func (s Settlement) validate(authority, intent []byte, owner ed25519.PublicKey, 
 }
 
 func (s Settlement) inspect() bool {
-	return s.Purpose == SettlementInspect || s.Purpose == SettlementRetire
+	return s.Purpose == SettlementInspect || s.Purpose == SettlementRetire || s.Purpose == SettlementRetireUnsealed
 }
 
 func SignSettlement(s Settlement, authority, intent []byte, key ed25519.PrivateKey, now time.Time) ([]byte, error) {

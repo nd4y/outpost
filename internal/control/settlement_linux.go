@@ -11,7 +11,7 @@ import (
 
 // SettlementAdmission is separate from Ingress: its original signed documents
 // identify retained history, while its fresh owner grant and enclosing current
-// policy admit only completed-receipt retrieval and acknowledgement.
+// policy admit only the purpose encoded in the owner grant.
 type SettlementAdmission struct {
 	Authority json.RawMessage `json:"authority"`
 	Intent    json.RawMessage `json:"intent"`

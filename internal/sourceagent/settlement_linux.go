@@ -52,7 +52,8 @@ func (a *Agent) settlementReceiver(s state, receiver string) (ingress.Intent, []
 }
 
 func (a *Agent) SettlementPreviewFor(ctx context.Context, purpose, receiver string) (control.SettlementAdmission, error) {
-	if purpose != "" && purpose != ingress.SettlementPublish && purpose != ingress.SettlementInspect && purpose != ingress.SettlementRetire {
+	if purpose != "" && purpose != ingress.SettlementPublish && purpose != ingress.SettlementInspect &&
+		purpose != ingress.SettlementRetire && purpose != ingress.SettlementRetireUnsealed {
 		return control.SettlementAdmission{}, ErrInvalid
 	}
 	var out control.SettlementAdmission
@@ -67,7 +68,8 @@ func (a *Agent) SettlementPreviewFor(ctx context.Context, purpose, receiver stri
 		if s.Phase != "ACTIVE" {
 			return ErrInvalid
 		}
-		if a.routed() && receiver != "" && purpose != ingress.SettlementInspect && !slices.Contains(s.Route, receiver) {
+		if a.routed() && receiver != "" && purpose != ingress.SettlementInspect &&
+			purpose != ingress.SettlementRetireUnsealed && !slices.Contains(s.Route, receiver) {
 			return ErrInvalid
 		}
 		i, authority, intent, _, e := a.settlementReceiver(s, receiver)
@@ -79,7 +81,7 @@ func (a *Agent) SettlementPreviewFor(ctx context.Context, purpose, receiver stri
 			return ErrInvalid
 		}
 		var id string
-		if purpose != ingress.SettlementInspect && purpose != ingress.SettlementRetire {
+		if purpose == "" || purpose == ingress.SettlementPublish {
 			job, close, e := a.openJobMode(ctx, s, true, nil)
 			if e != nil {
 				return e

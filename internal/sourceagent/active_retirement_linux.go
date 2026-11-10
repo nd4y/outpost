@@ -5,6 +5,10 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"errors"
+	"os"
+	"path"
+	"slices"
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
@@ -43,8 +47,25 @@ func (a *Agent) activeReceivers(s state, i ingress.Intent) []string {
 	return []string{i.Ingress}
 }
 
-func (a *Agent) verifyActiveRetirement(s state, i ingress.Intent, record activeRetirement, now int64) error {
+func (a *Agent) retirementReceivers(s state, i ingress.Intent, purpose string) []string {
 	targets := a.activeReceivers(s, i)
+	if purpose == ingress.SettlementRetireUnsealed {
+		targets = slices.Clone(targets)
+		for _, receiver := range s.Superseded {
+			if !slices.Contains(targets, receiver) {
+				targets = append(targets, receiver)
+			}
+		}
+	}
+	return targets
+}
+
+func retiredPhase(phase, purpose string) bool {
+	return phase == "NOT_ADMITTED" || purpose == ingress.SettlementRetireUnsealed && phase == ingress.UnsealedRetired
+}
+
+func (a *Agent) verifyActiveRetirement(s state, i ingress.Intent, record activeRetirement, purpose string, now int64) error {
+	targets := a.retirementReceivers(s, i, purpose)
 	if record.Binding != a.binding || record.Operation != i.Operation || record.Checkpoint != storage.Hash(s.Checkpoint) ||
 		record.RecordedUnix < i.ExpiresUnix || record.RecordedUnix > now ||
 		len(record.Admissions) != len(targets) || len(record.Observations) != len(targets) {
@@ -57,8 +78,8 @@ func (a *Agent) verifyActiveRetirement(s state, i ingress.Intent, record activeR
 			return ErrInvalid
 		}
 		grant, err := ingress.VerifySettlement(item.Grant, authority, intent, a.b.Local.Owner, time.Unix(record.RecordedUnix, 0))
-		if err != nil || grant.Purpose != ingress.SettlementRetire || proof.Receiver != target || proof.Intent != grant.Intent ||
-			proof.Grant != grant.ID || proof.Phase != "NOT_ADMITTED" || proof.ObservedUnix < grant.NotBefore ||
+		if err != nil || grant.Purpose != purpose || proof.Receiver != target || proof.Intent != grant.Intent ||
+			proof.Grant != grant.ID || !retiredPhase(proof.Phase, purpose) || proof.ObservedUnix < grant.NotBefore ||
 			proof.ObservedUnix > record.RecordedUnix || proof.Generation != "" || proof.Receipt != nil || proof.Publication != nil {
 			return ErrInvalid
 		}
@@ -79,12 +100,27 @@ func (a *Agent) readActiveRetirement(s state, i ingress.Intent, id string) (acti
 		!ed25519.Verify(a.anchor.Trust.Writer, record.unsigned(), record.Signature) {
 		return record, ErrInvalid
 	}
-	return record, a.verifyActiveRetirement(s, i, record, time.Now().Unix())
+	return record, a.verifyActiveRetirement(s, i, record, s.RetirementKind, time.Now().Unix())
 }
 
-// RetireActive can advance only a local PLANNED job with current explicit
-// owner grants and a negative admission proof from every possible receiver.
 func (a *Agent) RetireActive(ctx context.Context, primary control.SettlementAdmission, companion *control.SettlementAdmission) error {
+	items := []control.SettlementAdmission{primary}
+	if companion != nil {
+		items = append(items, *companion)
+	}
+	return a.RetireActiveWithAdmissions(ctx, items)
+}
+
+// RetireActiveWithAdmissions leaves the prior generation intact. Every holder
+// must either prove non-admission or durably fence an unsealed session.
+func (a *Agent) RetireActiveWithAdmissions(ctx context.Context, items []control.SettlementAdmission) error {
+	var first ingress.Settlement
+	if len(items) == 0 || len(items) > 3 || storage.Decode(items[0].Grant, &first, ingress.MaxSettlementDocument) != nil ||
+		first.Purpose != ingress.SettlementRetire && first.Purpose != ingress.SettlementRetireUnsealed {
+		return ErrInvalid
+	}
+	purpose := first.Purpose
+	unsealed := purpose == ingress.SettlementRetireUnsealed
 	return a.lease.WithLock(ctx, func() error {
 		if err := a.guard(ctx); err != nil {
 			return err
@@ -93,7 +129,7 @@ func (a *Agent) RetireActive(ctx context.Context, primary control.SettlementAdmi
 		if err != nil {
 			return err
 		}
-		if len(s.Superseded) != 0 {
+		if !unsealed && len(s.Superseded) != 0 {
 			// A superseded receiver may have accepted data. An absence proof
 			// from the replacement pair cannot retire that admission.
 			return ingress.ErrConflict
@@ -102,19 +138,22 @@ func (a *Agent) RetireActive(ctx context.Context, primary control.SettlementAdmi
 		if err != nil {
 			return err
 		}
-		items := []control.SettlementAdmission{primary}
-		if companion != nil {
-			items = append(items, *companion)
-		}
 		id := retirementID(items)
-		if s.Phase == "ABANDONED" && s.RetirementKind == ingress.SettlementRetire && s.Retirement == id {
+		if s.Phase == "ABANDONED" && s.RetirementKind == purpose && s.Retirement == id {
 			return nil
 		}
-		targets := a.activeReceivers(s, i)
+		targets := a.retirementReceivers(s, i, purpose)
 		if s.Phase != "ACTIVE" || len(items) != len(targets) || time.Now().Unix() < i.ExpiresUnix {
 			return ErrInvalid
 		}
-		job, closeJob, err := a.openJobMode(ctx, s, true, nil)
+		if s.RouteCatalog != "" {
+			return ingress.ErrConflict
+		}
+		local := s
+		if local.RoutePreparing {
+			local.Route, local.Superseded, local.RoutePreparing = local.Superseded, nil, false
+		}
+		job, closeJob, err := a.openJobMode(ctx, local, true, nil)
 		if err != nil {
 			return err
 		}
@@ -123,41 +162,86 @@ func (a *Agent) RetireActive(ctx context.Context, primary control.SettlementAdmi
 		if err != nil {
 			return err
 		}
-		if status.Phase != "PLANNED" || status.CompletedFiles != 0 || status.Generation != "" {
+		if status.Generation != "" || (status.Phase != "PLANNED" && (!unsealed || status.Phase != "CAPTURING")) ||
+			!unsealed && status.CompletedFiles != 0 {
 			return ingress.ErrConflict
 		}
-		record := activeRetirement{Binding: a.binding, Operation: i.Operation, Checkpoint: storage.Hash(s.Checkpoint), Admissions: items}
-		for k, item := range items {
-			proof, err := a.observeReceiver(ctx, s, item, ingress.SettlementRetire)
+		auditErr := os.ErrNotExist
+		if unsealed {
+			pending := s
+			pending.RetirementKind = purpose
+			_, auditErr = a.readActiveRetirement(pending, i, id)
+		}
+		if errors.Is(auditErr, os.ErrNotExist) {
+			auditErr = a.recordActiveRetirement(ctx, s, i, items, targets, id, purpose)
+		}
+		if auditErr != nil {
+			return auditErr
+		}
+		check := func() error {
+			if err := a.guard(ctx); err != nil {
+				return err
+			}
+			now := time.Now()
+			for _, item := range items {
+				if _, err := ingress.VerifySettlement(item.Grant, item.Authority, item.Intent, a.b.Local.Owner, now); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if err = check(); err != nil {
+			return err
+		}
+		if unsealed {
+			provider, err := a.openProvider(ctx, path.Join("operations", i.Operation), i, false)
 			if err != nil {
 				return err
 			}
-			if proof.Receiver != targets[k] || proof.Phase != "NOT_ADMITTED" {
-				return ingress.ErrConflict
+			defer provider.Close()
+			if err = provider.Release(ctx, i.Operation, i.Operation); err != nil {
+				return err
 			}
-			record.Observations = append(record.Observations, proof)
-		}
-		record.RecordedUnix = time.Now().Unix()
-		if err = a.verifyActiveRetirement(s, i, record, record.RecordedUnix); err != nil {
-			return err
-		}
-		record.Signature = ed25519.Sign(a.writer, record.unsigned())
-		raw, _ := json.Marshal(record)
-		if err = a.store.Write("active-retirement-"+id+".json", raw); err != nil {
-			return err
-		}
-		if err = a.point("source-active-retirement-durable"); err != nil {
-			return err
-		}
-		if err = a.guard(ctx); err != nil {
-			return err
-		}
-		for _, item := range items {
-			if _, err = ingress.VerifySettlement(item.Grant, item.Authority, item.Intent, a.b.Local.Owner, time.Now()); err != nil {
+			if err = check(); err != nil {
 				return err
 			}
 		}
-		s.Phase, s.Retirement, s.RetirementKind = "ABANDONED", id, ingress.SettlementRetire
+		s.Phase, s.Retirement, s.RetirementKind, s.RoutePreparing = "ABANDONED", id, purpose, false
 		return a.save(s)
 	})
+}
+
+func (a *Agent) recordActiveRetirement(ctx context.Context, s state, i ingress.Intent, items []control.SettlementAdmission, targets []string, id, purpose string) error {
+	unsealed := purpose == ingress.SettlementRetireUnsealed
+	record := activeRetirement{Binding: a.binding, Operation: i.Operation, Checkpoint: storage.Hash(s.Checkpoint), Admissions: items}
+	for k, item := range items {
+		proof, err := a.observeReceiver(ctx, s, item, purpose, false)
+		if err != nil {
+			return err
+		}
+		if proof.Receiver != targets[k] || !retiredPhase(proof.Phase, purpose) && (!unsealed || proof.Phase != "ADMITTED") {
+			return ingress.ErrConflict
+		}
+		record.Observations = append(record.Observations, proof)
+	}
+	if unsealed {
+		// Inspect all possible holders before fencing any.
+		for k, item := range items {
+			proof, err := a.observeReceiver(ctx, s, item, purpose, true)
+			if err != nil {
+				return err
+			}
+			record.Observations[k] = proof
+		}
+	}
+	record.RecordedUnix = time.Now().Unix()
+	if err := a.verifyActiveRetirement(s, i, record, purpose, record.RecordedUnix); err != nil {
+		return err
+	}
+	record.Signature = ed25519.Sign(a.writer, record.unsigned())
+	raw, _ := json.Marshal(record)
+	if err := a.store.Write("active-retirement-"+id+".json", raw); err != nil {
+		return err
+	}
+	return a.point("source-active-retirement-durable")
 }

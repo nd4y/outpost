@@ -45,7 +45,7 @@ func legacyRegistry(raw, authority []byte, owner ed25519.PublicKey) (registrySta
 	if e != nil {
 		return s, e
 	}
-	if s.Format != RegistryFormat || s.Authority != storage.Hash(authority) || len(s.CurrentAuthority)+len(s.IntentAuthority)+len(s.OriginalAuthority)+len(s.PreviousAuthority) != 0 || s.LegacyDigest != "" {
+	if s.Format != RegistryFormat || s.Authority != storage.Hash(authority) || len(s.CurrentAuthority)+len(s.IntentAuthority)+len(s.OriginalAuthority)+len(s.PreviousAuthority) != 0 || s.LegacyDigest != "" || s.LegacyRetirement != nil {
 		return s, ErrConflict
 	}
 	if len(s.Intent) != 0 {
@@ -96,6 +96,13 @@ func (g *Registry) loadRegistry(raw []byte) error {
 	if e != nil || legacy.ObservedUnix > s.ObservedUnix {
 		return ErrConflict
 	}
+	if retirement := s.LegacyRetirement; retirement != nil {
+		grant, err := VerifySettlement(retirement.Grant, s.OriginalAuthority, legacy.Intent, g.options.Owner, time.Unix(retirement.ObservedUnix, 0))
+		if err != nil || grant.Purpose != SettlementRetireUnsealed ||
+			retirement.ObservedUnix < legacy.ObservedUnix || retirement.ObservedUnix > s.ObservedUnix {
+			return ErrConflict
+		}
+	}
 	if len(s.Intent) == 0 {
 		if len(s.IntentAuthority)+len(legacy.Intent) != 0 {
 			return ErrConflict
@@ -111,7 +118,11 @@ func (g *Registry) loadRegistry(raw []byte) error {
 		}
 		if len(legacy.Intent) != 0 {
 			var prior Intent
-			if canonicalIntent(legacy.Intent, s.OriginalAuthority, g.options.Owner, &prior) != nil || i.Sequence < prior.Sequence || i.Sequence == prior.Sequence && !bytes.Equal(s.Intent, legacy.Intent) {
+			if canonicalIntent(legacy.Intent, s.OriginalAuthority, g.options.Owner, &prior) != nil || i.Sequence < prior.Sequence {
+				return ErrConflict
+			}
+			if i.Sequence == prior.Sequence && !bytes.Equal(s.Intent, legacy.Intent) &&
+				(s.LegacyRetirement == nil || i.Parent != prior.Parent || i.Operation == prior.Operation) {
 				return ErrConflict
 			}
 		}

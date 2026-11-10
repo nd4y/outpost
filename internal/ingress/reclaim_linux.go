@@ -207,13 +207,13 @@ func (g *Registry) reclaim(ctx context.Context, request ReclaimRequest, i Intent
 	return true, nil
 }
 
-// An exact readiness replay must also respect a reclaim fence after the
-// process restarts, before an in-memory session has been opened.
-func (g *Registry) slotReclaimed(intent []byte) (bool, error) {
+// An exact readiness replay must respect a closed slot before an in-memory
+// session has been opened, including after a receiver restart.
+func (g *Registry) slotFenced(intent []byte) (bool, error) {
 	if g.session != nil {
 		g.session.mu.Lock()
 		defer g.session.mu.Unlock()
-		return len(g.session.state.Reclaimed) != 0, nil
+		return len(g.session.state.Reclaimed) != 0 || len(g.session.state.Retired) != 0, nil
 	}
 	meta, err := statefile.OpenAt(g.root, "current/state", maxSessionDocument, false)
 	if errors.Is(err, os.ErrNotExist) {
@@ -234,7 +234,7 @@ func (g *Registry) slotReclaimed(intent []byte) (bool, error) {
 	if storage.Decode(raw, &state, maxSessionDocument) != nil {
 		return false, ErrConflict
 	}
-	return bytes.Equal(state.Intent, intent) && len(state.Reclaimed) != 0, nil
+	return bytes.Equal(state.Intent, intent) && (len(state.Reclaimed) != 0 || len(state.Retired) != 0), nil
 }
 
 func (s *Session) slotEmpty() (bool, error) {

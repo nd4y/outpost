@@ -332,13 +332,14 @@ func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	now := time.Now()
 	ack := resource == "ack" && method == http.MethodPut
+	retiring := resource == "retire" && method == http.MethodPut
 	reclaim := c.cleanup && !c.inspection && resource == "reclaim" && method == http.MethodPut
 	settling := len(c.settlement) != 0
 	if c.stagingReader && (method != http.MethodGet || !strings.HasPrefix(resource, "staged/")) {
 		return 0, nil, nil, ErrDenied
 	}
 	if c.inspection {
-		if resource != "reconcile" || method != http.MethodGet {
+		if !retiring && (resource != "reconcile" || method != http.MethodGet) {
 			return 0, nil, nil, ErrDenied
 		}
 	} else if (c.cleanup || settling) && !ack && !reclaim && !(settling && resource == "receipt" && method == http.MethodGet) {
@@ -351,6 +352,9 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		if e != nil {
 			return 0, nil, nil, e
 		}
+	}
+	if retiring && grant.Purpose != SettlementRetireUnsealed {
+		return 0, nil, nil, ErrDenied
 	}
 	if !ack && !reclaim && !settling && c.peerPublicationDeadline.IsZero() {
 		if _, _, e := VerifyIntent(c.intentRaw, c.authority, c.owner, now); e != nil {

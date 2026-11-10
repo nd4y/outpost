@@ -85,7 +85,8 @@ func RenewRegistry(ctx context.Context, o RegistryOptions, fresh []byte, guard f
 	if e = check(); e != nil {
 		return result, e
 	}
-	if e = g.renewalQuiescent(ctx); e != nil {
+	retirement, e := g.renewalQuiescent(ctx)
+	if e != nil {
 		return result, e
 	}
 	if e = check(); e != nil {
@@ -113,6 +114,7 @@ func RenewRegistry(ctx context.Context, o RegistryOptions, fresh []byte, guard f
 		}
 		g.state.OriginalAuthority = bytes.Clone(previous)
 		g.state.LegacyDigest = digest
+		g.state.LegacyRetirement = retirement
 		if len(g.state.Intent) != 0 {
 			g.state.IntentAuthority = bytes.Clone(previous)
 		}
@@ -141,47 +143,56 @@ func RenewRegistry(ctx context.Context, o RegistryOptions, fresh []byte, guard f
 
 // Inspection is deliberately non-mutating: renewal does not complete an ACK,
 // release a pin, delete a temporary object or infer completion from a head.
-func (g *Registry) renewalQuiescent(ctx context.Context) error {
+func (g *Registry) renewalQuiescent(ctx context.Context) (*registryRetirement, error) {
 	if len(g.state.Intent) == 0 {
 		_, e := g.root.Lstat("current")
 		if errors.Is(e, os.ErrNotExist) {
-			return nil
+			return nil, nil
 		}
 		if e != nil {
-			return e
+			return nil, e
 		}
-		return ErrConflict
+		return nil, ErrConflict
 	}
 	o := g.sessionOptions(g.state.Intent)
 	o.Initialize = false
-	s, e := openSessionMode(ctx, o, true, true)
+	s, e := openSessionFor(ctx, o, sessionInspect)
 	if e != nil {
-		return e
+		return nil, e
 	}
 	defer s.Close()
+	if len(s.state.Retired) != 0 {
+		if err := g.checkPredecessor(ctx, s.intent); err != nil {
+			return nil, err
+		}
+		return &registryRetirement{Grant: bytes.Clone(s.state.Retired), ObservedUnix: s.state.LastObserved}, nil
+	}
+	if len(s.state.Reclaimed) != 0 {
+		return nil, ErrConflict
+	}
 	if !s.state.Complete || !s.state.Acknowledged || s.state.Receipt == nil || len(s.refs) != 0 || s.bytes != 0 {
-		return ErrConflict
+		return nil, ErrConflict
 	}
 	d, e := s.objectRoot.Open(".")
 	if e != nil {
-		return e
+		return nil, e
 	}
 	names, e := d.ReadDir(1)
 	d.Close()
 	if e != nil && !errors.Is(e, io.EOF) {
-		return e
+		return nil, e
 	}
 	if len(names) != 0 {
-		return ErrConflict
+		return nil, ErrConflict
 	}
 	status, e := g.options.Replica.Status(ctx)
 	if e != nil {
-		return e
+		return nil, e
 	}
 	for _, kind := range []string{"base", "receipt"} {
 		if _, exists := status.Pins[s.pin(kind)]; exists {
-			return ErrConflict
+			return nil, ErrConflict
 		}
 	}
-	return nil
+	return nil, nil
 }

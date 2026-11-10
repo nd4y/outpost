@@ -21,7 +21,7 @@ TLS 1.3 mutual authentication verifies CA, hostname, public-key identity and cur
 | GET `catalog`           | None                                          | Exact published catalog before acknowledgement            |
 | PUT `ack`               | Exact saved receipt, at most 4 KiB            | Bounded cleanup progress, not a new verification          |
 
-One capture occupies a receiver's domain slot. Its durable fence prevents replay or displacement. The next capture advances the sequence by one and names the acknowledged parent. Reusing the compact slot never retires replica history. Admission/slot-replacement crashes resume from the persisted fence. Initial catch-up requires an available valid parent.
+One capture occupies a receiver's domain slot. Its durable fence prevents replay or displacement. After an acknowledged capture, the next one advances the sequence by one and names the acknowledged parent. After [retirement before sealing](source-settlement.md#retire-an-admitted-capture-before-sealing), a fresh intent can reuse the uncommitted sequence and its exact predecessor. Reusing the compact slot preserves replica history. Admission and slot-replacement crashes resume from the persisted fence. Initial catch-up requires an available valid parent.
 
 ## Publication and acknowledgement
 
@@ -41,4 +41,4 @@ The [expired-operation settlement workflow](source-settlement.md) retrieves only
 
 The [receiver renewal workflow](receiver-renewal.md) admits a fresh same-scope grant in the existing registry after explicit quiescent maintenance. It preserves historical receipts and generations, fences previous readers and uses the current receiver policy and disk budget.
 
-[Missing receipt recovery](receipt-recovery.md) uses separate fresh owner permission and current receiver policy to reconstruct a receipt only from an already complete generation and unchanged original publication proof. It preserves the original verification age and signed audit; ordinary settlement remains a separate step. Truly unpublished operations and lost journals remain pending.
+[Missing receipt recovery](receipt-recovery.md) uses separate fresh owner permission and current receiver policy to reconstruct a receipt only from an already complete generation and unchanged original publication proof. It preserves the original verification age and signed audit; ordinary settlement remains a separate step. Operations with uncertain evidence and lost journals remain pending.

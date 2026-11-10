@@ -507,7 +507,7 @@ func (a *Agent) loadScope(adopt bool) (state, error) {
 				if err != nil || record.RecordedUnix > s.ObservedUnix {
 					return s, ErrInvalid
 				}
-			case ingress.SettlementRetire:
+			case ingress.SettlementRetire, ingress.SettlementRetireUnsealed:
 				record, err := a.readActiveRetirement(s, i, s.Retirement)
 				if err != nil || record.RecordedUnix > s.ObservedUnix {
 					return s, ErrInvalid

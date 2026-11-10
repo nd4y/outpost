@@ -66,6 +66,23 @@ Use `source-settlement-preview --purpose inspect-active --node RECEIVER_ID`, the
 
 If a source job is still `PLANNED` and every involved holder proves `NOT_ADMITTED`, the owner can issue new `retire-unadmitted` grants through the same workflow. Run `source-retire-active` with the primary grant in `--input` and the paired grant in `--companion` when applicable. The source rechecks all receivers under its execution lease, saves the signed evidence and records `ABANDONED`. It preserves the previous generation and local history. Unavailable receivers, admitted work and lost journals cannot authorize this transition. After an automatic change in `ACTIVE`, the source preserves the original admission and refuses retirement based on the replacement route.
 
+## Retire an admitted capture before sealing
+
+An expired capture with staged objects can be retired if the source has no sealed catalog and every possible receiver can prove either non-admission or an intact unsealed slot at the exact predecessor. Use `source-settlement-preview --purpose retire-unsealed --node RECEIVER_ID` for each distinct current or superseded receiver. Sign each grant and install it in the receiver's current settlement configuration. Keep the source scheduler paused.
+
+```sh
+outpost source-retire-active --bootstrap /private/source.json \
+  --input /private/primary-retirement.json \
+  --companion /private/companion-retirement.json \
+  --superseded /private/superseded-retirement.json
+```
+
+Supply the current receivers in the order shown by `source-status`. Omit `--companion` for one copy and `--superseded` when there is no replaced receiver. Each grant binds the original intent and one receiver. The source checks all receivers before sending retirement requests. A sealed catalog, a changed predecessor, unavailable evidence or a lost journal keeps the source pending. If the source or a receiver already sealed the catalog, use the staged-publication or receipt recovery workflow.
+
+The receiver durably fences the old intent and retains its staged objects and pins. After all receivers confirm, the source writes its signed audit, releases its view and commits `ABANDONED` at the previous checkpoint. Repeat the same command after an interrupted reply. With all original grants still current, the source can finish from its durable audit even if a receiver goes offline. If a grant expires before the transition, issue a fresh grant for the same intent and receiver. A receiver with an intact retirement record can return evidence under that fresh grant.
+
+Renew the source and receiver authority after the source reports `ABANDONED`, then restore the ordinary ingress policy. A fresh signed attempt at the same sequence and exact predecessor can reclaim the retired slot in bounded steps. Unknown staging files still block reuse. The receiver keeps the previous complete generation and requires a compatible executable to read the new retirement record. Source view release follows the installed provider's existing contract.
+
 ## Retire an expired unstarted intent
 
 The source agent can retire an exact expired intent while its signed journal is still `PREPARING`, including after successful local job preparation. At execution the agent checks validity again and durably saves `ACTIVE` before its first receiver admission request. Preview and retirement take the same execution lease as capture. The owner permit binds the exact source, intent, previous checkpoint and expiry. Existing and new `ACTIVE` intents require separate reconciliation even without a receipt.

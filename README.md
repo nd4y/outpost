@@ -30,6 +30,8 @@ For active and completed operations, `source-status` reports when the source obs
 
 [Automatic receiver replacement](docs/en/source-agent.md#automatic-replacement-after-active) supports a standby for one copy and a reserve for two. Paired capture adjusts initial transfers to measured receiver throughput, including split coverage with a direct handoff to the assigned holder. Before full publication the worker estimates additional space from the signed catalog. With a complete surviving closure, the pair replays the signed catalog and reclaims the old slot after catch-up. [Scoped recovery](docs/en/source-settlement.md) lets both holders finish staged publication after expiry and distinguishes an unadmitted source operation from retained receiver work.
 
+An [expired unsealed capture](docs/en/source-settlement.md#retire-an-admitted-capture-before-sealing) can retire with exact owner grants and evidence from every possible receiver. The old slot retains its staging until a fresh attempt is admitted at the same sequence and predecessor.
+
 Worker bootstrap now requires [runtime volume admission](docs/en/runtime-volume.md). Missing markers or replaced paths stop work, while opened descriptors keep writes on the admitted tree. Encrypted per-file progress reuses accepted packs after a crash; the source is still reread. The [source job lifecycle](docs/en/source-jobs.md) defines enforced checkpoint/release ordering and the remaining network copy-threshold integration.
 
 [Trusted content verification](docs/en/trusted-verification.md) decrypts selected retained versions without plaintext output or a replica index. Private reports preserve per-version outcomes and original check times; partial checks return a failure status. Ordinary workers remain keyless.

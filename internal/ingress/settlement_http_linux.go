@@ -14,8 +14,8 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-// NewSettlementClient cannot Begin, fetch ciphertext, upload or publish a
-// catalog. Its fresh owner capability is separate from the immutable intent.
+// NewSettlementClient cannot begin capture, fetch ciphertext, upload or
+// publish a catalog. Its owner capability is separate from the original intent.
 func NewSettlementClient(endpoint string, authority, intent, grant []byte, owner ed25519.PublicKey, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*Client, error) {
 	selected, e := VerifySettlement(grant, authority, intent, owner, time.Now())
 	if e != nil {
@@ -63,7 +63,10 @@ func settlementRequest(r *http.Request, leaf *x509.Certificate, i Intent, grant 
 	if r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.RawPath != "" || r.URL.Path != r.URL.EscapedPath() {
 		return false
 	}
-	if purpose == SettlementInspect || purpose == SettlementRetire {
+	if purpose == SettlementRetireUnsealed && r.Method == http.MethodPut {
+		return r.URL.Path == route(i)+"/retire" && r.ContentLength == 0 && len(r.TransferEncoding) == 0
+	}
+	if purpose == SettlementInspect || purpose == SettlementRetire || purpose == SettlementRetireUnsealed {
 		return r.Method == http.MethodGet && r.URL.Path == route(i)+"/reconcile" && r.ContentLength == 0 && len(r.TransferEncoding) == 0
 	}
 	if r.Method == http.MethodGet && r.URL.Path == route(i)+"/receipt" {
@@ -183,7 +186,12 @@ func (g *Registry) serveSettlement(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cancel()
 	if grant.inspect() {
-		result, e := g.reconcile(ctx, intent, grant)
+		var result Reconciliation
+		if r.Method == http.MethodPut {
+			result, e = g.retireUnsealed(ctx, intent, grant)
+		} else {
+			result, e = g.reconcile(ctx, intent, grant)
+		}
 		if e != nil {
 			fail(w, e)
 			return

@@ -28,8 +28,8 @@ func (g *Registry) checkAdmission(ctx context.Context, raw []byte, i Intent) err
 		return ErrConflict
 	}
 	if bytes.Equal(g.state.Intent, raw) {
-		reclaimed, err := g.slotReclaimed(raw)
-		if reclaimed {
+		fenced, err := g.slotFenced(raw)
+		if fenced {
 			return ErrConflict
 		}
 		return err
@@ -55,7 +55,7 @@ func (g *Registry) checkNewIntent(ctx context.Context, i Intent, now int64) erro
 		return nil
 	}
 	var previous Intent
-	if canonicalIntent(g.state.Intent, g.intentAuthority(), g.options.Owner, &previous) != nil || i.Sequence <= previous.Sequence {
+	if canonicalIntent(g.state.Intent, g.intentAuthority(), g.options.Owner, &previous) != nil || i.Sequence < previous.Sequence {
 		return ErrConflict
 	}
 	s := g.session
@@ -71,6 +71,16 @@ func (g *Registry) checkNewIntent(ctx context.Context, i Intent, now int64) erro
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if len(s.state.Retired) != 0 {
+		if i.Sequence != previous.Sequence || i.Parent != previous.Parent || i.Operation == previous.Operation ||
+			now < s.state.LastObserved || !s.validRetirement() {
+			return ErrConflict
+		}
+		return nil
+	}
+	if i.Sequence == previous.Sequence {
+		return ErrConflict
+	}
 	if len(s.state.Reclaimed) != 0 {
 		grant, err := verifyReclaim(s.state.Reclaimed, g.state.Intent, g.authority.Trust.Writer)
 		if err != nil || now < s.state.LastObserved || i.Sequence == previous.Sequence+1 && i.Parent != grant.Generation {

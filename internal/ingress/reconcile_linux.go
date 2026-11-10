@@ -37,6 +37,8 @@ func (g *Registry) reconcile(ctx context.Context, intent Intent, grant Settlemen
 			defer s.Close()
 			out.Phase = "ADMITTED"
 			switch {
+			case len(s.state.Retired) != 0:
+				out.Phase = UnsealedRetired
 			case s.state.Receipt != nil:
 				out.Generation, out.Receipt, out.Phase = s.state.Receipt.Generation, s.state.Receipt, "RECEIPT"
 			case len(s.state.Catalog) != 0:
@@ -76,6 +78,11 @@ func (g *Registry) reconcile(ctx context.Context, intent Intent, grant Settlemen
 			}
 		}
 	}
+	if grant.Purpose == SettlementRetireUnsealed && (out.Phase == "ADMITTED" || out.Phase == UnsealedRetired) {
+		if err := g.checkPredecessor(ctx, intent); err != nil {
+			return Reconciliation{}, err
+		}
+	}
 	out.ObservedUnix = time.Now().Unix()
 	if ctx.Err() != nil || !active(time.Unix(out.ObservedUnix, 0), grant.NotBefore, grant.ExpiresUnix) || out.ObservedUnix < g.state.ObservedUnix {
 		return Reconciliation{}, ErrDenied
@@ -84,11 +91,15 @@ func (g *Registry) reconcile(ctx context.Context, intent Intent, grant Settlemen
 }
 
 func (c *Client) Reconcile(ctx context.Context) (Reconciliation, error) {
-	var out Reconciliation
 	if !c.inspection {
-		return out, ErrDenied
+		return Reconciliation{}, ErrDenied
 	}
-	_, _, raw, err := c.request(ctx, http.MethodGet, "reconcile", nil, nil, MaxReceiptDocument+1024)
+	return c.reconciliation(ctx, http.MethodGet, "reconcile")
+}
+
+func (c *Client) reconciliation(ctx context.Context, method, action string) (Reconciliation, error) {
+	var out Reconciliation
+	_, _, raw, err := c.request(ctx, method, action, nil, nil, MaxReceiptDocument+1024)
 	if err != nil {
 		return out, err
 	}
@@ -99,7 +110,7 @@ func (c *Client) Reconcile(ctx context.Context) (Reconciliation, error) {
 	}
 	valid := false
 	switch out.Phase {
-	case "UNKNOWN", "NOT_ADMITTED", "FENCED", "ADMITTED":
+	case "UNKNOWN", "NOT_ADMITTED", "FENCED", "ADMITTED", UnsealedRetired:
 		valid = out.Generation == "" && out.Receipt == nil && out.Publication == nil
 	case "SEALED":
 		valid = storage.ID(out.Generation) && out.Receipt == nil && out.Publication == nil

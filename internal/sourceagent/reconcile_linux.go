@@ -13,7 +13,7 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-func (a *Agent) observeReceiver(ctx context.Context, s state, item control.SettlementAdmission, purpose string) (ingress.Reconciliation, error) {
+func (a *Agent) observeReceiver(ctx context.Context, s state, item control.SettlementAdmission, purpose string, retire bool) (ingress.Reconciliation, error) {
 	g, err := ingress.VerifySettlement(item.Grant, item.Authority, item.Intent, a.b.Local.Owner, time.Now())
 	if err != nil || g.Purpose != purpose {
 		return ingress.Reconciliation{}, ErrInvalid
@@ -28,7 +28,12 @@ func (a *Agent) observeReceiver(ctx context.Context, s state, item control.Settl
 		return ingress.Reconciliation{}, err
 	}
 	defer c.Close()
-	out, err := c.Reconcile(ctx)
+	var out ingress.Reconciliation
+	if retire {
+		out, err = c.RetireUnsealed(ctx)
+	} else {
+		out, err = c.Reconcile(ctx)
+	}
 	if err != nil {
 		return ingress.Reconciliation{}, err
 	}
@@ -50,7 +55,7 @@ func (a *Agent) Reconcile(ctx context.Context, item control.SettlementAdmission)
 		if s.Phase != "ACTIVE" {
 			return ErrInvalid
 		}
-		out, err = a.observeReceiver(ctx, s, item, ingress.SettlementInspect)
+		out, err = a.observeReceiver(ctx, s, item, ingress.SettlementInspect, false)
 		if err != nil {
 			return err
 		}

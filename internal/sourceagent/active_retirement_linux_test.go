@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/policy"
@@ -21,6 +22,15 @@ import (
 )
 
 func TestExpiredActiveRetirementRequiresAllAdmissionProofs(t *testing.T) {
+	testExpiredRetirement(t, false)
+}
+
+func TestExpiredUnsealedSourceRetiresAdmittedCaptureAndReleasesView(t *testing.T) {
+	testExpiredRetirement(t, true)
+}
+
+func testExpiredRetirement(t *testing.T, unsealed bool) {
+	t.Helper()
 	if os.Getenv("OUTPOST_EXPIRY_INTEGRATION") != "1" {
 		t.Skip("real expiry integration is exercised on the dedicated HDD")
 	}
@@ -61,15 +71,20 @@ func TestExpiredActiveRetirementRequiresAllAdmissionProofs(t *testing.T) {
 	stop := apply()
 	must(t, f.a.Next(ctx))
 	crash := errors.New("simulated interruption after durable source fence")
+	boundary, expected := "source-agent-active-durable", "NOT_ADMITTED"
+	if unsealed {
+		boundary, expected = "source-file-durable", "ADMITTED"
+	}
 	f.a.Fault = func(point string) error {
-		if point == "source-agent-active-durable" {
+		if point == boundary {
 			return crash
 		}
 		return nil
 	}
-	if err = f.a.Run(ctx); !errors.Is(err, crash) || admissionCalls.Load() != 0 {
-		t.Fatal("source did not stop before receiver admission", err, admissionCalls.Load())
+	if err = f.a.Run(ctx); !errors.Is(err, crash) || (admissionCalls.Load() > 0) != unsealed {
+		t.Fatal("source did not stop at the expected boundary", err, admissionCalls.Load())
 	}
+	originalCalls := admissionCalls.Load()
 	stop()
 	timer := time.NewTimer(time.Until(time.Unix(f.grant.ExpiresUnix, 0)) + 20*time.Millisecond)
 	defer timer.Stop()
@@ -110,14 +125,18 @@ func TestExpiredActiveRetirementRequiresAllAdmissionProofs(t *testing.T) {
 		report, err = f.a.Reconcile(ctx, inspection)
 		return err
 	}))
-	if report.Phase != "NOT_ADMITTED" {
-		t.Fatal("missing authenticated nonadmission proof", report)
+	if report.Phase != expected {
+		t.Fatal("unexpected authenticated admission state", report)
 	}
 	if err = f.a.RetireActive(ctx, inspection, nil); !errors.Is(err, ErrInvalid) {
 		t.Fatal("read-only inspection authorized retirement", err)
 	}
 	stop()
-	retirement, stop := provision(ingress.SettlementRetire)
+	purpose := ingress.SettlementRetire
+	if unsealed {
+		purpose = ingress.SettlementRetireUnsealed
+	}
+	retirement, stop := provision(purpose)
 	defer stop()
 	f.a.Fault = func(point string) error {
 		if point == "source-active-retirement-durable" {
@@ -128,14 +147,25 @@ func TestExpiredActiveRetirementRequiresAllAdmissionProofs(t *testing.T) {
 	if err = retry(func() error { return f.a.RetireActive(ctx, retirement, nil) }); !errors.Is(err, crash) {
 		t.Fatal("did not preserve pending state after audit write", err)
 	}
+	if unsealed {
+		pending, err := f.a.Status(ctx)
+		must(t, err)
+		if pending.Phase != "ACTIVE" || pending.Milestones == nil || pending.Milestones.ProviderReleaseUnix != 0 {
+			t.Fatal("source advanced or released its view before retry", pending)
+		}
+		stop()
+	}
 	f.reopen(t)
 	must(t, f.a.RetireActive(ctx, retirement, nil))
 	must(t, f.a.RetireActive(ctx, retirement, nil))
 	f.reopen(t)
 	status, err := f.a.Status(ctx)
 	must(t, err)
-	if status.Phase != "ABANDONED" || status.Generation != "" || admissionCalls.Load() != 0 {
+	if status.Phase != "ABANDONED" || status.Generation != "" || admissionCalls.Load() != originalCalls {
 		t.Fatal("retirement advanced the generation or contacted a write route", status)
+	}
+	if unsealed && capture.ProviderReleaseObservedUnix(f.a.root, status.Operation, filepath.ToSlash(filepath.Join("operations", status.Operation, "provider"))) == 0 {
+		t.Fatal("retired source did not durably release its view")
 	}
 	t.Log("inspection kept ACTIVE; fresh owner authorization and receiver proof allowed restart-safe retirement")
 }

@@ -25,7 +25,7 @@ import (
 
 const RegistryFormat = "outpost-ingress-registry-1"
 const RenewedRegistryFormat = "outpost-ingress-registry-2"
-const maxRegistryState = 5*MaxDocument + 4096
+const maxRegistryState = 5*MaxDocument + MaxSettlementDocument + 4096
 
 type RegistryOptions struct {
 	Parent      *os.Root
@@ -49,15 +49,21 @@ type RegistryOptions struct {
 	RemoveObject       func(context.Context, string, int64) error
 }
 type registryState struct {
-	Format            string          `json:"format"`
-	Authority         string          `json:"authority"`
-	Intent            json.RawMessage `json:"intent,omitempty"`
-	ObservedUnix      int64           `json:"observedUnix"`
-	CurrentAuthority  json.RawMessage `json:"currentAuthority,omitempty"`
-	IntentAuthority   json.RawMessage `json:"intentAuthority,omitempty"`
-	OriginalAuthority json.RawMessage `json:"originalAuthority,omitempty"`
-	PreviousAuthority json.RawMessage `json:"previousAuthority,omitempty"`
-	LegacyDigest      string          `json:"legacyDigest,omitempty"`
+	Format            string              `json:"format"`
+	Authority         string              `json:"authority"`
+	Intent            json.RawMessage     `json:"intent,omitempty"`
+	ObservedUnix      int64               `json:"observedUnix"`
+	CurrentAuthority  json.RawMessage     `json:"currentAuthority,omitempty"`
+	IntentAuthority   json.RawMessage     `json:"intentAuthority,omitempty"`
+	OriginalAuthority json.RawMessage     `json:"originalAuthority,omitempty"`
+	PreviousAuthority json.RawMessage     `json:"previousAuthority,omitempty"`
+	LegacyDigest      string              `json:"legacyDigest,omitempty"`
+	LegacyRetirement  *registryRetirement `json:"legacyRetirement,omitempty"`
+}
+
+type registryRetirement struct {
+	Grant        json.RawMessage `json:"grant"`
+	ObservedUnix int64           `json:"observedUnix"`
 }
 type Registry struct {
 	root                     *os.Root
@@ -274,8 +280,8 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 		}
 		return s, e
 	}
-	// A fence may have committed just before a crash. Only an acknowledged old
-	// slot can be reused, and it is cleaned before replacing its compact record.
+	// A fence may have committed before a crash. Reuse only an acknowledged,
+	// reclaimed or explicitly retired old slot after bounded cleanup.
 	meta, e := statefile.OpenAt(g.root, "current/state", maxSessionDocument, false)
 	if e != nil {
 		return nil, e
@@ -286,7 +292,7 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 		return nil, e
 	}
 	var state sessionState
-	if storage.Decode(prior, &state, maxSessionDocument) != nil || !state.Acknowledged && len(state.Reclaimed) == 0 {
+	if storage.Decode(prior, &state, maxSessionDocument) != nil || !state.Acknowledged && len(state.Reclaimed) == 0 && len(state.Retired) == 0 {
 		return nil, ErrConflict
 	}
 	oldOptions := o
@@ -298,7 +304,7 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	oldOptions.Intent = state.Intent
 	oldOptions.Initialize = false
 	mode := sessionComplete
-	if len(state.Reclaimed) != 0 {
+	if len(state.Reclaimed) != 0 || len(state.Retired) != 0 {
 		mode = sessionInspect
 	}
 	old, e := openSessionFor(ctx, oldOptions, mode)
@@ -307,7 +313,14 @@ func (g *Registry) openSlot(ctx context.Context, raw []byte) (*Session, error) {
 	}
 	defer old.Close()
 	var next Intent
-	if canonical(raw, &next) != nil || next.Sequence <= old.intent.Sequence {
+	if canonical(raw, &next) != nil {
+		return nil, ErrConflict
+	}
+	if len(state.Retired) != 0 {
+		if next.Sequence != old.intent.Sequence || next.Parent != old.intent.Parent || next.Operation == old.intent.Operation {
+			return nil, ErrConflict
+		}
+	} else if next.Sequence <= old.intent.Sequence {
 		return nil, ErrConflict
 	}
 	if e = g.checkPredecessor(ctx, next); e != nil {
