@@ -1650,6 +1650,10 @@
         },
         {
           "path": "internal/management/snapshot_linux_test.go",
+          "name": "TestManagementSnapshotStagePublishesExactFiles"
+        },
+        {
+          "path": "internal/management/snapshot_linux_test.go",
           "name": "TestManagementSnapshotIndependentHistoryPreservesAbandonment"
         },
         {

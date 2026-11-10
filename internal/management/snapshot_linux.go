@@ -368,6 +368,12 @@ func readSnapshot(ctx context.Context, r io.Reader, raw []byte) error {
 // It requires the exact independently retained manifest hash, not "any snapshot
 // signed by this service". A historical view never claims current authority.
 func InspectSnapshot(ctx context.Context, reader io.Reader, trust SnapshotTrust, maxBytes int64) (SnapshotInspection, error) {
+	return inspectSnapshot(ctx, reader, trust, maxBytes, nil)
+}
+
+// A sink receives only verified dependencies. Its output remains private and
+// unpublished until the caller has also verified the end of the stream.
+func inspectSnapshot(ctx context.Context, reader io.Reader, trust SnapshotTrust, maxBytes int64, sink func(string, []byte) error) (SnapshotInspection, error) {
 	var out SnapshotInspection
 	if reader == nil || trust.Format != SnapshotTrustFormat || len(trust.Owner) != 32 || len(trust.Signer) != 32 || bytes.Equal(trust.Owner, trust.Signer) || !storage.ID(trust.Checkpoint) || maxBytes < 1 || maxBytes > MaxSnapshotBytes {
 		return out, ErrInvalid
@@ -451,6 +457,11 @@ func InspectSnapshot(ctx context.Context, reader io.Reader, trust SnapshotTrust,
 		if e := checkSnapshotDependency(state, refs[i], b); e != nil {
 			return SnapshotInspection{}, e
 		}
+		if sink != nil {
+			if e := sink(refs[i].path, b); e != nil {
+				return SnapshotInspection{}, e
+			}
+		}
 	}
 	// Reject concatenated snapshots and unexpected/trailing payloads.
 	var tail [1]byte
@@ -486,25 +497,35 @@ func InspectSnapshot(ctx context.Context, reader io.Reader, trust SnapshotTrust,
 // InspectSnapshotFile accepts only a private, bounded regular local file. It
 // never follows links or contacts the original service or any storage target.
 func InspectSnapshotFile(ctx context.Context, path string, trust SnapshotTrust, maxBytes int64) (SnapshotInspection, error) {
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path || maxBytes < 1 || maxBytes > MaxSnapshotBytes {
-		return SnapshotInspection{}, ErrInvalid
-	}
-	root, e := localfs.OpenRoot(filepath.Dir(path))
-	if e != nil {
-		return SnapshotInspection{}, e
-	}
-	defer root.Close()
-	f, e := localfs.OpenFile(root, filepath.Base(path), os.O_RDONLY, 0)
+	f, e := openSnapshotFile(path, maxBytes)
 	if e != nil {
 		return SnapshotInspection{}, e
 	}
 	defer f.Close()
+	return InspectSnapshot(ctx, f, trust, maxBytes)
+}
+
+func openSnapshotFile(path string, maxBytes int64) (*os.File, error) {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path || maxBytes < 1 || maxBytes > MaxSnapshotBytes {
+		return nil, ErrInvalid
+	}
+	root, e := localfs.OpenRoot(filepath.Dir(path))
+	if e != nil {
+		return nil, e
+	}
+	defer root.Close()
+	f, e := localfs.OpenFile(root, filepath.Base(path), os.O_RDONLY, 0)
+	if e != nil {
+		return nil, e
+	}
 	info, e := f.Stat()
 	if e != nil {
-		return SnapshotInspection{}, e
+		f.Close()
+		return nil, e
 	}
 	if !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || info.Size() < 1 || info.Size() > maxBytes {
-		return SnapshotInspection{}, ErrInvalid
+		f.Close()
+		return nil, ErrInvalid
 	}
-	return InspectSnapshot(ctx, f, trust, maxBytes)
+	return f, nil
 }

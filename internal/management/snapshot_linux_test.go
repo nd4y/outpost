@@ -24,6 +24,60 @@ func snapshotBytes(t *testing.T, f *fixture) ([]byte, SnapshotTrust, SnapshotRec
 	trust := SnapshotTrust{SnapshotTrustFormat, f.options.Owner, f.options.Signer.Public().(ed25519.PublicKey), receipt.Checkpoint}
 	return b.Bytes(), trust, receipt
 }
+
+func TestManagementSnapshotStagePublishesExactFiles(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	_, req, _ := commandFixture(t, f)
+	f.r.Fault = interruptAt("management-command-intent-durable")
+	if _, e := f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req); e == nil {
+		t.Fatal("missing interruption")
+	}
+	f.reopen(t)
+	raw, trust, receipt := snapshotBytes(t, f)
+	registry, e := f.r.store.Read("registry.json")
+	must(t, e)
+	state, e := validateRegistry(registry, trust.Owner, trust.Signer)
+	must(t, e)
+	base := t.TempDir()
+	must(t, os.Chmod(base, 0700))
+	input := filepath.Join(base, "checkpoint.ops")
+	output := filepath.Join(base, "history")
+	for _, invalid := range [][]byte{raw[:len(raw)-1], append(bytes.Clone(raw), 0)} {
+		must(t, os.WriteFile(input, invalid, 0600))
+		if _, e = StageSnapshotFile(ctx, input, output, trust, 8<<20); e == nil {
+			t.Fatal("invalid stream staged")
+		}
+		if _, e = os.Stat(output); !errors.Is(e, os.ErrNotExist) {
+			t.Fatal("invalid stream published", e)
+		}
+	}
+	must(t, os.WriteFile(input, raw, 0600))
+	staged, e := StageSnapshotFile(ctx, input, output, trust, 8<<20)
+	must(t, e)
+	if staged != receipt || staged.ReplayAllowed || staged.CurrentState != "UNKNOWN" {
+		t.Fatal(staged)
+	}
+	for _, ref := range snapshotRefs(state) {
+		expected, e := snapshotRead(f.r.root, ref)
+		must(t, e)
+		file := filepath.Join(output, ref.path)
+		actual, e := os.ReadFile(file)
+		if expected == nil && ref.optional && errors.Is(e, os.ErrNotExist) {
+			continue
+		}
+		must(t, e)
+		info, e := os.Stat(file)
+		must(t, e)
+		if !bytes.Equal(actual, expected) || info.Mode().Perm() != 0600 {
+			t.Fatal("unexpected staged dependency", ref.path)
+		}
+	}
+	if _, e = StageSnapshotFile(ctx, input, output, trust, 8<<20); !errors.Is(e, ErrConflict) {
+		t.Fatal("staging replaced existing directory", e)
+	}
+}
+
 func TestManagementSnapshotIndependentHistoryPreservesAbandonment(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
