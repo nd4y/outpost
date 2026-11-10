@@ -195,6 +195,11 @@ func (record retentionPlanRecord) matches(tenant, node string, req command.Reque
 		permit.Window != nil && *permit.Window == *p.Window && slices.Equal(permit.Retire, p.Retire)
 }
 
+func expiredRetirementWindow(s registryState, operation string, now int64) bool {
+	plan, ok := s.RetentionPlans[operation]
+	return ok && plan.Plan.Request.Preview.Window.ExpiresUnix <= max(now, s.ObservedUnix)
+}
+
 func (r *Registry) readPlannedRetirement(s registryState, plan retentionPlanRecord, o commandOperation, out *RetentionPlanStatus) error {
 	req, _, e := r.commandRequest(o)
 	if e != nil {

@@ -193,7 +193,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		must(t, e)
 		return receipt
 	}
-	requireReconcile := func(actors []Principal, operation, expected string) {
+	requireReconcile := func(t *testing.T, actors []Principal, operation, expected string) {
 		t.Helper()
 		result, e := f.r.Reconcile(ctx, actors, 0, 16)
 		must(t, e)
@@ -204,7 +204,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		}
 		t.Fatalf("expected %s for %s, got %+v", expected, operation, result.Items)
 	}
-	requireReconcile([]Principal{f.p}, closeReq.Operation, "WAITING_PREREQUISITE")
+	requireReconcile(t, []Principal{f.p}, closeReq.Operation, "WAITING_PREREQUISITE")
 	if replay := stage(f, closeReq); replay != staged {
 		t.Fatal("stage replay changed original receipt", replay)
 	}
@@ -219,7 +219,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		grant.Retirement = &generation.RetirementBinding{Node: f.e.Node, Operation: op}
 		return grant
 	}
-	requestProtection := func(authority []byte, label string, g generation.RetentionProtection) command.Request {
+	requestProtection := func(t *testing.T, authority []byte, label string, g generation.RetentionProtection) command.Request {
 		t.Helper()
 		grant, e := generation.SignRetentionProtection(g, signer)
 		must(t, e)
@@ -261,7 +261,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	}
 	hold := func(peer *fixture, r *generation.Replica, authority []byte, suffix string) (CommandObservation, []byte, Principal) {
 		t.Helper()
-		return queue(peer, r, requestProtection(authority, "hold-"+suffix, holdGrant(peer, suffix)))
+		return queue(peer, r, requestProtection(t, authority, "hold-"+suffix, holdGrant(peer, suffix)))
 	}
 	observe := func(peer *fixture, sequence uint64, commands ...CommandObservation) {
 		t.Helper()
@@ -275,7 +275,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		_, e = f.r.PublishReport(ctx, peer.e.Node, f.e.Tenant, peer.e.Node, raw)
 		must(t, e)
 	}
-	a1Req := requestProtection(authorityA, "hold-a1", holdGrant(a, "a1"))
+	a1Req := requestProtection(t, authorityA, "hold-a1", holdGrant(a, "a1"))
 	a1Step := RetentionStepRequest{Format: RetentionStepRequestFormat, Node: a.e.Node, Command: a1Req}
 	f.r.Fault = func(point string) error {
 		if point == "management-retention-step-durable" {
@@ -288,8 +288,8 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	}
 	f.reopen(t)
 	stage(a, a1Req)
-	requireReconcile(nil, a1Req.Operation, "BLOCKED")
-	requireReconcile([]Principal{f.p}, a1Req.Operation, "PUBLISHED")
+	requireReconcile(t, nil, a1Req.Operation, "BLOCKED")
+	requireReconcile(t, []Principal{f.p}, a1Req.Operation, "PUBLISHED")
 	a1, ack, node := queue(a, ra, a1Req)
 	_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, a.e.Node, a1.Operation, ack)
 	must(t, e)
@@ -359,10 +359,10 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		}
 		return nil
 	}
-	requireReconcile([]Principal{f.p}, req.Operation, "BLOCKED")
+	requireReconcile(t, []Principal{f.p}, req.Operation, "BLOCKED")
 	f.reopen(t)
 	checkPlan("RETIREMENT_INTENT_RECORDED", false)
-	requireReconcile([]Principal{f.p}, req.Operation, "PUBLISHED")
+	requireReconcile(t, []Principal{f.p}, req.Operation, "PUBLISHED")
 	checkPlan("RETIREMENT_QUEUED", false)
 	targetNode := Principal{Actor: f.e.Node, Roles: []string{"node"}, Scopes: []Scope{{f.e.Tenant, trust.Domain}}}
 	list, _, e := f.r.Commands(ctx, targetNode, f.e.Tenant, f.e.Node, 0, 32)
@@ -380,11 +380,11 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	}
 
 	a3, _, _ := hold(a, ra, authorityA, "a3")
-	undelivered := requestProtection(authorityA, "hold-a4", holdGrant(a, "a4"))
+	undelivered := requestProtection(t, authorityA, "hold-a4", holdGrant(a, "a4"))
 	_, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, a.e.Node, undelivered)
 	must(t, e)
 	targetReplica := openCopy(f)
-	requireReconcile([]Principal{f.p}, closeReq.Operation, "PUBLISHED")
+	requireReconcile(t, []Principal{f.p}, closeReq.Operation, "PUBLISHED")
 	closeObservation, closeAck, closeNode := queue(f, targetReplica, closeReq)
 	checkPlan("CLOSURE_PENDING", true)
 	state, e := f.r.retentionState(ctx)
@@ -394,7 +394,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	if !hasPlannedClose(state, f.e.Tenant, request.Preview) || hasPlannedClose(state, f.e.Tenant, otherEpoch) {
 		t.Fatal("close intent crossed a repository epoch")
 	}
-	newHold := requestProtection(authorityA, "hold-a5", holdGrant(a, "a5"))
+	newHold := requestProtection(t, authorityA, "hold-a5", holdGrant(a, "a5"))
 	if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, a.e.Node, newHold); !errors.Is(e, ErrConflict) {
 		t.Fatal("new hold admitted after close intent", e)
 	}
@@ -423,7 +423,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		must(t, e)
 		g := protection(peer, pin.Operation, "RELEASE")
 		g.Generation, g.HoldDigest, g.Retirement, g.Closure = pin.Generation, pin.HoldDigest, pin.Retirement, &closure
-		return requestProtection(authority, "release-"+old.Operation, g)
+		return requestProtection(t, authority, "release-"+old.Operation, g)
 	}
 	releasedA := []CommandObservation{a1, a2, a3}
 	for _, old := range []CommandObservation{a1, a2, a3} {
@@ -435,7 +435,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	pendingRelease := holdGrant(a, "a4")
 	pendingRelease.Action, pendingRelease.HoldDigest = "RELEASE", storage.Hash(undelivered.RetentionGrant)
 	pendingRelease.Closure, pendingRelease.PendingHold = &closure, undelivered.RetentionGrant
-	fenced, fenceAck, fenceNode := queue(a, ra, requestProtection(authorityA, "release-undelivered", pendingRelease))
+	fenced, fenceAck, fenceNode := queue(a, ra, requestProtection(t, authorityA, "release-undelivered", pendingRelease))
 	_, e = f.r.AcknowledgeCommand(ctx, fenceNode, f.e.Tenant, a.e.Node, fenced.Operation, fenceAck)
 	must(t, e)
 	if _, e = ra.ApplyRetentionProtection(ctx, undelivered.RetentionGrant, nil); !errors.Is(e, generation.ErrConflict) {
@@ -444,7 +444,7 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	releasedA = append(releasedA, fenced)
 	releaseB := releaseRequest(b, authorityB, b1)
 	stage(b, releaseB)
-	requireReconcile([]Principal{f.p}, releaseB.Operation, "PUBLISHED")
+	requireReconcile(t, []Principal{f.p}, releaseB.Operation, "PUBLISHED")
 	c, ack, node := queue(b, rb, releaseB)
 	observe(a, 3, releasedA...)
 	observe(b, 4, b1, c)
@@ -468,4 +468,104 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 			t.Fatal("hold settled without its release", settled)
 		}
 	}
+
+	t.Run("ExpiredWindowAfterRestart", func(t *testing.T) {
+		expiredOp, holdOp := id("expired retirement"), id("expired hold")
+
+		// Model a signed registry restored after its deadline. Keep the outer
+		// command authority live so it cannot mask the inner window check.
+		at := time.Now().Unix()
+		preview := request.Preview
+		preview.Operation = expiredOp
+		preview.Window = &generation.PermitWindow{Node: f.e.Node, StartUnix: at - 20, ExpiresUnix: at - 1}
+		record := retentionPlanRecord{
+			Plan: RetentionPlan{Format: "outpost-retention-plan-1", Tenant: f.e.Tenant, Actor: f.p.Actor, RegisteredUnix: at - 10,
+				Request: RetentionDraftRequest{Format: RetentionPlanRequestFormat, Preview: preview, HoldCommands: []string{holdOp}}},
+			Trust: trust,
+		}
+		must(t, f.r.store.WithLock(ctx, func() error {
+			s, e := f.r.load()
+			if e != nil {
+				return e
+			}
+			record.Plan.RegistrationRevision = s.Revision + 1
+			s.RetentionPlans[expiredOp] = record
+			return f.r.save(s)
+		}))
+		permit := preview
+		permit.Format = generation.RetentionPermitFormat
+		permit.Coverage = &generation.RetentionCoverage{MinimumCopies: 2}
+		for _, peer := range []struct {
+			node    *fixture
+			replica *generation.Replica
+		}{{a, ra}, {b, rb}} {
+			hold := protection(peer.node, id("expired hold grant"), "HOLD")
+			hold.Generation = generationID
+			hold.Retirement = &generation.RetirementBinding{Node: f.e.Node, Operation: expiredOp}
+			signed, e := generation.SignRetentionProtection(hold, signer)
+			must(t, e)
+			proof, e := peer.replica.ApplyRetentionProtection(ctx, signed, nil)
+			must(t, e)
+			permit.Coverage.Witnesses = append(permit.Coverage.Witnesses, proof)
+		}
+		req := command.Request{Operation: expiredOp, Reason: "OWNER_MAINTENANCE", Tenant: f.e.Tenant, Domain: trust.Domain,
+			Kind: "maintenance", ExpectedRevision: targetCfg.Revision, Authority: targetAuthority, ExpiresUnix: at + 300}
+		signedPermit, e := generation.SignPermit(permit, signer)
+		req.MaintenancePermit = signedPermit
+		must(t, e)
+		if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req); !errors.Is(e, ErrDenied) {
+			t.Fatal("expired retirement accepted with live outer authority", e)
+		}
+		step := RetentionStepRequest{Format: RetentionStepRequestFormat, Node: f.e.Node, Command: req}
+		if _, e = f.r.StageRetentionStep(ctx, f.p, f.e.Tenant, trust.Domain, expiredOp, step); !errors.Is(e, ErrDenied) {
+			t.Fatal("expired retirement could be staged", e)
+		}
+
+		must(t, f.r.store.WithLock(ctx, func() error {
+			s, e := f.r.load()
+			if e != nil {
+				return e
+			}
+			requestBytes, e := json.Marshal(req)
+			if e != nil {
+				return e
+			}
+			requestDigest := req.Digest()
+			if e = f.r.commandBlob("request", requestDigest, requestBytes); e != nil {
+				return e
+			}
+			digest := commandRequestDigest(f.p, f.e.Node, req)
+			s.CommandOperations[expiredOp] = commandOperation{
+				Node: f.e.Node, NodeKey: f.e.PublicKey, Request: requestDigest, Configuration: s.Configurations[f.e.Node].Digest,
+				Receipt: Receipt{Format: "outpost-management-receipt-1", Operation: expiredOp, RequestDigest: digest, State: "ADMITTED", ObservedUnix: at - 2},
+				Audit: Audit{Operation: expiredOp, Sequence: s.Revision + 1, Actor: f.p.Actor, Tenant: f.e.Tenant, Domain: trust.Domain,
+					Reason: req.Reason, Action: "COMMAND_MAINTENANCE", State: "ADMITTED", ObservedUnix: at - 2, RequestDigest: digest},
+			}
+			return f.r.save(s)
+		}))
+		f.reopen(t)
+		result, e := f.r.RetentionPlanStatus(ctx, f.p, f.e.Tenant, trust.Domain, expiredOp, time.Minute)
+		must(t, e)
+		if result.State != "RETIREMENT_INTENT_RECORDED" || !result.CloseRequired {
+			t.Fatal("expired intent lost its closure requirement", result)
+		}
+		requireReconcile(t, []Principal{f.p}, expiredOp, "BLOCKED")
+
+		close := requestProtection(t, targetAuthority, "close expired", protection(f, expiredOp, "CLOSE"))
+		_, e = f.r.StageRetentionStep(ctx, f.p, f.e.Tenant, trust.Domain, expiredOp,
+			RetentionStepRequest{Format: RetentionStepRequestFormat, Node: f.e.Node, Command: close})
+		must(t, e)
+		requireReconcile(t, []Principal{f.p}, close.Operation, "PUBLISHED")
+		items, _, e := f.r.Commands(ctx, targetNode, f.e.Tenant, f.e.Node, 0, 32)
+		must(t, e)
+		if len(items) != 1 {
+			t.Fatal("expected only signed closure in queue", len(items))
+		}
+		env, _, e := command.VerifyEnvelope(items[0].Document, f.options.Owner)
+		must(t, e)
+		if env.Request.Operation != close.Operation {
+			t.Fatal("expired retirement became visible after restart", env.Request.Operation)
+		}
+		must(t, ra.VerifyComplete(ctx, generationID))
+	})
 }

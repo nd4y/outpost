@@ -159,6 +159,9 @@ func (r *Registry) admitCommandPolicy(ctx context.Context, s registryState, p Pr
 		if _, err = generation.VerifyPermit(input.MaintenancePermit, plan.Trust); err != nil {
 			return enrollment, "", ErrConflict
 		}
+		if expiredRetirementWindow(s, input.Operation, time.Now().Unix()) {
+			return enrollment, "", ErrDenied
+		}
 	}
 	if input.Kind == "retention" {
 		grant, e := cfg.RetentionProtection(input)
@@ -279,6 +282,11 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 		if e = r.point("management-command-envelope-durable"); e != nil {
 			return e
 		}
+		// Persisting an intent or envelope can outlast the independently signed
+		// retirement window. Keep the intent for closure, without exposing it.
+		if expiredRetirementWindow(s, input.Operation, time.Now().Unix()) {
+			return ErrDenied
+		}
 		o.Envelope = envelopeID
 		s.CommandOperations[input.Operation] = o
 		if e = r.save(s); e != nil {
@@ -377,8 +385,14 @@ func (r *Registry) Commands(ctx context.Context, p Principal, tenant, node strin
 		}
 		sort.Slice(candidates, func(i, j int) bool { return position(candidates[i]) < position(candidates[j]) })
 		bytes := 0
+		now := time.Now().Unix()
 		for _, o := range candidates {
 			if o.Envelope == "" {
+				// A retirement that can no longer be published must not
+				// prevent the worker from receiving its signed closure.
+				if o.Audit.Action == "COMMAND_MAINTENANCE" && expiredRetirementWindow(s, o.Receipt.Operation, now) {
+					continue
+				}
 				break
 			}
 			raw, _, e := r.readCommand(o)
