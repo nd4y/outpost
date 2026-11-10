@@ -11,9 +11,11 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
+	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,11 +24,16 @@ import (
 
 func TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant(t *testing.T) {
 	f := newFixture(t)
+	// Leave room for durable publication on a rotational test disk. The
+	// revocation path below must still close a request with its body open.
+	f.cfg.Limits.AttemptMillis = 60000
 	received := make(chan struct{}, 1)
+	served := make(chan struct{}, 1)
 	server := f.endpoint(t, func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Header.Get("Outpost-Test-Stall") == "1" {
 				received <- struct{}{}
+				defer func() { served <- struct{}{} }()
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -43,7 +50,7 @@ func TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant(t *testing.T)
 	i := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte("source-op")), Authority: storage.Hash(araw), Tenant: a.Tenant, Profile: a.Profile, Source: a.Source, Ingress: a.Ingress, Domain: a.Trust.Domain, Repository: a.Trust.Repository, Epoch: 1, Sequence: 1, Policy: 1, SnapshotUnix: time.Now().Unix(), NotBefore: a.NotBefore, ExpiresUnix: a.ExpiresUnix, MaxBytes: a.MaxBytes, MaxObjects: a.MaxObjects}
 	iraw, e := ingress.SignIntent(i, araw, f.owner.Public().(ed25519.PublicKey), f.writer, time.Now())
 	must(t, e)
-	client, e := ingress.NewClient(server.URL, araw, iraw, f.owner.Public().(ed25519.PublicKey), f.nodes[0].cert, f.ca.pool, peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1})
+	client, e := ingress.NewClient(server.URL, araw, iraw, f.owner.Public().(ed25519.PublicKey), f.nodes[0].cert, f.ca.pool, peer.Limits{Concurrency: 1, Timeout: 60 * time.Second, Attempts: 1})
 	must(t, e)
 	defer client.Close()
 	must(t, client.Begin(ctx))
@@ -85,7 +92,7 @@ func TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant(t *testing.T)
 	i.SnapshotUnix = time.Now().Unix()
 	iraw, e = ingress.SignIntent(i, araw, f.owner.Public().(ed25519.PublicKey), f.writer, time.Now())
 	must(t, e)
-	next, e := ingress.NewClient(server.URL, araw, iraw, f.owner.Public().(ed25519.PublicKey), f.nodes[0].cert, f.ca.pool, peer.Limits{Concurrency: 1, Timeout: 5 * time.Second, Attempts: 1})
+	next, e := ingress.NewClient(server.URL, araw, iraw, f.owner.Public().(ed25519.PublicKey), f.nodes[0].cert, f.ca.pool, peer.Limits{Concurrency: 1, Timeout: 60 * time.Second, Attempts: 1})
 	must(t, e)
 	defer next.Close()
 	must(t, next.Begin(ctx))
@@ -96,7 +103,7 @@ func TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant(t *testing.T)
 	defer writer.Close()
 	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: f.ca.pool, Certificates: []tls.Certificate{f.nodes[0].cert}}}
 	defer transport.CloseIdleConnections()
-	stall := &http.Client{Transport: transport, Timeout: 10 * time.Second}
+	stall := &http.Client{Transport: transport, Timeout: 60 * time.Second}
 	request, e := http.NewRequest(http.MethodPut, server.URL+"/v1/tenants/"+i.Tenant+"/domains/"+i.Domain+"/captures/"+i.Operation+"/objects/"+storage.Hash([]byte("stalled-object")), reader)
 	must(t, e)
 	request.ContentLength = 100
@@ -119,13 +126,25 @@ func TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant(t *testing.T)
 	case <-time.After(2 * time.Second):
 		t.Fatal("stalled request absent")
 	}
+	select {
+	case <-served:
+		t.Fatal("stalled request ended before the policy change")
+	default:
+	}
 	revoked := time.Now()
 	f.cfg.Ingress = nil
 	f.cfg.Revision = 2
 	f.config(t, 1, nil)
 	wait(t, func() bool { w.mu.Lock(); defer w.mu.Unlock(); return w.active != nil && w.active.cfg.Revision == 2 })
-	if time.Since(revoked) > 3*time.Second {
+	if time.Since(revoked) >= 30*time.Second {
 		t.Fatal("revocation waited for body timeout")
+	}
+	// The server must return while the sender still holds the body open. The
+	// HTTP/1 client can wait for its own body writer before returning.
+	select {
+	case <-served:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stalled request handler leaked after revocation")
 	}
 	writer.Close()
 	select {
@@ -153,4 +172,102 @@ func TestWorkerAdmitsSourceUnderCachedPolicyAndCancelsRevokedGrant(t *testing.T)
 	// The ordinary signed configuration remains valid without the removed grant.
 	_, e = control.Sign(f.config(t, 1, nil), f.owner)
 	must(t, e)
+}
+
+func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	source, bridge, target := f.nodes[0], f.nodes[1], f.nodes[2]
+	_, first := f.jobs()
+	second := first
+	second.Operation = storage.Hash([]byte("second ordinary transfer"))
+	jobs := []control.Job{first, second}
+	started := make(chan string, len(jobs))
+	releaseFirst, releaseSecond := make(chan struct{}), make(chan struct{})
+	releases := map[string]chan struct{}{first.Operation: releaseFirst, second.Operation: releaseSecond}
+	bridgeServer := f.endpoint(t, func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			op := r.Header.Get("Outpost-Operation")
+			release := releases[op]
+			if release == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+			select {
+			case started <- op:
+			case <-r.Context().Done():
+				return
+			}
+			select {
+			case <-release:
+				http.Error(w, "synthetic rejection", http.StatusForbidden)
+			case <-r.Context().Done():
+			}
+		})
+	})
+	httpServer, err := target.HTTPServer()
+	must(t, err)
+	targetServer := httptest.NewUnstartedServer(httpServer.Handler)
+	targetServer.TLS = httpServer.TLSConfig
+	targetServer.StartTLS()
+	t.Cleanup(targetServer.Close)
+	f.cfg.Nodes[2].Endpoint = targetServer.URL
+	f.cfg.Format = control.SettlementConfigFormat
+	f.cfg.Limits.Parallel, f.cfg.Limits.AttemptMillis = 1, 60000
+	f.domain.Placement.Edges = append(f.domain.Placement.Edges, policy.Edge{From: source.node, To: target.node, Mode: "push"})
+	owner := f.owner.Public().(ed25519.PublicKey)
+	intent := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte("queued capture")), Tenant: storage.Hash([]byte("tenant")), Profile: storage.Hash([]byte("profile")), Source: source.node, Domain: f.domain.Trust.Domain, Repository: f.domain.Trust.Repository, Epoch: 1, Sequence: 1, Policy: 1, SnapshotUnix: time.Now().Unix(), NotBefore: f.cfg.NotBefore, ExpiresUnix: f.cfg.ExpiresUnix, MaxBytes: 32 << 20, MaxObjects: 64}
+	capture := func(index int, endpoint, stagingPeer string) *ingress.Client {
+		t.Helper()
+		i := intent
+		i.Ingress = f.nodes[index].node
+		a := ingress.Authority{Format: ingress.AuthorityFormat, Tenant: i.Tenant, Profile: i.Profile, Source: i.Source, Ingress: i.Ingress, Revision: 1, NotBefore: i.NotBefore, ExpiresUnix: i.ExpiresUnix, Trust: f.domain.Trust, MaxBytes: i.MaxBytes, MaxObjects: i.MaxObjects}
+		grant, err := ingress.SignAuthority(a, f.owner)
+		must(t, err)
+		i.Authority = storage.Hash(grant)
+		signed, err := ingress.SignIntent(i, grant, owner, f.writer, time.Now())
+		must(t, err)
+		f.cfg.Ingress = []json.RawMessage{grant}
+		f.domain.CaptureStagingPeers = []string{stagingPeer}
+		f.config(t, index, jobs)
+		client, err := ingress.NewClient(endpoint, grant, signed, owner, source.cert, f.ca.pool, peer.Limits{Concurrency: 1, Timeout: 60 * time.Second, Attempts: 1})
+		must(t, err)
+		t.Cleanup(client.Close)
+		return client
+	}
+	origin := capture(1, bridgeServer.URL, target.node)
+	destination := capture(2, targetServer.URL, bridge.node)
+	stopBridge := start(t, bridge)
+	wait(t, func() bool { bridge.mu.Lock(); defer bridge.mu.Unlock(); return bridge.active != nil })
+	must(t, origin.Begin(ctx))
+	data := []byte("durably staged ciphertext")
+	object := filekit.Object{ID: storage.Hash(data), Bytes: len(data)}
+	_, err = origin.Write(ctx, object, data)
+	must(t, err)
+	stopTarget := start(t, target)
+	waitForStart := func(expected string) {
+		t.Helper()
+		select {
+		case op := <-started:
+			if op != expected {
+				t.Fatalf("started %s, want %s", op, expected)
+			}
+		case <-time.After(60 * time.Second):
+			t.Fatal("transfer did not get a worker slot")
+		}
+	}
+	waitForStart(first.Operation)
+	must(t, destination.Begin(ctx))
+	must(t, destination.QueueStaged(ctx, origin, object))
+	if err = destination.Check(ctx, object); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the import ran while the only slot was occupied: %v", err)
+	}
+	close(releaseFirst)
+	waitForStart(second.Operation)
+	if err = destination.Check(ctx, object); err != nil {
+		t.Fatalf("next ordinary transfer took the slot before the pending import: %v", err)
+	}
+	close(releaseSecond)
+	stopTarget()
+	stopBridge()
 }

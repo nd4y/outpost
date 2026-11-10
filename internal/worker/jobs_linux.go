@@ -24,6 +24,32 @@ func (w *Worker) jobs(v *view) error {
 	results := make(chan result, v.cfg.Limits.Parallel)
 	running := map[string]bool{}
 	coverageNext := map[string]time.Time{}
+	preferCapture := false
+	scheduleCapture := func(limit int) bool {
+		started := 0
+		for domain, local := range v.domains {
+			if started == limit || len(running) >= v.cfg.Limits.Parallel {
+				break
+			}
+			key := "capture-coverage/" + domain
+			if local.ingress == nil || running[key] || v.paused(domain, "") || time.Now().Before(coverageNext[domain]) {
+				continue
+			}
+			running[key] = true
+			started++
+			go func() {
+				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
+				defer cancel()
+				paused := func(op string) bool { return v.paused(domain, op) }
+				advanced, err := local.ingress.AdvanceCoverage(ctx, paused)
+				if err == nil && !advanced {
+					advanced, err = local.ingress.AdvanceStagedImport(ctx, paused)
+				}
+				results <- result{coverage: domain, advanced: advanced, err: err}
+			}()
+		}
+		return started != 0
+	}
 	finish := func(r result) error {
 		if r.coverage != "" {
 			delete(running, "capture-coverage/"+r.coverage)
@@ -119,6 +145,11 @@ func (w *Worker) jobs(v *view) error {
 				desired = append(desired, old.Job)
 			}
 		}
+		// Alternate the first available slot under transfer load. Capture work
+		// still shares the same concurrency limit and never displaces a running job.
+		if preferCapture && scheduleCapture(1) {
+			preferCapture = false
+		}
 		for _, j := range desired {
 			if j.Executor != w.node || s.Rejected[j.Operation] != "" || running[j.Operation] || len(running) >= v.cfg.Limits.Parallel || v.paused(j.Domain, j.Operation) || s.Controls.paused(j.Domain, j.Operation) {
 				continue
@@ -148,6 +179,7 @@ func (w *Worker) jobs(v *view) error {
 				return errors.Join(e, joined)
 			}
 			running[j.Operation] = true
+			preferCapture = true
 			go func(job control.Job) {
 				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
 				defer cancel()
@@ -164,25 +196,8 @@ func (w *Worker) jobs(v *view) error {
 		if len(running) < v.cfg.Limits.Parallel {
 			w.scheduleExternalAudit(v, s, running, results)
 		}
-		for domain, local := range v.domains {
-			if len(running) >= v.cfg.Limits.Parallel {
-				break
-			}
-			key := "capture-coverage/" + domain
-			if local.ingress == nil || running[key] || v.paused(domain, "") || time.Now().Before(coverageNext[domain]) {
-				continue
-			}
-			running[key] = true
-			go func() {
-				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
-				defer cancel()
-				paused := func(op string) bool { return v.paused(domain, op) }
-				advanced, err := local.ingress.AdvanceCoverage(ctx, paused)
-				if err == nil && !advanced {
-					advanced, err = local.ingress.AdvanceStagedImport(ctx, paused)
-				}
-				results <- result{coverage: domain, advanced: advanced, err: err}
-			}()
+		if scheduleCapture(v.cfg.Limits.Parallel) {
+			preferCapture = false
 		}
 		select {
 		case r := <-results:
