@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -343,10 +344,12 @@ func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []
 }
 
 func stagedOriginUnavailable(err error) bool {
+	var dns *net.DNSError
 	return errors.Is(err, os.ErrNotExist) || errors.Is(err, ErrUnavailable) ||
-		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, syscall.ECONNREFUSED) ||
-		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ENETUNREACH) ||
-		errors.Is(err, syscall.EHOSTUNREACH)
+		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, syscall.ETIMEDOUT) ||
+		errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.EHOSTUNREACH) ||
+		errors.As(err, &dns)
 }
 
 func (g *Registry) fetchStaged(ctx context.Context, target, peerIntent Intent, endpoint string, origin stagingOrigin, ref filekit.Object) ([]byte, error) {

@@ -6,9 +6,12 @@ import (
 	"crypto/ed25519"
 	"crypto/tls"
 	"errors"
+	"net"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,6 +20,25 @@ import (
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/storage"
 )
+
+func TestStagedOriginAvailabilityDistinguishesTransportAndPolicyErrors(t *testing.T) {
+	for _, test := range []struct {
+		err         error
+		unavailable bool
+	}{
+		{&net.DNSError{Err: "no such host", Name: "peer.invalid", IsNotFound: true}, true},
+		{syscall.ETIMEDOUT, true},
+		{context.DeadlineExceeded, true},
+		{context.Canceled, false},
+		{ErrDenied, false},
+		{ErrProtocol, false},
+	} {
+		err := &url.Error{Op: "GET", URL: "https://peer.invalid", Err: test.err}
+		if got := stagedOriginUnavailable(err); got != test.unavailable {
+			t.Errorf("availability of %v = %t, want %t", err, got, test.unavailable)
+		}
+	}
+}
 
 func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 240*time.Second)

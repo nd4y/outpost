@@ -324,9 +324,15 @@ func TestSourceSelectsPreviousStagedHolder(t *testing.T) {
 	primary, err := ingress.NewClient(f.server.URL, f.authority, raw, a.b.Local.Owner, a.cert, a.roots, sourceFixtureLimits)
 	must(t, err)
 	t.Cleanup(primary.Close)
+	var stallPrimary, stalledRead atomic.Bool
 	f.registryMu.Lock()
 	f.intercept = func(out http.ResponseWriter, req *http.Request) bool {
 		if req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/staged/") {
+			if stallPrimary.Load() {
+				stalledRead.Store(true)
+				<-req.Context().Done()
+				return true
+			}
 			http.Error(out, "survivor staged reads unavailable", http.StatusServiceUnavailable)
 			return true
 		}
@@ -348,8 +354,13 @@ func TestSourceSelectsPreviousStagedHolder(t *testing.T) {
 	if err := target.Check(ctx, ref); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("target already held the object: %v", err)
 	}
-	if advanced, err := registry.AdvanceStagedImport(ctx, func(string) bool { return false }); err != nil || !advanced {
-		t.Fatalf("recipient did not use the confirmed alternate: %v, %v", advanced, err)
+	// The primary accepts mTLS but never sends a response to the worker.
+	// The alternate must still fit in the same overall attempt.
+	stallPrimary.Store(true)
+	attempt, stop := context.WithTimeout(ctx, 12*time.Second)
+	defer stop()
+	if advanced, err := registry.AdvanceStagedImport(attempt, func(string) bool { return false }); err != nil || !advanced || !stalledRead.Load() {
+		t.Fatalf("recipient did not use the confirmed alternate after the primary stalled: %v, %v", advanced, err)
 	}
 	must(t, sink.Check(ctx, ref))
 	got, err := target.Read(ctx, ref)
