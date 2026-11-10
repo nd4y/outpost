@@ -51,7 +51,7 @@ func (r *Replica) publishedEvidenceLocked(ctx context.Context, id string) (Publi
 		if e != nil {
 			return e
 		}
-		v, e := r.verification(id, "", refs)
+		v, _, e := r.verification(id, "", refs)
 		if e != nil {
 			return e
 		}

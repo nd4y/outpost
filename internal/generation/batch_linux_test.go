@@ -106,6 +106,53 @@ func TestBatchedReceptionDurableProgressFaultAndCancellation(t *testing.T) {
 	}
 }
 
+func TestBatchedReceptionSyncsParentUntilFirstCheckpointIsDurable(t *testing.T) {
+	dir := filepath.Join(temp(t), "replica")
+	trust, key, _ := trust(t)
+	r := openTest(t, dir, trust)
+	raw, objects := synthetic(t, trust, key, 1, "parent")
+	interrupted := errors.New("stop before first verification checkpoint")
+	parentSyncs := 0
+	fault := func(point string) error {
+		if point == "verification-directory-durable" {
+			parentSyncs++
+			if parentSyncs == 1 {
+				return interrupted
+			}
+		}
+		return nil
+	}
+	r.Fault = fault
+	if _, err := r.ReceiveBatch(ctx, raw, 1, MaxObject, fetch(objects)); !errors.Is(err, interrupted) {
+		t.Fatalf("first checkpoint boundary not reached: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "verification", Hash(raw))); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("checkpoint exists before its first write: %v", err)
+	}
+	ok(t, r.Close())
+
+	r, err := Open(dir, trust, false)
+	ok(t, err)
+	r.Fault = fault
+	first, err := r.ReceiveBatch(ctx, raw, 1, MaxObject, fetch(objects))
+	ok(t, err)
+	if first.Complete || first.VerifiedObjects != 1 || parentSyncs != 2 {
+		t.Fatalf("missing checkpoint did not repeat parent sync: %+v, syncs=%d", first, parentSyncs)
+	}
+	ok(t, r.Close())
+
+	r, err = Open(dir, trust, false)
+	ok(t, err)
+	defer r.Close()
+	r.Fault = fault
+	final, err := r.ReceiveBatch(ctx, raw, 1, MaxObject, fetch(objects))
+	ok(t, err)
+	if !final.Complete || final.VerifiedObjects != 2 || parentSyncs != 2 {
+		t.Fatalf("durable checkpoint repeated parent sync or failed to publish: %+v, syncs=%d", final, parentSyncs)
+	}
+	ok(t, r.VerifyComplete(ctx, Hash(raw)))
+}
+
 func TestBatchedReplayKeepsRecordedVerificationTimeAndChecksChangedStamps(t *testing.T) {
 	base := temp(t)
 	trust, key, _ := trust(t)

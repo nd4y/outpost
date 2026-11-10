@@ -2552,6 +2552,10 @@
           "name": "TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache"
         },
         {
+          "path": "internal/generation/batch_linux_test.go",
+          "name": "TestBatchedReceptionSyncsParentUntilFirstCheckpointIsDurable"
+        },
+        {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
         },

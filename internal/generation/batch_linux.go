@@ -94,7 +94,7 @@ func verificationName(id, window string) string {
 	}
 	return "window-" + Hash([]byte(id+"/"+window))
 }
-func (r *Replica) verification(id, window string, refs map[string]Object) (verificationState, error) {
+func (r *Replica) verification(id, window string, refs map[string]Object) (verificationState, bool, error) {
 	t, _ := json.Marshal(r.trust)
 	v := verificationState{Format: VerificationFormat, Generation: id, Trust: Hash(t), Objects: map[string]objectVerification{}}
 	if window != "" {
@@ -103,29 +103,36 @@ func (r *Replica) verification(id, window string, refs map[string]Object) (verif
 	}
 	b, e := read(r.root, "verification/"+verificationName(id, window), MaxState)
 	if errors.Is(e, os.ErrNotExist) {
-		return v, nil
+		return v, false, nil
 	}
 	if e != nil {
-		return v, e
+		return v, false, e
 	}
 	var old verificationState
 	if canonical(b, &old, MaxState) != nil || old.Format != v.Format || old.Generation != id || old.Trust != v.Trust || old.Window != window || old.Objects == nil || len(old.Objects) > len(refs) || old.CompletedAt < 0 || old.CompletedAt > time.Now().Unix() || old.CompletedAt > 0 && len(old.Objects) != len(refs) {
-		return v, ErrInvalid
+		return v, false, ErrInvalid
 	}
 	for key, checked := range old.Objects {
 		ref, ok := refs[key]
 		if !ok || checked.Stamp.Size != int64(ref.Bytes) || checked.CheckedUnix <= 0 || checked.CheckedUnix > time.Now().Unix() || old.CompletedAt > 0 && checked.CheckedUnix > old.CompletedAt {
-			return v, ErrInvalid
+			return v, false, ErrInvalid
 		}
 	}
-	return old, nil
+	return old, true, nil
 }
-func (r *Replica) saveVerification(v verificationState) error {
-	if e := r.root.Mkdir("verification", 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return e
-	}
-	if e := syncDir(r.root, "."); e != nil {
-		return e
+func (r *Replica) saveVerification(v verificationState, hasCheckpoint bool) error {
+	// A loaded checkpoint proves the parent was synced before its first
+	// write. An existing directory alone could be left by a failed attempt.
+	if !hasCheckpoint {
+		if e := r.root.Mkdir("verification", 0700); e != nil && !errors.Is(e, os.ErrExist) {
+			return e
+		}
+		if e := syncDir(r.root, "."); e != nil {
+			return e
+		}
+		if e := r.point("verification-directory-durable"); e != nil {
+			return e
+		}
 	}
 	b, e := json.Marshal(v)
 	if e != nil {
@@ -249,7 +256,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 			return e
 		}
 		result.TotalObjects = len(refs)
-		v, e := r.verification(id, window, refs)
+		v, _, e := r.verification(id, window, refs)
 		if e != nil {
 			return e
 		}
@@ -346,7 +353,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		if e != nil {
 			return e
 		}
-		v, e := r.verification(id, window, refs)
+		v, hasCheckpoint, e := r.verification(id, window, refs)
 		if e != nil {
 			return e
 		}
@@ -373,7 +380,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		} else {
 			v.CompletedAt = 0
 		}
-		if e = r.saveVerification(v); e != nil {
+		if e = r.saveVerification(v, hasCheckpoint); e != nil {
 			return e
 		}
 		result.VerifiedObjects = len(v.Objects)
