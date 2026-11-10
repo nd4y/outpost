@@ -32,21 +32,22 @@ type Pin struct {
 	Kind       string `json:"kind"`
 }
 type state struct {
-	Format          string                  `json:"format"`
-	Trust           Trust                   `json:"trust"`
-	Revision        uint64                  `json:"revision"`
-	HighestSequence uint64                  `json:"highestSequence"`
-	HighestID       string                  `json:"highestId"`
-	Latest          string                  `json:"latestComplete"`
-	Generations     map[string]entry        `json:"generations"`
-	Pins            map[string]Pin          `json:"pins"`
-	Receipts        map[string]string       `json:"maintenanceReceipts"`
-	GC              map[string]gcRecord     `json:"gc,omitempty"`
-	Damage          map[string]DamageRecord `json:"damage,omitempty"`
-	Repairs         map[string]RepairRecord `json:"repairs,omitempty"`
-	CatalogDamage   map[string]DamageRecord `json:"catalogDamage,omitempty"`
-	CatalogRepairs  map[string]RepairRecord `json:"catalogRepairs,omitempty"`
-	IndexNode       string                  `json:"indexNode,omitempty"`
+	Format               string                               `json:"format"`
+	Trust                Trust                                `json:"trust"`
+	Revision             uint64                               `json:"revision"`
+	HighestSequence      uint64                               `json:"highestSequence"`
+	HighestID            string                               `json:"highestId"`
+	Latest               string                               `json:"latestComplete"`
+	Generations          map[string]entry                     `json:"generations"`
+	Pins                 map[string]Pin                       `json:"pins"`
+	RetentionProtections map[string]retentionProtectionRecord `json:"retentionProtections,omitempty"`
+	Receipts             map[string]string                    `json:"maintenanceReceipts"`
+	GC                   map[string]gcRecord                  `json:"gc,omitempty"`
+	Damage               map[string]DamageRecord              `json:"damage,omitempty"`
+	Repairs              map[string]RepairRecord              `json:"repairs,omitempty"`
+	CatalogDamage        map[string]DamageRecord              `json:"catalogDamage,omitempty"`
+	CatalogRepairs       map[string]RepairRecord              `json:"catalogRepairs,omitempty"`
+	IndexNode            string                               `json:"indexNode,omitempty"`
 }
 type Status struct {
 	Revision        uint64         `json:"revision"`
@@ -353,9 +354,14 @@ func (r *Replica) validateState(s state) (state, error) {
 			return s, ErrInvalid
 		}
 	}
+	if e := r.validateRetentionProtections(s); e != nil {
+		return s, e
+	}
 	return s, nil
 }
-func pinKind(k string) bool { return k == "generation" || k == "kit" || k == "restore" }
+func pinKind(k string) bool {
+	return k == "generation" || k == "kit" || k == "restore" || k == retentionPinKind
+}
 func (r *Replica) locked(ctx context.Context, fn func(*state) error) error {
 	return r.exclusive(ctx, func() error {
 		s, e := r.load()
@@ -605,7 +611,7 @@ func (r *Replica) Status(ctx context.Context) (Status, error) {
 	return result, e
 }
 func (r *Replica) Pin(ctx context.Context, id, generation, kind string) error {
-	if !validID(id) || !pinKind(kind) {
+	if !validID(id) || !pinKind(kind) || kind == retentionPinKind {
 		return ErrInvalid
 	}
 	return r.locked(ctx, func(s *state) error {
@@ -633,8 +639,12 @@ func (r *Replica) ReleasePin(ctx context.Context, id string) error {
 		return ErrInvalid
 	}
 	return r.locked(ctx, func(s *state) error {
-		if _, ok := s.Pins[id]; !ok {
+		pin, ok := s.Pins[id]
+		if !ok {
 			return nil
+		}
+		if pin.Kind == retentionPinKind {
+			return ErrProtected
 		}
 		delete(s.Pins, id)
 		s.Revision++

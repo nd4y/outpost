@@ -42,8 +42,8 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 	}
 	owner, ownerKey := key()
 	nodeKey, nodePrivate := key()
-	writer, _ := key()
-	maintenance, _ := key()
+	writer, writerKey := key()
+	maintenance, maintenanceKey := key()
 	planner, _ := key()
 	now := time.Now()
 	template := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}}
@@ -146,6 +146,57 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 	must(e)
 	if !bytes.Contains(encoded, []byte("worker-report-loop")) || !bytes.Contains(encoded, []byte("management-enrollment-sign")) {
 		t.Fatal("report commands absent from help")
+	}
+	{
+		trust := cfg.Domains[0].Trust
+		dir := filepath.Join(worker.DomainDirectory(filepath.Join(root, "worker"), trust), "replica")
+		must(os.MkdirAll(dir, 0700))
+		r, e := generation.Open(dir, trust, true)
+		must(e)
+		manifest, payload := []byte("kit fixture"), []byte("ciphertext fixture")
+		rootRef := generation.Object{ID: storage.Hash(manifest), Bytes: len(manifest)}
+		payloadRef := generation.Object{ID: storage.Hash(payload), Bytes: len(payload)}
+		raw, e := generation.SignCatalog(generation.Catalog{
+			Format: generation.Format, Domain: domain, Repository: repository, Epoch: trust.Epoch,
+			Sequence: 1, SnapshotUnix: now.Unix(), Policy: cfg.Revision, KitFormat: generation.KitFormat,
+			Kits: []generation.Kit{{
+				File: storage.Hash([]byte("file")), Version: storage.Hash([]byte("version")),
+				Root: rootRef, Objects: []generation.Object{payloadRef},
+			}},
+		}, writerKey)
+		must(e)
+		objects := map[string][]byte{rootRef.ID: manifest, payloadRef.ID: payload}
+		id, e := r.Receive(ctx, raw, func(ref generation.Object) ([]byte, error) { return objects[ref.ID], nil })
+		must(e)
+		must(r.Close())
+		grant := generation.RetentionProtection{
+			Format: generation.RetentionProtectionFormat, Node: node, Domain: domain, Repository: repository,
+			Epoch: trust.Epoch, Operation: storage.Hash([]byte("retention")), Generation: id,
+			Action: "HOLD", NotBefore: cfg.NotBefore, ExpiresUnix: cfg.ExpiresUnix,
+		}
+		maintenanceFile := put("maintenance.json", map[string]any{"privateKey": maintenanceKey})
+		apply := func(filename, state string) generation.RetentionProtectionReceipt {
+			input := put(filename+"-draft.json", grant)
+			signed := filepath.Join(base, filename+"-signed.json")
+			_, e := run(ctx, []string{"retention-protection-sign", "--key", maintenanceFile, "--input", input, "--output", signed})
+			must(e)
+			result, e := run(ctx, []string{"replica-retention-protect", "--bootstrap", bootstrap, "--domain", domain, "--input", signed})
+			must(e)
+			raw, e := json.Marshal(result)
+			must(e)
+			receipt, e := generation.VerifyRetentionProtectionReceipt(raw, node)
+			must(e)
+			if receipt.State != state || receipt.Operation != grant.Operation || receipt.Generation != id {
+				t.Fatal(receipt)
+			}
+			return receipt
+		}
+		held := apply("hold", "HELD")
+		grant.Action, grant.HoldDigest = "RELEASE", held.HoldDigest
+		released := apply("release", "RELEASED")
+		if released.Revision <= held.Revision {
+			t.Fatal("release did not advance the replica revision")
+		}
 	}
 	checkCLICommands(t, base, bootstrap, ownerFile, cfg, ownerKey)
 }

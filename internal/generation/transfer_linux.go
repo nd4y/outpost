@@ -80,21 +80,25 @@ func (r *Replica) missing(ctx context.Context, id string, metadataOnly bool) ([]
 // object has arrived. Detected catalog damage is durably fenced under admission.
 func (r *Replica) VerifyComplete(ctx context.Context, id string) error {
 	return r.locked(ctx, func(s *state) error {
-		if !s.Generations[id].Complete || s.Generations[id].Damaged {
-			return ErrIncomplete
-		}
-		_, refs, err := r.get(s, id, true)
-		if err != nil {
+		return r.verifyComplete(ctx, s, id)
+	})
+}
+
+func (r *Replica) verifyComplete(ctx context.Context, s *state, id string) error {
+	if !s.Generations[id].Complete || s.Generations[id].Damaged {
+		return ErrIncomplete
+	}
+	_, refs, err := r.get(s, id, true)
+	if err != nil {
+		return err
+	}
+	for _, key := range sortedIDs(refs) {
+		if err = ctx.Err(); err != nil {
 			return err
 		}
-		for _, key := range sortedIDs(refs) {
-			if err = ctx.Err(); err != nil {
-				return err
-			}
-			if _, err = r.object(refs[key]); err != nil {
-				return ErrIncomplete
-			}
+		if _, err = r.object(refs[key]); err != nil {
+			return ErrIncomplete
 		}
-		return nil
-	})
+	}
+	return nil
 }

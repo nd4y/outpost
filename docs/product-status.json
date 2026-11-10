@@ -3055,6 +3055,14 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/generation/retention_protection_linux_test.go",
+          "name": "TestRetentionProtectionSurvivesLostReplyAndBlocksRetirement"
+        },
+        {
+          "path": "internal/generation/retention_protection_linux_test.go",
+          "name": "TestRetentionProtectionRejectsDamagedGeneration"
+        },
+        {
           "path": "internal/management/retention_coverage_linux_test.go",
           "name": "TestManagementRetentionCoverageUsesCurrentPinnedSurvivors"
         },
@@ -3169,6 +3177,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/generation/retention_protection_linux_test.go",
+          "name": "TestRetentionProtectionSurvivesLostReplyAndBlocksRetirement"
+        },
+        {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestMaintenanceAuthorityPinsAndReplay"
         },
@@ -3204,6 +3216,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "cmd/outpost/reporting_linux_test.go",
+          "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestMaintenanceAuthorityPinsAndReplay"
