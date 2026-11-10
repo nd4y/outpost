@@ -103,8 +103,71 @@ func TestWorkerRetentionCheckpointUsesStoppedAdmittedReplica(t *testing.T) {
 	}
 }
 
+func TestWorkerScheduledMaintenanceResumesFromOfflineCache(t *testing.T) {
+	f := newFixture(t)
+	f.cfg.Limits.AttemptMillis = 60000
+	f.endpoint(t, nil)
+	r, head, makeCommand := maintenanceCommandFixture(t, f)
+	w := f.nodes[0]
+	ctx := context.Background()
+	sign := func(op, node string, from int64, sequence uint64) []byte {
+		t.Helper()
+		legacy := maintenancePermit(t, f, r, op, f.maintenance, f.generation)
+		p, e := generation.VerifyPermit(legacy, f.domain.Trust)
+		must(t, e)
+		p.Format = generation.PermitWindowFormat
+		p.Window = &generation.PermitWindow{Node: node, StartUnix: from, ExpiresUnix: from + 75}
+		raw, e := generation.SignPermit(p, f.maintenance)
+		must(t, e)
+		return makeCommand(raw, op, sequence)
+	}
+	foreign := storage.Hash([]byte("foreign scheduled operation"))
+	foreignCommand := sign(foreign, f.nodes[1].node, time.Now().Unix(), 1)
+	denial, e := w.ExecuteCommand(ctx, foreignCommand)
+	must(t, e)
+	if a := verifyWorkerAck(t, w, foreignCommand, denial); a.State != "FAILED" || a.ErrorCode != "POLICY_BLOCKED" {
+		t.Fatal("foreign timed permit was admitted", a)
+	}
+	op := storage.Hash([]byte("scheduled operation"))
+	startUnix := time.Now().Add(22 * time.Second).Unix()
+	raw := sign(op, w.node, startUnix, 2)
+	ack, e := w.ExecuteCommand(ctx, raw)
+	must(t, e)
+	if len(ack) != 0 {
+		t.Fatal("future command reported complete")
+	}
+	reopened, e := Open(Options{Directory: w.dir, Node: w.node, Owner: w.owner, Certificate: w.cert, Roots: w.roots})
+	must(t, e)
+	defer reopened.Close()
+	stop := start(t, reopened)
+	defer stop()
+	s, e := reopened.Status(ctx)
+	must(t, e)
+	work := s.Controls.Operations[op].Work
+	if work == nil || work.NextMillis != startUnix*1000 || work.Phase != "QUEUED" || work.Attempts != 0 || time.Now().Unix() >= startUnix {
+		t.Fatal("future work did not survive reopen before the signed window", work)
+	}
+	must(t, r.VerifyComplete(ctx, f.generation))
+	waitFor(t, 90*time.Second, func() bool {
+		status, e := reopened.Status(ctx)
+		return e == nil && len(status.Controls.Operations[op].Ack) != 0
+	})
+	ack, e = reopened.ExecuteCommand(ctx, raw)
+	must(t, e)
+	if result := verifyWorkerAck(t, reopened, raw, ack); result.State != "COMPLETE" || result.ObservedUnix < startUnix {
+		t.Fatal("unexpected scheduled maintenance outcome", result)
+	}
+	receipt, e := r.MaintenanceResult(ctx, op)
+	must(t, e)
+	if receipt.CompletedUnix < startUnix || receipt.AbsentCatalogs != 1 {
+		t.Fatal("missing physical retirement inside signed window", receipt)
+	}
+	must(t, r.VerifyComplete(ctx, head))
+}
+
 func TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome(t *testing.T) {
 	f := newFixture(t)
+	f.cfg.Limits.AttemptMillis = 60000
 	f.endpoint(t, nil)
 	r, head, makeCommand := maintenanceCommandFixture(t, f)
 	w := f.nodes[0]
@@ -138,7 +201,11 @@ func TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome(t *testing.T)
 			t.Fatal("admission claimed execution")
 		}
 		stop := start(t, w)
-		record := waitAction(t, w, raw)
+		var record CommandRecord
+		waitFor(t, 60*time.Second, func() bool {
+			record = actionRecord(t, w, raw)
+			return len(record.Ack) != 0
+		})
 		stop()
 		a := verifyWorkerAck(t, w, raw, record.Ack)
 		if kind == "protected" {

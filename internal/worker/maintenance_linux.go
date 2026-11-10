@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/generation"
@@ -18,11 +19,17 @@ func (w *Worker) executeMaintenance(ctx context.Context, v *view, env command.En
 	if local == nil {
 		return nil, ErrDenied
 	}
-	if _, e := v.cfg.MaintenancePermit(env.Request); e != nil {
+	p, e := v.cfg.MaintenancePermit(env.Request)
+	if e != nil {
 		return nil, e
 	}
+	if p.Window != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, time.Unix(p.Window.ExpiresUnix, 0))
+		defer cancel()
+	}
 	admit := func() error { return w.actionPolicy(ctx, v, env) }
-	if _, e := local.replica.MaintainAdmitted(ctx, env.Request.MaintenancePermit, admit); e != nil {
+	if _, e := local.replica.MaintainOnNode(ctx, env.Request.MaintenancePermit, w.node, admit); e != nil {
 		return nil, e
 	}
 	if e := w.point("worker-command-maintenance-result-durable"); e != nil {

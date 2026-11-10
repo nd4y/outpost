@@ -98,6 +98,13 @@ func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, res
 			return e
 		}
 		policyErr := w.actionPolicy(v.ctx, v, env)
+		if policyErr == nil && env.Request.Kind == "maintenance" {
+			p, err := v.cfg.MaintenancePermit(env.Request)
+			if err == nil && p.Window != nil && time.Now().Unix() < p.Window.StartUnix {
+				continue
+			}
+			policyErr = err
+		}
 		if policyErr == nil && (v.paused(op.Domain, "") || s.Controls.paused(op.Domain, "") || op.Work.NextMillis > time.Now().UnixMilli()) {
 			continue
 		}
@@ -230,6 +237,9 @@ func (w *Worker) finishAction(ctx context.Context, v *view, out *actionResult) e
 			if out.envelope.Request.Kind == "maintenance" {
 				code = "EFFECT_UNCONFIRMED"
 			}
+		case errors.Is(out.err, generation.ErrMaintenanceWindow):
+			op.Work.Phase = "FAILED"
+			code = "EFFECT_UNCONFIRMED"
 		case errors.Is(out.err, recovery.ErrInvalid), errors.Is(out.err, recovery.ErrConflict), errors.Is(out.err, recovery.ErrStopped):
 			op.Work.Phase = "FAILED"
 			code = "RESTORE_BLOCKED"

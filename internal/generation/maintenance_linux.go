@@ -22,20 +22,41 @@ func (r *Replica) Maintain(ctx context.Context, raw []byte) (int, error) {
 // destructive step. The caller must cancel and join it before acknowledging a
 // hold or policy replacement. Admission must not re-enter this replica.
 func (r *Replica) MaintainAdmitted(ctx context.Context, raw []byte, admit func() error) (int, error) {
+	return r.maintain(ctx, raw, "", admit, time.Now)
+}
+
+// MaintainOnNode binds a scheduled permit to the caller's authenticated node.
+// Legacy unscoped permits keep their existing revision and admission checks.
+func (r *Replica) MaintainOnNode(ctx context.Context, raw []byte, node string, admit func() error) (int, error) {
+	if !validID(node) {
+		return 0, ErrMaintenanceWindow
+	}
+	return r.maintain(ctx, raw, node, admit, time.Now)
+}
+
+func (r *Replica) maintain(ctx context.Context, raw []byte, node string, admit func() error, now func() time.Time) (int, error) {
+	p, e := verifyPermit(raw, r.trust)
+	if e != nil {
+		return 0, e
+	}
 	check := func() error {
 		if e := ctx.Err(); e != nil {
 			return e
 		}
 		if admit != nil {
-			return admit()
+			if e := admit(); e != nil {
+				return e
+			}
+		}
+		if w := p.Window; w != nil {
+			at := now().Unix()
+			if node != w.Node || at < w.StartUnix || at >= w.ExpiresUnix {
+				return ErrMaintenanceWindow
+			}
 		}
 		return nil
 	}
 	if e := check(); e != nil {
-		return 0, e
-	}
-	p, e := verifyPermit(raw, r.trust)
-	if e != nil {
 		return 0, e
 	}
 	operation := Hash(raw)

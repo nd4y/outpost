@@ -13,17 +13,19 @@ import (
 )
 
 const (
-	Format         = "outpost-generation-1"
-	StateFormat    = "outpost-replica-state-2"
-	KitFormat      = "outpost-filekit-1"
-	TypedKitFormat = "outpost-filekit-2"
-	MaxObject      = 8 << 20
-	MaxCatalog     = 8 << 20
-	MaxObjects     = 32768
-	MaxKits        = 4096
-	MaxGenerations = 256
-	MaxPins        = 1024
-	MaxState       = 32 << 20
+	Format             = "outpost-generation-1"
+	PermitWindowFormat = "outpost-maintenance-permit-2"
+	MaxPermit          = 64 << 10
+	StateFormat        = "outpost-replica-state-2"
+	KitFormat          = "outpost-filekit-1"
+	TypedKitFormat     = "outpost-filekit-2"
+	MaxObject          = 8 << 20
+	MaxCatalog         = 8 << 20
+	MaxObjects         = 32768
+	MaxKits            = 4096
+	MaxGenerations     = 256
+	MaxPins            = 1024
+	MaxState           = 32 << 20
 )
 
 var (
@@ -33,6 +35,7 @@ var (
 	ErrProtected         = errors.New("generation is locally protected")
 	ErrIncomplete        = errors.New("generation dependencies unavailable or corrupt")
 	ErrMigrationRequired = errors.New("explicit local replica migration required")
+	ErrMaintenanceWindow = errors.New("maintenance node or window does not permit deletion")
 )
 
 type Object struct {
@@ -180,18 +183,38 @@ func VerifyCatalog(raw []byte, t Trust) (Catalog, error) {
 }
 
 type Permit struct {
-	Format     string   `json:"format"`
-	Domain     string   `json:"domain"`
-	Repository string   `json:"repository"`
-	Epoch      uint64   `json:"epoch"`
-	Revision   uint64   `json:"revision"`
-	Operation  string   `json:"operation"`
-	Retire     []string `json:"retire"`
-	Signature  []byte   `json:"signature,omitempty"`
+	Format     string        `json:"format"`
+	Domain     string        `json:"domain"`
+	Repository string        `json:"repository"`
+	Epoch      uint64        `json:"epoch"`
+	Revision   uint64        `json:"revision"`
+	Operation  string        `json:"operation"`
+	Retire     []string      `json:"retire"`
+	Window     *PermitWindow `json:"window,omitempty"`
+	Signature  []byte        `json:"signature,omitempty"`
+}
+
+type PermitWindow struct {
+	Node        string `json:"node"`
+	StartUnix   int64  `json:"startUnix"`
+	ExpiresUnix int64  `json:"expiresUnix"`
 }
 
 func validPermit(p Permit) bool {
-	if p.Format != Format || !validID(p.Domain) || !validID(p.Repository) || p.Epoch == 0 || !validID(p.Operation) || len(p.Retire) > MaxGenerations {
+	if !validID(p.Domain) || !validID(p.Repository) || p.Epoch == 0 || !validID(p.Operation) || len(p.Retire) > MaxGenerations {
+		return false
+	}
+	switch p.Format {
+	case Format:
+		if p.Window != nil {
+			return false
+		}
+	case PermitWindowFormat:
+		w := p.Window
+		if w == nil || !validID(w.Node) || w.StartUnix <= 0 || w.ExpiresUnix > 1<<40 || w.ExpiresUnix <= w.StartUnix || w.ExpiresUnix-w.StartUnix > 86400 {
+			return false
+		}
+	default:
 		return false
 	}
 	last := ""
@@ -209,7 +232,7 @@ func SignPermit(p Permit, key ed25519.PrivateKey) ([]byte, error) {
 	}
 	p.Signature = nil
 	b, _ := json.Marshal(p)
-	p.Signature = ed25519.Sign(key, append([]byte(Format+"\x00maintenance\x00"), b...))
+	p.Signature = ed25519.Sign(key, append([]byte(p.Format+"\x00maintenance\x00"), b...))
 	return json.Marshal(p)
 }
 
@@ -221,7 +244,7 @@ func verifyPermit(raw []byte, t Trust) (Permit, error) {
 	if !t.valid() {
 		return p, ErrInvalid
 	}
-	if err := canonical(raw, &p, 64<<10); err != nil {
+	if err := canonical(raw, &p, MaxPermit); err != nil {
 		return p, err
 	}
 	if !validPermit(p) || p.Domain != t.Domain || p.Repository != t.Repository || p.Epoch != t.Epoch {
@@ -231,7 +254,7 @@ func verifyPermit(raw []byte, t Trust) (Permit, error) {
 	p.Signature = nil
 	b, _ := json.Marshal(p)
 	p.Signature = sig
-	if !ed25519.Verify(t.Maintenance, append([]byte(Format+"\x00maintenance\x00"), b...), sig) {
+	if !ed25519.Verify(t.Maintenance, append([]byte(p.Format+"\x00maintenance\x00"), b...), sig) {
 		return p, ErrInvalid
 	}
 	return p, nil

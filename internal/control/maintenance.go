@@ -18,5 +18,8 @@ func (c Config) MaintenancePermit(request command.Request) (generation.Permit, e
 	if e != nil || out.Operation != request.Operation {
 		return out, ErrDenied
 	}
+	if w := out.Window; w != nil && (w.Node != c.Node || w.StartUnix >= request.ExpiresUnix || w.StartUnix >= c.ExpiresUnix) {
+		return out, ErrDenied
+	}
 	return out, nil
 }

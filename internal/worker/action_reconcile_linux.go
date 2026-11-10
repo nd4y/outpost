@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/generation"
 )
 
 // The caller owns the execution lease and has no active view. No actual work
@@ -31,7 +32,9 @@ func (w *Worker) reconcileActions(ctx context.Context) error {
 		denied := false
 		if !expired {
 			e = w.cache.WithCurrent(ctx, time.Now(), func(cfg control.Config, policy []byte) error { return w.commandPolicy(ctx, cfg, policy, env) })
-			if e != nil {
+			if errors.Is(e, generation.ErrMaintenanceWindow) {
+				expired = true
+			} else if e != nil {
 				if !errors.Is(e, ErrDenied) && !errors.Is(e, control.ErrDenied) && !errors.Is(e, control.ErrInactive) && !errors.Is(e, control.ErrRollback) {
 					return e
 				}

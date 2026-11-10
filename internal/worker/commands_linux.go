@@ -10,19 +10,25 @@ import (
 
 	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
 func (w *Worker) commandPolicy(ctx context.Context, cfg control.Config, raw []byte, env command.Envelope) error {
-	if env.Node != w.node || cfg.Revision != env.Request.ExpectedRevision || storage.Hash(raw) != env.ConfigurationDigest || env.Active(time.Now()) != nil {
+	now := time.Now()
+	if env.Node != w.node || cfg.Revision != env.Request.ExpectedRevision || storage.Hash(raw) != env.ConfigurationDigest || env.Active(now) != nil {
 		return ErrDenied
 	}
-	if _, e := cfg.CommandAuthority(env.Request.Authority, w.owner, time.Now()); e != nil {
+	if _, e := cfg.CommandAuthority(env.Request.Authority, w.owner, now); e != nil {
 		return e
 	}
 	if env.Request.Kind == "maintenance" {
-		if _, e := cfg.MaintenancePermit(env.Request); e != nil {
+		p, e := cfg.MaintenancePermit(env.Request)
+		if e != nil {
 			return e
+		}
+		if p.Window != nil && now.Unix() >= p.Window.ExpiresUnix {
+			return generation.ErrMaintenanceWindow
 		}
 	}
 	if env.Request.Job != "" {
@@ -144,6 +150,15 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 					if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" || env.Request.Kind == "restore" {
 						op.Generation = env.Request.Generation
 						op.Work = &CommandWork{Phase: "QUEUED"}
+						if env.Request.Kind == "maintenance" {
+							p, err := cfg.MaintenancePermit(env.Request)
+							if err != nil {
+								return err
+							}
+							if p.Window != nil {
+								op.Work.NextMillis = p.Window.StartUnix * 1000
+							}
+						}
 						if env.Request.Kind == "restore" {
 							s.Format = RecoveryFormat
 						}
@@ -196,11 +211,12 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 				}
 				// Policy denial has no effect. Infrastructure errors remain retryable and
 				// cannot turn an unknown write outcome into a false failure receipt.
-				if !errors.Is(e, ErrDenied) && !errors.Is(e, control.ErrDenied) && !errors.Is(e, control.ErrInactive) && !errors.Is(e, control.ErrRollback) {
+				expired := errors.Is(e, generation.ErrMaintenanceWindow)
+				if !expired && !errors.Is(e, ErrDenied) && !errors.Is(e, control.ErrDenied) && !errors.Is(e, control.ErrInactive) && !errors.Is(e, control.ErrRollback) {
 					return e
 				}
 				code := "POLICY_BLOCKED"
-				if env.Active(time.Now()) != nil {
+				if expired || env.Active(time.Now()) != nil {
 					code = "COMMAND_EXPIRED"
 				}
 				ack, e := w.commandResult(raw, env, op, "FAILED", code)

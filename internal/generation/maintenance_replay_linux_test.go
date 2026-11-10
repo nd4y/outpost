@@ -8,7 +8,56 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestMaintenanceWindowFencesNodeAndStopsPartialCleanupAtExpiry(t *testing.T) {
+	tt, writer, maintenance := trust(t)
+	dir := filepath.Join(temp(t), "replica")
+	r := openTest(t, dir, tt)
+	old, objects := synthetic(t, tt, writer, 1, "retiring")
+	id, e := r.Receive(ctx, old, fetch(objects))
+	ok(t, e)
+	latest, other := synthetic(t, tt, writer, 2, "protected")
+	head, e := r.Receive(ctx, latest, fetch(other))
+	ok(t, e)
+	if len(objects) < 2 {
+		t.Fatal("fixture cannot distinguish partial cleanup")
+	}
+	legacy := permit(t, r, maintenance, id)
+	p, e := VerifyPermit(legacy, tt)
+	ok(t, e)
+	p.Format = PermitWindowFormat
+	p.Window = &PermitWindow{Node: Hash([]byte("assigned maintenance node")), StartUnix: 100, ExpiresUnix: 110}
+	signed, e := SignPermit(p, maintenance)
+	ok(t, e)
+	at := time.Unix(99, 0)
+	clock := func() time.Time { return at }
+	if removed, e := r.maintain(ctx, signed, p.Window.Node, nil, clock); removed != 0 || !errors.Is(e, ErrMaintenanceWindow) {
+		t.Fatal("maintenance before start changed data", removed, e)
+	}
+	at = time.Unix(p.Window.StartUnix, 0)
+	if removed, e := r.maintain(ctx, signed, Hash([]byte("different node")), nil, clock); removed != 0 || !errors.Is(e, ErrMaintenanceWindow) {
+		t.Fatal("different node admitted", removed, e)
+	}
+	ok(t, r.VerifyComplete(ctx, id))
+	r.Fault = func(point string) error {
+		if point == "gc-object-removed" {
+			at = time.Unix(p.Window.ExpiresUnix, 0)
+		}
+		return nil
+	}
+	if removed, e := r.maintain(ctx, signed, p.Window.Node, nil, clock); removed != 1 || !errors.Is(e, ErrMaintenanceWindow) {
+		t.Fatal("expired operation did not stop at one deletion", removed, e)
+	}
+	if _, e = r.MaintenanceResult(ctx, p.Operation); !errors.Is(e, ErrIncomplete) {
+		t.Fatal("partial outcome reported as complete", e)
+	}
+	if removed, e := r.maintain(ctx, signed, p.Window.Node, nil, clock); removed != 0 || !errors.Is(e, ErrMaintenanceWindow) {
+		t.Fatal("expired replay deleted more data", removed, e)
+	}
+	ok(t, r.VerifyComplete(ctx, head))
+}
 
 func TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences(t *testing.T) {
 	for _, protect := range []bool{false, true} {

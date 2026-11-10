@@ -23,6 +23,41 @@ import (
 	"github.com/nd4y/outpost/internal/worker"
 )
 
+func TestCLISignsScopedMaintenancePermit(t *testing.T) {
+	base := teststore.Root(t)
+	pub, key, e := ed25519.GenerateKey(rand.Reader)
+	if e != nil {
+		t.Fatal(e)
+	}
+	trust := generation.Trust{Domain: storage.Hash([]byte("domain")), Repository: storage.Hash([]byte("repo")), Epoch: 2, Writer: make([]byte, ed25519.PublicKeySize), Maintenance: pub}
+	permit := generation.Permit{Format: generation.PermitWindowFormat, Domain: trust.Domain, Repository: trust.Repository, Epoch: trust.Epoch, Revision: 4, Operation: storage.Hash([]byte("operation")), Window: &generation.PermitWindow{Node: storage.Hash([]byte("node")), StartUnix: 100, ExpiresUnix: 500}}
+	keyFile, input, output := filepath.Join(base, "maintenance.json"), filepath.Join(base, "permit.json"), filepath.Join(base, "signed.json")
+	for path, value := range map[string]any{keyFile: map[string]any{"privateKey": key}, input: permit} {
+		raw, e := json.Marshal(value)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = os.WriteFile(path, raw, 0600); e != nil {
+			t.Fatal(e)
+		}
+	}
+	args := []string{"maintenance-permit-sign", "--key", keyFile, "--input", input, "--output", output}
+	if _, e = run(context.Background(), args); e != nil {
+		t.Fatal(e)
+	}
+	raw, e := os.ReadFile(output)
+	if e != nil {
+		t.Fatal(e)
+	}
+	got, e := generation.VerifyPermit(raw, trust)
+	if e != nil || got.Window == nil || *got.Window != *permit.Window || got.Operation != permit.Operation {
+		t.Fatal("signed maintenance scope did not round trip", got, e)
+	}
+	if _, e = run(context.Background(), args); !errors.Is(e, os.ErrExist) {
+		t.Fatal("signed permit was overwritten", e)
+	}
+}
+
 func TestCLISourceProbeAndCapabilityErrors(t *testing.T) {
 	ctx := context.Background()
 	base := teststore.Root(t)
