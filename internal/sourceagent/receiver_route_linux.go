@@ -285,7 +285,7 @@ func (a *Agent) checkSealedDonor(ctx context.Context, s state, route []string, c
 
 // The source execution lease covers the old job, the signed route decision
 // and creation of the next job. At most one ACTIVE replacement may happen.
-func (a *Agent) executeCapture(ctx context.Context, s *state, grant []byte, companion [][]byte) ([]byte, map[string]string, error) {
+func (a *Agent) executeCapture(ctx context.Context, s *state, grant []byte, companion [][]byte, relay []byte) ([]byte, map[string]string, error) {
 	preflight := true
 	for {
 		job, closeJob, err := a.openJobMode(ctx, *s, false, grant, companion...)
@@ -308,6 +308,12 @@ func (a *Agent) executeCapture(ctx context.Context, s *state, grant []byte, comp
 		if err = a.fenceCapture(ctx, s); err != nil {
 			closeJob()
 			return nil, nil, err
+		}
+		if len(relay) != 0 {
+			if err = a.offerRelayIntent(ctx, *s, relay); err != nil {
+				closeJob()
+				return nil, nil, err
+			}
 		}
 		err = job.Run(ctx)
 		if err == nil {

@@ -41,7 +41,10 @@ func (w *Worker) jobs(v *view) error {
 				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
 				defer cancel()
 				paused := func(op string) bool { return v.paused(domain, op) }
-				advanced, err := local.ingress.AdvanceCoverage(ctx, paused)
+				advanced, err := local.ingress.AdvanceRelayedIntent(ctx, paused)
+				if err == nil && !advanced {
+					advanced, err = local.ingress.AdvanceCoverage(ctx, paused)
+				}
 				if err == nil && !advanced {
 					advanced, err = local.ingress.AdvanceStagedImport(ctx, paused)
 				}

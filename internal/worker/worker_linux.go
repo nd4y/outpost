@@ -462,6 +462,8 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		if local == nil {
 			return fail(ErrDenied)
 		}
+		domain, _ := c.DomainByID(a.Trust.Domain)
+		relayOnly := !domain.Placement.HasEdge(a.Source, a.Ingress, "push")
 		dir := filepath.Join(DomainDirectory(w.dir, a.Trust), "ingress")
 		relative, e := filepath.Rel(w.dir, dir)
 		if e != nil {
@@ -469,7 +471,7 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		}
 		e = w.createOrOpen(ctx, dir, func(init bool) error {
 			var e error
-			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Parent: w.root, Directory: w.relative(dir), Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Staging: captureStagingRoutes(c, a.Trust.Domain), Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
+			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Parent: w.root, Directory: w.relative(dir), Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Staging: captureStagingRoutes(c, a.Trust.Domain, a.Source), RelayOnly: relayOnly, Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
 				return w.admission(filepath.ToSlash(filepath.Join(relative, prefix)))
 			}, CheckRegistryWrite: func(ctx context.Context, size int) error {
 				if e := w.check(ctx); e != nil {

@@ -10,12 +10,12 @@ import (
 	"github.com/nd4y/outpost/internal/ingress"
 )
 
-func captureStagingRoutes(c control.Config, domain string) *ingress.StagingRoutes {
+func captureStagingRoutes(c control.Config, domain, source string) *ingress.StagingRoutes {
 	d, ok := c.DomainByID(domain)
 	if !ok || len(d.CaptureStagingPeers) == 0 {
 		return nil
 	}
-	routes := &ingress.StagingRoutes{Origins: map[string]string{}, Readers: map[string]bool{}, AutomaticPeers: map[string]bool{}}
+	routes := &ingress.StagingRoutes{Origins: map[string]string{}, Readers: map[string]bool{}, AutomaticPeers: map[string]bool{}, RelayOrigins: map[string]bool{}, RelayReaders: map[string]bool{}}
 	for _, id := range d.CaptureAutomaticPeers {
 		routes.AutomaticPeers[id] = true
 	}
@@ -26,9 +26,15 @@ func captureStagingRoutes(c control.Config, domain string) *ingress.StagingRoute
 		if edge.To == c.Node && slices.Contains(d.CaptureStagingPeers, edge.From) {
 			node, _ := c.NodeByID(edge.From)
 			routes.Origins[edge.From] = node.Endpoint
+			if slices.Contains(d.CaptureRelayPeers, edge.From) && d.Placement.HasEdge(source, edge.From, "push") {
+				routes.RelayOrigins[edge.From] = true
+			}
 		}
 		if edge.From == c.Node && slices.Contains(d.CaptureStagingPeers, edge.To) {
 			routes.Readers[edge.To] = true
+			if slices.Contains(d.CaptureRelayPeers, edge.To) {
+				routes.RelayReaders[edge.To] = true
+			}
 		}
 	}
 	return routes

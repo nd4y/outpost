@@ -38,7 +38,7 @@ type SessionOptions struct {
 
 const maxPublicationGrants = 16
 const MaxReceiptDocument = 8192
-const maxSessionDocument = generation.MaxCatalog + (4+4*maxQueuedStagingImports)*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
+const maxSessionDocument = generation.MaxCatalog + (4+4*maxQueuedStagingImports+2*maxRelayOffers)*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
 
 type sessionState struct {
 	Format            string                 `json:"format"`
@@ -57,6 +57,7 @@ type sessionState struct {
 	Acknowledged      bool                   `json:"acknowledged,omitempty"`
 	Reclaimed         []byte                 `json:"reclaimed,omitempty"`
 	Retired           json.RawMessage        `json:"retired,omitempty"`
+	RelayOffers       []relayOffer           `json:"relayOffers,omitempty"`
 }
 type Receipt struct {
 	PublishedWith string `json:"publishedWith,omitempty"`
@@ -333,6 +334,9 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 			}
 		}
 		queued[pending.Object.ID] = true
+	}
+	if !validRelayOffers(s.state.RelayOffers, i, a, o.Owner) {
+		return fail(ErrConflict)
 	}
 	if s.state.CoveragePeer != nil {
 		origin := s.state.CoveragePeer

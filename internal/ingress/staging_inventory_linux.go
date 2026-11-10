@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"time"
@@ -106,51 +107,15 @@ func (s *Session) inventoryPage(ctx context.Context, epoch, offset string) (stag
 
 func (g *Registry) readStagedInventory(ctx context.Context, target Intent, origin string, cursor stagedCursor) (stagedInventoryPage, error) {
 	var page stagedInventoryPage
-	h, u, err := peer.AuthenticatedHTTP(g.options.Staging.Origins[origin], g.options.Certificate, g.options.Roots, target.Ingress, origin, g.options.Limits)
+	headers := http.Header{}
+	headers.Set("Outpost-Capture", stagingBinding(target))
+	headers.Set("Outpost-Staged-Epoch", cursor.epoch)
+	headers.Set("Outpost-Staged-Offset", strconv.Itoa(cursor.offset))
+	raw, err := g.readStagingDocument(ctx, origin, route(target)+"/staged-inventory", headers, maxStagedInventoryPage)
 	if err != nil {
 		return page, err
 	}
-	defer h.CloseIdleConnections()
-	u.Path = route(target) + "/staged-inventory"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return page, err
-	}
-	req.Header.Set("Outpost-Capture", stagingBinding(target))
-	req.Header.Set("Outpost-Staged-Epoch", cursor.epoch)
-	req.Header.Set("Outpost-Staged-Offset", strconv.Itoa(cursor.offset))
-	req.Header.Set("Accept-Encoding", "identity")
-	res, err := h.Do(req)
-	if err != nil {
-		return page, err
-	}
-	defer res.Body.Close()
-	switch res.StatusCode {
-	case http.StatusOK:
-	case http.StatusForbidden, http.StatusUnauthorized:
-		return page, ErrDenied
-	default:
-		return page, ErrUnavailable
-	}
-	if res.ContentLength > maxStagedInventoryPage || res.Header.Get("Content-Encoding") != "" || res.Header.Get("Content-Type") != "application/json" {
-		return page, ErrProtocol
-	}
-	raw, err := io.ReadAll(io.LimitReader(res.Body, maxStagedInventoryPage+1))
-	if err != nil {
-		return page, err
-	}
-	if res.TLS == nil || len(res.TLS.VerifiedChains) == 0 || len(res.TLS.PeerCertificates) == 0 {
-		return page, ErrDenied
-	}
-	leaf := res.TLS.PeerCertificates[0]
-	now := time.Now()
-	if peer.Identity(leaf) != origin || now.Before(leaf.NotBefore) || !now.Before(leaf.NotAfter) {
-		return page, ErrDenied
-	}
-	if err = ctx.Err(); err != nil {
-		return page, err
-	}
-	if len(raw) > maxStagedInventoryPage || decodeReply(raw, &page) != nil || !storage.ID(page.Epoch) || len(page.Objects) > stagedInventoryPageSize {
+	if decodeReply(raw, &page) != nil || !storage.ID(page.Epoch) || len(page.Objects) > stagedInventoryPageSize {
 		return page, ErrProtocol
 	}
 	expected := 0
@@ -172,6 +137,55 @@ func (g *Registry) readStagedInventory(ctx context.Context, target Intent, origi
 		return page, ErrDenied
 	}
 	return page, nil
+}
+
+func (g *Registry) readStagingDocument(ctx context.Context, origin, path string, headers http.Header, limit int) ([]byte, error) {
+	h, u, err := peer.AuthenticatedHTTP(g.options.Staging.Origins[origin], g.options.Certificate, g.options.Roots, g.authority.Ingress, origin, g.options.Limits)
+	if err != nil {
+		return nil, err
+	}
+	defer h.CloseIdleConnections()
+	u.Path = path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	for name, values := range headers {
+		req.Header[name] = values
+	}
+	req.Header.Set("Accept-Encoding", "identity")
+	res, err := h.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.TLS == nil || len(res.TLS.VerifiedChains) == 0 || len(res.TLS.PeerCertificates) == 0 {
+		return nil, ErrDenied
+	}
+	leaf := res.TLS.PeerCertificates[0]
+	if peer.Identity(leaf) != origin || time.Now().Before(leaf.NotBefore) || !time.Now().Before(leaf.NotAfter) {
+		return nil, ErrDenied
+	}
+	switch res.StatusCode {
+	case http.StatusOK:
+	case http.StatusNoContent:
+		return nil, os.ErrNotExist
+	case http.StatusForbidden, http.StatusUnauthorized:
+		return nil, ErrDenied
+	default:
+		return nil, ErrUnavailable
+	}
+	if res.ContentLength > int64(limit) || res.Header.Get("Content-Encoding") != "" || res.Header.Get("Content-Type") != "application/json" {
+		return nil, ErrProtocol
+	}
+	raw, err := io.ReadAll(io.LimitReader(res.Body, int64(limit)+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > limit || !time.Now().Before(leaf.NotAfter) {
+		return nil, ErrProtocol
+	}
+	return raw, ctx.Err()
 }
 
 // advanceAutomaticStaging is entered with the registry lock held. Network

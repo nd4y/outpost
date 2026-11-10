@@ -48,6 +48,7 @@ type Domain struct {
 	RetirementMinimumCopies      int               `json:"retirementMinimumCopies,omitempty"`
 	CaptureStagingPeers          []string          `json:"captureStagingPeers,omitempty"`
 	CaptureAutomaticPeers        []string          `json:"captureAutomaticPeers,omitempty"`
+	CaptureRelayPeers            []string          `json:"captureRelayPeers,omitempty"`
 	ScrubIntervalSeconds         int64             `json:"scrubIntervalSeconds,omitempty"`
 	PeerReadbackMaxAgeSeconds    int64             `json:"peerReadbackMaxAgeSeconds,omitempty"`
 	CloudReadbackMaxAgeSeconds   int64             `json:"cloudReadbackMaxAgeSeconds,omitempty"`
@@ -115,6 +116,20 @@ func (c Config) DomainByID(id string) (Domain, bool) {
 	}
 	return Domain{}, false
 }
+
+func (c Config) permitsCaptureIngress(d Domain, a ingress.Authority) bool {
+	if d.Placement.HasEdge(a.Source, a.Ingress, "push") {
+		return true
+	}
+	if c.Node == a.Ingress {
+		for _, bridge := range d.CaptureRelayPeers {
+			if d.Placement.HasEdge(a.Source, bridge, "push") && d.Placement.HasEdge(bridge, a.Ingress, "pull") {
+				return true
+			}
+		}
+	}
+	return false
+}
 func (c Config) TargetByID(id string) (Target, bool) {
 	for _, t := range c.Targets {
 		if t.ID == id {
@@ -173,6 +188,14 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		}
 		for i, id := range d.CaptureAutomaticPeers {
 			if !slices.Contains(d.CaptureStagingPeers, id) || slices.Contains(d.CaptureAutomaticPeers[:i], id) {
+				return ErrDenied
+			}
+		}
+		if len(d.CaptureRelayPeers) > len(d.CaptureAutomaticPeers) {
+			return ErrDenied
+		}
+		for i, id := range d.CaptureRelayPeers {
+			if !slices.Contains(d.CaptureAutomaticPeers, id) || slices.Contains(d.CaptureRelayPeers[:i], id) {
 				return ErrDenied
 			}
 		}
@@ -259,7 +282,7 @@ func (c Config) validate(owner ed25519.PublicKey) error {
 		d, ok := domains[a.Trust.Domain]
 		x, _ := json.Marshal(d.Trust)
 		y, _ := json.Marshal(a.Trust)
-		if !ok || !bytes.Equal(x, y) || nodes[a.Source].Class != "trusted" || !d.Placement.HasEdge(a.Source, a.Ingress, "push") {
+		if !ok || !bytes.Equal(x, y) || nodes[a.Source].Class != "trusted" || !c.permitsCaptureIngress(d, a) {
 			return ErrDenied
 		}
 		holder := false

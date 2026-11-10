@@ -27,6 +27,8 @@ type StagingRoutes struct {
 	Origins        map[string]string
 	Readers        map[string]bool
 	AutomaticPeers map[string]bool
+	RelayOrigins   map[string]bool
+	RelayReaders   map[string]bool
 }
 
 type stagingOrigin struct {
@@ -153,7 +155,7 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	identity := peer.Identity(remote)
 	if read && (r.Method != http.MethodGet || r.ContentLength != 0 || !g.options.Staging.Readers[identity]) ||
 		inventory && (!g.options.Staging.AutomaticPeers[identity] || len(g.options.Settlement) != 0) ||
-		!read && (r.Method != http.MethodPut || identity != g.authority.Source || len(g.options.Settlement) != 0) {
+		!read && (r.Method != http.MethodPut || identity != g.authority.Source || g.options.RelayOnly || len(g.options.Settlement) != 0) {
 		fail(w, ErrDenied)
 		return true
 	}

@@ -53,6 +53,7 @@ func (g *Registry) retireUnsealed(ctx context.Context, i Intent, grant Settlemen
 	if len(s.state.Retired) == 0 {
 		s.state.Retired = bytes.Clone(g.options.Settlement)
 		s.state.PendingImport, s.state.AdditionalImports = nil, nil
+		s.state.RelayOffers = nil
 		s.state.LastObserved = now.Unix()
 		if err = s.save(); err != nil {
 			return Reconciliation{}, err

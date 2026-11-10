@@ -911,10 +911,21 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 func (a *Agent) Run(ctx context.Context) error {
 	return a.lease.WithLock(ctx, func() error { return a.run(ctx) })
 }
+
+func (a *Agent) RunWithRelay(ctx context.Context, authority []byte) error {
+	if len(authority) == 0 {
+		return ErrInvalid
+	}
+	return a.lease.WithLock(ctx, func() error { return a.runCapture(ctx, nil, nil, authority) })
+}
+
 func (a *Agent) run(ctx context.Context) error {
 	return a.runSettlement(ctx, nil)
 }
 func (a *Agent) runSettlement(ctx context.Context, grant []byte, companion ...[]byte) error {
+	return a.runCapture(ctx, grant, companion, nil)
+}
+func (a *Agent) runCapture(ctx context.Context, grant []byte, companion [][]byte, relay []byte) error {
 	if e := a.guard(ctx); e != nil {
 		return e
 	}
@@ -969,7 +980,7 @@ func (a *Agent) runSettlement(ctx context.Context, grant []byte, companion ...[]
 			}
 		}
 	}
-	checkpoint, heads, e := a.executeCapture(ctx, &s, grant, companion)
+	checkpoint, heads, e := a.executeCapture(ctx, &s, grant, companion, relay)
 	if e != nil {
 		return errors.Join(e, context.Cause(ctx))
 	}

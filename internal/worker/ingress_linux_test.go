@@ -314,3 +314,101 @@ func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
 	stopTarget()
 	stopBridge()
 }
+
+func TestWorkerAdmitsInitialCaptureThroughOfflineBridge(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	source, bridge, target := f.nodes[0], f.nodes[1], f.nodes[2]
+	bridgeServer := f.endpoint(t, nil)
+	f.cfg.Format = control.SettlementConfigFormat
+	f.cfg.Limits.Parallel, f.cfg.Limits.AttemptMillis = 1, 60000
+	owner := f.owner.Public().(ed25519.PublicKey)
+	intent := ingress.Intent{Format: ingress.IntentFormat, Operation: storage.Hash([]byte("relayed capture")), Tenant: storage.Hash([]byte("relay tenant")), Profile: storage.Hash([]byte("relay profile")), Source: source.node, Domain: f.domain.Trust.Domain, Repository: f.domain.Trust.Repository, Epoch: 1, Sequence: 1, Policy: 1, SnapshotUnix: time.Now().Unix(), NotBefore: f.cfg.NotBefore, ExpiresUnix: f.cfg.ExpiresUnix, MaxBytes: 32 << 20, MaxObjects: 64}
+	proof := func(receiver string) ([]byte, []byte) {
+		t.Helper()
+		i := intent
+		i.Ingress = receiver
+		a := ingress.Authority{Format: ingress.AuthorityFormat, Tenant: i.Tenant, Profile: i.Profile, Source: i.Source, Ingress: i.Ingress, Revision: 1, NotBefore: i.NotBefore, ExpiresUnix: i.ExpiresUnix, Trust: f.domain.Trust, MaxBytes: i.MaxBytes, MaxObjects: i.MaxObjects}
+		grant, err := ingress.SignAuthority(a, f.owner)
+		must(t, err)
+		i.Authority = storage.Hash(grant)
+		raw, err := ingress.SignIntent(i, grant, owner, f.writer, time.Now())
+		must(t, err)
+		return grant, raw
+	}
+	bridgeGrant, bridgeIntent := proof(bridge.node)
+	targetGrant, targetIntent := proof(target.node)
+	f.cfg.Ingress = []json.RawMessage{bridgeGrant}
+	f.domain.CaptureStagingPeers = []string{target.node}
+	f.domain.CaptureAutomaticPeers = []string{target.node}
+	f.domain.CaptureRelayPeers = []string{target.node}
+	f.config(t, 1, nil)
+	f.cfg.Ingress = []json.RawMessage{targetGrant}
+	f.domain.CaptureStagingPeers = []string{bridge.node}
+	f.domain.CaptureAutomaticPeers = []string{bridge.node}
+	f.domain.CaptureRelayPeers = nil
+	withoutRelay := f.cfg
+	withoutRelay.Node, withoutRelay.Domains = target.node, []control.Domain{f.domain}
+	if _, err := control.Sign(withoutRelay, f.owner); err == nil {
+		t.Fatal("configuration accepted a capture with neither a direct nor a relay route")
+	}
+	f.domain.CaptureRelayPeers = []string{bridge.node}
+	f.config(t, 2, nil)
+	limits := peer.Limits{Concurrency: 1, Timeout: 60 * time.Second, Attempts: 1}
+	upstream, err := ingress.NewClient(bridgeServer.URL, bridgeGrant, bridgeIntent, owner, source.cert, f.ca.pool, limits)
+	must(t, err)
+	t.Cleanup(upstream.Close)
+	stopBridge := start(t, bridge)
+	wait(t, func() bool { bridge.mu.Lock(); defer bridge.mu.Unlock(); return bridge.active != nil })
+	must(t, upstream.Begin(ctx))
+	unknownGrant, unknownIntent := proof(storage.Hash([]byte("unadmitted relay recipient")))
+	if err = upstream.OfferRelayIntent(ctx, unknownGrant, unknownIntent); !errors.Is(err, ingress.ErrDenied) {
+		t.Fatalf("unadmitted recipient entered the relay: %v", err)
+	}
+	must(t, upstream.OfferRelayIntent(ctx, targetGrant, targetIntent))
+	must(t, upstream.OfferRelayIntent(ctx, targetGrant, targetIntent))
+	data := []byte("ciphertext sent in the first connectivity window")
+	object := filekit.Object{ID: storage.Hash(data), Bytes: len(data)}
+	_, err = upstream.Write(ctx, object, data)
+	must(t, err)
+	upstream.Close()
+	stopBridge()
+
+	// The recipient's signed topology has no inbound endpoint or source edge.
+	// An isolated listener makes the direct rejection observable in this test.
+	targetHTTP, err := target.HTTPServer()
+	must(t, err)
+	listener := httptest.NewUnstartedServer(targetHTTP.Handler)
+	listener.TLS = targetHTTP.TLSConfig
+	listener.StartTLS()
+	t.Cleanup(listener.Close)
+	direct, err := ingress.NewClient(listener.URL, targetGrant, targetIntent, owner, source.cert, f.ca.pool, limits)
+	must(t, err)
+	t.Cleanup(direct.Close)
+	durable := make(chan struct{}, 1)
+	target.Fault = func(point string) error {
+		if point == "capture-object-durable" {
+			durable <- struct{}{}
+		}
+		return nil
+	}
+	stopTarget := start(t, target)
+	wait(t, func() bool { target.mu.Lock(); defer target.mu.Unlock(); return target.active != nil })
+	if err = direct.Begin(ctx); !errors.Is(err, ingress.ErrDenied) {
+		t.Fatalf("direct source admission bypassed the signed topology: %v", err)
+	}
+	stopBridge = start(t, bridge)
+	select {
+	case <-durable:
+	case <-time.After(90 * time.Second):
+		t.Fatal("recipient did not admit and import the stored offer")
+	}
+	path := filepath.Join(DomainDirectory(target.dir, f.domain.Trust), "ingress", "current", "objects", object.ID)
+	stored, err := os.ReadFile(path)
+	must(t, err)
+	if string(stored) != string(data) {
+		t.Fatal("ciphertext changed across the bridge")
+	}
+	stopTarget()
+	stopBridge()
+}

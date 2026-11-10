@@ -17,7 +17,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -66,6 +68,56 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	return newFixtureLifetime(t, 1800)
+}
+
+func TestSourceRunOffersRelayBeforeUploading(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	original := f.intent(t, 1, "")
+	i, _, err := ingress.VerifyIntent(original, f.authority, f.b.Local.Owner, time.Now())
+	must(t, err)
+	grant := f.grant
+	grant.Ingress = storage.Hash([]byte("downstream recipient"))
+	authority, err := ingress.SignAuthority(grant, f.ownerSigner)
+	must(t, err)
+	var offered, uploadAfterOffer atomic.Bool
+	f.registryMu.Lock()
+	f.intercept = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/relay-intent") {
+			var offer struct {
+				Recipient         string
+				Authority, Intent json.RawMessage
+			}
+			if err := json.NewDecoder(io.LimitReader(r.Body, 3*ingress.MaxDocument)).Decode(&offer); err != nil {
+				http.Error(w, "invalid offer", http.StatusBadRequest)
+				return true
+			}
+			target, _, err := ingress.VerifyIntent(offer.Intent, offer.Authority, f.b.Local.Owner, time.Now())
+			if err != nil || !bytes.Equal(offer.Authority, authority) || offer.Recipient != grant.Ingress || target.Operation != i.Operation {
+				http.Error(w, "invalid offer", http.StatusBadRequest)
+				return true
+			}
+			offered.Store(true)
+			w.WriteHeader(http.StatusAccepted)
+			return true
+		}
+		if r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/objects/") {
+			uploadAfterOffer.Store(offered.Load())
+			http.Error(w, "interrupt the test upload", http.StatusServiceUnavailable)
+			return true
+		}
+		return false
+	}
+	f.registryMu.Unlock()
+	must(t, f.a.Prepare(ctx, original))
+	if err = f.a.RunWithRelay(ctx, authority); err == nil || !offered.Load() || !uploadAfterOffer.Load() {
+		t.Fatalf("source did not offer admission before uploading: %v", err)
+	}
+	status, err := f.a.Status(ctx)
+	must(t, err)
+	if status.Phase != "ACTIVE" || status.Operation != i.Operation {
+		t.Fatalf("interrupted source lost the original active capture: %+v", status)
+	}
 }
 func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
 	t.Helper()

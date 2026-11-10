@@ -39,6 +39,7 @@ type RegistryOptions struct {
 	Limits      peer.Limits
 	Initialize  bool
 	Staging     *StagingRoutes
+	RelayOnly   bool
 	// Settlement reopens only the exact existing historical slot. It cannot
 	// initialize a registry or authorize any payload route.
 	Settlement, SettlementIntent []byte
@@ -86,6 +87,8 @@ type Registry struct {
 	stageReads, stageImports chan struct{}
 	nextStagedImport         string
 	stagedPull               automaticStaging
+	relayOrigins             []string
+	nextRelayOrigin          int
 	Fault                    func(string) error
 }
 
@@ -202,12 +205,17 @@ func openRegistry(ctx context.Context, o RegistryOptions, historical bool) (*Reg
 	o.SettlementIntent = bytes.Clone(o.SettlementIntent)
 	if o.Staging != nil {
 		// Each registry view owns the routes from its admitted configuration.
-		o.Staging = &StagingRoutes{Origins: maps.Clone(o.Staging.Origins), Readers: maps.Clone(o.Staging.Readers), AutomaticPeers: maps.Clone(o.Staging.AutomaticPeers)}
+		o.Staging = &StagingRoutes{Origins: maps.Clone(o.Staging.Origins), Readers: maps.Clone(o.Staging.Readers), AutomaticPeers: maps.Clone(o.Staging.AutomaticPeers), RelayOrigins: maps.Clone(o.Staging.RelayOrigins), RelayReaders: maps.Clone(o.Staging.RelayReaders)}
 	}
 	owned = true
 	g := &Registry{root: r, options: o, authority: a, leaf: leaf, lease: lease, gate: make(chan struct{}, 1)}
 	if o.Staging != nil {
 		g.stagedPull = newAutomaticStaging(o.Staging)
+		for _, origin := range g.stagedPull.origins {
+			if o.Staging.RelayOrigins[origin] {
+				g.relayOrigins = append(g.relayOrigins, origin)
+			}
+		}
 		g.stageReads = make(chan struct{}, o.Limits.Concurrency)
 		g.stageImports = make(chan struct{}, o.Limits.Concurrency)
 	}
@@ -448,6 +456,9 @@ func (g *Registry) begin(ctx context.Context, raw []byte) (Intent, error) {
 	return i, nil
 }
 func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if g.options.Staging != nil && len(g.options.Settlement) == 0 && g.serveRelayIntent(w, r) {
+		return
+	}
 	if g.options.Staging != nil && (len(g.options.Settlement) == 0 || g.settlementPurpose == SettlementPublish) && g.serveStaging(w, r) {
 		return
 	}
@@ -463,6 +474,10 @@ func (g *Registry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer g.mu.Unlock()
 	if len(g.options.Settlement) != 0 {
 		g.serveSettlement(w, r)
+		return
+	}
+	if g.options.RelayOnly {
+		fail(w, ErrDenied)
 		return
 	}
 	now := time.Now()
