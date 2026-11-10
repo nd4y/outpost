@@ -4646,7 +4646,7 @@
             "type": "string",
             "contentEncoding": "base64",
             "maxLength": 5464,
-            "description": "Separate maintenance-signed HOLD, CLOSE or RELEASE grant; required only for retention."
+            "description": "Separate maintenance-signed HOLD, CLOSE or RELEASE grant. A bound RELEASE can embed the original signed HOLD as pendingHold. Required only for retention."
           }
         },
         "required": [

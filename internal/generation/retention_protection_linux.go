@@ -10,7 +10,7 @@ import (
 )
 
 type retentionProtectionRecord struct {
-	Hold    RetentionProtectionReceipt  `json:"hold"`
+	Hold    *RetentionProtectionReceipt `json:"hold,omitempty"`
 	Release *RetentionProtectionReceipt `json:"release,omitempty"`
 }
 
@@ -25,8 +25,18 @@ func (r *Replica) validateRetentionProtections(s state) error {
 	}
 	activePins := make(map[string]bool, len(s.RetentionProtections))
 	for operation, record := range s.RetentionProtections {
-		hold := record.Hold
-		if !hold.valid() || hold.State != "HELD" || hold.Operation != operation || !r.retentionReceiptMatches(s, hold) {
+		hold, release := record.Hold, record.Release
+		if release != nil && (!release.valid() || release.State != "RELEASED" ||
+			release.Operation != operation || !r.retentionReceiptMatches(s, *release)) {
+			return ErrInvalid
+		}
+		if hold == nil {
+			if release == nil || release.Retirement == nil {
+				return ErrInvalid
+			}
+			continue
+		}
+		if !hold.valid() || hold.State != "HELD" || hold.Operation != operation || !r.retentionReceiptMatches(s, *hold) {
 			return ErrInvalid
 		}
 		id := retentionPin(operation)
@@ -37,11 +47,8 @@ func (r *Replica) validateRetentionProtections(s state) error {
 			activePins[id] = true
 			continue
 		}
-		release := record.Release
-		if !release.valid() || release.State != "RELEASED" || release.Node != hold.Node || release.Domain != hold.Domain ||
-			release.Repository != hold.Repository || release.Epoch != hold.Epoch || release.Operation != operation ||
-			release.Generation != hold.Generation || release.HoldDigest != hold.GrantDigest || release.Revision <= hold.Revision ||
-			release.Revision > s.Revision || release.ObservedUnix < hold.ObservedUnix || !sameRetirement(release.Retirement, hold.Retirement) {
+		if release.Node != hold.Node || release.Generation != hold.Generation || release.HoldDigest != hold.GrantDigest ||
+			release.Revision <= hold.Revision || release.ObservedUnix < hold.ObservedUnix || !sameRetirement(release.Retirement, hold.Retirement) {
 			return ErrInvalid
 		}
 	}
@@ -99,7 +106,7 @@ func (r *Replica) ApplyRetentionProtection(ctx context.Context, raw []byte, admi
 				if record.Release != nil || record.Hold.GrantDigest != digest {
 					return ErrConflict
 				}
-				return readback(record.Hold)
+				return readback(*record.Hold)
 			}
 			if _, occupied := s.Pins[pin]; occupied {
 				return ErrConflict
@@ -114,15 +121,24 @@ func (r *Replica) ApplyRetentionProtection(ctx context.Context, raw []byte, admi
 				return e
 			}
 		case "RELEASE":
-			if !exists || record.Hold.Generation != grant.Generation || record.Hold.GrantDigest != grant.HoldDigest ||
-				!sameRetirement(record.Hold.Retirement, grant.Retirement) {
-				return ErrConflict
-			}
 			if record.Release != nil {
 				if record.Release.GrantDigest != digest {
 					return ErrConflict
 				}
 				return readback(*record.Release)
+			}
+			if !exists {
+				if len(grant.PendingHold) == 0 {
+					return ErrConflict
+				}
+				if len(s.RetentionProtections) >= maxRetentionProtectionRecords {
+					return statefile.ErrCapacity
+				}
+				break
+			}
+			if record.Hold.Generation != grant.Generation || record.Hold.GrantDigest != grant.HoldDigest ||
+				!sameRetirement(record.Hold.Retirement, grant.Retirement) {
+				return ErrConflict
 			}
 		}
 		return admit(func() error {
@@ -143,7 +159,7 @@ func (r *Replica) commitRetentionProtection(ctx context.Context, s *state, grant
 		return out, e
 	}
 	now := time.Now().Unix()
-	if now < grant.NotBefore || now >= grant.ExpiresUnix || now < record.Hold.ObservedUnix {
+	if now < grant.NotBefore || now >= grant.ExpiresUnix || record.Hold != nil && now < record.Hold.ObservedUnix {
 		return out, ErrMaintenanceWindow
 	}
 	if s.Revision >= ^uint64(0)-1 {
@@ -175,9 +191,11 @@ func (r *Replica) commitRetentionProtection(ctx context.Context, s *state, grant
 	} else {
 		if grant.Action == "HOLD" {
 			s.Pins[pin] = Pin{Generation: grant.Generation, Kind: retentionPinKind}
-			record.Hold = receipt
+			record.Hold = &receipt
 		} else {
-			delete(s.Pins, pin)
+			if record.Hold != nil {
+				delete(s.Pins, pin)
+			}
 			record.Release = &receipt
 		}
 		if s.RetentionProtections == nil {

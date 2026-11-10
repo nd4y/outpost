@@ -3055,6 +3055,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/generation/retention_pending_hold_linux_test.go",
+          "name": "TestRetentionReleaseFencesUndeliveredHoldAcrossRestart"
+        },
+        {
           "path": "internal/management/retention_draft_linux_test.go",
           "name": "TestManagementRetentionPlanReconcilesClosureAndReleases"
         },
@@ -3232,6 +3236,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/generation/retention_pending_hold_linux_test.go",
+          "name": "TestRetentionReleaseFencesUndeliveredHoldAcrossRestart"
+        },
         {
           "path": "internal/management/retention_draft_linux_test.go",
           "name": "TestManagementRetentionPlanReconcilesClosureAndReleases"

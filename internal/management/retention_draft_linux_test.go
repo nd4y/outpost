@@ -325,6 +325,9 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	}
 
 	a3, _, _ := hold(a, ra, authorityA, "a3")
+	undelivered := requestProtection(authorityA, "hold-a4", holdGrant(a, "a4"))
+	_, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, a.e.Node, undelivered)
+	must(t, e)
 	targetReplica := openCopy(f)
 	closeObservation, closeAck, closeNode := queue(f, targetReplica, requestProtection(targetAuthority, "close", protection(f, op, "CLOSE")))
 	checkPlan("CLOSURE_PENDING", true)
@@ -335,7 +338,7 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	if !hasPlannedClose(state, f.e.Tenant, request.Preview) || hasPlannedClose(state, f.e.Tenant, otherEpoch) {
 		t.Fatal("close intent crossed a repository epoch")
 	}
-	newHold := requestProtection(authorityA, "hold-a4", holdGrant(a, "a4"))
+	newHold := requestProtection(authorityA, "hold-a5", holdGrant(a, "a5"))
 	if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, a.e.Node, newHold); !errors.Is(e, ErrConflict) {
 		t.Fatal("new hold admitted after close intent", e)
 	}
@@ -344,7 +347,7 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	observe(f, 1, closeObservation)
 	observe(a, 2, a1, a2, a3)
 	closed := checkPlan("CLOSED_AWAITING_RELEASES", false)
-	if closed.Closure == nil || !bytes.Equal(closed.Closure.Proof, closeObservation.RetentionProof) || len(closed.Holds) != 4 {
+	if closed.Closure == nil || !bytes.Equal(closed.Closure.Proof, closeObservation.RetentionProof) || len(closed.Holds) != 5 {
 		t.Fatal("closure or registered holds lost", closed)
 	}
 	unconfirmed := 0
@@ -353,7 +356,7 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 			unconfirmed++
 		}
 	}
-	if unconfirmed != 1 {
+	if unconfirmed != 2 {
 		t.Fatal("pending hold wrongly reported as confirmed", closed.Holds)
 	}
 	closure, e := generation.VerifyRetentionProtectionReceipt(closed.Closure.Proof, f.e.Node)
@@ -373,6 +376,16 @@ func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 		must(t, e)
 		releasedA = append(releasedA, c)
 	}
+	pendingRelease := holdGrant(a, "a4")
+	pendingRelease.Action, pendingRelease.HoldDigest = "RELEASE", storage.Hash(undelivered.RetentionGrant)
+	pendingRelease.Closure, pendingRelease.PendingHold = &closure, undelivered.RetentionGrant
+	fenced, fenceAck, fenceNode := queue(a, ra, requestProtection(authorityA, "release-undelivered", pendingRelease))
+	_, e = f.r.AcknowledgeCommand(ctx, fenceNode, f.e.Tenant, a.e.Node, fenced.Operation, fenceAck)
+	must(t, e)
+	if _, e = ra.ApplyRetentionProtection(ctx, undelivered.RetentionGrant, nil); !errors.Is(e, generation.ErrConflict) {
+		t.Fatal("late delivery recreated a settled hold", e)
+	}
+	releasedA = append(releasedA, fenced)
 	c, ack, node := release(b, rb, authorityB, b1)
 	observe(a, 3, releasedA...)
 	observe(b, 4, b1, c)

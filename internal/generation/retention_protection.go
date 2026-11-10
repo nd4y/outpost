@@ -41,6 +41,7 @@ type RetentionProtection struct {
 	HoldDigest  string                      `json:"holdDigest,omitempty"`
 	Retirement  *RetirementBinding          `json:"retirement,omitempty"`
 	Closure     *RetentionProtectionReceipt `json:"closure,omitempty"`
+	PendingHold []byte                      `json:"pendingHold,omitempty"`
 	NotBefore   int64                       `json:"notBefore"`
 	ExpiresUnix int64                       `json:"expiresUnix"`
 	Signature   []byte                      `json:"signature,omitempty"`
@@ -72,11 +73,12 @@ func (p RetentionProtection) valid() bool {
 	}
 	switch p.Action {
 	case "HOLD":
-		return validID(p.Generation) && p.HoldDigest == "" && p.Closure == nil
+		return validID(p.Generation) && p.HoldDigest == "" && p.Closure == nil && len(p.PendingHold) == 0
 	case "RELEASE":
-		return validID(p.Generation) && validID(p.HoldDigest) && p.validClosure()
+		return validID(p.Generation) && validID(p.HoldDigest) && p.validClosure() &&
+			(len(p.PendingHold) == 0 || p.Retirement != nil)
 	case "CLOSE":
-		return p.Generation == "" && p.HoldDigest == "" && p.Retirement == nil && p.Closure == nil
+		return p.Generation == "" && p.HoldDigest == "" && p.Retirement == nil && p.Closure == nil && len(p.PendingHold) == 0
 	default:
 		return false
 	}
@@ -91,8 +93,26 @@ func (p RetentionProtection) validClosure() bool {
 		c.Domain == p.Domain && c.Repository == p.Repository && c.Epoch == p.Epoch && c.valid()
 }
 
+func (p RetentionProtection) signedBy(key ed25519.PublicKey) bool {
+	sig := p.Signature
+	p.Signature = nil
+	unsigned, e := json.Marshal(p)
+	return e == nil && ed25519.Verify(key, append([]byte(RetentionProtectionFormat+"\x00"), unsigned...), sig)
+}
+
+func (p RetentionProtection) validPendingHold(key ed25519.PublicKey) bool {
+	if len(p.PendingHold) == 0 {
+		return true
+	}
+	var h RetentionProtection
+	return canonical(p.PendingHold, &h, MaxRetentionProtection) == nil && h.Action == "HOLD" && h.valid() &&
+		Hash(p.PendingHold) == p.HoldDigest && h.Node == p.Node && h.Domain == p.Domain &&
+		h.Repository == p.Repository && h.Epoch == p.Epoch && h.Operation == p.Operation &&
+		h.Generation == p.Generation && sameRetirement(h.Retirement, p.Retirement) && h.signedBy(key)
+}
+
 func SignRetentionProtection(p RetentionProtection, key ed25519.PrivateKey) ([]byte, error) {
-	if len(key) != ed25519.PrivateKeySize || len(p.Signature) != 0 || !p.valid() {
+	if len(key) != ed25519.PrivateKeySize || len(p.Signature) != 0 || !p.valid() || !p.validPendingHold(key.Public().(ed25519.PublicKey)) {
 		return nil, ErrInvalid
 	}
 	unsigned, e := json.Marshal(p)
@@ -100,7 +120,11 @@ func SignRetentionProtection(p RetentionProtection, key ed25519.PrivateKey) ([]b
 		return nil, e
 	}
 	p.Signature = ed25519.Sign(key, append([]byte(RetentionProtectionFormat+"\x00"), unsigned...))
-	return json.Marshal(p)
+	raw, e := json.Marshal(p)
+	if e != nil || len(raw) > MaxRetentionProtection {
+		return nil, ErrInvalid
+	}
+	return raw, nil
 }
 
 // VerifyRetentionProtection authenticates a grant for the specified holder.
@@ -111,12 +135,10 @@ func VerifyRetentionProtection(raw []byte, trust Trust, node string) (RetentionP
 		p.Node != node || p.Domain != trust.Domain || p.Repository != trust.Repository || p.Epoch != trust.Epoch {
 		return p, ErrInvalid
 	}
-	sig := p.Signature
-	p.Signature = nil
-	unsigned, e := json.Marshal(p)
-	if e != nil || !ed25519.Verify(trust.Maintenance, append([]byte(RetentionProtectionFormat+"\x00"), unsigned...), sig) {
+	if !p.signedBy(trust.Maintenance) || !p.validPendingHold(trust.Maintenance) {
 		return p, ErrInvalid
 	}
+	p.Signature = nil
 	return p, nil
 }
 
