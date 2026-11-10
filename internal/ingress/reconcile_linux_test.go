@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -186,5 +187,65 @@ func TestGenerationCapacityReportsOverlapAndCreditsRetainedObjects(t *testing.T)
 	must(t, err)
 	if receipt == nil || receipt.Generation != id {
 		t.Fatal("restored capacity did not allow exact publication", receipt)
+	}
+}
+
+func TestGenerationCapacityResumesWithDurableVerification(t *testing.T) {
+	f := setup(t)
+	ctx := t.Context()
+	const ample = int64(1 << 50)
+	limit := ample
+	var observed diskbudget.Peak
+	f.options.CheckPublication = func(_ context.Context, peak diskbudget.Peak) error {
+		observed = peak
+		if peak.Spool > limit {
+			return statefile.ErrCapacity
+		}
+		return nil
+	}
+	f.reopen(t)
+	must(t, os.WriteFile(f.input, []byte("capture with a durable verification checkpoint"), 0600))
+	version, err := f.source.Backup(ctx, f.input, filekit.BackupOptions{Names: []string{"file"}})
+	must(t, err)
+	raw, roots := f.catalog(t, []string{version.Version})
+	f.roots(t, roots)
+	partial, _, err := f.session.FinishBatch(ctx, raw, 1, generation.MaxObject)
+	must(t, err)
+	if partial.Complete || partial.VerifiedObjects != 1 {
+		t.Fatalf("fixture did not leave a partial checkpoint: %+v", partial)
+	}
+
+	f.reopen(t)
+	limit = 0
+	if _, _, err = f.session.FinishBatch(ctx, raw, 256, 256<<20); !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatalf("partial checkpoint did not require metadata headroom: %v", err)
+	}
+	partialSpool := observed.Spool
+	limit = ample
+	replica := f.options.Replica
+	interrupted := errors.New("publication stopped after verification")
+	replica.Fault = func(point string) error {
+		if point == "before-complete" {
+			return interrupted
+		}
+		return nil
+	}
+	if _, _, err = f.session.FinishBatch(ctx, raw, 256, 256<<20); !errors.Is(err, interrupted) {
+		t.Fatalf("did not interrupt index publication: %v", err)
+	}
+	replica.Fault = nil
+	f.reopen(t)
+	limit = partialSpool - 1
+	replica.Admit = func(name string, _ int) (func(bool) error, error) {
+		if strings.HasPrefix(name, "verification/") {
+			return nil, statefile.ErrCapacity
+		}
+		return func(bool) error { return nil }, nil
+	}
+	result, receipt, err := f.session.FinishBatch(ctx, raw, 256, 256<<20)
+	must(t, err)
+	if observed.Data != 0 || observed.Spool <= 0 || observed.Spool > limit ||
+		!result.Complete || result.ReadBytes != 0 || receipt.Generation != storage.Hash(raw) {
+		t.Fatalf("unexpected estimate or completed receipt: %+v, %+v, %+v", observed, result, receipt)
 	}
 }

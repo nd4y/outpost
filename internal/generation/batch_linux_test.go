@@ -153,6 +153,38 @@ func TestBatchedReceptionSyncsParentUntilFirstCheckpointIsDurable(t *testing.T) 
 	ok(t, r.VerifyComplete(ctx, Hash(raw)))
 }
 
+func TestPublicationEstimateCreditsOnlyCurrentCompleteVerification(t *testing.T) {
+	dir := filepath.Join(temp(t), "replica")
+	trust, key, _ := trust(t)
+	r := openTest(t, dir, trust)
+	raw, objects := synthetic(t, trust, key, 1, "capacity-proof")
+	refs, err := Dependencies(raw, trust)
+	ok(t, err)
+
+	interrupted := errors.New("stop before index publication")
+	r.Fault = func(point string) error {
+		if point == "before-complete" {
+			return interrupted
+		}
+		return nil
+	}
+	if _, err = r.ReceiveBatch(ctx, raw, 2, MaxObject, fetch(objects)); !errors.Is(err, interrupted) {
+		t.Fatalf("did not stop after the durable verification checkpoint: %v", err)
+	}
+	estimate, err := r.EstimatePublication(ctx, raw, refs)
+	ok(t, err)
+	if len(estimate.MetadataSizes) != 1 || estimate.MetadataSizes[0] <= 0 || len(estimate.ObjectSizes) != 0 {
+		t.Fatalf("expected only the remaining index allocation: %+v", estimate)
+	}
+	stale := time.Unix(42, 0)
+	ok(t, os.Chtimes(filepath.Join(dir, "objects", refs[0].ID), stale, stale))
+	estimate, err = r.EstimatePublication(ctx, raw, refs)
+	ok(t, err)
+	if len(estimate.MetadataSizes) != 3 || len(estimate.ObjectSizes) != 0 {
+		t.Fatalf("changed stamp did not restore the verification allocation: %+v", estimate)
+	}
+}
+
 func TestBatchedReplayKeepsRecordedVerificationTimeAndChecksChangedStamps(t *testing.T) {
 	base := temp(t)
 	trust, key, _ := trust(t)

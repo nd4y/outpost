@@ -5765,6 +5765,14 @@
           "name": "TestGenerationCapacityReportsOverlapAndCreditsRetainedObjects"
         },
         {
+          "path": "internal/ingress/reconcile_linux_test.go",
+          "name": "TestGenerationCapacityResumesWithDurableVerification"
+        },
+        {
+          "path": "internal/generation/batch_linux_test.go",
+          "name": "TestPublicationEstimateCreditsOnlyCurrentCompleteVerification"
+        },
+        {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestOpenExistingBudgetDoesNotWaitForOrClearActiveReservation"
         },

@@ -45,22 +45,39 @@ func (r *Replica) EstimatePublication(ctx context.Context, raw []byte, refs []Ob
 		if exists && item.Complete && !item.Damaged {
 			return nil
 		}
-		// Each verification entry has a hex ID, two timespecs, device,
-		// inode, length and timestamp. A later atomic checkpoint may hold
-		// both the previous journal and its replacement.
-		const verificationEntry = 384
-		verificationSize := 512 + verificationEntry*len(refs)
-		writes.MetadataSizes = append(writes.MetadataSizes, verificationSize, verificationSize)
+		var checkpoint verificationState
+		if _, damaged := s.CatalogDamage[id]; exists && !item.Damaged && !damaged {
+			dependencies := make(map[string]Object, len(refs))
+			for _, ref := range refs {
+				dependencies[ref.ID] = ref
+			}
+			if saved, _, err := r.verification(id, "", dependencies); err == nil {
+				checkpoint = saved
+			}
+		}
+		reuseCheckpoint := checkpoint.CompletedAt > 0
 		for _, ref := range refs {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			_, err := r.objectStamp(ref)
+			stamp, err := r.objectStamp(ref)
 			if errors.Is(err, os.ErrNotExist) {
 				writes.ObjectSizes = append(writes.ObjectSizes, ref.Bytes)
 			} else if err != nil {
 				return err
 			}
+			if reuseCheckpoint {
+				checked, verified := checkpoint.Objects[ref.ID]
+				_, damaged := s.Damage[ref.ID]
+				reuseCheckpoint = err == nil && verified && !damaged && stamp == checked.Stamp
+			}
+		}
+		if !reuseCheckpoint {
+			// A new atomic checkpoint may need room for the journal
+			// and its replacement. Each entry holds the ID and stamp.
+			const verificationEntry = 384
+			verificationSize := 512 + verificationEntry*len(refs)
+			writes.MetadataSizes = append(writes.MetadataSizes, verificationSize, verificationSize)
 		}
 		return nil
 	})
