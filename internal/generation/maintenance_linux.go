@@ -54,6 +54,11 @@ func (r *Replica) MaintainAdmitted(ctx context.Context, raw []byte, admit func()
 		if replay && record.Result != nil {
 			return nil
 		}
+		if replay {
+			if _, _, e := r.retention(s); e != nil {
+				return e
+			}
+		}
 		if !replay && p.Revision != s.Revision {
 			return ErrRollback
 		}

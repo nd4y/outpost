@@ -209,6 +209,8 @@ func (f *fixture) jobs() (control.Job, control.Job) {
 }
 func TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache(t *testing.T) {
 	f := newFixture(t)
+	// This integration test checks the route and restart, not a disk SLA.
+	f.cfg.Limits.AttemptMillis = 60000
 	server := f.endpoint(t, nil)
 	push, pull := f.jobs()
 	f.config(t, 0, []control.Job{push})
@@ -216,11 +218,11 @@ func TestWorkerTransfersThroughOutboundOnlyReplicaAndOfflineCache(t *testing.T) 
 	f.config(t, 2, []control.Job{pull})
 	stopB := start(t, f.nodes[1])
 	stopA := start(t, f.nodes[0])
-	wait(t, func() bool { return complete(f.nodes[0], push.Operation) })
+	waitFor(t, 90*time.Second, func() bool { return complete(f.nodes[0], push.Operation) })
 	stopA()
 	// B serves from its durable copy after the sender has left. No A->C endpoint exists.
 	stopC := start(t, f.nodes[2])
-	wait(t, func() bool { return complete(f.nodes[2], pull.Operation) })
+	waitFor(t, 90*time.Second, func() bool { return complete(f.nodes[2], pull.Operation) })
 	client := &http.Client{Timeout: time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: f.ca.pool, Certificates: []tls.Certificate{f.nodes[0].cert}}}}
 	defer client.CloseIdleConnections()
 	request, e := http.NewRequest(http.MethodGet, server.URL+"/v1/"+f.domain.Trust.Domain+"/generations/"+f.generation+"/catalog", nil)

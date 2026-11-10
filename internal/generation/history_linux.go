@@ -24,20 +24,25 @@ type retentionLedger struct {
 
 func (r *Replica) retention(s *state) (retentionLedger, map[string]bool, error) {
 	ledger := retentionLedger{Format: RetentionFormat, Records: map[string]json.RawMessage{}}
-	retired := map[string]bool{}
 	raw, e := read(r.root, "retention.json", MaxState)
 	if errors.Is(e, os.ErrNotExist) {
 		if len(s.Receipts) > 0 {
 			return ledger, nil, ErrMigrationRequired
 		}
-		return ledger, retired, nil
+		return ledger, map[string]bool{}, nil
 	}
 	if e != nil {
 		return ledger, nil, e
 	}
+	return r.verifyRetention(s, raw)
+}
+
+func (r *Replica) verifyRetention(s *state, raw []byte) (retentionLedger, map[string]bool, error) {
+	var ledger retentionLedger
 	if canonical(raw, &ledger, MaxState) != nil || ledger.Format != RetentionFormat || ledger.Records == nil || len(ledger.Records) > MaxPins {
 		return ledger, nil, ErrInvalid
 	}
+	retired := map[string]bool{}
 	for op, raw := range ledger.Records {
 		p, e := verifyPermit(raw, r.trust)
 		if e != nil || p.Operation != op || p.Revision > s.Revision {
@@ -53,6 +58,53 @@ func (r *Replica) retention(s *state) (retentionLedger, map[string]bool, error) 
 		}
 	}
 	return ledger, retired, nil
+}
+
+// RetentionCheckpoint returns the verified signed permits, including any
+// pending retirement. The caller keeps the returned bytes and digest separately.
+func (r *Replica) RetentionCheckpoint(ctx context.Context) ([]byte, error) {
+	var raw []byte
+	e := r.exclusive(ctx, func() error {
+		s, e := r.load()
+		if e != nil {
+			return e
+		}
+		ledger, _, e := r.retention(&s)
+		if e != nil {
+			return e
+		}
+		raw, e = json.Marshal(ledger)
+		return e
+	})
+	return raw, e
+}
+
+// RestoreRetentionCheckpoint restores only an absent ledger using exact
+// archived bytes. The current replica index and every committed receipt must
+// still exist. The expected digest comes from independent checkpoint evidence.
+func (r *Replica) RestoreRetentionCheckpoint(ctx context.Context, raw []byte, expected string) error {
+	if len(raw) == 0 || len(raw) > MaxState || !validID(expected) || Hash(raw) != expected {
+		return ErrInvalid
+	}
+	return r.exclusive(ctx, func() error {
+		s, e := r.load()
+		if e != nil {
+			return e
+		}
+		if _, e := r.root.Lstat("retention.json"); !errors.Is(e, os.ErrNotExist) {
+			if e != nil {
+				return e
+			}
+			return ErrConflict
+		}
+		if _, _, e := r.verifyRetention(&s, raw); e != nil {
+			return e
+		}
+		if e := ctx.Err(); e != nil {
+			return e
+		}
+		return r.write("retention.json", raw)
+	})
 }
 
 func (r *Replica) recordRetirement(s *state, raw []byte) error {

@@ -3144,7 +3144,13 @@
       "id": "REQ-33",
       "workstream": "generations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "implementation": [
+        "internal/generation",
+        "internal/peer",
+        "internal/upload",
+        "internal/worker",
+        "cmd/outpost"
+      ],
       "checks": [
         {
           "path": "internal/generation/generation_linux_test.go",
@@ -3171,6 +3177,14 @@
           "name": "TestRetirementAuthorityCrashKeepsDataAndFencesReacquisition"
         },
         {
+          "path": "internal/generation/history_linux_test.go",
+          "name": "TestPendingMaintenanceRequiresExactRetentionCheckpointAfterLoss"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerRetentionCheckpointUsesStoppedAdmittedReplica"
+        },
+        {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
         },
@@ -3180,7 +3194,7 @@
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling and epoch workflow, recovery after loss of the full replica index, and full product target-readiness reporting."
     },
     {
       "id": "REQ-34",

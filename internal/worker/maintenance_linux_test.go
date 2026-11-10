@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,6 +70,39 @@ func maintenancePermit(t *testing.T, f *fixture, r *generation.Replica, op strin
 	must(t, e)
 	return raw
 }
+
+func TestWorkerRetentionCheckpointUsesStoppedAdmittedReplica(t *testing.T) {
+	f := newFixture(t)
+	f.endpoint(t, nil)
+	r, head, _ := maintenanceCommandFixture(t, f)
+	w := f.nodes[0]
+	domain := f.domain.Trust.Domain
+	ctx := context.Background()
+	permission := maintenancePermit(t, f, r, storage.Hash([]byte("retention checkpoint")), f.maintenance, f.generation)
+	_, e := r.Maintain(ctx, permission)
+	must(t, e)
+	must(t, w.lease.WithLock(ctx, func() error {
+		if _, e := w.RetentionCheckpoint(ctx, domain); !errors.Is(e, generation.ErrConflict) {
+			t.Fatal("checkpoint ignored the active worker lease", e)
+		}
+		return nil
+	}))
+	if _, e = w.RetentionCheckpoint(ctx, storage.Hash([]byte("unknown domain"))); !errors.Is(e, ErrDenied) {
+		t.Fatal("unknown replica accepted", e)
+	}
+	raw, e := w.RetentionCheckpoint(ctx, domain)
+	must(t, e)
+	dir := filepath.Join(DomainDirectory(w.dir, f.domain.Trust), "replica")
+	must(t, os.Remove(filepath.Join(dir, "retention.json")))
+	must(t, w.RestoreRetentionCheckpoint(ctx, domain, raw, storage.Hash(raw)))
+	must(t, r.VerifyComplete(ctx, head))
+	got, e := os.ReadFile(filepath.Join(dir, "retention.json"))
+	must(t, e)
+	if !bytes.Equal(got, raw) {
+		t.Fatal("restored bytes differ from checkpoint")
+	}
+}
+
 func TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome(t *testing.T) {
 	f := newFixture(t)
 	f.endpoint(t, nil)

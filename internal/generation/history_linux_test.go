@@ -1,11 +1,91 @@
 package generation
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestPendingMaintenanceRequiresExactRetentionCheckpointAfterLoss(t *testing.T) {
+	tt, writer, maintenance := trust(t)
+	dir := filepath.Join(temp(t), "replica")
+	r := openTest(t, dir, tt)
+	old, oldObjects := synthetic(t, tt, writer, 1, "retiring")
+	id, e := r.Receive(ctx, old, fetch(oldObjects))
+	ok(t, e)
+	latest, newObjects := synthetic(t, tt, writer, 2, "protected")
+	head, e := r.Receive(ctx, latest, fetch(newObjects))
+	ok(t, e)
+	stale, e := r.RetentionCheckpoint(ctx)
+	ok(t, e)
+	permission := permit(t, r, maintenance, id)
+	p, e := VerifyPermit(permission, tt)
+	ok(t, e)
+	r.Fault = func(point string) error {
+		if point == "retirement-durable" {
+			return ioFailure
+		}
+		return nil
+	}
+	if _, e = r.Maintain(ctx, permission); !errors.Is(e, ioFailure) {
+		t.Fatal("interruption did not reach pending GC", e)
+	}
+	r.Fault = nil
+	raw, e := r.RetentionCheckpoint(ctx)
+	ok(t, e)
+	ledger := filepath.Join(dir, "retention.json")
+	ok(t, os.Remove(ledger))
+	if removed, e := r.Maintain(ctx, permission); removed != 0 || !errors.Is(e, ErrMigrationRequired) {
+		t.Fatal("pending cleanup proceeded after journal loss", removed, e)
+	}
+	for id, data := range oldObjects {
+		got, e := os.ReadFile(filepath.Join(dir, "objects", id))
+		ok(t, e)
+		if !bytes.Equal(got, data) {
+			t.Fatal("pending cleanup changed a candidate")
+		}
+	}
+	if e = r.RestoreRetentionCheckpoint(ctx, raw, Hash(stale)); !errors.Is(e, ErrInvalid) {
+		t.Fatal("wrong independently retained digest accepted", e)
+	}
+	if e = r.RestoreRetentionCheckpoint(ctx, stale, Hash(stale)); !errors.Is(e, ErrMigrationRequired) {
+		t.Fatal("stale checkpoint forgot a retirement receipt", e)
+	}
+	ok(t, r.RestoreRetentionCheckpoint(ctx, raw, Hash(raw)))
+	if e = r.RestoreRetentionCheckpoint(ctx, raw, Hash(raw)); !errors.Is(e, ErrConflict) {
+		t.Fatal("existing ledger was replaced", e)
+	}
+	orphan := []byte("new orphan outside the frozen candidates")
+	path := filepath.Join(dir, "objects", Hash(orphan))
+	ok(t, os.WriteFile(path, orphan, 0600))
+	_, e = r.Maintain(ctx, permission)
+	ok(t, e)
+	result, e := r.MaintenanceResult(ctx, p.Operation)
+	ok(t, e)
+	if result.AbsentObjects != len(oldObjects) || result.AbsentCatalogs != 1 {
+		t.Fatal("unexpected frozen candidate result", result)
+	}
+	got, e := os.ReadFile(path)
+	ok(t, e)
+	if !bytes.Equal(got, orphan) {
+		t.Fatal("replay changed an object outside the frozen candidates")
+	}
+	if _, e = r.BeginHistorical(ctx, old); !errors.Is(e, ErrProtected) {
+		t.Fatal("recovered tombstone did not block readmission", e)
+	}
+	ok(t, r.VerifyComplete(ctx, head))
+	ok(t, os.Remove(ledger))
+	if removed, e := r.Maintain(ctx, permission); removed != 0 || e != nil {
+		t.Fatal("completed historical replay should remain a no-op", removed, e)
+	}
+	again, e := r.MaintenanceResult(ctx, p.Operation)
+	ok(t, e)
+	if again != result {
+		t.Fatal("historical result changed", again)
+	}
+}
 
 func TestHistoricalAdmissionKeepsHeadAndRejectsRetiredOrConflictingCatalog(t *testing.T) {
 	tt, key, maintenance := trust(t)
