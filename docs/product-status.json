@@ -38,6 +38,14 @@
       ],
       "checks": [
         {
+          "path": "internal/capture/btrfs_producer_linux_test.go",
+          "name": "TestNativeBtrfsProducerReusesExactKernelSnapshot"
+        },
+        {
+          "path": "internal/capture/btrfs_producer_linux_test.go",
+          "name": "TestNativeBtrfsProducerRejectsOrdinaryTreeBeforeState"
+        },
+        {
           "path": "internal/sourceagent/btrfs_snapshot_linux_test.go",
           "name": "TestPreparedBtrfsSnapshotRestoresIndependentVersions"
         },
@@ -95,7 +103,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "Admit production snapshot producers and other filesystem and application profiles, measure retention and performance, resolve uncertain expired operations and lost active journals, and verify recovery package lifecycle across key epochs."
+      "remaining": "The native Btrfs candidate creates one read-only snapshot for a signed producer intent and reuses it on restart. Admit its actual source profile, retention and performance, verify native snapshot disposal, and admit the remaining filesystem and application profiles."
     },
     {
       "id": "REQ-03",

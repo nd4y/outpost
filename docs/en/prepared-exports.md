@@ -4,7 +4,7 @@
 
 The source agent can capture a closed export created by a separately configured native application producer. The private `outpost-source-agent-prepared-1` bootstrap declares `profile.consistency: "application"` and binds the producer's public key, method, original timestamps and exact file inventory. The producer must finish its consistent export before signing it. `producer-signed` status identifies this attestation; a signature or matching file hash alone does not establish application consistency.
 
-This provider consumes completed native views. The configured producer creates the application export or filesystem snapshot outside Outpost. Shared configuration cannot supply a shell command. The executable supports ordinary best-effort sources separately and refuses unsupported consistency providers.
+This provider consumes completed native views. The configured application producer creates its consistent export. The local Btrfs producer can create a read-only snapshot on an admitted staging tree. Shared configuration supplies signed policy, while the private source profile selects the local producer. The executable supports ordinary best-effort sources separately and refuses unsupported consistency providers.
 
 ## Private enrollment
 
@@ -64,6 +64,19 @@ For filesystem consistency, use the same prepared bootstrap with `profile.consis
 The trusted producer runs `btrfs subvolume snapshot -r LIVE SNAPSHOT` on the source host, with `SNAPSHOT` below the enrolled parent. It uses the existing manifest command with an increasing sequence, the relative snapshot root and `completedUnix`. Omit `snapshotUnix` to use the snapshot creation time returned by the kernel, or supply that exact time. The signed manifest carries the snapshot UUID. Admission and pre-seal verification check the native read-only flag, original transaction, enrolled parent UUID, snapshot UUID and creation time. An ordinary directory, writable snapshot, changed snapshot or snapshot of another source is refused. These checks use an unprivileged consumer.
 
 Keep the closed-inventory limits above. Btrfs snapshots do not include nested subvolumes. Enroll each required nested subvolume separately. Snapshot creation and retention remain with the producer. The filesystem profile establishes a filesystem view and makes no application-consistency claim.
+
+### Native Btrfs producer
+
+Use a private request with a `profile` of format `outpost-btrfs-producer-1`, an opaque `operationId` and `sequence` starting at 1. The profile includes `source` and `staging` tree bindings from `source-probe` with the same opaque origin. The trees must be disjoint and on the same Btrfs filesystem. The original source must be a subvolume with the UUID in `trust.snapshotOrigin`. Match `staging` to the prepared source agent's tree. Include the exact prepared `trust` object, a separately admitted `stateVolume` with `trust.profile` as its scope, a pre-created private `stateDirectory`, and `maxRetained` from 1 to 16.
+
+```sh
+outpost source-native-btrfs-export --input /private/snapshot-request.json \
+  --key /private/producer-key.json --output /private/manifests/next-export.json
+```
+
+The producer persists its signed operation before the native snapshot call and verifies the resulting read-only subvolume, parent UUID and creation time. A repeated request reopens the same snapshot and returns the exact signed manifest. An unrecorded destination or a changed acquired UUID blocks the operation. The next producer operation advances the sequence by one and waits if the retained count reaches its limit. Keep the producer journal in its original admitted directory and select a private manifest parent disjoint from the source, staging and producer state. The manifest includes source names and stays in the trusted zone.
+
+This profile snapshots one subvolume. Btrfs snapshot boundaries and the prepared export's regular-file restrictions apply. The source agent consumes the manifest through the ordinary prepared workflow. Physical removal of retained snapshots belongs to the producer's approved retention process and requires its own evidence.
 
 ## Recovery and compatibility
 
