@@ -33,15 +33,16 @@ type LogicalProvider interface {
 	Lineage(source.Entry) ([]byte, bool, error)
 }
 type PreparedProviderOptions struct {
-	Parent               *os.Root
-	Directory, Operation string
-	Tree                 TreeBinding
-	Trust                PreparedTrust
-	Manifest             []byte
-	Initialize           bool
-	Admission            statefile.Admission
-	Guard                func(context.Context) error
-	Fault                func(string) error
+	Parent                      *os.Root
+	Directory, Operation        string
+	Tree                        TreeBinding
+	Trust                       PreparedTrust
+	Manifest                    []byte
+	Initialize                  bool
+	Admission                   statefile.Admission
+	ReleaseObservationAdmission statefile.Admission
+	Guard                       func(context.Context) error
+	Fault                       func(string) error
 }
 type preparedViewState struct {
 	Format    string          `json:"format"`
@@ -304,6 +305,7 @@ func (p *PreparedProvider) Release(ctx context.Context, operation, view string) 
 		if e = p.save(ctx, s); e != nil {
 			return e
 		}
+		recordReleaseObservation(p.runtime, p.o.Operation, p.store, p.o.ReleaseObservationAdmission)
 		return p.point("prepared-view-released")
 	})
 }

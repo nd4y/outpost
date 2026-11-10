@@ -33,7 +33,13 @@ func TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider(t *testing.T)
 			must(t, e)
 			file := filepath.Join(f.base, "prepared-kill-input.json")
 			must(t, os.WriteFile(file, raw, 0600))
-			bounded, cancel := context.WithTimeout(ctx, 15*time.Second)
+			deadline := 15 * time.Second
+			if point == "prepared-view-released" {
+				// This boundary includes the complete durable source and
+				// receiver writes, including on the dedicated HDD.
+				deadline = 90 * time.Second
+			}
+			bounded, cancel := context.WithTimeout(ctx, deadline)
 			defer cancel()
 			cmd := exec.CommandContext(bounded, os.Args[0], "-test.run=^TestSourceAgentSIGKILLChild$")
 			cmd.Env = append(os.Environ(), "OUTPOST_SOURCE_KILL_INPUT="+file)
@@ -67,12 +73,29 @@ func TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider(t *testing.T)
 			}
 			f.a, e = Open(ctx, f.b, false)
 			must(t, e)
+			var observedRelease int64
+			if point == "prepared-view-released" {
+				status, err := f.a.Status(ctx)
+				must(t, err)
+				if status.Milestones == nil || status.Prepared == nil || status.Milestones.ProviderReleaseUnix < status.Prepared.SnapshotUnix {
+					t.Fatal("release timing lost at the provider boundary", status)
+				}
+				observedRelease = status.Milestones.ProviderReleaseUnix
+			}
 			must(t, f.a.Next(ctx))
 			must(t, f.a.Run(ctx))
 			complete, e := f.a.Status(ctx)
 			must(t, e)
 			if complete.Phase != "COMPLETE" || complete.Sequence != 1 || complete.Operation != storage.Hash(frozen) || complete.Prepared == nil || complete.Prepared.ProducerSequence != 10 {
 				t.Fatal("crash replaced frozen export or duplicated generation", complete)
+			}
+			timing := complete.Milestones
+			if timing == nil || timing.SnapshotUnix != complete.Prepared.SnapshotUnix || timing.ProviderReleaseUnix < timing.SnapshotUnix ||
+				len(timing.Replicas) != 1 || timing.Replicas[0].Target != complete.Receiver ||
+				timing.FirstReplicaVerifiedUnix != timing.Replicas[0].VerifiedUnix ||
+				timing.FirstReplicaVerifiedUnix < timing.SnapshotUnix || timing.FirstReplicaVerifiedUnix > timing.ProviderReleaseUnix ||
+				observedRelease != 0 && timing.ProviderReleaseUnix != observedRelease {
+				t.Fatal("source milestones lost or conflated on restart", timing)
 			}
 			out := filepath.Join(f.base, "prepared-crash-restore")
 			_, e = generation.RecoverMaterialized(ctx, f.replicaPath, complete.Generation, f.grant.Trust, f.owner, generation.RecoverySelection{}, out)

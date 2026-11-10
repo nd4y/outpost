@@ -32,6 +32,8 @@ type treeState struct {
 	Released  bool   `json:"released"`
 }
 type TreeProvider struct {
+	ReleaseObservationAdmission statefile.Admission
+
 	binding                   TreeBinding
 	runtimeRoot               *os.Root
 	operation, view, identity string
@@ -165,6 +167,7 @@ func (p *TreeProvider) Release(ctx context.Context, operation, view string) erro
 		if e = p.store.Write("view.json", raw); e != nil {
 			return e
 		}
+		recordReleaseObservation(p.runtimeRoot, p.operation, p.store, p.ReleaseObservationAdmission)
 		if p.guard != nil {
 			return p.guard(ctx)
 		}

@@ -45,6 +45,10 @@ Set `profile.releasePolicy` to `two-holder-coverage` in a new paired installatio
 
 During early release, `source-status` shows the pending job's `stagedRelease` separately from its publication phase. The source still needs the two complete, verified copies for `source-checkpoint`, receiver cleanup and advancement of the generation head. Workers can continue bounded full verification and publication after a restart with the source offline, while the signed capture intent and worker policy are valid. Staged data and predecessor pins remain protected until safe acknowledgement. Coverage relies on the holders' durable staging and the pinned, previously accepted predecessor. Full publication reads and verifies the ciphertext.
 
+For an active or completed operation, `source-status` reports `result.milestones`. `snapshotUnix` is the time declared by the capture intent. `providerReleaseUnix` records when the source observed durable release of its view lease. A prepared export or snapshot may remain on disk under the producer's retention policy. The optional observation uses the telemetry budget. An older journal, interruption before the observation write, or lack of telemetry space leaves the time unknown. Reading or replaying the operation does not backfill it.
+
+`replicas` lists the targets and original ciphertext verification times in the accepted checkpoint. `firstReplicaVerifiedUnix` is the earliest of those times. A staged coverage receipt supplies neither field. Use worker reports for later followers outside the source checkpoint and record a separate independent restore receipt to establish successful decryption.
+
 The `two-holder-coverage` policy requires two holders for every dependency.
 
 Set `profile.releasePolicy` to `paired-split-coverage` to accept one staged copy per dependency before release. New object ownership is stable across retries and derived from its opaque ID and the two holder identities. Both holders retain the final catalog. The source validates the union by recomputing the assigned dependency list for each holder. A required dependency cannot be covered by an unrelated holder or intent.

@@ -193,8 +193,14 @@ type installedProvider interface {
 }
 
 func (a *Agent) openProvider(ctx context.Context, prefix string, i ingress.Intent, initialize bool) (installedProvider, error) {
+	observe := a.admission("telemetry")
 	if a.b.Prepared == nil {
-		return capture.OpenTreeProvider(ctx, a.root, prefix+"/provider", i.Operation, i.Operation, a.b.Tree, initialize, a.admission(prefix+"/provider"), a.guard)
+		p, err := capture.OpenTreeProvider(ctx, a.root, prefix+"/provider", i.Operation, i.Operation, a.b.Tree, initialize, a.admission(prefix+"/provider"), a.guard)
+		if err != nil {
+			return nil, err
+		}
+		p.ReleaseObservationAdmission = observe
+		return p, nil
 	}
 	m, raw, e := a.readPrepared(ctx, i.Operation)
 	if e != nil {
@@ -203,5 +209,5 @@ func (a *Agent) openProvider(ctx context.Context, prefix string, i ingress.Inten
 	if m.SnapshotUnix != i.SnapshotUnix {
 		return nil, ErrInvalid
 	}
-	return capture.OpenPreparedProvider(ctx, capture.PreparedProviderOptions{Parent: a.root, Directory: prefix + "/provider", Operation: i.Operation, Tree: a.b.Tree, Trust: a.b.Prepared.Trust, Manifest: raw, Initialize: initialize, Admission: a.admission(prefix + "/provider"), Guard: a.guard, Fault: a.Fault})
+	return capture.OpenPreparedProvider(ctx, capture.PreparedProviderOptions{Parent: a.root, Directory: prefix + "/provider", Operation: i.Operation, Tree: a.b.Tree, Trust: a.b.Prepared.Trust, Manifest: raw, Initialize: initialize, Admission: a.admission(prefix + "/provider"), ReleaseObservationAdmission: observe, Guard: a.guard, Fault: a.Fault})
 }

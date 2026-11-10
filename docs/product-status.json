@@ -5017,6 +5017,8 @@
         "internal/management",
         "internal/managementservice",
         "internal/worker",
+        "internal/capture",
+        "internal/sourceagent",
         "internal/diskbudget",
         "cmd/outpost",
         "internal/isolation",
@@ -5026,6 +5028,22 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/capture/tree_linux_test.go",
+          "name": "TestReleaseObservationQuotaAndLegacyRemainUnknown"
+        },
+        {
+          "path": "internal/sourceagent/prepared_crash_linux_test.go",
+          "name": "TestPreparedSourceSIGKILLKeepsFrozenExportAndReleasedProvider"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourcePartitionCoverageAssemblesFromPeersAfterRelease"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
+        },
         {
           "path": "internal/telemetry/outbox_linux_test.go",
           "name": "TestTelemetryTypedPayloadPrivacyAndUnknown"
@@ -5148,7 +5166,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Separate measured snapshot release, first independent restore and per-replica readiness timestamps remain open."
+      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. Full-scale snapshot retention, first independent restore and readiness timing for every assigned replica remain open."
     },
     {
       "id": "REQ-43",

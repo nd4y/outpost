@@ -113,6 +113,19 @@ type Status struct {
 	AuthorityRevision uint64          `json:"authorityRevision,omitempty"`
 	Prepared          *PreparedStatus `json:"prepared,omitempty"`
 	Pending           *PendingStatus  `json:"pending,omitempty"`
+	Milestones        *Milestones     `json:"milestones,omitempty"`
+}
+
+type Milestones struct {
+	SnapshotUnix             int64              `json:"snapshotUnix"`
+	ProviderReleaseUnix      int64              `json:"providerReleaseUnix,omitempty"`
+	FirstReplicaVerifiedUnix int64              `json:"firstReplicaVerifiedUnix,omitempty"`
+	Replicas                 []ReplicaMilestone `json:"replicas,omitempty"`
+}
+
+type ReplicaMilestone struct {
+	Target       string `json:"target"`
+	VerifiedUnix int64  `json:"verifiedUnix"`
 }
 
 // PendingStatus describes the local intent fence and the applicable recovery path.
@@ -987,6 +1000,20 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 				}
 				out.Pending = &PendingStatus{IntentExpiresUnix: i.ExpiresUnix, Action: action}
 			}
+			if s.Phase == "ACTIVE" || s.Phase == "COMPLETE" {
+				out.Milestones = &Milestones{SnapshotUnix: i.SnapshotUnix}
+				released := capture.ProviderReleaseObservedUnix(a.root, i.Operation, path.Join("operations", i.Operation, "provider"))
+				if released >= i.SnapshotUnix {
+					out.Milestones.ProviderReleaseUnix = released
+				}
+			}
+			if s.Phase == "COMPLETE" {
+				checkpoint, e := capture.VerifyCheckpoint(s.Checkpoint, a.grant.Trust)
+				if e != nil {
+					return e
+				}
+				out.Milestones.addReplicas(checkpoint.Copies)
+			}
 			if a.b.Prepared != nil {
 				m, _, e := a.readPrepared(ctx, i.Operation)
 				if e != nil {
@@ -1006,10 +1033,20 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 				return e
 			}
 			out.Job = &j
+			out.Milestones.addReplicas(j.Copies)
 		}
 		return nil
 	})
 	return out, e
+}
+
+func (m *Milestones) addReplicas(copies []capture.CopyReceipt) {
+	for _, copy := range copies {
+		m.Replicas = append(m.Replicas, ReplicaMilestone{Target: copy.Target, VerifiedUnix: copy.ObservedUnix})
+		if m.FirstReplicaVerifiedUnix == 0 || copy.ObservedUnix < m.FirstReplicaVerifiedUnix {
+			m.FirstReplicaVerifiedUnix = copy.ObservedUnix
+		}
+	}
 }
 func (a *Agent) Checkpoint(ctx context.Context) ([]byte, error) {
 	var raw []byte

@@ -396,6 +396,9 @@ func (j *Job) decodeState(raw []byte) (State, error) {
 	if phase(s.Phase) >= phase("WAITING_COPIES") && (s.Receipt == nil || s.Receipt.Generation != s.Generation || s.Receipt.Operation != j.intent.Operation) {
 		return s, ErrInvalid
 	}
+	if phase(s.Phase) < phase("CHECKPOINTED") && len(s.Copies) != 0 {
+		return s, ErrInvalid
+	}
 	return s, nil
 }
 func (j *Job) save(s *State) error {

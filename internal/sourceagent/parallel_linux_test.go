@@ -392,7 +392,7 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 		}
 		current, e := f.a.Status(ctx)
 		must(t, e)
-		if current.Job.StagedRelease != "" {
+		if current.Job.StagedRelease != "" || current.Milestones == nil || current.Milestones.ProviderReleaseUnix != 0 {
 			t.Fatal("snapshot release advanced without the second coverage receipt", current.Job)
 		}
 		allowCoverage.Store(true)
@@ -420,6 +420,11 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 		if current.Job.Phase != "SEALED" || current.Job.StagedRelease != "RELEASED" || current.Job.Receipt != nil {
 			t.Fatal("coverage was confused with full publication", current.Job)
 		}
+		if current.Milestones == nil || current.Milestones.ProviderReleaseUnix < current.Milestones.SnapshotUnix ||
+			current.Milestones.FirstReplicaVerifiedUnix != 0 || len(current.Milestones.Replicas) != 0 {
+			t.Fatal("coverage release was not observed independently of full replica readiness", current.Milestones)
+		}
+		released := current.Milestones.ProviderReleaseUnix
 		if _, e = f.a.Checkpoint(ctx); !errors.Is(e, capture.ErrCopies) {
 			t.Fatal("coverage was exposed as a full-copy checkpoint", e)
 		}
@@ -540,6 +545,31 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 				t.Fatal("late receipt lost its provenance or bypassed the full-copy threshold", checkpoint)
 			}
 			t.Log("both receivers independently restored after original expiry; source accepted the late receipts with their original verification times")
+		} else {
+			f.a, e = Open(ctx, f.b, false)
+			must(t, e)
+			for {
+				e = f.a.Run(ctx)
+				if !errors.Is(e, capture.ErrCopies) && !errors.Is(e, observation.ErrPending) {
+					break
+				}
+				select {
+				case <-time.After(100 * time.Millisecond):
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				}
+			}
+			must(t, e)
+			completed, e := f.a.Status(ctx)
+			must(t, e)
+			if completed.Milestones == nil || completed.Milestones.ProviderReleaseUnix != released {
+				t.Fatal("release observation changed after complete publication", completed.Milestones)
+			}
+			checkpoint, e := f.a.Checkpoint(ctx)
+			must(t, e)
+			verified, e := capture.VerifyCheckpoint(checkpoint, f.grant.Trust)
+			must(t, e)
+			checkReplicaMilestones(t, completed.Milestones, verified.Copies)
 		}
 		t.Logf("withheld coverage blocked release; signed checkpoint survived source restart; both restarted workers restored independently with the source offline (%d background peer reads)", lateReads)
 		return
@@ -571,6 +601,9 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 	if len(c.Copies) != 2 || c.Generation != s.Job.Generation {
 		t.Fatal("expected two verified full copies", c)
 	}
+	completed, e := f.a.Status(finishCtx)
+	must(t, e)
+	checkReplicaMilestones(t, completed.Milestones, c.Copies)
 	t.Logf("two-copy checkpoint and acknowledgement after %s", time.Since(started))
 	must(t, f.a.Close())
 	f.a = nil
@@ -607,6 +640,19 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 		}
 	}
 	t.Logf("concurrent source uploads, %d single initial sends, %d pre-seal peer reads, three independent restores with the outbound follower admitted after source release", initial, relayed)
+}
+
+func checkReplicaMilestones(t *testing.T, milestones *Milestones, receipts []capture.CopyReceipt) {
+	t.Helper()
+	if milestones == nil || len(receipts) != 2 || len(milestones.Replicas) != 2 ||
+		milestones.FirstReplicaVerifiedUnix != min(receipts[0].ObservedUnix, receipts[1].ObservedUnix) {
+		t.Fatal("first and per-replica times did not survive completion", milestones)
+	}
+	for i, receipt := range receipts {
+		if milestones.Replicas[i].Target != receipt.Target || milestones.Replicas[i].VerifiedUnix != receipt.ObservedUnix {
+			t.Fatal("replica timing differs from the authenticated checkpoint", milestones.Replicas[i])
+		}
+	}
 }
 
 func testSplitDelivery(t *testing.T, ctx context.Context, a *Agent, traffic *captureTraffic, allow, refuse *atomic.Bool) {
