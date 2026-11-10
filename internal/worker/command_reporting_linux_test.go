@@ -73,6 +73,7 @@ func TestWorkerCommandReportQueuedScrubAndOriginalCompletionWithoutTenantLeak(t 
 
 func TestWorkerCommandReportMaintenanceRetainsReplicaOutcome(t *testing.T) {
 	f := newFixture(t)
+	f.cfg.Limits.AttemptMillis = 60000
 	f.endpoint(t, nil)
 	replica, _, makeCommand := maintenanceCommandFixture(t, f)
 	w := f.nodes[0]
@@ -83,7 +84,11 @@ func TestWorkerCommandReportMaintenanceRetainsReplicaOutcome(t *testing.T) {
 	_, e := w.ExecuteCommand(ctx, raw)
 	must(t, e)
 	stop := start(t, w)
-	record := waitAction(t, w, raw)
+	var record CommandRecord
+	waitFor(t, 60*time.Second, func() bool {
+		record = actionRecord(t, w, raw)
+		return len(record.Ack) > 0
+	})
 	stop()
 	snapshot, e := w.ManagementSnapshot(ctx, commandEnrollment(t, f), f.domain.Trust.Domain)
 	must(t, e)

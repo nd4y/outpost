@@ -3184,7 +3184,7 @@
                   "items": {
                     "properties": {
                       "kind": {
-                        "enum": ["scrub", "maintenance"]
+                        "enum": ["scrub", "maintenance", "retention"]
                       }
                     }
                   }
@@ -3615,7 +3615,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["retry", "pause", "resume", "scrub", "restore", "maintenance"]
+            "enum": ["retry", "pause", "resume", "scrub", "restore", "maintenance", "retention"]
           },
           "job": {
             "$ref": "#/components/schemas/ID"
@@ -3655,6 +3655,12 @@
             "contentEncoding": "base64",
             "maxLength": 1398104,
             "description": "Separate domain maintenance permit; required only for maintenance and verified independently by the worker."
+          },
+          "retentionGrant": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 5464,
+            "description": "Separate maintenance-signed HOLD, CLOSE or RELEASE grant; required only for retention."
           }
         },
         "required": [
@@ -3822,7 +3828,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["scrub", "maintenance", "restore"]
+            "enum": ["scrub", "maintenance", "restore", "retention"]
           },
           "phase": {
             "type": "string",
@@ -3839,6 +3845,12 @@
           },
           "maintenance": {
             "$ref": "#/components/schemas/MaintenanceOutcome"
+          },
+          "retentionProof": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 5464,
+            "description": "Original canonical node-signed receipt of a completed retention command. Decoded bytes match resultDigest."
           },
           "startedUnix": {
             "type": "integer",
@@ -3897,6 +3909,16 @@
           "verifiedUnix"
         ],
         "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": { "const": "retention" },
+                "phase": { "const": "COMPLETE" }
+              }
+            },
+            "then": { "required": ["retentionProof"] },
+            "else": { "not": { "required": ["retentionProof"] } }
+          },
           {
             "if": {
               "properties": {
@@ -4127,7 +4149,7 @@
                   "items": {
                     "properties": {
                       "kind": {
-                        "enum": ["scrub", "maintenance"]
+                        "enum": ["scrub", "maintenance", "retention"]
                       }
                     }
                   }
@@ -4438,9 +4460,17 @@
                 "kinds": {
                   "type": "array",
                   "items": {
-                    "enum": ["pause", "resume", "retry", "scrub", "restore", "maintenance"]
+                    "enum": [
+                      "pause",
+                      "resume",
+                      "retry",
+                      "scrub",
+                      "restore",
+                      "maintenance",
+                      "retention"
+                    ]
                   },
-                  "maxItems": 6
+                  "maxItems": 7
                 },
                 "expiresUnix": {
                   "type": "integer",

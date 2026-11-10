@@ -103,9 +103,11 @@ func SignRetentionProtection(p RetentionProtection, key ed25519.PrivateKey) ([]b
 	return json.Marshal(p)
 }
 
-func verifyRetentionProtection(raw []byte, trust Trust, node string) (RetentionProtection, error) {
+// VerifyRetentionProtection authenticates a grant for the specified holder.
+// The replica checks time when admitting a new effect.
+func VerifyRetentionProtection(raw []byte, trust Trust, node string) (RetentionProtection, error) {
 	var p RetentionProtection
-	if canonical(raw, &p, MaxRetentionProtection) != nil || !p.valid() ||
+	if !trust.valid() || canonical(raw, &p, MaxRetentionProtection) != nil || !p.valid() ||
 		p.Node != node || p.Domain != trust.Domain || p.Repository != trust.Repository || p.Epoch != trust.Epoch {
 		return p, ErrInvalid
 	}

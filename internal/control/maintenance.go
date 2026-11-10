@@ -40,6 +40,20 @@ func (c Config) MaintenancePermit(request command.Request) (generation.Permit, e
 	return out, nil
 }
 
+// RetentionProtection binds a signed grant to the current trusted recipient.
+func (c Config) RetentionProtection(request command.Request) (generation.RetentionProtection, error) {
+	var out generation.RetentionProtection
+	d, ok := c.DomainByID(request.Domain)
+	if !ok || request.Kind != "retention" || !c.trustedHolder(d, c.Node) {
+		return out, ErrDenied
+	}
+	out, err := generation.VerifyRetentionProtection(request.RetentionGrant, d.Trust, c.Node)
+	if err != nil || out.Operation == request.Operation || out.NotBefore >= request.ExpiresUnix || out.NotBefore >= c.ExpiresUnix {
+		return out, ErrDenied
+	}
+	return out, nil
+}
+
 func (c Config) trustedHolder(d Domain, id string) bool {
 	n, ok := c.NodeByID(id)
 	return ok && n.Class == "trusted" && slices.Contains(d.Placement.Holders, id)

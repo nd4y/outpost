@@ -20,6 +20,7 @@ const MaxAuthority = 64 << 10
 const MaxRequest = 2 << 20
 const MaxEnvelope = 3 << 20
 const MaxAck = 65536
+const MaxRetentionGrant = 4096
 const MaxSafeInteger = 9007199254740991
 
 var ErrInvalid = errors.New("invalid command document")
@@ -48,7 +49,7 @@ func oneOf(v string, values ...string) bool {
 func instant(n int64) bool  { return n > 0 && n <= 1<<40 }
 func counter(n uint64) bool { return n > 0 && n <= MaxSafeInteger }
 func Kind(v string) bool {
-	return oneOf(v, "retry", "pause", "resume", "scrub", "restore", "maintenance")
+	return oneOf(v, "retry", "pause", "resume", "scrub", "restore", "maintenance", "retention")
 }
 func Reason(v string) bool {
 	return oneOf(v, "OPERATOR_REQUEST", "INCIDENT_RESPONSE", "RECOVERY_DRILL", "POLICY_CHANGE", "OWNER_MAINTENANCE")
@@ -81,7 +82,7 @@ type Authority struct {
 }
 
 func (a Authority) Validate() error {
-	if a.Format != AuthorityFormat || len(a.Service) != 32 || !storage.ID(a.Node) || Identity(a.Service) == a.Node || !storage.ID(a.Tenant) || !storage.ID(a.Domain) || !storage.ID(a.Repository) || !counter(a.WriterEpoch) || !counter(a.AuthorityEpoch) || len(a.Kinds) == 0 || len(a.Kinds) > 6 || !instant(a.NotBefore) || !instant(a.ExpiresUnix) || a.ExpiresUnix <= a.NotBefore {
+	if a.Format != AuthorityFormat || len(a.Service) != 32 || !storage.ID(a.Node) || Identity(a.Service) == a.Node || !storage.ID(a.Tenant) || !storage.ID(a.Domain) || !storage.ID(a.Repository) || !counter(a.WriterEpoch) || !counter(a.AuthorityEpoch) || len(a.Kinds) == 0 || len(a.Kinds) > 7 || !instant(a.NotBefore) || !instant(a.ExpiresUnix) || a.ExpiresUnix <= a.NotBefore {
 		return ErrInvalid
 	}
 	seen := map[string]bool{}
@@ -147,6 +148,7 @@ type Request struct {
 	Versions          []string `json:"versions,omitempty"`
 	Authority         []byte   `json:"authority"`
 	MaintenancePermit []byte   `json:"maintenancePermit,omitempty"`
+	RetentionGrant    []byte   `json:"retentionGrant,omitempty"`
 	ExpiresUnix       int64    `json:"expiresUnix"`
 }
 
@@ -155,6 +157,9 @@ func (r Request) Validate(a Authority) error {
 		return ErrInvalid
 	}
 	if r.Job != "" && !storage.ID(r.Job) || r.Generation != "" && !storage.ID(r.Generation) || r.Preset != "" && !storage.ID(r.Preset) || len(r.Versions) > 256 || len(r.MaintenancePermit) > 1<<20 {
+		return ErrInvalid
+	}
+	if r.Kind != "retention" && len(r.RetentionGrant) != 0 {
 		return ErrInvalid
 	}
 	seen := map[string]bool{}
@@ -179,6 +184,11 @@ func (r Request) Validate(a Authority) error {
 		}
 	case "restore":
 		if r.Job != "" || r.Generation == "" || r.Preset == "" || len(r.MaintenancePermit) > 0 {
+			return ErrInvalid
+		}
+	case "retention":
+		if r.Job != "" || r.Generation != "" || r.Preset != "" || len(r.Versions) > 0 || len(r.MaintenancePermit) != 0 ||
+			len(r.RetentionGrant) == 0 || len(r.RetentionGrant) > MaxRetentionGrant || r.Reason != "OWNER_MAINTENANCE" {
 			return ErrInvalid
 		}
 	case "maintenance":

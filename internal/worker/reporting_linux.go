@@ -334,6 +334,8 @@ func commandObservations(status Status, tenant, domain string) ([]management.Com
 						return nil, management.ErrInvalid
 					}
 					c.Maintenance = &result.Result
+				case "retention":
+					c.RetentionProof = op.Result
 				default:
 					return nil, management.ErrInvalid
 				}

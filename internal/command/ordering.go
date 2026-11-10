@@ -5,6 +5,10 @@ import "github.com/nd4y/outpost/internal/storage"
 // Controls have an independent replay fence so a later pause can overtake work
 // without making an earlier, not yet delivered work command stale.
 func Control(kind string) bool { return kind == "pause" || kind == "resume" }
+
+// Scheduled commands run on the worker execution lease.
+func Scheduled(kind string) bool { return oneOf(kind, "scrub", "maintenance", "restore", "retention") }
+
 func SequenceScope(service, kind string) string {
 	if Control(kind) {
 		return service

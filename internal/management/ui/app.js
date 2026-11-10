@@ -475,6 +475,7 @@ const stateNames = {
     scrub: "Проверить поколение",
     restore: "Восстановить",
     maintenance: "Обслуживание",
+    retention: "Защита копий",
   },
   en: {
     ABANDONED: "Abandoned before publication",
@@ -486,6 +487,7 @@ const stateNames = {
     scrub: "Scrub generation",
     restore: "Restore",
     maintenance: "Maintenance",
+    retention: "Retention protection",
   },
 };
 let lang = navigator.language.startsWith("ru") ? "ru" : "en";

@@ -112,7 +112,7 @@ func (w *Worker) validateControls(c *Controls) error {
 		if (op.Kind == "scrub" || op.Kind == "restore") && op.StartedUnix > 0 && (op.Generation == "" || op.Work == nil) {
 			return ErrDenied
 		}
-		if op.Kind == "maintenance" && (op.Generation != "" || op.StartedUnix > 0 && op.Work == nil) {
+		if (op.Kind == "maintenance" || op.Kind == "retention") && (op.Generation != "" || op.StartedUnix > 0 && op.Work == nil) {
 			return ErrDenied
 		}
 		if op.Work != nil {
@@ -122,7 +122,7 @@ func (w *Worker) validateControls(c *Controls) error {
 			if !storage.ID(op.Tenant) {
 				return ErrDenied
 			}
-			if (op.Kind != "scrub" && op.Kind != "maintenance" && op.Kind != "restore") || op.Work.Attempts > command.MaxSafeInteger || op.Work.NextMillis < 0 || op.Work.VerifiedObjects < 0 || op.Work.TotalObjects < op.Work.VerifiedObjects {
+			if !command.Scheduled(op.Kind) || op.Work.Attempts > command.MaxSafeInteger || op.Work.NextMillis < 0 || op.Work.VerifiedObjects < 0 || op.Work.TotalObjects < op.Work.VerifiedObjects {
 				return ErrDenied
 			}
 			switch op.Work.Phase {

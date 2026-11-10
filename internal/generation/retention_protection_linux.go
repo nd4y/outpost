@@ -66,7 +66,7 @@ func (r *Replica) ApplyRetentionProtection(ctx context.Context, raw []byte, admi
 	if len(r.indexKey) != ed25519.PrivateKeySize {
 		return out, ErrInvalid
 	}
-	grant, e := verifyRetentionProtection(raw, r.trust, r.indexNode)
+	grant, e := VerifyRetentionProtection(raw, r.trust, r.indexNode)
 	if e != nil {
 		return out, e
 	}

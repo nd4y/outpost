@@ -10,6 +10,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -307,6 +308,14 @@ func (r Report) Validate(e Enrollment, now time.Time) error {
 	for _, c := range r.Commands {
 		if c.Kind == "restore" && r.Format != RecoveryReportFormat && !hasCatalog || seen[c.Operation] || c.Validate(r.ObservedUnix) != nil {
 			return ErrInvalid
+		}
+		if len(c.RetentionProof) > 0 {
+			proof, err := generation.VerifyRetentionProtectionReceipt(c.RetentionProof, r.Node)
+			// Command history can outlive the enrollment's repository epoch.
+			// A new maintenance permit independently checks the current scope.
+			if err != nil || proof.Domain != r.Domain || proof.ObservedUnix > c.FinishedUnix {
+				return ErrInvalid
+			}
 		}
 		seen[c.Operation] = true
 	}

@@ -46,6 +46,12 @@ When retirement has finished or must be abandoned, apply a separate `CLOSE` gran
 
 A bound `RELEASE` carries the same `retirement` and the exact signed `CLOSED` receipt in `closure`. The survivor verifies the retiring node, operation, domain, repository and epoch before removing the pin. A missing proof, a receipt from another operation or a modified receipt leaves the hold in force. Keep the hold until the retiring node can produce the closure receipt.
 
+#### Queue protection on running holders
+
+An owner can submit `kind: retention` and `reason: OWNER_MAINTENANCE` through the existing command API. The node's owner-signed command authority must include `retention`, and the separate maintenance-signed `HOLD`, `CLOSE` or `RELEASE` grant goes in base64 `retentionGrant`. Choose a command operation ID distinct from the operation in the grant. Both service admission and worker execution check the recipient's trusted placement and the signed scope. The worker rechecks the exact accepted policy before committing the replica update.
+
+Read the completed command through the existing signed report or `command-status` endpoint. Its `retentionProof` contains the original base64 node receipt and hashes to `resultDigest`. Verify the receipt signature, scope and grant digest before using it. An interrupted operation retries through the queue and preserves the original receipt. If the command expired before confirmation, a new command ID may carry the identical signed grant to read back an already committed result. A new effect still requires a live grant. Automated planning across holders remains a separate step.
+
 #### Require surviving copies in the signed domain policy
 
 Set the optional `retirementMinimumCopies` field of the owner-signed domain configuration to 1–8. A positive value requires coverage for every generation retired by a maintenance command. Existing policies with the field omitted retain their prior behavior. An independently authorized collection of unreferenced objects can still use the existing permit formats with an empty `retire` list.

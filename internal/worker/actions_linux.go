@@ -163,6 +163,9 @@ func (w *Worker) executeAction(ctx context.Context, v *view, env command.Envelop
 	if env.Request.Kind == "maintenance" {
 		return w.executeMaintenance(ctx, v, env)
 	}
+	if env.Request.Kind == "retention" {
+		return w.executeRetentionProtection(ctx, v, env)
+	}
 	if env.Request.Kind != "scrub" {
 		return nil, ErrDenied
 	}
@@ -234,7 +237,7 @@ func (w *Worker) finishAction(ctx context.Context, v *view, out *actionResult) e
 		case out.envelope.Active(time.Now()) != nil:
 			op.Work.Phase = "FAILED"
 			code = "COMMAND_EXPIRED"
-			if out.envelope.Request.Kind == "maintenance" {
+			if out.envelope.Request.Kind == "maintenance" || out.envelope.Request.Kind == "retention" {
 				code = "EFFECT_UNCONFIRMED"
 			}
 		case errors.Is(out.err, generation.ErrMaintenanceWindow), errors.Is(out.err, generation.ErrRetirementClosed):

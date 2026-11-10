@@ -34,7 +34,7 @@ func commandRole(p Principal, kind string) bool {
 	if kind == "restore" {
 		return p.Role("recovery")
 	}
-	return kind != "maintenance" && p.Role("operator")
+	return kind != "maintenance" && kind != "retention" && p.Role("operator")
 }
 func commandRequestDigest(p Principal, node string, input command.Request) string {
 	raw, _ := json.Marshal(struct {
@@ -142,6 +142,11 @@ func (r *Registry) admitCommandPolicy(ctx context.Context, s registryState, p Pr
 	a, e := cfg.CommandAuthority(input.Authority, r.owner, time.Now())
 	if e != nil || input.Validate(a) != nil || a.Tenant != tenant || command.Identity(a.Service) != identity(r.signer.Public().(ed25519.PublicKey)) || input.ExpiresUnix <= time.Now().Unix() || input.ExpiresUnix > cfg.ExpiresUnix || input.ExpiresUnix > time.Now().Unix()+86400 {
 		return enrollment, "", ErrDenied
+	}
+	if input.Kind == "retention" {
+		if _, e := cfg.RetentionProtection(input); e != nil || enrollment.Class != "trusted" {
+			return enrollment, "", ErrDenied
+		}
 	}
 	return enrollment, storage.Hash(raw), nil
 }

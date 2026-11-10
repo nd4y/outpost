@@ -36,6 +36,10 @@ func (w *Worker) commandPolicy(ctx context.Context, cfg control.Config, raw []by
 			return generation.ErrMaintenanceWindow
 		}
 	}
+	if env.Request.Kind == "retention" {
+		_, e := cfg.RetentionProtection(env.Request)
+		return e
+	}
 	if env.Request.Job != "" {
 		for _, job := range cfg.Jobs {
 			if job.Operation == env.Request.Job && job.Domain == env.Request.Domain && (job.Executor == w.node || job.Peer == w.node) {
@@ -62,7 +66,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 	if e != nil || env.Node != w.node {
 		return nil, ErrDenied
 	}
-	if env.Request.Kind != "pause" && env.Request.Kind != "resume" && env.Request.Kind != "retry" && env.Request.Kind != "scrub" && env.Request.Kind != "maintenance" && env.Request.Kind != "restore" {
+	if !command.Kind(env.Request.Kind) {
 		return nil, ErrDenied
 	}
 	if e = w.check(ctx); e != nil {
@@ -152,7 +156,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 					if s.Controls == nil || s.Controls.Revision >= command.MaxSafeInteger || cfg.Active(time.Now()) != nil || env.Active(time.Now()) != nil {
 						return ErrDenied
 					}
-					if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" || env.Request.Kind == "restore" {
+					if command.Scheduled(env.Request.Kind) {
 						op.Generation = env.Request.Generation
 						op.Work = &CommandWork{Phase: "QUEUED"}
 						if env.Request.Kind == "maintenance" {
@@ -163,6 +167,13 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 							if p.Window != nil {
 								op.Work.NextMillis = p.Window.StartUnix * 1000
 							}
+						}
+						if env.Request.Kind == "retention" {
+							grant, err := cfg.RetentionProtection(env.Request)
+							if err != nil {
+								return err
+							}
+							op.Work.NextMillis = grant.NotBefore * 1000
 						}
 						if env.Request.Kind == "restore" {
 							s.Format = RecoveryFormat
@@ -246,7 +257,7 @@ func (w *Worker) ExecuteCommand(ctx context.Context, raw []byte) ([]byte, error)
 				return e
 			}
 		}
-		if env.Request.Kind == "scrub" || env.Request.Kind == "maintenance" || env.Request.Kind == "restore" {
+		if command.Scheduled(env.Request.Kind) {
 			if exists {
 				acquire, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
 				err := w.lease.WithLock(acquire, func() error { return state.reconcileActions(ctx) })

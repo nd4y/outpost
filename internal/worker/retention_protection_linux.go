@@ -3,10 +3,12 @@ package worker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"slices"
 	"time"
 
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -45,4 +47,34 @@ func (w *Worker) ApplyRetentionProtection(ctx context.Context, domain string, ra
 		return e
 	})
 	return receipt, e
+}
+
+func (w *Worker) executeRetentionProtection(ctx context.Context, v *view, env command.Envelope) ([]byte, error) {
+	local := v.domains[env.Request.Domain]
+	if local == nil {
+		return nil, ErrDenied
+	}
+	if _, e := v.cfg.RetentionProtection(env.Request); e != nil {
+		return nil, e
+	}
+	ctx, cancel := context.WithDeadline(ctx, time.Unix(env.Request.ExpiresUnix, 0))
+	defer cancel()
+	receipt, e := local.replica.ApplyRetentionProtection(ctx, env.Request.RetentionGrant, func(commit func() error) error {
+		return w.cache.WithCurrent(ctx, time.Now(), func(cfg control.Config, raw []byte) error {
+			if e := w.commandAdmission(cfg, raw, env, time.Now()); e != nil {
+				return e
+			}
+			if e := w.check(ctx); e != nil {
+				return e
+			}
+			return commit()
+		})
+	})
+	if e != nil {
+		return nil, e
+	}
+	if e = w.point("worker-command-retention-result-durable"); e != nil {
+		return nil, e
+	}
+	return json.Marshal(receipt)
 }

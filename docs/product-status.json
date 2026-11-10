@@ -3055,6 +3055,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/worker/retention_command_linux_test.go",
+          "name": "TestWorkerRetentionCommandReplaysOriginalProofAfterRestart"
+        },
+        {
           "path": "internal/worker/retention_coverage_linux_test.go",
           "name": "TestWorkerMaintenanceRequiresBoundSurvivorCopies"
         },
@@ -3224,6 +3228,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/worker/retention_command_linux_test.go",
+          "name": "TestWorkerRetentionCommandReplaysOriginalProofAfterRestart"
+        },
         {
           "path": "internal/worker/retention_coverage_linux_test.go",
           "name": "TestWorkerMaintenanceRequiresBoundSurvivorCopies"
@@ -5948,6 +5956,10 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/worker/retention_command_linux_test.go",
+          "name": "TestWorkerRetentionCommandReplaysOriginalProofAfterRestart"
+        },
         {
           "path": "internal/management/retention_coverage_linux_test.go",
           "name": "TestManagementRetentionCoverageUsesCurrentPinnedSurvivors"

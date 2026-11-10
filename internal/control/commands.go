@@ -21,7 +21,7 @@ func (c Config) validateCommands(owner ed25519.PublicKey) error {
 		d, ok := c.DomainByID(a.Domain)
 		node, found := c.NodeByID(c.Node)
 		binding := command.Identity(a.Service) + "/" + a.Domain
-		if !ok || !found || a.Node != c.Node || a.Repository != d.Trust.Repository || a.WriterEpoch != d.Trust.Epoch || a.NotBefore >= c.ExpiresUnix || a.ExpiresUnix <= c.NotBefore || seen[binding] || a.Allows("restore") && node.Class != "trusted" {
+		if !ok || !found || a.Node != c.Node || a.Repository != d.Trust.Repository || a.WriterEpoch != d.Trust.Epoch || a.NotBefore >= c.ExpiresUnix || a.ExpiresUnix <= c.NotBefore || seen[binding] || a.Allows("restore") && node.Class != "trusted" || a.Allows("retention") && !c.trustedHolder(d, c.Node) {
 			return ErrDenied
 		}
 		seen[binding] = true

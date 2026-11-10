@@ -1,6 +1,7 @@
 package management
 
 import (
+	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/storage"
@@ -28,10 +29,11 @@ type CommandObservation struct {
 	Restore           *recovery.Receipt              `json:"restore,omitempty"`
 	CleanupPending    bool                           `json:"cleanupPending,omitempty"`
 	Maintenance       *generation.MaintenanceReceipt `json:"maintenance,omitempty"`
+	RetentionProof    []byte                         `json:"retentionProof,omitempty"`
 }
 
 func (c CommandObservation) Validate(observed int64) error {
-	if !storage.ID(c.Operation) || !storage.ID(c.EnvelopeDigest) || !oneOf(c.Kind, "scrub", "maintenance", "restore") || !oneOf(c.Phase, "QUEUED", "RUNNING", "RETRY_WAIT", "COMPLETE", "FAILED") || !validTime(c.StartedUnix) || c.StartedUnix > observed || c.FinishedUnix < 0 || c.FinishedUnix > observed || !safe(c.Attempts) || c.NextAttemptMillis < 0 || c.NextAttemptMillis > 1<<50 || !safe(c.VerifiedObjects) || !safe(c.TotalObjects) || c.VerifiedObjects > c.TotalObjects || !stableCode(c.ErrorCode) {
+	if !storage.ID(c.Operation) || !storage.ID(c.EnvelopeDigest) || !command.Scheduled(c.Kind) || !oneOf(c.Phase, "QUEUED", "RUNNING", "RETRY_WAIT", "COMPLETE", "FAILED") || !validTime(c.StartedUnix) || c.StartedUnix > observed || c.FinishedUnix < 0 || c.FinishedUnix > observed || !safe(c.Attempts) || c.NextAttemptMillis < 0 || c.NextAttemptMillis > 1<<50 || !safe(c.VerifiedObjects) || !safe(c.TotalObjects) || c.VerifiedObjects > c.TotalObjects || !stableCode(c.ErrorCode) {
 		return ErrInvalid
 	}
 	terminal := c.Phase == "COMPLETE" || c.Phase == "FAILED"
@@ -42,6 +44,18 @@ func (c CommandObservation) Validate(observed int64) error {
 		return ErrInvalid
 	}
 	if c.Kind != "restore" && (c.Restore != nil || c.CleanupPending) {
+		return ErrInvalid
+	}
+	if c.Kind == "retention" {
+		if c.Generation != "" || c.Verification != "" || c.VerifiedUnix != 0 || c.VerifiedObjects != 0 || c.TotalObjects != 0 ||
+			c.Maintenance != nil || (c.Phase == "COMPLETE") != (len(c.RetentionProof) > 0) ||
+			len(c.RetentionProof) > generation.MaxRetentionProtection ||
+			len(c.RetentionProof) > 0 && storage.Hash(c.RetentionProof) != c.ResultDigest {
+			return ErrInvalid
+		}
+		return nil
+	}
+	if len(c.RetentionProof) != 0 {
 		return ErrInvalid
 	}
 	if c.Kind == "scrub" {
