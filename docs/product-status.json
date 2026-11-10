@@ -38,6 +38,10 @@
       ],
       "checks": [
         {
+          "path": "internal/sourceagent/native_release_linux_test.go",
+          "name": "TestNativeReleaseTicketFollowsDurableCheckpointWithoutExecutionLease"
+        },
+        {
           "path": "internal/capture/btrfs_producer_linux_test.go",
           "name": "TestNativeBtrfsProducerReusesExactKernelSnapshot"
         },
@@ -103,7 +107,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "The native Btrfs candidate creates one read-only snapshot for a signed producer intent and reuses it on restart. Admit its actual source profile, retention and performance, verify native snapshot disposal, and admit the remaining filesystem and application profiles."
+      "remaining": "The native Btrfs candidate creates one read-only snapshot for a signed producer intent and reuses it on restart. A separate producer disposes the exact snapshot using the source's signed release ticket. Admit the real source profile, privileges, retention and performance and the remaining filesystem and application profiles."
     },
     {
       "id": "REQ-03",
@@ -278,6 +282,10 @@
         "internal/policy"
       ],
       "checks": [
+        {
+          "path": "internal/sourceagent/native_release_linux_test.go",
+          "name": "TestNativeReleaseTicketFollowsDurableCheckpointWithoutExecutionLease"
+        },
         {
           "path": "internal/sourceagent/journal_copy_linux_test.go",
           "name": "TestSourceJournalCopyReconcilesExactPredecessorAndLostActiveFile"
@@ -5073,6 +5081,10 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/sourceagent/native_release_linux_test.go",
+          "name": "TestNativeReleaseTicketFollowsDurableCheckpointWithoutExecutionLease"
+        },
         {
           "path": "internal/capture/tree_linux_test.go",
           "name": "TestReleaseObservationQuotaAndLegacyRemainUnknown"

@@ -15,6 +15,7 @@ const BtrfsSnapshotMethod = "btrfs-readonly-snapshot-v1"
 type btrfsSnapshot struct {
 	id, parent string
 	created    int64
+	subvolume  uint64
 }
 
 func btrfsUUID(text string) bool {
@@ -58,8 +59,8 @@ func inspectBtrfsSnapshot(root *os.Root) (btrfsSnapshot, error) {
 	generation := binary.NativeEndian.Uint64(info[280:288])
 	original := binary.NativeEndian.Uint64(info[352:360])
 	created := binary.NativeEndian.Uint64(info[392:400])
-	result = btrfsSnapshot{hex.EncodeToString(info[296:312]), hex.EncodeToString(info[312:328]), int64(created)}
-	if !btrfsUUID(result.id) || !btrfsUUID(result.parent) || generation == 0 || generation != original || created == 0 || created > 1<<40 {
+	result = btrfsSnapshot{hex.EncodeToString(info[296:312]), hex.EncodeToString(info[312:328]), int64(created), binary.NativeEndian.Uint64(info[:8])}
+	if !btrfsUUID(result.id) || !btrfsUUID(result.parent) || generation == 0 || generation != original || created == 0 || created > 1<<40 || result.subvolume < 256 {
 		return btrfsSnapshot{}, ErrInvalid
 	}
 	return result, nil

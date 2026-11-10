@@ -26,7 +26,7 @@ The [source and recovery components](docs/en/product-development.md) include bou
 
 An optional [write-ahead source journal copy](docs/en/source-journal-copy.md) repairs a missing main journal from the exact signed state when the admitted copy and required capture records survive.
 
-The [native Btrfs producer](docs/en/prepared-exports.md#native-btrfs-producer) creates one read-only snapshot for a durable signed operation and hands it to the prepared source agent.
+The [native Btrfs producer](docs/en/prepared-exports.md#native-btrfs-producer) creates one read-only snapshot for a durable signed operation. A separate producer action consumes the source's signed release ticket and removes the exact subvolume.
 
 The `source-status` command reports the expiry of pending work and indicates whether the operator can resume it or needs owner action or receiver reconciliation. An expired operation prepared locally can be retired with owner approval until execution reaches the receiver fence.
 

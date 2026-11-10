@@ -209,4 +209,7 @@ func TestNativeBtrfsProducerReusesExactKernelSnapshot(t *testing.T) {
 	if count != 2 {
 		t.Fatal("unexpected number of physical snapshots", count)
 	}
+	if os.Getenv("OUTPOST_BTRFS_TEST_RELEASE") == "1" {
+		exerciseNativeRemoval(t, ctx, profile, key, first, secondRaw, original)
+	}
 }

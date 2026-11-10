@@ -12,6 +12,7 @@ import (
 	"github.com/nd4y/outpost/internal/capture"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/volume"
@@ -26,15 +27,17 @@ var ErrPreparedUnchanged = errors.New("prepared export has not advanced")
 // Pointer changes select only future operations; pending work uses its frozen
 // signed manifest. Native producer execution and retention are independent.
 type PreparedSource struct {
-	Trust        capture.PreparedTrust `json:"trust"`
-	ManifestFile string                `json:"manifestFile"`
+	Trust                capture.PreparedTrust `json:"trust"`
+	ManifestFile         string                `json:"manifestFile"`
+	NativeReleaseTickets bool                  `json:"nativeReleaseTickets,omitempty"`
 }
 type PreparedStatus struct {
-	Method           string `json:"method"`
-	ProducerSequence uint64 `json:"producerSequence"`
-	SnapshotUnix     int64  `json:"snapshotUnix"`
-	CompletedUnix    int64  `json:"completedUnix"`
-	Attestation      string `json:"attestation"`
+	Method           string                       `json:"method"`
+	ProducerSequence uint64                       `json:"producerSequence"`
+	SnapshotUnix     int64                        `json:"snapshotUnix"`
+	CompletedUnix    int64                        `json:"completedUnix"`
+	Attestation      string                       `json:"attestation"`
+	NativeRelease    *capture.NativeReleaseStatus `json:"nativeRelease,omitempty"`
 }
 
 // CreatePreparedManifest is a producer-side read/sign operation. It does not
@@ -58,7 +61,47 @@ func CreatePreparedManifest(ctx context.Context, b Bootstrap, c capture.Prepared
 
 func preparedBootstrap(b Bootstrap) bool {
 	p := b.Prepared
-	return b.Format == PreparedAgentFormat && p != nil && b.Profile.Consistency == p.Trust.Consistency() && p.Trust.Validate() == nil && p.Trust.Profile == b.Profile.ID && p.Trust.Origin == b.Profile.Origin && p.Trust.MaxBytes <= b.Profile.MaxSourceBytes && filepath.IsAbs(p.ManifestFile) && filepath.Clean(p.ManifestFile) == p.ManifestFile && len(p.ManifestFile) <= 4095
+	return b.Format == PreparedAgentFormat && p != nil && b.Profile.Consistency == p.Trust.Consistency() && p.Trust.Validate() == nil && p.Trust.Profile == b.Profile.ID && p.Trust.Origin == b.Profile.Origin && p.Trust.MaxBytes <= b.Profile.MaxSourceBytes && filepath.IsAbs(p.ManifestFile) && filepath.Clean(p.ManifestFile) == p.ManifestFile && len(p.ManifestFile) <= 4095 &&
+		(!p.NativeReleaseTickets || p.Trust.Method == capture.BtrfsSnapshotMethod && p.Trust.Consistency() == "filesystem")
+}
+
+// NativeReleaseTicket reads one exact historical provider state without taking
+// the source execution lease or opening private data and writer keys.
+func NativeReleaseTicket(ctx context.Context, b Bootstrap, operation string) ([]byte, error) {
+	if !preparedBootstrap(b) || !b.Prepared.NativeReleaseTickets || !storage.ID(operation) ||
+		b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != ed25519.PublicKeySize {
+		return nil, ErrInvalid
+	}
+	authority, err := worker.ReadPrivate(b.AuthorityFile, ingress.MaxDocument)
+	if err != nil {
+		return nil, err
+	}
+	grant, err := ingress.VerifyAuthorityDocument(authority, b.Local.Owner)
+	if err != nil || grant.Source != b.Local.Node || grant.Profile != b.Profile.ID {
+		return nil, ErrInvalid
+	}
+	root, err := b.Local.Volume.Open(ctx, b.Local.Directory, false)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	provider, err := capture.OpenPreparedProvider(ctx, capture.PreparedProviderOptions{Parent: root,
+		Directory: "operations/" + operation + "/provider", Operation: operation, Tree: b.Tree, Trust: b.Prepared.Trust,
+		NativeReleaseTickets: true, Guard: func(ctx context.Context) error {
+			return b.Local.Volume.CheckHandle(ctx, b.Local.Directory, root)
+		}})
+	if err != nil {
+		return nil, err
+	}
+	defer provider.Close()
+	raw, _, err := provider.NativeRelease(ctx, grant.Trust)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return nil, observation.ErrPending
+	}
+	return raw, nil
 }
 func (a *Agent) preparedStore(initialize bool) (*statefile.Store, error) {
 	s, e := statefile.OpenAt(a.root, "prepared-views", capture.MaxPreparedExport, initialize)
@@ -209,5 +252,5 @@ func (a *Agent) openProvider(ctx context.Context, prefix string, i ingress.Inten
 	if m.SnapshotUnix != i.SnapshotUnix {
 		return nil, ErrInvalid
 	}
-	return capture.OpenPreparedProvider(ctx, capture.PreparedProviderOptions{Parent: a.root, Directory: prefix + "/provider", Operation: i.Operation, Tree: a.b.Tree, Trust: a.b.Prepared.Trust, Manifest: raw, Initialize: initialize, Admission: a.admission(prefix + "/provider"), ReleaseObservationAdmission: observe, Guard: a.guard, Fault: a.Fault})
+	return capture.OpenPreparedProvider(ctx, capture.PreparedProviderOptions{Parent: a.root, Directory: prefix + "/provider", Operation: i.Operation, Tree: a.b.Tree, Trust: a.b.Prepared.Trust, Manifest: raw, Initialize: initialize, Admission: a.admission(prefix + "/provider"), ReleaseObservationAdmission: observe, NativeReleaseTickets: a.b.Prepared.NativeReleaseTickets, Guard: a.guard, Fault: a.Fault})
 }

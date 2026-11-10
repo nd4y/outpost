@@ -41,6 +41,7 @@ type PreparedProviderOptions struct {
 	Initialize                  bool
 	Admission                   statefile.Admission
 	ReleaseObservationAdmission statefile.Admission
+	NativeReleaseTickets        bool
 	Guard                       func(context.Context) error
 	Fault                       func(string) error
 }
@@ -59,23 +60,27 @@ type PreparedProvider struct {
 }
 
 func OpenPreparedProvider(ctx context.Context, o PreparedProviderOptions) (*PreparedProvider, error) {
-	if o.Parent == nil || !storage.ID(o.Operation) || o.Trust.validate() != nil || o.Tree.Format != TreeFormat || o.Tree.Origin != o.Trust.Origin || !filepath.IsAbs(o.Tree.Path) || filepath.Clean(o.Tree.Path) != o.Tree.Path || o.Tree.Observed.RootInode == 0 || o.Tree.Observed.FSID == [2]int32{} || len(o.Manifest) > MaxPreparedExport || o.Initialize && len(o.Manifest) == 0 {
+	if o.Parent == nil || !storage.ID(o.Operation) || o.Trust.validate() != nil || o.Tree.Format != TreeFormat || o.Tree.Origin != o.Trust.Origin || !filepath.IsAbs(o.Tree.Path) || filepath.Clean(o.Tree.Path) != o.Tree.Path || o.Tree.Observed.RootInode == 0 || o.Tree.Observed.FSID == [2]int32{} || len(o.Manifest) > MaxPreparedExport || o.Initialize && len(o.Manifest) == 0 ||
+		o.NativeReleaseTickets && (o.Trust.Method != BtrfsSnapshotMethod || o.Trust.Consistency() != "filesystem") {
 		return nil, ErrInvalid
 	}
 	if len(o.Manifest) != 0 {
 		if storage.Hash(o.Manifest) != o.Operation {
 			return nil, ErrInvalid
 		}
-		if _, e := VerifyPreparedExport(o.Manifest, o.Trust, time.Now()); e != nil {
+		if m, e := VerifyPreparedExport(o.Manifest, o.Trust, time.Now()); e != nil {
 			return nil, e
+		} else if o.NativeReleaseTickets && !nativeSnapshotName(m.Root) {
+			return nil, ErrInvalid
 		}
 	}
 	o.Manifest = bytes.Clone(o.Manifest)
 	o.Trust.Producer = bytes.Clone(o.Trust.Producer)
 	raw, _ := json.Marshal(struct {
-		Tree  TreeBinding
-		Trust PreparedTrust
-	}{o.Tree, o.Trust})
+		Tree                 TreeBinding
+		Trust                PreparedTrust
+		NativeReleaseTickets bool `json:",omitempty"`
+	}{o.Tree, o.Trust, o.NativeReleaseTickets})
 	p := &PreparedProvider{o: o, binding: storage.Hash(raw)}
 	if e := p.guard(ctx); e != nil {
 		return nil, e
@@ -172,8 +177,12 @@ func (p *PreparedProvider) load() (preparedViewState, error) {
 	if !bytes.Equal(canonical, raw) {
 		return s, ErrInvalid
 	}
-	if _, e = VerifyPreparedExport(s.Manifest, p.o.Trust, time.Now()); e != nil {
+	m, e := VerifyPreparedExport(s.Manifest, p.o.Trust, time.Now())
+	if e != nil {
 		return s, e
+	}
+	if p.o.NativeReleaseTickets && !nativeSnapshotName(m.Root) {
+		return s, ErrInvalid
 	}
 	return s, nil
 }

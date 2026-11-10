@@ -122,7 +122,7 @@ func (j *Job) releaseWithCoverage(ctx context.Context, s *State, raw []byte) err
 			return err
 		}
 	}
-	if err := j.options.Provider.Release(ctx, j.intent.Operation, j.options.Profile.View); err != nil {
+	if err := j.releaseCommittedView(ctx, s.Generation, j.options.Profile.ReleasePolicy); err != nil {
 		return err
 	}
 	if err := j.point("source-provider-released"); err != nil {

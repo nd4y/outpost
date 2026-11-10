@@ -42,7 +42,7 @@ outpost source-prepared-export-create --bootstrap /private/source.json \
   --output /private/next-export.json
 ```
 
-The command measures the exact closed inventory, checks stable identities, signs `outpost-prepared-export-1`, and creates a new private output without overwrite. It does not open source runtime or source encryption/writer key files. The producer then atomically publishes this manifest at its configured `manifestFile`, retaining the selected export unchanged. Establish producer retention before enabling capture; Outpost never deletes native exports.
+The command measures the exact closed inventory, checks stable identities, signs `outpost-prepared-export-1`, and creates a new private output without overwrite. It uses only the producer key. The producer then atomically publishes this manifest at its configured `manifestFile` and retains the selected export until release. Establish producer retention before enabling capture.
 
 ```sh
 outpost source-init --bootstrap /private/source.json
@@ -76,11 +76,19 @@ outpost source-native-btrfs-export --input /private/snapshot-request.json \
 
 The producer persists its signed operation before the native snapshot call and verifies the resulting read-only subvolume, parent UUID and creation time. A repeated request reopens the same snapshot and returns the exact signed manifest. An unrecorded destination or a changed acquired UUID blocks the operation. The next producer operation advances the sequence by one and waits if the retained count reaches its limit. Keep the producer journal in its original admitted directory and select a private manifest parent disjoint from the source, staging and producer state. The manifest includes source names and stays in the trusted zone.
 
-This profile snapshots one subvolume. Btrfs snapshot boundaries and the prepared export's regular-file restrictions apply. The source agent consumes the manifest through the ordinary prepared workflow. Physical removal of retained snapshots belongs to the producer's approved retention process and requires its own evidence.
+This profile snapshots one subvolume. Btrfs snapshot boundaries and the prepared export's regular-file restrictions apply. The source agent consumes the manifest through the ordinary prepared workflow.
+
+#### Release a native snapshot
+
+For a new filesystem runtime, set `prepared.nativeReleaseTickets` to `true` in the private source bootstrap. After the configured complete-copy or staged-coverage checkpoint is durable and the view is released, the source signs a ticket for the exact generation, operation and snapshot. `source-status` reports the digest and issue time alongside the separate provider release observation. Read the exact ticket with `source-native-release-ticket --bootstrap FILE --operation ID --output TICKET`. The operation is the SHA-256 of the signed manifest. This lookup can run while the capture process holds its execution lease.
+
+The producer runs `source-native-btrfs-dispose --input PRIVATE_REQUEST --trust SOURCE_TRUST --key PRODUCER_KEY` in a separately authorized local context. Its request has format `outpost-btrfs-disposal-request-1` and contains the original `profile`, `manifestFile` and `ticketFile`. Use the source writer's independently retained public generation trust. The producer verifies both signatures and records a disposal intent before deleting by the kernel subvolume ID on the admitted staging filesystem. Keep the producer's disposal records and permissions separate from the source runtime.
+
+The signed disposal result distinguishes `removedUnix`, observed after a successful kernel reply, from `pathAbsentUnix`, observed on the admitted staging filesystem. If the kernel reply is lost, replay can confirm absence without inventing a removal time. These observations measure the snapshot reference, while reclaimed bytes need separate filesystem accounting. An abandoned capture records a logical view release and leaves the producer's snapshot for separate retention handling.
 
 ## Recovery and compatibility
 
-The existing checkpoint, required-copy threshold, provider release and acknowledgement order remains intact. Release records only the consumer's durable completion; it does not open, delete or modify producer files. After sealing, receipt/checkpoint recovery does not need source payload access. Independent file and generation recovery uses the existing encrypted format and recovery material.
+The checkpoint, required-copy threshold, consumer release and acknowledgement follow the same durable order. The producer handles physical disposal separately using its signed ticket. After sealing, receipt and checkpoint recovery use retained metadata. Independent file and generation recovery uses the encrypted format and recovery material.
 
 Previous executables refuse the prepared bootstrap without changing the journal. They can still recover compatible ciphertext. Preserve runtime state and use a compatible executable instead of changing the bootstrap format or discarding journals. Producer signing-key rotation, a different source root/method, and conversion of existing profiles require separate migration work.
 

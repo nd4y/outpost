@@ -1057,6 +1057,16 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 					return e
 				}
 				out.Prepared = &PreparedStatus{Method: m.Method, ProducerSequence: m.Sequence, SnapshotUnix: m.SnapshotUnix, CompletedUnix: m.CompletedUnix, Attestation: "producer-signed"}
+				if a.b.Prepared.NativeReleaseTickets && (s.Phase == "ACTIVE" || s.Phase == "COMPLETE") {
+					provider, e := a.openProvider(ctx, path.Join("operations", i.Operation), i, false)
+					if e != nil {
+						return e
+					}
+					_, out.Prepared.NativeRelease, e = provider.(*capture.PreparedProvider).NativeRelease(ctx, a.grant.Trust)
+					if e = errors.Join(e, provider.Close()); e != nil {
+						return e
+					}
+				}
 			}
 		}
 		if s.Phase == "ACTIVE" && !s.RoutePreparing {

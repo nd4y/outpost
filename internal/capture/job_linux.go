@@ -686,7 +686,7 @@ func (j *Job) Run(ctx context.Context) error {
 		}
 		if s.Phase == "RELEASING" {
 			if s.StagedRelease != "RELEASED" {
-				if e = j.options.Provider.Release(ctx, j.intent.Operation, j.options.Profile.View); e != nil {
+				if e = j.releaseCommittedView(ctx, s.Generation, "complete-copy"); e != nil {
 					return e
 				}
 				if e = j.point("source-provider-released"); e != nil {
