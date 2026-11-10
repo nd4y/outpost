@@ -33,15 +33,25 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 		if _, err := s.read(ctx, ref); !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		if pending := s.state.PendingImport; pending != nil {
-			if pending.Object == ref && bytes.Equal(pending.Origin.Authority, origin.Authority) && bytes.Equal(pending.Origin.Intent, origin.Intent) {
+		pending := s.state.PendingImport
+		if pending != nil {
+			if pending.Object != ref {
+				return ErrConflict
+			}
+			if bytes.Equal(pending.Origin.Authority, origin.Authority) && bytes.Equal(pending.Origin.Intent, origin.Intent) {
 				return nil
 			}
-			return ErrConflict
+			// The current view must withdraw the original origin before
+			// the source can bind this exact object to another route.
+			var previous Intent
+			if canonicalIntent(pending.Origin.Intent, pending.Origin.Authority, g.options.Owner, &previous) != nil ||
+				g.options.Staging.Origins[previous.Ingress] != "" {
+				return ErrConflict
+			}
 		}
 		s.state.PendingImport = &queuedStagingImport{Origin: origin, Object: ref}
 		if err := s.save(); err != nil {
-			s.state.PendingImport = nil
+			s.state.PendingImport = pending
 			return err
 		}
 		return s.point("capture-staged-import-queued")

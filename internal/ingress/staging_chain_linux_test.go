@@ -165,7 +165,7 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatalf("paused capture advanced: %v, %v", advanced, err)
 	}
 	for id, data := range objects {
-		if id != probe.ID {
+		if id != probe.ID && id != extraID {
 			must(t, final.PullStaged(ctx, bridge, filekit.Object{ID: id, Bytes: len(data)}))
 		}
 	}
@@ -186,6 +186,37 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatalf("completed request did not leave the queue: %v, %v", advanced, err)
 	}
 	must(t, final.PullStaged(ctx, bridge, probe))
+
+	extraRef := filekit.Object{ID: extraID, Bytes: len(extra)}
+	must(t, final.QueueStaged(ctx, bridge, extraRef))
+	stopFinal()
+	firstOptions.Initialize = false
+	firstOptions.Staging.Readers[finalID] = true
+	first, _, firstURL, stopFirst = open(firstOptions, firstIntent, firstID)
+	finalRoutes.Origins[firstID] = firstURL
+	final, _, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if err := final.QueueStaged(ctx, first, extraRef); !errors.Is(err, ErrConflict) {
+		t.Fatalf("queued import switched while its old route remained admitted: %v", err)
+	}
+	stopFinal()
+	delete(finalRoutes.Origins, bridgeID)
+	final, _, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if err := final.QueueStaged(ctx, bridge, extraRef); !errors.Is(err, ErrDenied) {
+		t.Fatalf("withdrawn origin still admitted a request: %v", err)
+	}
+	other := filekit.Object{ID: storage.Hash([]byte("different object")), Bytes: len("different object")}
+	if err := final.QueueStaged(ctx, first, other); !errors.Is(err, ErrConflict) {
+		t.Fatalf("replacement changed the queued object: %v", err)
+	}
+	must(t, final.QueueStaged(ctx, first, extraRef))
+	stopFinal()
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
+		t.Fatalf("rebound import did not finish with the bridge offline: %v, %v", advanced, err)
+	}
+	must(t, final.Check(ctx, extraRef))
+	stopFirst()
+
 	var receipt *Receipt
 	for range len(required) + 1 {
 		_, receipt, err = final.FinishStep(ctx, catalog)

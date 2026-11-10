@@ -77,7 +77,7 @@ A receiver can serve an object it previously imported and durably accepted into 
 
 An isolated check stages ciphertext at the first receiver, imports it at the bridge, then closes the first receiver and reopens the bridge on its retained state. The source requests the second hop using the bridge. The last receiver refuses an undeclared shortcut, keeps the unsealed capture out of complete inventory and publishes only after verifying the signed catalog. It restores independently after the first receiver and bridge are offline.
 
-The source can queue one object import per admitted capture with `Client.QueueStaged`. The `queued-imports` endpoint returns HTTP 202 after durable acceptance or when the exact object is already available. Check object availability separately. Repeating the same request reuses the pending record. A second pending object or origin returns HTTP 409.
+The source can queue one object import per admitted capture with `Client.QueueStaged`. The `queued-imports` endpoint returns HTTP 202 after durable acceptance or when the exact object is already available. Check object availability separately. Repeating the same request reuses the pending record. A different pending object returns HTTP 409. The source can rebind the same object to another origin in the same capture after the current policy withdraws the previous route and admits the new one. While the previous route remains admitted, a different origin returns HTTP 409.
 
 During a paired capture, the source asks the destination to queue an import after a temporary synchronous failure if the origin already confirmed the object. The capture keeps the failed handoff pending until the destination confirms the object is available.
 
