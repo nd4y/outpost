@@ -193,17 +193,6 @@ func TestGenerationCapacityReportsOverlapAndCreditsRetainedObjects(t *testing.T)
 func TestGenerationCapacityResumesWithDurableVerification(t *testing.T) {
 	f := setup(t)
 	ctx := t.Context()
-	const ample = int64(1 << 50)
-	limit := ample
-	var observed diskbudget.Peak
-	f.options.CheckPublication = func(_ context.Context, peak diskbudget.Peak) error {
-		observed = peak
-		if peak.Spool > limit {
-			return statefile.ErrCapacity
-		}
-		return nil
-	}
-	f.reopen(t)
 	must(t, os.WriteFile(f.input, []byte("capture with a durable verification checkpoint"), 0600))
 	version, err := f.source.Backup(ctx, f.input, filekit.BackupOptions{Names: []string{"file"}})
 	must(t, err)
@@ -215,14 +204,23 @@ func TestGenerationCapacityResumesWithDurableVerification(t *testing.T) {
 		t.Fatalf("fixture did not leave a partial checkpoint: %+v", partial)
 	}
 
-	f.reopen(t)
-	limit = 0
-	if _, _, err = f.session.FinishBatch(ctx, raw, 256, 256<<20); !errors.Is(err, statefile.ErrCapacity) {
-		t.Fatalf("partial checkpoint did not require metadata headroom: %v", err)
+	// The ledger measures the fixture's existing staged data and partial
+	// checkpoint. Subsequent session and replica writes use its real admission.
+	limits := diskbudget.Limits{Capacity: 64 << 20, Reserve: 1 << 20, Spool: 8 << 20, Telemetry: 1 << 20}
+	budget, err := diskbudget.Open(ctx, f.base, limits, true)
+	must(t, err)
+	defer budget.Close()
+	var observed diskbudget.Peak
+	f.options.CheckPublication = func(ctx context.Context, peak diskbudget.Peak) error {
+		observed = peak
+		return budget.CheckPeak(ctx, peak)
 	}
-	partialSpool := observed.Spool
-	limit = ample
+	f.options.AdmitState = budget.Admission("session/state")
+	f.options.AdmitObject = budget.Admission("session/objects")
 	replica := f.options.Replica
+	admitReplica := budget.Admission("replica")
+	replica.Admit = admitReplica
+	f.reopen(t)
 	interrupted := errors.New("publication stopped after verification")
 	replica.Fault = func(point string) error {
 		if point == "before-complete" {
@@ -233,19 +231,59 @@ func TestGenerationCapacityResumesWithDurableVerification(t *testing.T) {
 	if _, _, err = f.session.FinishBatch(ctx, raw, 256, 256<<20); !errors.Is(err, interrupted) {
 		t.Fatalf("did not interrupt index publication: %v", err)
 	}
+	partialSpool := observed.Spool
 	replica.Fault = nil
 	f.reopen(t)
-	limit = partialSpool - 1
-	replica.Admit = func(name string, _ int) (func(bool) error, error) {
+
+	// A second client reserves space for a concurrent metadata write. Keep
+	// enough headroom for the final index and receipt but below the old peak.
+	var available *diskbudget.PeakError
+	if err = budget.CheckPeak(ctx, diskbudget.Peak{Spool: limits.Spool}); !errors.As(err, &available) {
+		t.Fatalf("could not measure metadata headroom: %v", err)
+	}
+	headroom := partialSpool - diskbudget.WriteCharge(1)
+	reserveBytes := available.Available.Spool - headroom - diskbudget.WriteCharge(1)
+	if headroom <= 0 || reserveBytes <= 0 {
+		t.Fatalf("invalid fixture capacity: partial=%d, available=%d", partialSpool, available.Available.Spool)
+	}
+	other, err := diskbudget.Open(ctx, f.base, limits, false)
+	must(t, err)
+	defer other.Close()
+	finish, err := other.Reserve(ctx, "concurrent-metadata.json", int(reserveBytes))
+	must(t, err)
+	defer func() { must(t, finish(false)) }()
+	var short *diskbudget.PeakError
+	if err = budget.CheckPeak(ctx, diskbudget.Peak{Spool: partialSpool}); !errors.As(err, &short) || short.Available.Spool >= partialSpool {
+		t.Fatalf("ledger did not reject the old metadata peak: %v", err)
+	}
+	before, err := budget.Status(ctx)
+	must(t, err)
+	if len(before.Pending) != 1 {
+		t.Fatalf("concurrent reservation is missing: %+v", before.Pending)
+	}
+
+	verificationWrites := 0
+	replica.Admit = func(name string, size int) (func(bool) error, error) {
 		if strings.HasPrefix(name, "verification/") {
-			return nil, statefile.ErrCapacity
+			verificationWrites++
 		}
-		return func(bool) error { return nil }, nil
+		return admitReplica(name, size)
 	}
 	result, receipt, err := f.session.FinishBatch(ctx, raw, 256, 256<<20)
 	must(t, err)
-	if observed.Data != 0 || observed.Spool <= 0 || observed.Spool > limit ||
-		!result.Complete || result.ReadBytes != 0 || receipt.Generation != storage.Hash(raw) {
-		t.Fatalf("unexpected estimate or completed receipt: %+v, %+v, %+v", observed, result, receipt)
+	if observed.Data != 0 || observed.Spool <= 0 || observed.Spool > short.Available.Spool ||
+		!result.Complete || result.ReadBytes != 0 || receipt.Generation != storage.Hash(raw) || verificationWrites != 0 {
+		t.Fatalf("unexpected estimate or completed receipt: %+v, %+v, %+v, writes=%d", observed, result, receipt, verificationWrites)
 	}
+	after, err := budget.Status(ctx)
+	must(t, err)
+	if after.Revision <= before.Revision || len(after.Pending) != len(before.Pending) {
+		t.Fatalf("publication did not use the ledger or lost the concurrent reservation: %+v", after)
+	}
+	for id, reservation := range before.Pending {
+		if after.Pending[id] != reservation {
+			t.Fatal("publication changed the other client's reservation")
+		}
+	}
+	t.Logf("metadata bytes: old peak %d, available %d, resumed peak %d", partialSpool, short.Available.Spool, observed.Spool)
 }
