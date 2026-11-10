@@ -171,7 +171,7 @@
       "id": "REQ-25",
       "acceptanceSubset": ["AT-07", "AT-08"],
       "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss. Offline inspection checks declared routes to each domain holder and detects absent or divergent node documents, and checks paired autonomous replication rules and peer revision floors.",
-      "remaining": "Installed topology and runtime permissions, real host egress enforcement, long partitions and autonomous multi-hop staging. The staging chain, restart and paired source fallback for a queued import and offline CLI checks are tracked in product-status.json.",
+      "remaining": "Installed topology and runtime permissions, real host egress enforcement, long partitions and autonomous multi-hop staging. The staging chain, recipient SIGKILL recovery and paired source fallback for a queued import and offline CLI checks are tracked in product-status.json.",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",

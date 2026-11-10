@@ -157,18 +157,6 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, func(op string) bool { return op == f.intent.Operation }); err != nil || advanced {
 		t.Fatalf("paused capture advanced: %v, %v", advanced, err)
 	}
-	interrupted := errors.New("fixture interruption after durable object")
-	finalRegistry.Fault = func(stage string) error {
-		if stage == "capture-object-durable" {
-			return interrupted
-		}
-		return nil
-	}
-	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err == nil || advanced {
-		t.Fatalf("lost completion was accepted: %v, %v", advanced, err)
-	}
-	finalRegistry.Fault = nil
-	must(t, final.Check(ctx, probe))
 	for id, data := range objects {
 		if id != probe.ID {
 			must(t, final.PullStaged(ctx, bridge, filekit.Object{ID: id, Bytes: len(data)}))
@@ -179,9 +167,11 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	if len(inventory) != 0 {
 		t.Fatal("unsealed ciphertext was listed as a complete generation")
 	}
-	stopBridge()
 	stopFinal()
+	killStagedImportAfterWrite(t, ctx, finalOptions, finalDir, ca.cert.Raw)
+	stopBridge()
 	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	must(t, final.Check(ctx, probe))
 	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
 		t.Fatalf("pending receipt did not replay with bridge offline: %v, %v", advanced, err)
 	}
