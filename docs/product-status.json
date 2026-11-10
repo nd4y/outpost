@@ -1649,6 +1649,14 @@
           "name": "owner abandonment at full journal survives lost reply with exact resolution replay"
         },
         {
+          "path": "internal/management/registry_journal_linux_test.go",
+          "name": "TestManagementRegistryJournalRepairsInterruptedCommit"
+        },
+        {
+          "path": "internal/management/registry_journal_linux_test.go",
+          "name": "TestManagementRegistryJournalRejectsStaleCopyAndMissingDependencies"
+        },
+        {
           "path": "internal/management/snapshot_linux_test.go",
           "name": "TestManagementSnapshotStagePublishesExactFiles"
         },

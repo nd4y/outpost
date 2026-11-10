@@ -38,6 +38,10 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
+	return newJournalFixture(t, false)
+}
+
+func newJournalFixture(t *testing.T, journal bool) *fixture {
 	t.Helper()
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
@@ -46,7 +50,7 @@ func newFixture(t *testing.T) *fixture {
 	node, nkey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	dir := filepath.Join(teststore.Root(t), "registry")
-	o := Options{Directory: dir, Owner: pub, Signer: service, Initialize: true}
+	o := Options{Directory: dir, Owner: pub, Signer: service, Initialize: true, JournalCopy: journal}
 	r, e := Open(o)
 	must(t, e)
 	o.Initialize = false

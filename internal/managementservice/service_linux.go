@@ -44,6 +44,7 @@ type Profile struct {
 	TimeoutMillis       int                    `json:"timeoutMillis"`
 	ReportMaxAgeSeconds int                    `json:"reportMaxAgeSeconds"`
 	ReconcileSeconds    int                    `json:"reconcileSeconds"`
+	RegistryJournalCopy bool                   `json:"registryJournalCopy,omitempty"`
 }
 
 func Load(path string) (Profile, error) {
@@ -82,6 +83,22 @@ type Service struct {
 }
 
 func Open(ctx context.Context, p Profile, initialize bool) (*Service, error) {
+	return open(ctx, p, initialize, false)
+}
+
+func RecoverRegistry(ctx context.Context, p Profile) (Status, error) {
+	if !p.RegistryJournalCopy {
+		return Status{}, management.ErrDenied
+	}
+	s, e := open(ctx, p, false, true)
+	if e != nil {
+		return Status{}, e
+	}
+	defer s.Close()
+	return s.Status(ctx)
+}
+
+func open(ctx context.Context, p Profile, initialize, recoverJournal bool) (*Service, error) {
 	if p.Format != Format || p.Revision == 0 || p.Revision > management.MaxSafeInteger || p.Local.Format != worker.BootstrapFormat || p.Local.Volume.Scope != p.Local.Node || !storage.ID(p.Local.Node) || len(p.Local.Owner) != 32 || !filepath.IsAbs(p.Local.Directory) || p.Local.ControlEndpoint != "" || p.Local.ControlIdentity != "" || p.Local.Listen != "" || p.Local.StorageCAFile != "" || len(p.Local.Credentials) != 0 || p.ReconcileSeconds < 1 || p.ReconcileSeconds > 3600 {
 		return nil, management.ErrInvalid
 	}
@@ -162,20 +179,30 @@ func Open(ctx context.Context, p Profile, initialize bool) (*Service, error) {
 		return fail(e)
 	}
 	s.state.Admit = s.admission("service")
+	options := management.Options{Root: s.root, Directory: "registry", Owner: p.Local.Owner, Signer: s.signer, Initialize: initialize, JournalCopy: p.RegistryJournalCopy, Guard: s.guard, Admission: s.admission("registry")}
 	if initialize {
 		e = s.lease.WithLock(ctx, func() error {
 			if _, e := s.state.Read("profile.json"); !errors.Is(e, os.ErrNotExist) {
 				return management.ErrConflict
 			}
-			s.registry, e = management.Open(management.Options{Root: s.root, Directory: "registry", Owner: p.Local.Owner, Signer: s.signer, Initialize: true, Guard: s.guard, Admission: s.admission("registry")})
+			s.registry, e = management.Open(options)
 			if e != nil {
 				return e
 			}
 			return s.saveProfile(serviceState{})
 		})
+	} else if recoverJournal {
+		e = s.lease.WithLock(ctx, func() error {
+			if _, e := s.loadProfile(true); e != nil {
+				return e
+			}
+			var repairErr error
+			s.registry, repairErr = management.RecoverRegistry(ctx, options)
+			return repairErr
+		})
 	} else {
 		if _, e = s.loadProfile(false); e == nil {
-			s.registry, e = management.Open(management.Options{Root: s.root, Directory: "registry", Owner: p.Local.Owner, Signer: s.signer, Guard: s.guard, Admission: s.admission("registry")})
+			s.registry, e = management.Open(options)
 		}
 	}
 	if e != nil {

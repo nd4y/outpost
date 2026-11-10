@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/http"
@@ -63,6 +64,7 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	must(listener.Close())
 	profile := managementservice.Profile{Format: managementservice.Format, Revision: 1, Local: worker.Bootstrap{Format: worker.BootstrapFormat, Node: node, Owner: owner, Directory: filepath.Join(root, "management"), Volume: binding, CertificateFile: certFile, PrivateKeyFile: keyFile, CAFile: certFile}, Listen: address, Origin: "https://" + address, Principals: []management.Principal{{Actor: node, Roles: []string{"owner"}, Scopes: []management.Scope{{Tenant: storage.Hash([]byte("tenant")), Domain: storage.Hash([]byte("domain"))}}}}, Limits: diskbudget.Limits{Capacity: 64 << 20, Reserve: 8 << 20, Spool: 16 << 20, Telemetry: 1 << 20}, Concurrency: 1, TimeoutMillis: 500, ReportMaxAgeSeconds: 30, ReconcileSeconds: 1}
 	file := filepath.Join(base, "private-profile.json")
+	profile.RegistryJournalCopy = true
 	write := func() { raw, e := json.Marshal(profile); must(e); must(os.WriteFile(file, raw, 0600)) }
 	write()
 	invoke := func(name string) any {
@@ -116,6 +118,19 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	if _, e = run(ctx, []string{"management-init", "--input", file}); e == nil {
 		t.Fatal("runtime reinitialized")
 	}
+	registryPath := filepath.Join(profile.Local.Directory, "registry", "registry.json")
+	registry, e := os.ReadFile(registryPath)
+	must(e)
+	must(os.Remove(registryPath))
+	if _, e = run(ctx, []string{"management-status", "--input", file}); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("missing registry admitted by status", e)
+	}
+	invoke("management-registry-recover")
+	actual, e := os.ReadFile(registryPath)
+	must(e)
+	if !bytes.Equal(registry, actual) {
+		t.Fatal("CLI changed recovered registry bytes")
+	}
 	profile.Revision = 2
 	write()
 	invoke("management-profile-set")
@@ -149,6 +164,14 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if ready {
+		short, stop := context.WithTimeout(ctx, 50*time.Millisecond)
+		_, e = run(short, []string{"management-registry-recover", "--input", file})
+		stop()
+		if !errors.Is(e, context.DeadlineExceeded) {
+			t.Fatal("repair did not wait for the service lease", e)
+		}
 	}
 	cancel()
 	select {

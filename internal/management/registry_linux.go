@@ -71,6 +71,7 @@ type registryState struct {
 	CommandOperations map[string]commandOperation    `json:"commandOperations,omitempty"`
 	Resolutions       map[string]intentResolution    `json:"resolutions,omitempty"`
 	LegacyCheckpoint  string                         `json:"legacyCheckpoint,omitempty"`
+	JournalCopy       bool                           `json:"journalCopy,omitempty"`
 	Signature         []byte                         `json:"signature,omitempty"`
 }
 type domainFence struct {
@@ -79,32 +80,47 @@ type domainFence struct {
 	Epoch      uint64 `json:"epoch"`
 }
 type Options struct {
-	Root       *os.Root
-	Directory  string
-	Owner      ed25519.PublicKey
-	Signer     ed25519.PrivateKey
-	Initialize bool
-	Guard      func(context.Context) error
-	Admission  statefile.Admission
+	Root        *os.Root
+	Directory   string
+	Owner       ed25519.PublicKey
+	Signer      ed25519.PrivateKey
+	Initialize  bool
+	JournalCopy bool
+	Guard       func(context.Context) error
+	Admission   statefile.Admission
 }
 type Registry struct {
-	store     *statefile.Store
-	owner     ed25519.PublicKey
-	signer    ed25519.PrivateKey
-	guard     func(context.Context) error
-	root      *os.Root
-	blobs     *statefile.Store
-	admission statefile.Admission
+	store       *statefile.Store
+	owner       ed25519.PublicKey
+	signer      ed25519.PrivateKey
+	guard       func(context.Context) error
+	root        *os.Root
+	blobs       *statefile.Store
+	admission   statefile.Admission
+	journalCopy bool
 	// Fault is a local process-interruption hook, never request input.
 	Fault func(string) error
 }
 
 func Open(o Options) (*Registry, error) {
+	return openRegistry(context.Background(), o, false)
+}
+
+// RecoverRegistry opens the exact repaired registry. The management service
+// supplies the stopped-service lease and the admitted storage guard.
+func RecoverRegistry(ctx context.Context, o Options) (*Registry, error) {
+	return openRegistry(ctx, o, true)
+}
+
+func openRegistry(ctx context.Context, o Options, recoverJournal bool) (*Registry, error) {
+	if recoverJournal && (o.Initialize || !o.JournalCopy) {
+		return nil, ErrInvalid
+	}
 	if len(o.Owner) != 32 || len(o.Signer) != 64 || bytes.Equal(o.Owner, o.Signer.Public().(ed25519.PublicKey)) {
 		return nil, ErrInvalid
 	}
 	if o.Guard != nil {
-		if e := o.Guard(context.Background()); e != nil {
+		if e := o.Guard(ctx); e != nil {
 			return nil, e
 		}
 	}
@@ -112,13 +128,17 @@ func Open(o Options) (*Registry, error) {
 	if e != nil {
 		return nil, e
 	}
-	s, e := statefile.OpenAt(root, ".", maxRegistry, false)
+	limit := maxRegistry
+	if o.JournalCopy {
+		limit = maxRegistryJournal
+	}
+	s, e := statefile.OpenAt(root, ".", limit, false)
 	if e != nil {
 		root.Close()
 		return nil, e
 	}
 	s.Admit = o.Admission
-	r := &Registry{store: s, owner: append(ed25519.PublicKey(nil), o.Owner...), signer: append(ed25519.PrivateKey(nil), o.Signer...), guard: o.Guard, root: root, admission: o.Admission}
+	r := &Registry{store: s, owner: append(ed25519.PublicKey(nil), o.Owner...), signer: append(ed25519.PrivateKey(nil), o.Signer...), guard: o.Guard, root: root, admission: o.Admission, journalCopy: o.JournalCopy}
 	r.blobs, e = statefile.OpenAt(root, "blobs", control.MaxConfig+2<<20, o.Initialize)
 	if e != nil {
 		s.Close()
@@ -126,7 +146,15 @@ func Open(o Options) (*Registry, error) {
 		return nil, e
 	}
 	r.blobs.Admit = r.subAdmission("blobs")
-	e = s.WithLock(context.Background(), func() error {
+	e = s.WithLock(ctx, func() error {
+		if o.Initialize || !o.JournalCopy {
+			if e := r.requireNoJournalCopy(); e != nil {
+				return e
+			}
+		}
+		if recoverJournal {
+			return r.recoverRegistryJournal(ctx)
+		}
 		_, e := r.load()
 		if o.Initialize {
 			if !errors.Is(e, os.ErrNotExist) {
@@ -178,9 +206,22 @@ func (r *Registry) point(p string) error {
 func (r *Registry) load() (registryState, error) {
 	raw, e := r.store.Read("registry.json")
 	if e != nil {
+		if r.journalCopy {
+			e = errors.Join(ErrRegistryJournal, e)
+		}
 		return registryState{}, e
 	}
-	return validateRegistry(raw, r.owner, r.signer.Public().(ed25519.PublicKey))
+	s, e := validateRegistry(raw, r.owner, r.signer.Public().(ed25519.PublicKey))
+	if e != nil {
+		return s, e
+	}
+	if s.JournalCopy != r.journalCopy {
+		return s, ErrRegistryJournal
+	}
+	if r.journalCopy {
+		e = r.checkRegistryJournal(raw)
+	}
+	return s, e
 }
 
 // validateRegistry is shared by the live store and the keyless snapshot reader.
@@ -254,6 +295,7 @@ func (r *Registry) save(s registryState) error {
 	}
 	s.Revision++
 	s.ObservedUnix = now
+	s.JournalCopy = r.journalCopy
 	s.Signature = nil
 	raw, _ := json.Marshal(s)
 	s.Signature = ed25519.Sign(r.signer, append([]byte(s.Format+"\x00"), raw...))
@@ -263,6 +305,11 @@ func (r *Registry) save(s registryState) error {
 	}
 	if len(raw) > maxRegistry {
 		return ErrCapacity
+	}
+	if r.journalCopy {
+		if e = r.writeRegistryJournal(raw, s.Revision == 1); e != nil {
+			return e
+		}
 	}
 	if e = r.store.Write("registry.json", raw); e != nil {
 		return e

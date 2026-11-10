@@ -33,3 +33,11 @@ A new private `.partial-snapshot-*` file receives the stream and is synced befor
 ## Recovery boundary
 
 These commands recover administrative history for review. They do not activate an old runtime. Snapshot integrity and selection do not prove global freshness, fencing of an old service instance, or absence of later commands. Never copy an old registry or its format1 checkpoint over current format2 state: doing so could forget abandonment fences. Active control-plane recovery, identity transition and bounded audit retention remain separate implementation/acceptance work. Old backup data remains independently readable through the existing recovery tools.
+
+## Repair an enrolled local registry
+
+For a new management runtime, set `registryJournalCopy` to `true` in the private profile before `management-init`. Each registry write stores a service-signed copy, an anchor for the exact bytes and then the primary. Allow space for the additional copy and temporary writes under the management volume budget. Existing profiles without this setting keep their original layout. Migration to this mode and downgrade of an enrolled registry require a separate procedure.
+
+With the service stopped and its original private profile, identity and bound volume available, run `outpost management-registry-recover --input /private/management.json`. The command takes the service and registry locks. It verifies the current anchor, signed state, and retained command, configuration and report dependencies. It can restore a missing primary or finish a write if the surviving primary is the exact signed predecessor. Repeat the command to verify the same state. Then run the ordinary status and startup commands under the usual deployment authorization.
+
+This repair covers single-file loss on the original volume and interruption between durable writes. The copy and anchor share the same volume. Missing or inconsistent support files, a stale copy and a changed profile require separate investigation. Whole-volume loss and takeover by another identity remain open.
