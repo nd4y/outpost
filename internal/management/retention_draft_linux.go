@@ -86,7 +86,7 @@ func (r *Registry) prepareRetentionDraft(ctx context.Context, s registryState, t
 	_, commandUsed := s.CommandOperations[permit.Operation]
 	_, enrollmentUsed := s.Operations[permit.Operation]
 	_, configurationUsed := s.ConfigOperations[permit.Operation]
-	if commandUsed || enrollmentUsed || configurationUsed {
+	if commandUsed || enrollmentUsed || configurationUsed || hasPlannedClose(s, tenant, permit) {
 		return out, ErrConflict
 	}
 	_, cfg, target, ok := r.retentionHolder(ctx, s, permit.Window.Node, domain, fence, now)
@@ -189,24 +189,39 @@ func (r *Registry) prepareRetentionDraft(ctx context.Context, s registryState, t
 }
 
 func (r *Registry) retentionDraftProof(o commandOperation, c CommandObservation, trust generation.Trust, binding generation.RetirementBinding, now time.Time) (generation.RetentionProtectionReceipt, bool) {
+	grant, proof, ok := r.confirmedRetentionProof(o, c, trust, now)
+	return proof, ok && grant.Action == "HOLD" && grant.Retirement != nil && *grant.Retirement == binding
+}
+
+func (r *Registry) confirmedRetentionProof(o commandOperation, c CommandObservation, trust generation.Trust, now time.Time) (generation.RetentionProtection, generation.RetentionProtectionReceipt, bool) {
+	var grant generation.RetentionProtection
 	var proof generation.RetentionProtectionReceipt
 	raw, env, e := r.readCommand(o)
 	if e != nil || env.Request.Kind != "retention" || c.EnvelopeDigest != o.Envelope {
-		return proof, false
+		return grant, proof, false
 	}
 	ack, e := command.VerifyAck(o.Acknowledgement, raw, r.owner, o.NodeKey, now)
 	if e != nil || ack.State != "COMPLETE" || ack.ResultDigest != c.ResultDigest || ack.ObservedUnix != c.FinishedUnix {
-		return proof, false
+		return grant, proof, false
 	}
-	grant, e := generation.VerifyRetentionProtection(env.Request.RetentionGrant, trust, o.Node)
-	if e != nil || grant.Action != "HOLD" || grant.Retirement == nil || *grant.Retirement != binding {
-		return proof, false
+	grant, e = generation.VerifyRetentionProtection(env.Request.RetentionGrant, trust, o.Node)
+	if e != nil {
+		return grant, proof, false
 	}
 	proof, e = generation.VerifyRetentionProtectionReceipt(c.RetentionProof, o.Node)
-	ok := e == nil && proof.State == "HELD" && proof.GrantDigest == storage.Hash(env.Request.RetentionGrant) &&
+	digest := storage.Hash(env.Request.RetentionGrant)
+	state, hold := "CLOSED", ""
+	switch grant.Action {
+	case "HOLD":
+		state, hold = "HELD", digest
+	case "RELEASE":
+		state, hold = "RELEASED", grant.HoldDigest
+	}
+	bound := grant.Retirement == nil && proof.Retirement == nil ||
+		grant.Retirement != nil && proof.Retirement != nil && *grant.Retirement == *proof.Retirement
+	ok := e == nil && proof.State == state && proof.GrantDigest == digest && proof.HoldDigest == hold &&
 		proof.Domain == grant.Domain && proof.Repository == grant.Repository && proof.Epoch == grant.Epoch &&
 		proof.Generation == grant.Generation && proof.Operation == grant.Operation &&
-		proof.ObservedUnix >= grant.NotBefore && proof.ObservedUnix < grant.ExpiresUnix &&
-		proof.Retirement != nil && *proof.Retirement == binding
-	return proof, ok
+		proof.ObservedUnix >= grant.NotBefore && proof.ObservedUnix < grant.ExpiresUnix && bound
+	return grant, proof, ok
 }

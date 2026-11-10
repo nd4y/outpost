@@ -18,14 +18,15 @@ import (
 )
 
 type commandOperation struct {
-	Receipt         Receipt           `json:"receipt"`
-	Audit           Audit             `json:"audit"`
-	Node            string            `json:"node"`
-	NodeKey         ed25519.PublicKey `json:"nodePublicKey"`
-	Request         string            `json:"request"`
-	Configuration   string            `json:"configuration"`
-	Envelope        string            `json:"envelope,omitempty"`
-	Acknowledgement []byte            `json:"acknowledgement,omitempty"`
+	Receipt         Receipt               `json:"receipt"`
+	Audit           Audit                 `json:"audit"`
+	Node            string                `json:"node"`
+	NodeKey         ed25519.PublicKey     `json:"nodePublicKey"`
+	Request         string                `json:"request"`
+	Configuration   string                `json:"configuration"`
+	Envelope        string                `json:"envelope,omitempty"`
+	Acknowledgement []byte                `json:"acknowledgement,omitempty"`
+	Retention       *retentionCommandLink `json:"retention,omitempty"`
 }
 
 func commandRole(p Principal, kind string) bool {
@@ -98,6 +99,9 @@ func (r *Registry) validateCommandState(s registryState) error {
 		if enrollment || configuration || !storage.ID(id) || id != o.Receipt.Operation || id != o.Audit.Operation || !storage.ID(o.Node) || command.Identity(o.NodeKey) != o.Node || !storage.ID(o.Request) || !storage.ID(o.Configuration) || o.Envelope != "" && !storage.ID(o.Envelope) || o.Receipt.Format != "outpost-management-receipt-1" || !oneOf(o.Receipt.State, "ADMITTED", "COMPLETE", "FAILED") || o.Audit.State != o.Receipt.State || !storage.ID(o.Receipt.RequestDigest) || o.Audit.RequestDigest != o.Receipt.RequestDigest || !storage.ID(o.Audit.Actor) || !storage.ID(o.Audit.Tenant) || !storage.ID(o.Audit.Domain) || !command.Reason(o.Audit.Reason) || !strings.HasPrefix(o.Audit.Action, "COMMAND_") || !command.Kind(strings.ToLower(strings.TrimPrefix(o.Audit.Action, "COMMAND_"))) || o.Audit.Sequence == 0 || o.Audit.Sequence > s.Revision || !validTime(o.Audit.ObservedUnix) || o.Audit.ObservedUnix > s.ObservedUnix || !validTime(o.Receipt.ObservedUnix) || o.Receipt.ObservedUnix < o.Audit.ObservedUnix || o.Receipt.ObservedUnix > s.ObservedUnix || len(o.Acknowledgement) > command.MaxAck {
 			return ErrInvalid
 		}
+		if o.Retention != nil && !o.Retention.valid(o) {
+			return ErrInvalid
+		}
 		if o.Receipt.State == "ADMITTED" {
 			if len(o.Acknowledgement) != 0 || o.Receipt.ResultDigest != "" || o.Audit.ResultDigest != "" || o.Receipt.ErrorCode != "" || o.Receipt.ObservedUnix != o.Audit.ObservedUnix {
 				return ErrInvalid
@@ -145,6 +149,9 @@ func (r *Registry) admitCommandPolicy(ctx context.Context, s registryState, p Pr
 		return enrollment, "", ErrDenied
 	}
 	if plan, exists := s.RetentionPlans[input.Operation]; exists {
+		if hasPlannedClose(s, plan.Plan.Tenant, plan.Plan.Request.Preview) {
+			return enrollment, "", ErrConflict
+		}
 		permit, err := cfg.MaintenancePermit(input)
 		if err != nil || !plan.matches(tenant, node, input, permit) {
 			return enrollment, "", ErrConflict
@@ -154,8 +161,12 @@ func (r *Registry) admitCommandPolicy(ctx context.Context, s registryState, p Pr
 		}
 	}
 	if input.Kind == "retention" {
-		if _, e := cfg.RetentionProtection(input); e != nil || enrollment.Class != "trusted" {
+		grant, e := cfg.RetentionProtection(input)
+		if e != nil || enrollment.Class != "trusted" {
 			return enrollment, "", ErrDenied
+		}
+		if e = admitRetentionLink(s, node, input, grant); e != nil {
+			return enrollment, "", e
 		}
 	}
 	return enrollment, storage.Hash(raw), nil
@@ -224,6 +235,13 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 			}
 			now := time.Now().Unix()
 			o = commandOperation{Node: node, NodeKey: enrollment.PublicKey, Request: requestID, Configuration: configuration, Receipt: Receipt{Format: "outpost-management-receipt-1", Operation: input.Operation, RequestDigest: digest, State: "ADMITTED", ObservedUnix: now}, Audit: Audit{Sequence: s.Revision + 1, Actor: p.Actor, Tenant: tenant, Domain: input.Domain, Operation: input.Operation, Reason: input.Reason, Action: "COMMAND_" + strings.ToUpper(input.Kind), State: "ADMITTED", ObservedUnix: now, RequestDigest: digest}}
+			if input.Kind == "retention" {
+				var grant generation.RetentionProtection
+				if e = json.Unmarshal(input.RetentionGrant, &grant); e != nil {
+					return ErrInvalid
+				}
+				o.Retention = linkRetentionGrant(grant, input.RetentionGrant)
+			}
 			if s.CommandOperations == nil {
 				s.CommandOperations = map[string]commandOperation{}
 			}

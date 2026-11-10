@@ -31,14 +31,16 @@ type retentionPlanRecord struct {
 }
 
 type RetentionPlanStatus struct {
-	Format           string          `json:"format"`
-	State            string          `json:"state"`
-	Authorization    string          `json:"authorization"`
-	RegistryRevision uint64          `json:"registryRevision"`
-	Plan             RetentionPlan   `json:"plan"`
-	Draft            *RetentionDraft `json:"draft,omitempty"`
-	Retirement       *Receipt        `json:"retirement,omitempty"`
-	CloseRequired    bool            `json:"closeRequired"`
+	Format           string                `json:"format"`
+	State            string                `json:"state"`
+	Authorization    string                `json:"authorization"`
+	RegistryRevision uint64                `json:"registryRevision"`
+	Plan             RetentionPlan         `json:"plan"`
+	Draft            *RetentionDraft       `json:"draft,omitempty"`
+	Retirement       *Receipt              `json:"retirement,omitempty"`
+	CloseRequired    bool                  `json:"closeRequired"`
+	Closure          *RetentionActionProof `json:"closure,omitempty"`
+	Holds            []RetentionHoldStatus `json:"holds,omitempty"`
 }
 
 func validateRetentionPlans(s registryState) error {
@@ -152,7 +154,15 @@ func (r *Registry) RetentionPlanStatus(ctx context.Context, p Principal, tenant,
 		if e != nil {
 			return RetentionPlanStatus{}, e
 		}
-	} else if record.Plan.Request.Preview.Window.ExpiresUnix <= time.Now().Unix() {
+	}
+	settlement, e := r.reconcileRetentionSettlement(ctx, s, record, &out)
+	if e != nil {
+		return RetentionPlanStatus{}, e
+	}
+	if settlement || out.Retirement != nil || out.State == "COMMAND_CONFLICT" {
+		return out, r.checkRetentionRevision(ctx, s.Revision)
+	}
+	if record.Plan.Request.Preview.Window.ExpiresUnix <= time.Now().Unix() {
 		out.State, out.CloseRequired = "WINDOW_EXPIRED", true
 	} else {
 		draft, e := r.prepareRetentionDraft(ctx, s, tenant, domain, record.Plan.Request, &record.Trust, maxAge)

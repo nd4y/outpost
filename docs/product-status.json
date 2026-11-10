@@ -3056,7 +3056,7 @@
       "checks": [
         {
           "path": "internal/management/retention_draft_linux_test.go",
-          "name": "TestManagementRetentionPlanReconcilesAcknowledgedHolds"
+          "name": "TestManagementRetentionPlanReconcilesClosureAndReleases"
         },
         {
           "path": "internal/worker/retention_command_linux_test.go",
@@ -3234,7 +3234,7 @@
       "checks": [
         {
           "path": "internal/management/retention_draft_linux_test.go",
-          "name": "TestManagementRetentionPlanReconcilesAcknowledgedHolds"
+          "name": "TestManagementRetentionPlanReconcilesClosureAndReleases"
         },
         {
           "path": "internal/worker/retention_command_linux_test.go",
@@ -5966,7 +5966,7 @@
       "checks": [
         {
           "path": "internal/management/retention_draft_linux_test.go",
-          "name": "TestManagementRetentionPlanReconcilesAcknowledgedHolds"
+          "name": "TestManagementRetentionPlanReconcilesClosureAndReleases"
         },
         {
           "path": "internal/worker/retention_command_linux_test.go",

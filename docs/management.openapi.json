@@ -3048,7 +3048,10 @@
               "RETIREMENT_INTENT_RECORDED",
               "RETIREMENT_QUEUED",
               "RETIREMENT_REPORTED_COMPLETE",
-              "RETIREMENT_EFFECT_UNCONFIRMED"
+              "RETIREMENT_EFFECT_UNCONFIRMED",
+              "CLOSURE_PENDING",
+              "CLOSED_AWAITING_RELEASES",
+              "SETTLED"
             ]
           },
           "authorization": {
@@ -3070,6 +3073,80 @@
           },
           "closeRequired": {
             "type": "boolean"
+          },
+          "closure": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "commandOperationId": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "node": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "digest": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "observedUnix": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1099511627776
+              },
+              "proof": {
+                "type": "string",
+                "contentEncoding": "base64",
+                "maxLength": 5464,
+                "description": "Exact original signed node receipt."
+              }
+            },
+            "required": ["commandOperationId", "node", "digest", "observedUnix", "proof"]
+          },
+          "holds": {
+            "type": "array",
+            "maxItems": 2048,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "holdDigest": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "state": {
+                  "enum": ["HOLD_UNCONFIRMED", "HELD", "RELEASED"]
+                },
+                "release": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "commandOperationId": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "node": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "digest": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "observedUnix": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1099511627776
+                    },
+                    "proof": {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "maxLength": 5464,
+                      "description": "Exact original signed node receipt."
+                    }
+                  },
+                  "required": ["commandOperationId", "node", "digest", "observedUnix", "proof"]
+                }
+              },
+              "required": ["node", "holdDigest", "state"]
+            }
           }
         },
         "required": [

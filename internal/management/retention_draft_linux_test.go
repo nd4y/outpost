@@ -20,7 +20,7 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-func TestManagementRetentionPlanReconcilesAcknowledgedHolds(t *testing.T) {
+func TestManagementRetentionPlanReconcilesClosureAndReleases(t *testing.T) {
 	h := newHTTPFixture(t)
 	f := h.f
 	f.enroll(t)
@@ -167,39 +167,59 @@ func TestManagementRetentionPlanReconcilesAcknowledgedHolds(t *testing.T) {
 		return result
 	}
 
-	hold := func(peer *fixture, r *generation.Replica, authority []byte, suffix string) (CommandObservation, []byte, Principal) {
+	protection := func(peer *fixture, operation, action string) generation.RetentionProtection {
+		return generation.RetentionProtection{Format: generation.RetentionProtectionFormat, Node: peer.e.Node, Domain: trust.Domain,
+			Repository: trust.Repository, Epoch: trust.Epoch, Operation: operation, Action: action, NotBefore: now - 60, ExpiresUnix: now + 300}
+	}
+	holdGrant := func(peer *fixture, suffix string) generation.RetentionProtection {
+		grant := protection(peer, id("pin-"+suffix), "HOLD")
+		grant.Generation = generationID
+		grant.Retirement = &generation.RetirementBinding{Node: f.e.Node, Operation: op}
+		return grant
+	}
+	requestProtection := func(authority []byte, label string, g generation.RetentionProtection) command.Request {
 		t.Helper()
-		grant, e := generation.SignRetentionProtection(generation.RetentionProtection{
-			Format: generation.RetentionProtectionFormat, Node: peer.e.Node, Domain: trust.Domain,
-			Repository: trust.Repository, Epoch: trust.Epoch, Operation: id("pin-" + suffix), Generation: generationID,
-			Action: "HOLD", NotBefore: now - 60, ExpiresUnix: now + 300,
-			Retirement: &generation.RetirementBinding{Node: f.e.Node, Operation: op},
-		}, signer)
+		grant, e := generation.SignRetentionProtection(g, signer)
 		must(t, e)
-		req := command.Request{Operation: id("hold-" + suffix), Reason: "OWNER_MAINTENANCE", Tenant: f.e.Tenant,
+		return command.Request{Operation: id(label), Reason: "OWNER_MAINTENANCE", Tenant: f.e.Tenant,
 			Domain: trust.Domain, Kind: "retention", ExpectedRevision: 1, Authority: authority, ExpiresUnix: now + 300, RetentionGrant: grant}
-		_, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, peer.e.Node, req)
+	}
+	queue := func(peer *fixture, r *generation.Replica, req command.Request) (CommandObservation, []byte, Principal) {
+		t.Helper()
+		_, e := f.r.AdmitCommand(ctx, f.p, f.e.Tenant, peer.e.Node, req)
 		must(t, e)
 		node := Principal{Actor: peer.e.Node, Roles: []string{"node"}, Scopes: []Scope{{f.e.Tenant, trust.Domain}}}
-		list, _, e := f.r.Commands(ctx, node, f.e.Tenant, peer.e.Node, 0, 1)
+		list, _, e := f.r.Commands(ctx, node, f.e.Tenant, peer.e.Node, 0, 32)
 		must(t, e)
-		if len(list) != 1 {
-			t.Fatal(list)
+		var raw []byte
+		var env command.Envelope
+		for _, queued := range list {
+			env, _, e = command.VerifyEnvelope(queued.Document, f.options.Owner)
+			must(t, e)
+			if env.Request.Operation == req.Operation {
+				raw = queued.Document
+				break
+			}
 		}
-		env, _, e := command.VerifyEnvelope(list[0].Document, f.options.Owner)
-		must(t, e)
-		receipt, e := r.ApplyRetentionProtection(ctx, grant, nil)
+		if raw == nil {
+			t.Fatal("protection command missing from queue", req.Operation)
+		}
+		receipt, e := r.ApplyRetentionProtection(ctx, req.RetentionGrant, nil)
 		must(t, e)
 		proof, e := json.Marshal(receipt)
 		must(t, e)
 		ack := command.Ack{Format: command.AckFormat, Node: peer.e.Node, Operation: req.Operation,
-			EnvelopeDigest: storage.Hash(list[0].Document), State: "COMPLETE", StartedUnix: env.AdmittedUnix,
+			EnvelopeDigest: storage.Hash(raw), State: "COMPLETE", StartedUnix: env.AdmittedUnix,
 			ObservedUnix: time.Now().Unix(), ResultDigest: storage.Hash(proof)}
-		signedAck, e := command.SignAck(ack, list[0].Document, f.options.Owner, peer.node, time.Now())
+		signedAck, e := command.SignAck(ack, raw, f.options.Owner, peer.node, time.Now())
 		must(t, e)
 		return CommandObservation{Operation: req.Operation, EnvelopeDigest: ack.EnvelopeDigest, Kind: "retention",
 			Phase: "COMPLETE", StartedUnix: ack.StartedUnix, FinishedUnix: ack.ObservedUnix, Attempts: 1,
 			ResultDigest: ack.ResultDigest, RetentionProof: proof}, signedAck, node
+	}
+	hold := func(peer *fixture, r *generation.Replica, authority []byte, suffix string) (CommandObservation, []byte, Principal) {
+		t.Helper()
+		return queue(peer, r, requestProtection(authority, "hold-"+suffix, holdGrant(peer, suffix)))
 	}
 	observe := func(peer *fixture, sequence uint64, commands ...CommandObservation) {
 		t.Helper()
@@ -302,5 +322,78 @@ func TestManagementRetentionPlanReconcilesAcknowledgedHolds(t *testing.T) {
 	afterRestart := checkPlan("RETIREMENT_REPORTED_COMPLETE", true)
 	if afterRestart.Retirement == nil || *afterRestart.Retirement != done {
 		t.Fatal("plan lost original retirement acknowledgement", afterRestart)
+	}
+
+	a3, _, _ := hold(a, ra, authorityA, "a3")
+	targetReplica := openCopy(f)
+	closeObservation, closeAck, closeNode := queue(f, targetReplica, requestProtection(targetAuthority, "close", protection(f, op, "CLOSE")))
+	checkPlan("CLOSURE_PENDING", true)
+	state, e := f.r.retentionState(ctx)
+	must(t, e)
+	otherEpoch := request.Preview
+	otherEpoch.Epoch++
+	if !hasPlannedClose(state, f.e.Tenant, request.Preview) || hasPlannedClose(state, f.e.Tenant, otherEpoch) {
+		t.Fatal("close intent crossed a repository epoch")
+	}
+	newHold := requestProtection(authorityA, "hold-a4", holdGrant(a, "a4"))
+	if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, a.e.Node, newHold); !errors.Is(e, ErrConflict) {
+		t.Fatal("new hold admitted after close intent", e)
+	}
+	_, e = f.r.AcknowledgeCommand(ctx, closeNode, f.e.Tenant, f.e.Node, closeObservation.Operation, closeAck)
+	must(t, e)
+	observe(f, 1, closeObservation)
+	observe(a, 2, a1, a2, a3)
+	closed := checkPlan("CLOSED_AWAITING_RELEASES", false)
+	if closed.Closure == nil || !bytes.Equal(closed.Closure.Proof, closeObservation.RetentionProof) || len(closed.Holds) != 4 {
+		t.Fatal("closure or registered holds lost", closed)
+	}
+	unconfirmed := 0
+	for _, h := range closed.Holds {
+		if h.State == "HOLD_UNCONFIRMED" {
+			unconfirmed++
+		}
+	}
+	if unconfirmed != 1 {
+		t.Fatal("pending hold wrongly reported as confirmed", closed.Holds)
+	}
+	closure, e := generation.VerifyRetentionProtectionReceipt(closed.Closure.Proof, f.e.Node)
+	must(t, e)
+	release := func(peer *fixture, r *generation.Replica, authority []byte, old CommandObservation) (CommandObservation, []byte, Principal) {
+		t.Helper()
+		pin, e := generation.VerifyRetentionProtectionReceipt(old.RetentionProof, peer.e.Node)
+		must(t, e)
+		g := protection(peer, pin.Operation, "RELEASE")
+		g.Generation, g.HoldDigest, g.Retirement, g.Closure = pin.Generation, pin.HoldDigest, pin.Retirement, &closure
+		return queue(peer, r, requestProtection(authority, "release-"+old.Operation, g))
+	}
+	releasedA := []CommandObservation{a1, a2, a3}
+	for _, old := range []CommandObservation{a1, a2, a3} {
+		c, ack, node := release(a, ra, authorityA, old)
+		_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, a.e.Node, c.Operation, ack)
+		must(t, e)
+		releasedA = append(releasedA, c)
+	}
+	c, ack, node := release(b, rb, authorityB, b1)
+	observe(a, 3, releasedA...)
+	observe(b, 4, b1, c)
+	f.reopen(t)
+	partial := checkPlan("CLOSED_AWAITING_RELEASES", false)
+	pending := 0
+	for _, h := range partial.Holds {
+		if h.Release == nil {
+			pending++
+		}
+	}
+	if pending != 1 {
+		t.Fatal("loss of release acknowledgement was hidden", partial.Holds)
+	}
+	_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, b.e.Node, c.Operation, ack)
+	must(t, e)
+	f.reopen(t)
+	settled := checkPlan("SETTLED", false)
+	for _, h := range settled.Holds {
+		if h.State != "RELEASED" || h.Release == nil {
+			t.Fatal("hold settled without its release", settled)
+		}
 	}
 }
