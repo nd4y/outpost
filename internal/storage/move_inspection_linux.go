@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"net/http"
 	"os"
 	"slices"
+	"strings"
 )
 
 type MoveStagingAttempt struct {
@@ -82,4 +84,22 @@ func (b *MoveBook) InspectStaging(ctx context.Context, after string) (MoveStagin
 		return MoveStagingPage{}, e
 	}
 	return out, nil
+}
+
+// VerifyMoveStage reads only one generated staging name in this MOVE namespace.
+// A successful response with different bytes is distinct from a failed read.
+func (b *Backend) VerifyMoveStage(ctx context.Context, a MoveStagingAttempt) (bool, error) {
+	name, ok := strings.CutPrefix(a.Temporary, "attempt-")
+	if b.profile.WriteMode != WebDAVMoveMode || !ok || !ID(name) || !ID(a.Digest) ||
+		a.Bytes < 1 || a.Bytes > b.profile.MaxObjectBytes || a.WriteStartedMillis <= 0 {
+		return false, ErrDenied
+	}
+	data, status, e := b.request(ctx, http.MethodGet, a.Temporary, nil)
+	if e != nil {
+		return false, e
+	}
+	if status != http.StatusOK {
+		return false, ErrUnsupported
+	}
+	return len(data) == a.Bytes && Hash(data) == a.Digest, nil
 }

@@ -24,7 +24,7 @@ type externalRecoveryProfile struct {
 	Archive        *archiveReader  `json:"archive,omitempty"`
 }
 
-func loadExternalReader(profileFile string, trust generation.Trust) (externalRecoveryProfile, error) {
+func readExternalReader(profileFile string) (externalRecoveryProfile, error) {
 	var profile externalRecoveryProfile
 	raw, err := worker.ReadPrivate(profileFile, 65536)
 	if err != nil {
@@ -34,6 +34,14 @@ func loadExternalReader(profileFile string, trust generation.Trust) (externalRec
 		profile.Profile.Validate() != nil || profile.Profile.ID() != profile.Target || !filepath.IsAbs(profile.CredentialFile) ||
 		(profile.CAFile != "" && !filepath.IsAbs(profile.CAFile)) || profile.Archive != nil && !profile.Archive.valid(profile.Profile) {
 		return profile, errUsage
+	}
+	return profile, nil
+}
+
+func loadExternalReader(profileFile string, trust generation.Trust) (externalRecoveryProfile, error) {
+	profile, err := readExternalReader(profileFile)
+	if err != nil {
+		return profile, err
 	}
 	if profile.Profile.Namespace != storage.Hash([]byte(trust.Domain+"/"+trust.Repository)) {
 		return profile, storage.ErrDenied

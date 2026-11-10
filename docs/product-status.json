@@ -1182,7 +1182,7 @@
         },
         {
           "path": "internal/upload/move_linux_test.go",
-          "name": "TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan"
+          "name": "TestWebDAVMoveQueueStagingReadbackUsesRetainedPlan"
         },
         {
           "path": "internal/upload/abandonment_linux_test.go",
@@ -3270,7 +3270,7 @@
         },
         {
           "path": "internal/upload/move_linux_test.go",
-          "name": "TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan"
+          "name": "TestWebDAVMoveQueueStagingReadbackUsesRetainedPlan"
         },
         {
           "path": "internal/upload/abandonment_linux_test.go",

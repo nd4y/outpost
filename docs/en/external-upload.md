@@ -65,6 +65,10 @@ On a stopped worker, `outpost worker-upload-staging-status --bootstrap FILE --do
 
 The report returns `remotePresence: NOT_CHECKED` and performs no target requests. `PUBLISHED` records verification of the final name, so the temporary name may still exist. An `ALLOCATING` bucket is an interrupted local allocation. A missing or damaged initialized book or bucket fails instead of returning an empty inventory. `NOT_STARTED` means the local MOVE book has not been initialized and `NOT_APPLICABLE` means the plan does not use MOVE. Store the report privately. It does not inventory the fixed collision probe, other workers' records or historical claims outside this local book.
 
+To check one recorded temporary name, run `outpost worker-upload-staging-check --bootstrap FILE --domain ID --operation ID --input PRIVATE_READER --temporary NAME`. Supply the same `--after` cursor used for the page with that name. Use a private [external recovery reader profile](#independent-external-recovery) with read access and the exact target ID from the signed plan. The command performs bounded GET readback for that name. `MATCHED` means size and digest agree, `MISMATCH` means the returned bytes differ, `MISSING_AT_READ` means the endpoint returned 404, and `UNAVAILABLE` preserves access, protocol or transport failure. A name with no recorded write yields `NOT_CHECKED`.
+
+The result is an observation at read time. Another worker or a delayed request can change the target afterward. The command never publishes, moves or removes objects.
+
 ## Complete generations and recovery
 
 Completed immutable parts remain completed when assignment slots rotate. If a publication read discovers an absent part, only that part loses its local completion mark. Other verified progress survives. This prevents a slow executor from repeatedly restarting its completed prefix while preserving full publication checks. A delayed-slot test also physically removes an acknowledged fixture part and requires its independent reupload before recovery.

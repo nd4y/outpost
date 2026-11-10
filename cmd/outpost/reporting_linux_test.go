@@ -18,6 +18,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/localfs"
 	"github.com/nd4y/outpost/internal/management"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
@@ -209,7 +210,10 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 		must(e)
 		defer r.Close()
 		op := storage.Hash([]byte("expired upload"))
-		profile := storage.Profile{Kind: "webdav", Endpoint: "https://target.invalid", Namespace: storage.Hash([]byte(domain + "/" + repository)),
+		namespace := storage.Hash([]byte(domain + "/" + repository))
+		server := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: namespace, MoveOnly: true,
+			Logins: map[string]teststore.Login{"staging-reader": {Secret: "synthetic-read-secret"}}})
+		profile := storage.Profile{Kind: "webdav", Endpoint: server.Endpoint(), Namespace: namespace,
 			MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true, WriteMode: storage.WebDAVMoveMode, MaxStagingAttempts: 3}
 		limits := upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}
 		queueDir := filepath.Join(filepath.Dir(dir), "uploads", op)
@@ -230,6 +234,62 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 		staging := status.(upload.StagingStatus)
 		if staging.State != "NOT_STARTED" || staging.RemotePresence != "NOT_CHECKED" || staging.Operation != op || staging.Plan != storage.Hash(plan) {
 			t.Fatal("wrong staging status for unopened MOVE book", staging)
+		}
+
+		readerProfile := put("staging-reader.json", externalRecoveryProfile{Format: externalRecoveryFormat,
+			Target: profile.ID(), Profile: profile, CredentialFile: filepath.Join(base, "unused-credentials.json")})
+		checkArgs := []string{"worker-upload-staging-check", "--bootstrap", bootstrap, "--domain", domain,
+			"--operation", op, "--temporary", "attempt-" + storage.Hash([]byte("unrecorded")), "--input", readerProfile}
+		if _, e = run(ctx, checkArgs); !errors.Is(e, storage.ErrDenied) {
+			t.Fatal("CLI attempted a read before the MOVE journal existed", e)
+		}
+
+		// Restore the synthetic writer's durable MOVE book, then read only its temporary name.
+		journalPath := filepath.Join(queueDir, "jobs", op)
+		journalRoot, e := localfs.OpenRoot(journalPath)
+		must(e)
+		defer journalRoot.Close()
+		stateFile := filepath.Join(journalPath, "state.json")
+		stateRaw, e := os.ReadFile(stateFile)
+		must(e)
+		var state upload.State
+		must(json.Unmarshal(stateRaw, &state))
+		book, e := storage.OpenMoveBook(ctx, storage.MoveBookOptions{Parent: journalRoot, Directory: "move-attempts",
+			Scope: storage.Hash([]byte(state.Format + "/" + storage.Hash(plan) + "/" + node)), Profile: profile, Initialize: true})
+		must(e)
+		var name string
+		data := []byte("synthetic staging bytes")
+		digest := storage.Hash(data)
+		must(book.WithRecord(ctx, profile.ID(), "part-"+digest, digest, len(data), func(tx storage.MoveTransaction) error {
+			a, e := tx.Allocate()
+			if e != nil {
+				return e
+			}
+			name, e = tx.Temporary(a)
+			if e != nil {
+				return e
+			}
+			return tx.Transition(a.Nonce, "WRITING")
+		}))
+		must(book.Close())
+		state.MoveBookReady = true
+		stateRaw, e = json.Marshal(state)
+		must(e)
+		must(os.WriteFile(stateFile, stateRaw, 0600))
+		must(os.WriteFile(server.Path(name), data, 0600))
+		creds := put("staging-credentials.json", map[string]any{"access": "staging-reader", "secret": "synthetic-read-secret",
+			"expiresUnix": time.Now().Add(time.Minute).Unix()})
+		ca := filepath.Join(base, "staging-ca.pem")
+		must(os.WriteFile(ca, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.HTTP.Certificate().Raw}), 0600))
+		put("staging-reader.json", externalRecoveryProfile{Format: externalRecoveryFormat,
+			Target: profile.ID(), Profile: profile, CredentialFile: creds, CAFile: ca})
+		checkArgs[8] = name
+		read, e := run(ctx, checkArgs)
+		must(e)
+		checked := read.(upload.StagingReadback)
+		if checked.RemotePresence != "MATCHED" || checked.Attempt.Temporary != name || checked.Plan != storage.Hash(plan) ||
+			server.Snapshot().Requests != 1 || len(server.Snapshot().Writes) != 0 {
+			t.Fatal("CLI did not limit readback to one temporary object", checked)
 		}
 
 		draft := filepath.Join(base, "upload-abandonment.json")

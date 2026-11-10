@@ -3,6 +3,7 @@ package upload
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -149,9 +150,21 @@ func TestWebDAVMoveQueueReopensWithDurableAttemptBook(t *testing.T) {
 	}
 }
 
-func TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan(t *testing.T) {
+func TestWebDAVMoveQueueStagingReadbackUsesRetainedPlan(t *testing.T) {
 	f := fixtureBytes(t, 32<<10)
-	target := f.externalServer(t, teststore.Options{Kind: "webdav", MoveOnly: true})
+	var response atomic.Int32
+	var unexpected atomic.Bool
+	target := f.externalServer(t, teststore.Options{Kind: "webdav", MoveOnly: true,
+		Before: func(w http.ResponseWriter, r *http.Request, _, key string, _ []byte) bool {
+			if r.Method != http.MethodGet || !strings.HasPrefix(key, "attempt-") {
+				unexpected.Store(true)
+			}
+			if code := response.Load(); code != 0 {
+				w.WriteHeader(int(code))
+				return true
+			}
+			return false
+		}})
 	plan := f.plan(t, target, 1, 60000)
 	q, _ := queueFor(t, f, queueLimits())
 	ctx := context.Background()
@@ -194,5 +207,54 @@ func TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan(t *testing.T) {
 	}
 	if target.Snapshot().Requests != 0 {
 		t.Fatal("local inspection contacted the target")
+	}
+
+	reader := f.backend(t, target, 0)
+	if _, e = ReadStaging(ctx, out, "attempt-"+storage.Hash([]byte("unrecorded")), reader); !errors.Is(e, ErrDenied) {
+		t.Fatal("unrecorded name was accepted", e)
+	}
+	wrong := j.plan.Profile
+	wrong.RequestsPerSecond--
+	wrongReader, e := storage.New(wrong, storage.Credentials{Access: f.workers[0].ID,
+		Secret: target.Options.Logins[f.workers[0].ID].Secret, ExpiresUnix: f.expiresUnix()}, target.Roots)
+	must(t, e)
+	defer wrongReader.Close()
+	if _, e = ReadStaging(ctx, out, name, wrongReader); !errors.Is(e, ErrDenied) {
+		t.Fatal("substituted target profile was accepted", e)
+	}
+	notWritten := out
+	page := *out.Move
+	page.Attempts = append([]storage.MoveStagingAttempt(nil), page.Attempts...)
+	page.Attempts[0].Phase, page.Attempts[0].WriteStartedMillis = "ALLOCATED", 0
+	notWritten.Move = &page
+	skipped, e := ReadStaging(ctx, notWritten, name, reader)
+	must(t, e)
+	if skipped.RemotePresence != "NOT_CHECKED" || skipped.ErrorCode != "NO_WRITE_RECORDED" || skipped.ObservedUnix != 0 ||
+		target.Snapshot().Requests != 0 {
+		t.Fatal("inspection read a name without a recorded write", skipped)
+	}
+
+	check := func(want, code string) {
+		t.Helper()
+		got, e := ReadStaging(ctx, out, name, reader)
+		must(t, e)
+		if got.RemotePresence != want || got.ErrorCode != code || got.ObservedUnix == 0 ||
+			got.Attempt != out.Move.Attempts[0] || got.Plan != out.Plan || got.Target != out.Target {
+			t.Fatal("wrong readback result", got)
+		}
+	}
+	check("MISSING_AT_READ", "")
+	must(t, os.WriteFile(target.Path(name), []byte("four"), 0600))
+	check("MATCHED", "")
+	must(t, os.WriteFile(target.Path(name), []byte("five"), 0600))
+	check("MISMATCH", "")
+	response.Store(http.StatusForbidden)
+	check("UNAVAILABLE", "ACCESS_DENIED")
+	response.Store(http.StatusServiceUnavailable)
+	check("UNAVAILABLE", "READ_FAILED")
+	response.Store(http.StatusCreated)
+	check("UNAVAILABLE", "INVALID_RESPONSE")
+	if unexpected.Load() || len(target.Snapshot().Writes) != 0 {
+		t.Fatal("readback attempted a write or a different object")
 	}
 }
