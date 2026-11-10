@@ -14,7 +14,6 @@ import (
 	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/diskbudget"
-	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/management"
 	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -183,7 +182,7 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	}
 	sort.Slice(out.Jobs, func(i, j int) bool { return out.Jobs[i].Operation < out.Jobs[j].Operation })
 	d, _ := cfg.DomainByID(domain)
-	replica, e := generation.OpenAt(w.root, w.relative(filepath.Join(DomainDirectory(w.dir, d.Trust), "replica")), d.Trust, false)
+	replica, e := w.openReplicaAt(w.relative(filepath.Join(DomainDirectory(w.dir, d.Trust), "replica")), d.Trust, false)
 	if e == nil {
 		prefix := filepath.ToSlash(w.relative(filepath.Join(DomainDirectory(w.dir, d.Trust), "replica")))
 		replica.Admit = func(name string, size int) (func(bool) error, error) {

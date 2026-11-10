@@ -3,6 +3,7 @@ package generation
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -45,6 +46,7 @@ type state struct {
 	Repairs         map[string]RepairRecord `json:"repairs,omitempty"`
 	CatalogDamage   map[string]DamageRecord `json:"catalogDamage,omitempty"`
 	CatalogRepairs  map[string]RepairRecord `json:"catalogRepairs,omitempty"`
+	IndexNode       string                  `json:"indexNode,omitempty"`
 }
 type Status struct {
 	Revision        uint64         `json:"revision"`
@@ -56,8 +58,10 @@ type Status struct {
 	Pins            map[string]Pin `json:"pins"`
 }
 type Replica struct {
-	root  *os.Root
-	trust Trust
+	root      *os.Root
+	trust     Trust
+	indexKey  ed25519.PrivateKey
+	indexNode string
 	// Fault is a development-test hook; production callers leave it nil.
 	Fault           func(string) error
 	Admit           statefile.Admission
@@ -72,6 +76,19 @@ func Open(dir string, t Trust, initialize bool) (*Replica, error) {
 	return OpenAt(nil, dir, t, initialize)
 }
 func OpenAt(parent *os.Root, dir string, t Trust, initialize bool) (*Replica, error) {
+	return openAt(parent, dir, t, initialize, nil)
+}
+
+// OpenWorkerAt supplies the enrolled node identity for a replica with an
+// optional signed index copy. Ordinary immutable recovery needs no node key.
+func OpenWorkerAt(parent *os.Root, dir string, t Trust, initialize bool, key ed25519.PrivateKey) (*Replica, error) {
+	if len(key) != ed25519.PrivateKeySize {
+		return nil, ErrInvalid
+	}
+	return openAt(parent, dir, t, initialize, key)
+}
+
+func openAt(parent *os.Root, dir string, t Trust, initialize bool, key ed25519.PrivateKey) (*Replica, error) {
 	if !t.valid() {
 		return nil, ErrInvalid
 	}
@@ -82,6 +99,9 @@ func OpenAt(parent *os.Root, dir string, t Trust, initialize bool) (*Replica, er
 		return nil, err
 	}
 	p := &Replica{root: r, trust: t}
+	if len(key) != 0 {
+		p.setIndexKey(key)
+	}
 	if initialize {
 		f, e := r.Open(".")
 		if e != nil {
@@ -204,6 +224,11 @@ func (r *Replica) save(s state) error {
 	if len(b) > MaxState {
 		return statefile.ErrCapacity
 	}
+	if s.IndexNode != "" {
+		if e = r.writeIndexCopy(s.IndexNode, b); e != nil {
+			return e
+		}
+	}
 	if e = r.write("state.json", b); e != nil {
 		return e
 	}
@@ -213,15 +238,41 @@ func (r *Replica) load() (state, error) {
 	var s state
 	b, e := read(r.root, "state.json", MaxState)
 	if e != nil {
+		if _, err := r.root.Lstat(indexCopyName); err == nil {
+			return s, errors.Join(ErrIndexRecovery, e)
+		}
 		return s, e
 	}
+	s, e = r.decodeIndex(b)
+	if e != nil {
+		return s, e
+	}
+	if s.IndexNode == "" {
+		if _, e = r.root.Lstat(indexCopyName); !errors.Is(e, os.ErrNotExist) {
+			return s, ErrIndexRecovery
+		}
+		return s, nil
+	}
+	copy, _, e := r.readIndexCopy()
+	if e != nil || !bytes.Equal(copy.Index, b) {
+		return s, errors.Join(ErrIndexRecovery, e)
+	}
+	anchor, e := read(r.root, indexAnchorName, 64)
+	if e != nil || string(anchor) != Hash(b) {
+		return s, errors.Join(ErrIndexRecovery, e)
+	}
+	return s, nil
+}
+
+func (r *Replica) decodeIndex(b []byte) (state, error) {
+	var s state
 	var header struct {
 		Format string `json:"format"`
 	}
 	if json.Unmarshal(b, &header) == nil && header.Format == Format {
 		return s, ErrMigrationRequired
 	}
-	if e = canonical(b, &s, MaxState); e != nil {
+	if e := canonical(b, &s, MaxState); e != nil {
 		return s, e
 	}
 	return r.validateState(s)
@@ -229,7 +280,7 @@ func (r *Replica) load() (state, error) {
 func (r *Replica) validateState(s state) (state, error) {
 	t, _ := json.Marshal(r.trust)
 	u, _ := json.Marshal(s.Trust)
-	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat && !integrityState(s.Format)) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) {
+	if (s.Format != StateFormat && s.Format != MaintenanceStateFormat && !integrityState(s.Format)) || !bytes.Equal(t, u) || s.Generations == nil || s.Pins == nil || s.Receipts == nil || len(s.Generations) > MaxGenerations || len(s.Pins) > MaxPins || len(s.Receipts) > MaxPins || s.Revision == ^uint64(0) || s.IndexNode != "" && !validID(s.IndexNode) {
 		return s, ErrInvalid
 	}
 	if s.Format == StateFormat && s.GC != nil || s.Format == MaintenanceStateFormat && len(s.GC) == 0 || len(s.GC) > len(s.Receipts) {

@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func (w *Worker) withStoppedReplica(ctx context.Context, domain string, action f
 
 func (w *Worker) RetentionCheckpoint(ctx context.Context, domain string) ([]byte, error) {
 	var raw []byte
-	e := w.withRetentionReplica(ctx, domain, func(replica *generation.Replica) error {
+	e := w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
 		var err error
 		raw, err = replica.RetentionCheckpoint(ctx)
 		return err
@@ -71,14 +72,14 @@ func (w *Worker) RetentionCheckpoint(ctx context.Context, domain string) ([]byte
 }
 
 func (w *Worker) RestoreRetentionCheckpoint(ctx context.Context, domain string, raw []byte, expected string) error {
-	return w.withRetentionReplica(ctx, domain, func(replica *generation.Replica) error {
+	return w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
 		return replica.RestoreRetentionCheckpoint(ctx, raw, expected)
 	})
 }
 
-func (w *Worker) withRetentionReplica(ctx context.Context, domain string, action func(*generation.Replica) error) error {
-	return w.withStoppedReplica(ctx, domain, func(root *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
-		replica, e := generation.OpenAt(root, path, trust, false)
+func (w *Worker) withExistingReplica(ctx context.Context, domain string, action func(*generation.Replica) error) error {
+	return w.withStoppedReplica(ctx, domain, func(_ *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
+		replica, e := w.openReplicaAt(path, trust, false)
 		if e != nil {
 			return e
 		}
@@ -86,4 +87,20 @@ func (w *Worker) withRetentionReplica(ctx context.Context, domain string, action
 		replica.Admit = admit
 		return action(replica)
 	})
+}
+
+func (w *Worker) EnableReplicaIndexCopy(ctx context.Context, domain string) error {
+	return w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
+		return replica.EnableIndexCopy(ctx)
+	})
+}
+
+func (w *Worker) RecoverReplicaIndexCopy(ctx context.Context, domain string) (bool, error) {
+	var changed bool
+	e := w.withStoppedReplica(ctx, domain, func(root *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
+		var err error
+		changed, err = generation.RecoverIndexCopyAt(root, ctx, path, trust, w.cert.PrivateKey.(ed25519.PrivateKey), admit)
+		return err
+	})
+	return changed, e
 }

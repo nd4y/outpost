@@ -9,7 +9,6 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/diskbudget"
-	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -81,7 +80,7 @@ func (w *Worker) RenewIngress(ctx context.Context, domain string, previous, fres
 				return ErrDenied
 			}
 			dir := DomainDirectory(w.dir, d.Trust)
-			r, e := generation.OpenAt(w.root, w.relative(filepath.Join(dir, "replica")), d.Trust, false)
+			r, e := w.openReplicaAt(w.relative(filepath.Join(dir, "replica")), d.Trust, false)
 			if e != nil {
 				return e
 			}

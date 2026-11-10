@@ -103,6 +103,61 @@ func TestWorkerRetentionCheckpointUsesStoppedAdmittedReplica(t *testing.T) {
 	}
 }
 
+func TestWorkerRecoversSignedReplicaIndexUnderStoppedLease(t *testing.T) {
+	f := newFixture(t)
+	f.endpoint(t, nil)
+	cfg := f.config(t, 0, nil)
+	w := f.nodes[0]
+	trust := f.domain.Trust
+	ctx := context.Background()
+	path := filepath.Join(DomainDirectory(w.dir, trust), "replica")
+	state := filepath.Join(path, "state.json")
+	must(t, w.EnableReplicaIndexCopy(ctx, trust.Domain))
+	replica, e := w.openReplicaAt(w.relative(path), trust, false)
+	must(t, e)
+	defer replica.Close()
+	admit := w.admission(filepath.ToSlash(w.relative(path)))
+	replica.Admit = admit
+	pin := storage.Hash([]byte("retain while index is lost"))
+	must(t, replica.Pin(ctx, pin, f.generation, "restore"))
+	must(t, os.Remove(state))
+	must(t, w.lease.WithLock(ctx, func() error {
+		if changed, e := w.RecoverReplicaIndexCopy(ctx, trust.Domain); changed || !errors.Is(e, generation.ErrConflict) {
+			t.Fatal("recovery ran while the execution lease was held", changed, e)
+		}
+		return nil
+	}))
+	changed, e := w.RecoverReplicaIndexCopy(ctx, trust.Domain)
+	must(t, e)
+	if !changed {
+		t.Fatal("missing primary index was not reconstructed")
+	}
+	status, e := replica.Status(ctx)
+	must(t, e)
+	if status.Pins[pin].Generation != f.generation || status.LatestComplete != f.generation {
+		t.Fatal("reconstructed index lost protected references", status)
+	}
+	must(t, replica.VerifyComplete(ctx, f.generation))
+	stop := start(t, w)
+	waitFor(t, 30*time.Second, func() bool {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.active != nil
+	})
+	stop()
+	must(t, os.Rename(path, path+"-temporarily-unavailable"))
+	if view, e := w.start(ctx, cfg); !errors.Is(e, generation.ErrIndexRecovery) {
+		if view != nil {
+			must(t, w.stop(view))
+		}
+		t.Fatal("worker accepted loss of an already enrolled replica directory", e)
+	}
+	if _, e := os.Stat(path); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("worker reinitialized the lost replica directory", e)
+	}
+	must(t, os.Rename(path+"-temporarily-unavailable", path))
+}
+
 func TestWorkerScheduledMaintenanceResumesFromOfflineCache(t *testing.T) {
 	f := newFixture(t)
 	f.cfg.Limits.AttemptMillis = 60000

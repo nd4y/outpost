@@ -3185,6 +3185,18 @@
           "name": "TestWorkerRetentionCheckpointUsesStoppedAdmittedReplica"
         },
         {
+          "path": "internal/generation/index_copy_linux_test.go",
+          "name": "TestSignedReplicaIndexCopyRecoversExactPinsAndReceivingAfterLoss"
+        },
+        {
+          "path": "internal/generation/index_copy_linux_test.go",
+          "name": "TestSignedReplicaIndexRecoveryRequiresFrozenMaintenancePlan"
+        },
+        {
+          "path": "internal/worker/maintenance_linux_test.go",
+          "name": "TestWorkerRecoversSignedReplicaIndexUnderStoppedLease"
+        },
+        {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceWindowFencesNodeAndStopsPartialCleanupAtExpiry"
         },
@@ -3206,7 +3218,7 @@
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Automatic retirement selection and epoch workflow, recovery after loss of the full replica index, and full product target-readiness reporting."
+      "remaining": "Automatic retirement selection and epoch workflow, recovery after complete replica volume loss, and full product target-readiness reporting."
     },
     {
       "id": "REQ-34",

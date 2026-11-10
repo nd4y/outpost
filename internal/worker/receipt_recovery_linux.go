@@ -10,7 +10,6 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/diskbudget"
-	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/ingress"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
@@ -110,7 +109,7 @@ func (w *Worker) RecoverIngressReceipt(ctx context.Context, domain string, item 
 			dir := DomainDirectory(w.dir, d.Trust)
 			replicaPrefix := w.relative(filepath.Join(dir, "replica"))
 			prefix := w.relative(filepath.Join(dir, "ingress"))
-			r, e := generation.OpenAt(w.root, replicaPrefix, d.Trust, false)
+			r, e := w.openReplicaAt(replicaPrefix, d.Trust, false)
 			if e != nil {
 				return e
 			}

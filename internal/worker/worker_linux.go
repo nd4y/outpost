@@ -225,6 +225,9 @@ func (w *Worker) budgetFor(ctx context.Context, c control.Config, initialize boo
 func DomainDirectory(root string, t generation.Trust) string {
 	return filepath.Join(root, "domains", t.Domain, t.Repository, strconv.FormatUint(t.Epoch, 10))
 }
+func (w *Worker) openReplicaAt(path string, trust generation.Trust, initialize bool) (*generation.Replica, error) {
+	return generation.OpenWorkerAt(w.root, path, trust, initialize, w.cert.PrivateKey.(ed25519.PrivateKey))
+}
 func (w *Worker) check(ctx context.Context) error {
 	if e := ctx.Err(); e != nil {
 		return e
@@ -390,9 +393,19 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		local := &domainState{}
 		v.domains[d.Trust.Domain] = local
 		dir := DomainDirectory(w.dir, d.Trust)
-		e := w.createOrOpen(ctx, filepath.Join(dir, "replica"), func(init bool) error {
+		replicaPath := filepath.Join(dir, "replica")
+		if _, e := w.root.Lstat(w.relative(replicaPath)); errors.Is(e, os.ErrNotExist) {
+			// The worker enrolls its replica before its peer and ingress journals.
+			// A retained sibling therefore rules out first enrollment.
+			for _, journal := range []string{"peer", "ingress"} {
+				if _, e = w.root.Lstat(w.relative(filepath.Join(dir, journal))); !errors.Is(e, os.ErrNotExist) {
+					return fail(errors.Join(generation.ErrIndexRecovery, e))
+				}
+			}
+		}
+		e := w.createOrOpen(ctx, replicaPath, func(init bool) error {
 			var e error
-			local.replica, e = generation.OpenAt(w.root, w.relative(filepath.Join(dir, "replica")), d.Trust, init)
+			local.replica, e = w.openReplicaAt(w.relative(replicaPath), d.Trust, init)
 			return e
 		})
 		if e != nil {
