@@ -120,6 +120,87 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 		}
 	}
 
+	t.Run("compare signed peer routes", func(t *testing.T) {
+		runCompare := func(path, node string) (any, error) {
+			return run(context.Background(), []string{
+				"config-route-compare", "--input", input, "--node", source, "--peer-config", path,
+				"--peer", node, "--trust", trustFile, "--domain", domain,
+			})
+		}
+		for _, tc := range []struct {
+			name   string
+			mutate func(*control.Config)
+			want   []string
+		}{
+			{name: "same graph reordered with different revision and external class"},
+			{"changed trust epoch", func(c *control.Config) {
+				c.Domains[0].Trust.Epoch++
+			}, []string{"DOMAIN_TRUST"}},
+			{"expanded peer class policy", func(c *control.Config) {
+				p := &c.Domains[0].Placement
+				p.AllowedClasses = append(p.AllowedClasses, "untrusted")
+			}, []string{"PEER_CLASSES"}},
+			{"changed transit to holder", func(c *control.Config) {
+				p := &c.Domains[0].Placement
+				p.Transit = nil
+				p.Holders = append(p.Holders, bridge)
+			}, []string{"HOLDERS", "TRANSIT"}},
+			{"reversed data edge with same HTTPS dialer", func(c *control.Config) {
+				p := &c.Domains[0].Placement
+				for i, edge := range p.Edges {
+					if edge == hops[1] {
+						p.Edges[i] = policy.Edge{From: outbound, To: bridge, Mode: "push"}
+					}
+				}
+			}, []string{"PEER_EDGES"}},
+			{"changed relay endpoint", func(c *control.Config) {
+				for i, node := range c.Nodes {
+					if node.ID == bridge {
+						c.Nodes[i].Endpoint = "https://new-bridge.invalid"
+					}
+				}
+			}, []string{"PEER_NODES"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				peer, err := control.Verify(raw, public, source)
+				if err != nil {
+					t.Fatal(err)
+				}
+				peer.Node = outbound
+				peer.Revision++
+				peer.Limits.PollSeconds++
+				slices.Reverse(peer.Nodes)
+				placement := &peer.Domains[0].Placement
+				slices.Reverse(placement.Edges)
+				slices.Reverse(placement.Holders)
+				placement.AllowedClasses = append(placement.AllowedClasses, "external")
+				if tc.mutate != nil {
+					tc.mutate(&peer)
+				}
+				peerRaw := sign(peer)
+				peerFile := write("peer signed.json", peerRaw)
+				result, err := runCompare(peerFile, outbound)
+				if err != nil {
+					t.Fatal(err)
+				}
+				comparison := result.(routeComparison)
+				primaryIdentity := routeConfigIdentity{Node: source, Revision: config.Revision, ConfigDigest: storage.Hash(raw)}
+				peerIdentity := routeConfigIdentity{Node: outbound, Revision: peer.Revision, ConfigDigest: storage.Hash(peerRaw)}
+				if comparison.Format != "outpost-config-route-compare-1" || comparison.Domain != domain ||
+					comparison.Primary != primaryIdentity || comparison.Peer != peerIdentity ||
+					comparison.Consistent != (len(tc.want) == 0) || comparison.Differences == nil || !slices.Equal(comparison.Differences, tc.want) {
+					t.Fatalf("unexpected comparison: %+v", comparison)
+				}
+			})
+		}
+		if _, err := runCompare(input, outbound); !errors.Is(err, control.ErrDenied) {
+			t.Fatalf("misaddressed peer config rejected with %v", err)
+		}
+		if _, err := runCompare(input, source); !errors.Is(err, errUsage) {
+			t.Fatalf("duplicate node rejected with %v", err)
+		}
+	})
+
 	other, _ := makeKey()
 	tampered := strings.Replace(string(raw), `"revision":4`, `"revision":5`, 1)
 	if tampered == string(raw) {

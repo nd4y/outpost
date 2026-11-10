@@ -12,7 +12,7 @@ Each domain/repository/epoch uses an explicitly provisioned `Policy`, a CA-verif
 
 The client accepts one explicit HTTPS origin. It validates the CA, hostname and pinned identity; it follows no redirects, ambient proxy settings, discovery or alternate routes. The server requires a verified client certificate, TLS 1.3 and an allowed peer/operation on every request. Grants and leaf certificates are checked for expiry, including reused connections. Requests are scoped to a domain; the replica's immutable public trust binds the repository, epoch and catalog author. A sender cannot supply a replacement author key or classify itself as trusted.
 
-Policies and certificates are fixed for each constructed client/server. Provisioning, hot reload, owner-signed policy distribution, consistency checks across peer configurations, host firewall enforcement and revocation of already distributed ciphertext remain separate work. This candidate enforces configured edges at its own endpoints; it cannot make a compromised authorized holder obey transit policy.
+Policies and certificates are fixed for each constructed client/server. Provisioning, hot reload, owner-signed policy distribution, verification of live replication permissions, host firewall enforcement and revocation of already distributed ciphertext remain separate work. This candidate enforces configured edges at its own endpoints; it cannot make a compromised authorized holder obey transit policy.
 
 ### Inspect declared routes offline
 
@@ -23,7 +23,19 @@ outpost config-routes --input /private/signed-config.json \
 
 The trust file contains the owner's independently obtained public key as a JSON `publicKey` field (base64). The command verifies the signature, intended node and validity period, then reports the signed document's SHA-256 and revision. It lists every holder in the selected domain, sorted by opaque ID, with a shortest declared path in data-flow order. On a pull edge, the receiving node dials the sender. A reachable local holder has no hops. An unreachable holder has `reachable: false` and no hops. The command also accepts an origin assigned only for transit.
 
-The report describes one signed document. Keep it private with the configuration. Compare peer configurations separately and check their credentials and network access before deployment. The command opens no connections and leaves the applied worker configuration untouched.
+The report describes one signed document. Keep it private with the configuration. The command opens no connections and leaves the applied worker configuration untouched.
+
+### Compare two signed peer configurations
+
+```sh
+outpost config-route-compare --input /private/signed-config.json --node NODE_ID \
+  --peer-config /private/signed-peer.json --peer PEER_ID \
+  --trust /private/owner-public.json --domain DOMAIN_ID
+```
+
+Both documents must be active, addressed to the specified distinct nodes and signed by the same trusted owner. Each node must have a holder or transit role in the selected domain of its document. The report identifies each document by node, revision and SHA-256. It compares domain trust, allowed peer classes, holder and transit sets, directed peer edges, and the class and endpoint of each placed node. Array order, configuration revision and policies for external targets do not affect the comparison.
+
+Check `consistent` and the `differences` array in the returned JSON. The command returns a report for valid documents that disagree and an error for invalid, expired or misaddressed input. Keep the report private. Check the configuration of each participating node and verify replication permissions, credentials and network access separately before deployment.
 
 ## Transfer and publication
 
