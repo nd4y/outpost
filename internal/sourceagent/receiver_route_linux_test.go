@@ -31,6 +31,18 @@ import (
 	"github.com/nd4y/outpost/internal/worker"
 )
 
+type routeCatalogResponse struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *routeCatalogResponse) WriteHeader(status int) {
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *routeCatalogResponse) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 func TestSourceActiveReceiverReplacement(t *testing.T) {
 	t.Run("single", func(t *testing.T) { testActiveReceiverReplacement(t, 1) })
 	t.Run("two-copies", func(t *testing.T) { testActiveReceiverReplacement(t, 2) })
@@ -40,6 +52,7 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 	t.Helper()
 	var third tls.Certificate
 	f := newFixtureWithPeer(t, 1800, &third)
+	started := time.Now()
 	ctx, cancel := context.WithTimeout(t.Context(), 350*time.Second)
 	defer cancel()
 
@@ -84,6 +97,13 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 						}
 					}
 				}
+			}
+			if req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/catalog") {
+				started := time.Now()
+				reply := &routeCatalogResponse{ResponseWriter: out}
+				h.worker.ServeHTTP(reply, req)
+				t.Logf("holder %d catalog PUT: status=%d duration=%s", k, reply.status, time.Since(started).Round(time.Millisecond))
+				return
 			}
 			h.worker.ServeHTTP(out, req)
 		}
@@ -154,11 +174,15 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 	if copies == 2 {
 		f.b.Reserve = selection(holders[2])
 	}
+	// Replace the fixture's only file so the file accepted before the
+	// injected outage is also the one independently restored below.
+	const capturedFile = "private.bin"
 	payload := bytes.Repeat([]byte("preserve the bytes already accepted by the surviving receiver"), 512)
-	must(t, os.WriteFile(filepath.Join(f.tree, "route-input.bin"), payload, 0640))
+	must(t, os.WriteFile(filepath.Join(f.tree, capturedFile), payload, 0640))
 	f.a, err = Open(ctx, f.b, true)
 	must(t, err)
 	must(t, f.a.Next(ctx))
+	t.Logf("source prepared after %s", time.Since(started).Round(time.Millisecond))
 	before, err := f.a.Status(ctx)
 	must(t, err)
 	if before.Phase != "PREPARING" || !slices.Equal(before.Receivers, targets[:copies]) {
@@ -181,6 +205,7 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 	if err = f.a.Run(ctx); !errors.Is(err, crash) {
 		t.Fatal("did not switch after durable capture", err)
 	}
+	t.Logf("replacement route durable after %s", time.Since(started).Round(time.Millisecond))
 	want := slices.Clone(targets[:copies])
 	want[copies-1] = holders[copies].id
 	f.reopen(t)
@@ -206,6 +231,9 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 	if finalRoute.Job == nil || finalRoute.Job.Phase != "SEALED" || !slices.Equal(finalRoute.Receivers, want) {
 		t.Fatal("unexpected route at seal", finalRoute)
 	}
+	deadline, _ := ctx.Deadline()
+	t.Logf("catalog sealed after %s; publication budget remaining %s",
+		time.Since(started).Round(time.Millisecond), time.Until(deadline).Round(time.Millisecond))
 	f.a.Fault = nil
 	for attempt := 0; attempt < 4; attempt++ {
 		err = f.a.Run(ctx)
@@ -218,6 +246,7 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 		t.Logf("retry publication after bounded transport error: %v", err)
 	}
 	must(t, err)
+	t.Logf("publication and source settlement finished after %s", time.Since(started).Round(time.Millisecond))
 	raw, err := f.a.Checkpoint(ctx)
 	must(t, err)
 	c, err := capture.VerifyCheckpoint(raw, f.grant.Trust)
@@ -247,7 +276,7 @@ func testActiveReceiverReplacement(t *testing.T, copies int) {
 		out := filepath.Join(h.directory, "route-restored")
 		_, err = generation.RecoverMaterialized(ctx, replica, c.Generation, f.grant.Trust, f.owner, generation.RecoverySelection{}, out)
 		must(t, err)
-		got, err := os.ReadFile(filepath.Join(out, "route-input.bin"))
+		got, err := os.ReadFile(filepath.Join(out, capturedFile))
 		must(t, err)
 		if !bytes.Equal(got, payload) {
 			t.Fatal("restore differs", h.id)
