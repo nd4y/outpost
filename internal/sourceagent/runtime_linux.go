@@ -54,6 +54,7 @@ type Bootstrap struct {
 	Reserve         *CompanionIngress   `json:"reserveIngress,omitempty"`
 	Standby         bool                `json:"standby,omitempty"`
 	Companion       *CompanionIngress   `json:"companionIngress,omitempty"`
+	JournalCopy     *JournalCopy        `json:"journalCopy,omitempty"`
 }
 
 func Load(path string) (Bootstrap, error) {
@@ -140,6 +141,7 @@ type Agent struct {
 	root               *os.Root
 	budget             *diskbudget.Budget
 	store, lease       *statefile.Store
+	journal            *sourceJournal
 	owner              filekit.Owner
 	writer             ed25519.PrivateKey
 	authority          []byte
@@ -192,6 +194,10 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		p := *b.Prepared
 		p.Trust.Producer = bytes.Clone(p.Trust.Producer)
 		b.Prepared = &p
+	}
+	if b.JournalCopy != nil {
+		copy := *b.JournalCopy
+		b.JournalCopy = &copy
 	}
 	if b.Standby && (b.Companion == nil || b.Profile.MinimumCopies != 1 || b.Profile.ReleasePolicy != "" || b.ObservationFile != "") {
 		return nil, ErrUnsupported
@@ -339,6 +345,12 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		return fail(e)
 	}
 	a.store.Admit = a.admission("state")
+	if b.JournalCopy != nil {
+		a.journal, e = openSourceJournal(ctx, b, initialize)
+		if e != nil {
+			return fail(e)
+		}
+	}
 	if initialize {
 		if e = a.point("source-install-stores-created"); e != nil {
 			return fail(e)
@@ -361,10 +373,13 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 	}
 	e = a.lease.WithLock(ctx, func() error {
 		if initialize {
-			if _, e := a.store.Read("agent.json"); !errors.Is(e, os.ErrNotExist) {
+			if _, e := a.store.Read(sourceStateFile); !errors.Is(e, os.ErrNotExist) {
 				return ErrInvalid
 			}
-			return a.save(state{Format: Format, Binding: a.binding, Phase: "IDLE", Previous: map[string]string{}})
+			return a.commitState(state{Format: Format, Binding: a.binding, Phase: "IDLE", Previous: map[string]string{}}, true)
+		}
+		if e := a.reconcileJournal(ctx); e != nil {
+			return e
 		}
 		if _, e := a.loadAdopt(); e != nil {
 			return e
@@ -390,13 +405,22 @@ func (a *Agent) Close() error {
 	if a.root != nil {
 		e = errors.Join(e, a.root.Close())
 	}
+	if a.journal != nil {
+		e = errors.Join(e, a.journal.close())
+	}
 	return e
 }
 func (a *Agent) guard(ctx context.Context) error {
 	if a.poisoned.Load() {
 		return ErrInvalid
 	}
-	return a.b.Local.Volume.CheckHandle(ctx, a.runtimeDirectory, a.root)
+	if e := a.b.Local.Volume.CheckHandle(ctx, a.runtimeDirectory, a.root); e != nil {
+		return e
+	}
+	if a.journal != nil {
+		return a.journal.guard(ctx)
+	}
+	return nil
 }
 func (a *Agent) point(name string) error {
 	if a.Fault != nil {
@@ -417,6 +441,10 @@ func (a *Agent) admission(prefix string) statefile.Admission {
 	}
 }
 func (a *Agent) save(s state) error {
+	return a.commitState(s, false)
+}
+
+func (a *Agent) commitState(s state, initialize bool) error {
 	if time.Now().Unix() < s.ObservedUnix {
 		return ErrInvalid
 	}
@@ -431,7 +459,12 @@ func (a *Agent) save(s state) error {
 	if e != nil {
 		return e
 	}
-	if e = a.store.Write("agent.json", raw); e != nil {
+	if a.journal == nil {
+		e = a.store.Write(sourceStateFile, raw)
+	} else {
+		e = a.writeJournal(raw, initialize)
+	}
+	if e != nil {
 		a.poisoned.Store(true)
 	}
 	return e
@@ -441,11 +474,15 @@ func (a *Agent) load() (state, error) {
 }
 func (a *Agent) loadAdopt() (state, error) { return a.loadScope(true) }
 func (a *Agent) loadScope(adopt bool) (state, error) {
-	var s state
-	raw, e := a.store.Read("agent.json")
+	raw, e := a.store.Read(sourceStateFile)
 	if e != nil {
-		return s, e
+		return state{}, e
 	}
+	return a.decodeState(raw, adopt)
+}
+
+func (a *Agent) decodeState(raw []byte, adopt bool) (state, error) {
+	var s state
 	if storage.Decode(raw, &s, maxState) != nil || (s.Format != Format && s.Format != renewedFormat) || s.Binding != a.binding || s.ObservedUnix < 1 || s.ObservedUnix > time.Now().Unix() || s.Previous == nil || len(s.Previous) > generation.MaxKits {
 		return s, ErrInvalid
 	}

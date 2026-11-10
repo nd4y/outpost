@@ -101,6 +101,8 @@ The previous executable refuses the migrated journal. Downgrading the executable
 
 ## Interrupted initial installation
 
+For new installations, an optional [source journal copy](source-journal-copy.md) supports exact recovery of the main state file on restart.
+
 The final runtime path appears only after its lease, capacity ledger and signed initial agent state are durable. All signed bindings name the final bootstrap path; the temporary physical path is never a different source profile. A crash before publication leaves a private `.outpost-source-install-...` candidate and no final runtime. Run the same `source-init` again to create a fresh candidate. The earlier candidate is retained, not reused or deleted. After an uncertain reply, check `source-status` first: publication may have succeeded. A present valid runtime is reopened normally; repeated initialization refuses to overwrite it.
 
 Admission uses an interruptible cross-process lock on the private parent. At most four unpublished candidates for the same final path are admitted, and parent inspection is bounded to 4096 entries. Reaching either bound returns a capacity error without erasing anything. A successful competing initializer wins the final name atomically; other candidates remain. These small initialization artifacts contain metadata, not captured payload, and are retained on the enrolled volume. Inspection and separately authorized cleanup are required after exhaustion; there is no automatic directory cleanup command.

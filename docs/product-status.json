@@ -271,6 +271,10 @@
       ],
       "checks": [
         {
+          "path": "internal/sourceagent/journal_copy_linux_test.go",
+          "name": "TestSourceJournalCopyReconcilesExactPredecessorAndLostActiveFile"
+        },
+        {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations"
         },
@@ -396,7 +400,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection and retirement of proven unadmitted or intact unsealed ACTIVE across all possible holders. An opt-in ACTIVE replacement before durable catalog supports single-copy standby and a third receiver for two-copy mode, with signed restart state and staged-pack reuse. A surviving complete ciphertext closure allows paired replacement after sealing without changing the catalog. The replaced receiver reclaims its slot after verified catch-up. Physical long-offline rejoin, recovery when no reachable holder has a required ciphertext dependency, and measured asymmetric 500/500/100 acceptance remain open. Full-copy initial transfers adapt to measured durable ingress throughput with a bounded weight ratio; split coverage retains deterministic ownership."
+      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, whole-runtime and receiver journal recovery, separate failure-domain admission and recovery-package lifecycle across key epochs. New source runtimes can enroll a separate signed journal copy and repair the main file when the supporting records survive. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection and retirement of proven unadmitted or intact unsealed ACTIVE across all possible holders. An opt-in ACTIVE replacement before durable catalog supports single-copy standby and a third receiver for two-copy mode, with signed restart state and staged-pack reuse. A surviving complete ciphertext closure allows paired replacement after sealing without changing the catalog. The replaced receiver reclaims its slot after verified catch-up. Physical long-offline rejoin, recovery when no reachable holder has a required ciphertext dependency, and measured asymmetric 500/500/100 acceptance remain open. Full-copy initial transfers adapt to measured durable ingress throughput with a bounded weight ratio; split coverage retains deterministic ownership."
     },
     {
       "id": "REQ-06",
