@@ -18,7 +18,9 @@ outpost management-status --input /private/management.json
 outpost management-run --input /private/management.json
 ```
 
-Initialization does not open a listener. An existing runtime, lost journal or missing volume marker is never silently initialized. Retain an independent copy of the owner configuration, private profile, certificate material and registry backup; these commands are not journal-loss recovery. The process needs write access only to its enrolled runtime and read access to its own private files. No shell commands come from the API.
+Initialization first records the exact signed pending profile and admits it only after the initial registry is durable. The listener remains closed until `management-run` accepts the admitted profile. If installation was interrupted after the pending profile was recorded, repeat `management-init` with the same profile on the original bound volume. The command preserves the original initial registry bytes when available, reconciles pending quota reservations, and rejects a changed profile or an existing registry without the pending record. Use the separate [journal repair procedure](management-snapshots.md) after an admitted registry is lost.
+
+Retain independent copies of the owner configuration, private profile, certificate material and registry backup. The process needs write access only to its enrolled runtime and read access to its own private files. API requests carry typed operations.
 
 ## Restart and local changes
 

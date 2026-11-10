@@ -1178,6 +1178,14 @@
       "checks": [
         {
           "path": "internal/management/registry_journal_linux_test.go",
+          "name": "TestManagementRegistryJournalInitialCopyResumesExactBytes"
+        },
+        {
+          "path": "internal/managementservice/initialize_linux_test.go",
+          "name": "TestManagementInitializationResumesAfterSIGKILL"
+        },
+        {
+          "path": "internal/management/registry_journal_linux_test.go",
           "name": "TestManagementRegistryJournalEnablesFromExactLegacyPredecessor"
         },
         {
@@ -7481,6 +7489,14 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/management/registry_journal_linux_test.go",
+          "name": "TestManagementRegistryJournalInitialCopyResumesExactBytes"
+        },
+        {
+          "path": "internal/managementservice/initialize_linux_test.go",
+          "name": "TestManagementInitializationResumesAfterSIGKILL"
+        },
         {
           "path": "internal/management/registry_journal_linux_test.go",
           "name": "TestManagementRegistryJournalEnablesFromExactLegacyPredecessor"

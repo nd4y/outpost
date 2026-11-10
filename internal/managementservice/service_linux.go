@@ -25,6 +25,7 @@ import (
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/volume"
 	"github.com/nd4y/outpost/internal/worker"
 )
 
@@ -83,7 +84,12 @@ type Service struct {
 }
 
 func Open(ctx context.Context, p Profile, initialize bool) (*Service, error) {
-	return open(ctx, p, initialize, nil)
+	if initialize {
+		return open(ctx, p, true, func(s *Service, options management.Options) error {
+			return s.initialize(ctx, options, nil)
+		})
+	}
+	return open(ctx, p, false, nil)
 }
 
 func RecoverRegistry(ctx context.Context, p Profile) (Status, error) {
@@ -203,37 +209,47 @@ func open(ctx context.Context, p Profile, initialize bool, underLease func(*Serv
 		return nil, e
 	}
 	s := &Service{p: p, tls: tlsConfig, signer: signer}
+	fresh := initialize
 	s.root, e = p.Local.Volume.Open(ctx, p.Local.Directory, initialize)
+	if initialize && errors.Is(e, volume.ErrUnavailable) {
+		if root, existingErr := p.Local.Volume.Open(ctx, p.Local.Directory, false); existingErr == nil {
+			s.root, e, fresh = root, nil, false
+		}
+	}
 	if e != nil {
 		return nil, e
 	}
 	fail := func(e error) (*Service, error) { s.Close(); return nil, e }
-	s.lease, e = statefile.OpenAt(s.root, "lease", 4096, initialize)
+	if initialize && !fresh {
+		s.state, e = statefile.OpenAt(s.root, "service", 65536, false)
+		if e != nil {
+			return fail(errors.Join(management.ErrConflict, e))
+		}
+		raw, e := s.state.Read("profile.json")
+		if e != nil {
+			return fail(errors.Join(management.ErrConflict, e))
+		}
+		if _, e = s.decodeProfile(raw, initializationFormat, true); e != nil {
+			return fail(e)
+		}
+	}
+	s.lease, e = statefile.OpenAt(s.root, "lease", 4096, fresh)
 	if e != nil {
 		return fail(e)
 	}
-	s.budget, e = diskbudget.OpenAt(s.root, ctx, ".", p.Limits, initialize)
+	s.budget, e = diskbudget.OpenAt(s.root, ctx, ".", p.Limits, fresh)
 	if e != nil {
 		return fail(e)
 	}
-	s.state, e = statefile.OpenAt(s.root, "service", 65536, initialize)
-	if e != nil {
-		return fail(e)
+	if s.state == nil {
+		s.state, e = statefile.OpenAt(s.root, "service", 65536, fresh)
+		if e != nil {
+			return fail(e)
+		}
 	}
 	s.state.Admit = s.admission("service")
 	options := management.Options{Root: s.root, Directory: "registry", Owner: p.Local.Owner, Signer: s.signer, Initialize: initialize, JournalCopy: p.RegistryJournalCopy, Guard: s.guard, Admission: s.admission("registry")}
-	if initialize {
-		e = s.lease.WithLock(ctx, func() error {
-			if _, e := s.state.Read("profile.json"); !errors.Is(e, os.ErrNotExist) {
-				return management.ErrConflict
-			}
-			s.registry, e = management.Open(options)
-			if e != nil {
-				return e
-			}
-			return s.saveProfile(serviceState{})
-		})
-	} else if underLease != nil {
+	if underLease != nil {
 		e = s.lease.WithLock(ctx, func() error {
 			return underLease(s, options)
 		})
@@ -289,15 +305,23 @@ func (s *Service) loadProfile(exact bool) (serviceState, error) {
 	if e != nil {
 		return value, e
 	}
-	if storage.Decode(raw, &value, 65536) != nil || value.Format != Format || value.Service != s.p.Local.Node || !bytes.Equal(value.Owner, s.p.Local.Owner) || value.Revision == 0 || value.Revision > management.MaxSafeInteger || !storage.ID(value.ProfileDigest) || value.ObservedUnix < 1 || value.ObservedUnix > time.Now().Unix() {
+	return s.decodeProfile(raw, Format, exact)
+}
+
+func (s *Service) decodeProfile(raw []byte, format string, exact bool) (serviceState, error) {
+	var value serviceState
+	if storage.Decode(raw, &value, 65536) != nil || value.Service != s.p.Local.Node || !bytes.Equal(value.Owner, s.p.Local.Owner) || value.Revision == 0 || value.Revision > management.MaxSafeInteger || !storage.ID(value.ProfileDigest) || value.ObservedUnix < 1 || value.ObservedUnix > time.Now().Unix() {
 		return value, management.ErrInvalid
+	}
+	if value.Format != format {
+		return value, management.ErrConflict
 	}
 	sig := value.Signature
 	value.Signature = nil
 	unsigned, _ := json.Marshal(value)
 	value.Signature = sig
 	canonical, _ := json.Marshal(value)
-	if !bytes.Equal(raw, canonical) || !ed25519.Verify(s.signer.Public().(ed25519.PublicKey), append([]byte(Format+"\x00"), unsigned...), sig) {
+	if !bytes.Equal(raw, canonical) || !ed25519.Verify(s.signer.Public().(ed25519.PublicKey), append([]byte(format+"\x00"), unsigned...), sig) {
 		return value, management.ErrInvalid
 	}
 	if exact && (value.Revision != s.p.Revision || value.ProfileDigest != s.p.digest()) {
@@ -309,9 +333,17 @@ func (s *Service) saveProfile(old serviceState) error {
 	if s.p.Revision <= old.Revision || time.Now().Unix() < old.ObservedUnix {
 		return management.ErrConflict
 	}
-	value := serviceState{Format: Format, Service: s.p.Local.Node, Owner: s.p.Local.Owner, Revision: s.p.Revision, ProfileDigest: s.p.digest(), ObservedUnix: time.Now().Unix()}
+	return s.writeProfile(s.newProfileState(Format))
+}
+
+func (s *Service) newProfileState(format string) serviceState {
+	return serviceState{Format: format, Service: s.p.Local.Node, Owner: s.p.Local.Owner, Revision: s.p.Revision, ProfileDigest: s.p.digest(), ObservedUnix: time.Now().Unix()}
+}
+
+func (s *Service) writeProfile(value serviceState) error {
+	value.Signature = nil
 	raw, _ := json.Marshal(value)
-	value.Signature = ed25519.Sign(s.signer, append([]byte(Format+"\x00"), raw...))
+	value.Signature = ed25519.Sign(s.signer, append([]byte(value.Format+"\x00"), raw...))
 	raw, _ = json.Marshal(value)
 	if e := s.state.Write("profile.json", raw); e != nil {
 		return e

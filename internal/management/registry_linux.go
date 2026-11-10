@@ -108,6 +108,7 @@ const (
 	registryNormal registryOpenMode = iota
 	registryRepair
 	registryEnableCopy
+	registryResumeInit
 )
 
 func Open(o Options) (*Registry, error) {
@@ -126,8 +127,17 @@ func EnableRegistryJournal(ctx context.Context, o Options) (*Registry, error) {
 	return openRegistry(ctx, o, registryEnableCopy)
 }
 
+// InitializeRegistry resumes an empty registry under the management service's
+// authenticated pending profile. Ordinary Open retains its creation fence.
+func InitializeRegistry(ctx context.Context, o Options) (*Registry, error) {
+	if !o.Initialize {
+		return nil, ErrInvalid
+	}
+	return openRegistry(ctx, o, registryResumeInit)
+}
+
 func openRegistry(ctx context.Context, o Options, mode registryOpenMode) (*Registry, error) {
-	if mode != registryNormal && (o.Initialize || !o.JournalCopy) {
+	if (mode == registryRepair || mode == registryEnableCopy) && (o.Initialize || !o.JournalCopy) {
 		return nil, ErrInvalid
 	}
 	if len(o.Owner) != 32 || len(o.Signer) != 64 || bytes.Equal(o.Owner, o.Signer.Public().(ed25519.PublicKey)) {
@@ -161,6 +171,9 @@ func openRegistry(ctx context.Context, o Options, mode registryOpenMode) (*Regis
 	}
 	r.blobs.Admit = r.subAdmission("blobs")
 	e = s.WithLock(ctx, func() error {
+		if mode == registryResumeInit {
+			return r.resumeInitialization(ctx)
+		}
 		if o.Initialize || !o.JournalCopy {
 			if e := r.requireNoJournalCopy(); e != nil {
 				return e
@@ -177,7 +190,7 @@ func openRegistry(ctx context.Context, o Options, mode registryOpenMode) (*Regis
 			if !errors.Is(e, os.ErrNotExist) {
 				return ErrConflict
 			}
-			return r.save(registryState{Format: registryFormat, Owner: r.owner, Signer: r.signer.Public().(ed25519.PublicKey), Enrollments: map[string][]byte{}, Domains: map[string]domainFence{}, Operations: map[string]enrollmentOperation{}, Reports: map[string]reportPointer{}, Configurations: map[string]configPointer{}, ConfigOperations: map[string]configOperation{}})
+			return r.save(r.initialState())
 		}
 		return e
 	})

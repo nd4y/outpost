@@ -9,6 +9,41 @@ import (
 	"testing"
 )
 
+func TestManagementRegistryJournalInitialCopyResumesExactBytes(t *testing.T) {
+	f := newJournalFixture(t, true)
+	ctx := context.Background()
+	primary := filepath.Join(f.dir, "registry.json")
+	initial, e := f.r.store.Read("registry.json")
+	must(t, e)
+	must(t, f.r.Close())
+	f.r = nil
+	options := f.options
+	options.Initialize = true
+	for _, missingAnchor := range []bool{false, true} {
+		must(t, os.Remove(primary))
+		if missingAnchor {
+			must(t, os.Remove(filepath.Join(f.dir, registryJournalAnchorName)))
+		}
+		r, e := InitializeRegistry(ctx, options)
+		must(t, e)
+		actual, e := r.store.Read("registry.json")
+		must(t, e)
+		if !bytes.Equal(initial, actual) {
+			t.Fatal("initialization changed exact signed bytes")
+		}
+		must(t, r.Close())
+	}
+	f.r, e = Open(f.options)
+	must(t, e)
+	f.enroll(t)
+	if r, e := InitializeRegistry(ctx, options); !errors.Is(e, ErrConflict) {
+		if r != nil {
+			r.Close()
+		}
+		t.Fatal("nonempty registry admitted as an initialization", e)
+	}
+}
+
 func TestManagementRegistryJournalEnablesFromExactLegacyPredecessor(t *testing.T) {
 	for _, point := range []string{"management-registry-copy-durable", "management-registry-anchor-durable"} {
 		t.Run(point, func(t *testing.T) {
