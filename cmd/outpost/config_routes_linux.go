@@ -30,6 +30,7 @@ type signedRouteConfig struct {
 	config control.Config
 	domain control.Domain
 	digest string
+	size   int
 }
 
 func readRouteOwner(trustFile string) (ed25519.PublicKey, error) {
@@ -46,9 +47,9 @@ func readRouteOwner(trustFile string) (ed25519.PublicKey, error) {
 	return trust.PublicKey, nil
 }
 
-func readSignedRouteConfig(input string, owner ed25519.PublicKey, node, domain string, now time.Time) (signedRouteConfig, error) {
+func readSignedRouteConfig(input string, owner ed25519.PublicKey, node, domain string, now time.Time, limit int) (signedRouteConfig, error) {
 	var result signedRouteConfig
-	raw, err := worker.ReadPrivate(input, control.MaxConfig)
+	raw, err := worker.ReadPrivate(input, limit)
 	if err != nil {
 		return result, err
 	}
@@ -63,7 +64,7 @@ func readSignedRouteConfig(input string, owner ed25519.PublicKey, node, domain s
 	if !ok || !d.Placement.PermitsNode(node) {
 		return result, control.ErrDenied
 	}
-	return signedRouteConfig{config: config, domain: d, digest: storage.Hash(raw)}, nil
+	return signedRouteConfig{config: config, domain: d, digest: storage.Hash(raw), size: len(raw)}, nil
 }
 
 func inspectConfigRoutes(input, trustFile, node, domain string, now time.Time) (configRouteReport, error) {
@@ -75,7 +76,7 @@ func inspectConfigRoutes(input, trustFile, node, domain string, now time.Time) (
 	if err != nil {
 		return report, err
 	}
-	signed, err := readSignedRouteConfig(input, owner, node, domain, now)
+	signed, err := readSignedRouteConfig(input, owner, node, domain, now, control.MaxConfig)
 	if err != nil {
 		return report, err
 	}

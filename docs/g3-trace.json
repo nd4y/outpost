@@ -170,8 +170,8 @@
     {
       "id": "REQ-25",
       "acceptanceSubset": ["AT-07", "AT-08"],
-      "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss. Offline inspection checks declared routes to each domain holder and compares peer graphs between two signed node configurations.",
-      "remaining": "Deployment-wide topology and runtime permissions, real host egress enforcement, long partitions and general multi-hop staging. The paired source and offline CLI checks are tracked in product-status.json.",
+      "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss. Offline inspection checks declared routes to each domain holder and detects absent or divergent holder and transit documents relative to one signed reference.",
+      "remaining": "Installed topology and runtime permissions, real host egress enforcement, long partitions and general multi-hop staging. The paired source and offline CLI checks are tracked in product-status.json.",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",

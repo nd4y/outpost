@@ -37,6 +37,26 @@ Both documents must be active, addressed to the specified distinct nodes and sig
 
 Check `consistent` and the `differences` array in the returned JSON. The command returns a report for valid documents that disagree and an error for invalid, expired or misaddressed input. Keep the report private. Check the configuration of each participating node and verify replication permissions, credentials and network access separately before deployment.
 
+### Audit the signed topology for one domain
+
+```sh
+outpost config-route-audit --input /private/signed-reference.json --node REFERENCE_ID \
+  --peer-configs /private/route-index.json --trust /private/owner-public.json --domain DOMAIN_ID
+```
+
+Create a private index with the absolute path to each available peer document. Omit the reference node, whose document is passed separately.
+
+```json
+{
+  "format": "outpost-config-route-index-1",
+  "peers": [{ "node": "PEER_ID", "config": "/private/signed-peer.json" }]
+}
+```
+
+The signed reference defines the expected holders and transit nodes. Omitted documents appear in `missingPeers`. Each supplied document must be active, signed by the same owner and addressed to its listed node. Duplicate or unexpected nodes and invalid documents cause an error. The index is limited to 256 KiB and the signed documents together to 128 MiB.
+
+A report with `complete: true` has every expected document. `consistent: true` also requires every supplied graph and domain trust to match. Use the per-peer `differences` to locate discrepancies. The audit checks the supplied snapshot, with no network access. Verify active worker revisions, replication permissions and connectivity before deployment.
+
 ## Transfer and publication
 
 `NewServer` returns an HTTP server with TLS configuration but opens no listener. An integrating caller supplies admitted replica/journal directories and credentials and explicitly serves TLS. `NewClient` supplies `Push` and `Pull`; workers need public verification material and ciphertext, not owner decryption or catalog signing keys. Journal initialization is explicit and requires an existing empty directory. The storage admission/UUID checks belong to the caller, as in G2.

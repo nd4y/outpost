@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
@@ -61,14 +62,23 @@ func compareConfigRoutes(input, peerInput, trustFile, node, peer, domain string,
 	if err != nil {
 		return report, err
 	}
-	first, err := readSignedRouteConfig(input, owner, node, domain, now)
+	first, err := readSignedRouteConfig(input, owner, node, domain, now, control.MaxConfig)
 	if err != nil {
 		return report, err
 	}
-	second, err := readSignedRouteConfig(peerInput, owner, peer, domain, now)
+	second, err := readSignedRouteConfig(peerInput, owner, peer, domain, now, control.MaxConfig)
 	if err != nil {
 		return report, err
 	}
+	differences := peerRouteDifferences(first, second)
+	return routeComparison{
+		Format: "outpost-config-route-compare-1", Domain: domain,
+		Primary: first.identity(), Peer: second.identity(),
+		Consistent: len(differences) == 0, Differences: differences,
+	}, nil
+}
+
+func peerRouteDifferences(first, second signedRouteConfig) []string {
 	a, b := first.domain.Placement, second.domain.Placement
 	differences := []string{}
 	if !observation.SameTrust(first.domain.Trust, second.domain.Trust) {
@@ -90,9 +100,5 @@ func compareConfigRoutes(input, peerInput, trustFile, node, peer, domain string,
 	if !maps.Equal(first.peerNodes(), second.peerNodes()) {
 		differences = append(differences, "PEER_NODES")
 	}
-	return routeComparison{
-		Format: "outpost-config-route-compare-1", Domain: domain,
-		Primary: first.identity(), Peer: second.identity(),
-		Consistent: len(differences) == 0, Differences: differences,
-	}, nil
+	return differences
 }

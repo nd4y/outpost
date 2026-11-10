@@ -201,6 +201,102 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 		}
 	})
 
+	t.Run("audit every signed peer", func(t *testing.T) {
+		runAudit := func(ctx context.Context, peers []routeAuditEntry) (any, error) {
+			index := routeAuditIndex{Format: "outpost-config-route-index-1", Peers: peers}
+			rawIndex, err := json.Marshal(index)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return run(ctx, []string{
+				"config-route-audit", "--input", input, "--node", source,
+				"--peer-configs", write("route index.json", rawIndex), "--trust", trustFile, "--domain", domain,
+			})
+		}
+		peerConfig := func(id string) control.Config {
+			t.Helper()
+			peer, err := control.Verify(raw, public, source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			peer.Node = id
+			peer.Revision++
+			return peer
+		}
+		peerIDs := []string{outbound, disconnected, bridge}
+		slices.Sort(peerIDs)
+		entries := make([]routeAuditEntry, 0, len(peerIDs))
+		for _, id := range slices.Backward(peerIDs) {
+			entries = append(entries, routeAuditEntry{Node: id, Config: write(id+".json", sign(peerConfig(id)))})
+		}
+		ctx := context.Background()
+		result, err := runAudit(ctx, entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+		report := result.(routeAuditReport)
+		if report.Format != "outpost-config-route-audit-1" || report.Domain != domain ||
+			report.Reference != (routeConfigIdentity{Node: source, Revision: config.Revision, ConfigDigest: storage.Hash(raw)}) ||
+			!report.Complete || !report.Consistent || report.MissingPeers == nil || len(report.MissingPeers) != 0 || len(report.Peers) != len(peerIDs) {
+			t.Fatalf("unexpected complete audit: %+v", report)
+		}
+		for i, peer := range report.Peers {
+			if peer.Document.Node != peerIDs[i] || peer.Document.Revision != config.Revision+1 || peer.Differences == nil || len(peer.Differences) != 0 {
+				t.Fatalf("unexpected audited peer: %+v", peer)
+			}
+		}
+		drift := peerConfig(outbound)
+		drift.Domains[0].Placement.Edges = drift.Domains[0].Placement.Edges[:1]
+		driftEntry := routeAuditEntry{Node: outbound, Config: write("drift.json", sign(drift))}
+		changed := slices.Clone(entries)
+		for i, entry := range changed {
+			if entry.Node == outbound {
+				changed[i] = driftEntry
+			}
+		}
+		result, err = runAudit(ctx, changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		report = result.(routeAuditReport)
+		if !report.Complete || report.Consistent || len(report.MissingPeers) != 0 {
+			t.Fatalf("complete graph with drift was not distinguished: %+v", report)
+		}
+		result, err = runAudit(ctx, []routeAuditEntry{driftEntry})
+		if err != nil {
+			t.Fatal(err)
+		}
+		report = result.(routeAuditReport)
+		missing := []string{bridge, disconnected}
+		slices.Sort(missing)
+		if report.Complete || report.Consistent || !slices.Equal(report.MissingPeers, missing) ||
+			len(report.Peers) != 1 || !slices.Equal(report.Peers[0].Differences, []string{"PEER_EDGES"}) {
+			t.Fatalf("missing or changed peer hidden: %+v", report)
+		}
+		for _, tc := range []struct {
+			name  string
+			peers []routeAuditEntry
+			want  error
+		}{
+			{"duplicate peer", []routeAuditEntry{entries[0], entries[0]}, errUsage},
+			{"reference listed as peer", []routeAuditEntry{{Node: source, Config: input}}, errUsage},
+			{"unexpected peer", []routeAuditEntry{{Node: storage.Hash([]byte("unexpected")), Config: input}}, errUsage},
+			{"relative path", []routeAuditEntry{{Node: outbound, Config: "peer.json"}}, errUsage},
+			{"wrong recipient", []routeAuditEntry{{Node: outbound, Config: input}}, control.ErrDenied},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				if _, err := runAudit(ctx, tc.peers); !errors.Is(err, tc.want) {
+					t.Fatalf("got %v, want %v", err, tc.want)
+				}
+			})
+		}
+		canceled, cancel := context.WithCancel(ctx)
+		cancel()
+		if _, err := runAudit(canceled, entries); !errors.Is(err, context.Canceled) {
+			t.Fatalf("got %v for canceled audit", err)
+		}
+	})
+
 	other, _ := makeKey()
 	tampered := strings.Replace(string(raw), `"revision":4`, `"revision":5`, 1)
 	if tampered == string(raw) {

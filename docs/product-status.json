@@ -2676,7 +2676,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
-      "remaining": "Installation, long-outage and complete process-level acceptance. Forwarding staged objects before seal, reconciliation against the signed closure and crash/failover acceptance remain open. Pre-seal mTLS pulls work for an explicitly configured pair. The offline CLI reports declared routes and unreachable holders and detects peer graph or domain trust differences between two active signed node configurations. General multi-hop staging, deployment-wide topology and runtime permissions and connectivity acceptance remain open."
+      "remaining": "Installation, long-outage and complete process-level acceptance. Forwarding staged objects before seal, reconciliation against the signed closure and crash/failover acceptance remain open. Pre-seal mTLS pulls work for an explicitly configured pair. The offline CLI reports declared routes and unreachable holders, compares peer graphs and domain trust, and checks all expected holder and transit documents against one signed domain reference. General multi-hop staging, installed topology, runtime permissions and connectivity acceptance remain open."
     },
     {
       "id": "REQ-26",
