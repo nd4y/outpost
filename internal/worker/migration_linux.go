@@ -104,3 +104,13 @@ func (w *Worker) RecoverReplicaIndexCopy(ctx context.Context, domain string) (bo
 	})
 	return changed, e
 }
+
+func (w *Worker) PreviewRetention(ctx context.Context, domain string, selection generation.RetentionSelection) (*generation.Permit, error) {
+	var permit *generation.Permit
+	e := w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
+		var err error
+		permit, err = replica.PreviewRetention(ctx, w.node, selection)
+		return err
+	})
+	return permit, e
+}

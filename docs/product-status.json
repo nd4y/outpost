@@ -3015,6 +3015,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/generation/retention_preview_linux_test.go",
+          "name": "TestRetentionPreviewProtectsPinsReceivingAndCurrentRevision"
+        },
+        {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestMaintenanceAuthorityPinsAndReplay"
         },
@@ -3108,7 +3112,7 @@
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Local selection produces a bounded unsigned draft. Complete cross-node retention policy, live epoch workflow, volume-loss recovery and product target-readiness acceptance."
     },
     {
       "id": "REQ-32",
