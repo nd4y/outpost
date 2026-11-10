@@ -2035,6 +2035,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/peer/offline_history_linux_test.go",
+          "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
+        },
+        {
           "path": "internal/filekit/view_linux_test.go",
           "name": "TestSealedViewExcludesMaintenance"
         },
