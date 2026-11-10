@@ -231,6 +231,20 @@ func validPermit(p Permit) bool {
 	}
 	return p.Format != RetentionPermitFormat || p.validRetentionCoverage()
 }
+
+// ValidatePermitDraft validates the unsigned fields and bounds the signed size.
+func ValidatePermitDraft(p Permit) error {
+	if len(p.Signature) != 0 || !validPermit(p) {
+		return ErrInvalid
+	}
+	p.Signature = make([]byte, ed25519.SignatureSize)
+	raw, e := json.Marshal(p)
+	if e != nil || len(raw) > MaxPermit {
+		return ErrInvalid
+	}
+	return nil
+}
+
 func SignPermit(p Permit, key ed25519.PrivateKey) ([]byte, error) {
 	if !validPermit(p) || len(key) != ed25519.PrivateKeySize {
 		return nil, ErrInvalid

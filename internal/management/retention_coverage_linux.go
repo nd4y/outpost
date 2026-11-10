@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -73,15 +74,7 @@ func (r *Registry) PreviewRetentionCoverage(ctx context.Context, p Principal, te
 			return out, ErrInvalid
 		}
 	}
-	var state registryState
-	e := r.store.WithLock(ctx, func() error {
-		if e := r.check(ctx); e != nil {
-			return e
-		}
-		var e error
-		state, e = r.load()
-		return e
-	})
+	state, e := r.retentionState(ctx)
 	if e != nil {
 		return out, e
 	}
@@ -126,19 +119,7 @@ func (r *Registry) PreviewRetentionCoverage(ctx context.Context, p Principal, te
 	}
 	// The expensive report and policy reads run outside the registry lock.
 	// Check the revision before returning a coherent observation.
-	e = r.store.WithLock(ctx, func() error {
-		if e := r.check(ctx); e != nil {
-			return e
-		}
-		current, e := r.load()
-		if e != nil {
-			return e
-		}
-		if current.Revision != state.Revision {
-			return ErrConflict
-		}
-		return nil
-	})
+	e = r.checkRetentionRevision(ctx, state.Revision)
 	if e != nil {
 		return RetentionCoverage{}, e
 	}
@@ -146,24 +127,55 @@ func (r *Registry) PreviewRetentionCoverage(ctx context.Context, p Principal, te
 }
 
 func (r *Registry) retentionReport(ctx context.Context, s registryState, node, domain string, fence domainFence, now time.Time, maxAge time.Duration) (Report, reportPointer, int64, bool) {
-	enrollment, e := VerifyEnrollment(s.Enrollments[node], r.owner)
-	admission, allowed := enrollment.Domain(domain)
-	if e != nil || !allowed || enrollment.Class != "trusted" || !enrollment.Active(now) || enrollment.Tenant != fence.Tenant || admission.Repository != fence.Repository || admission.Epoch != fence.Epoch {
+	enrollment, cfg, d, ok := r.retentionHolder(ctx, s, node, domain, fence, now)
+	if !ok {
 		return Report{}, reportPointer{}, 0, false
 	}
 	report, pointer, e := r.readReport(s, node, domain)
 	cutoff := now.Unix() - int64(maxAge/time.Second)
-	if e != nil || report.Tenant != fence.Tenant || report.EnrollmentRevision != enrollment.Revision || report.ObservedUnix < cutoff || report.ObservedUnix > now.Unix() || report.InventoryState != "OBSERVED" {
-		return Report{}, reportPointer{}, 0, false
-	}
-	cfg, _, e := r.configuration(ctx, s, node)
-	d, present := cfg.DomainByID(domain)
-	configuredNode, known := cfg.NodeByID(node)
-	if e != nil || !present || !known || configuredNode.Class != "trusted" || cfg.Revision != report.ConfigurationRevision || report.ObservedUnix < cfg.NotBefore || now.Unix() >= cfg.ExpiresUnix || d.Trust.Repository != fence.Repository || d.Trust.Epoch != fence.Epoch || !slices.Contains(d.Placement.Holders, node) {
+	if e != nil || report.Tenant != fence.Tenant || report.EnrollmentRevision != enrollment.Revision || report.ObservedUnix < cutoff || report.ObservedUnix > now.Unix() || report.InventoryState != "OBSERVED" || cfg.Revision != report.ConfigurationRevision || report.ObservedUnix < cfg.NotBefore {
 		return Report{}, reportPointer{}, 0, false
 	}
 	if d.PeerReadbackMaxAgeSeconds > 0 {
 		cutoff = max(cutoff, now.Unix()-d.PeerReadbackMaxAgeSeconds)
 	}
 	return report, pointer, max(cutoff, cfg.NotBefore), true
+}
+
+func (r *Registry) retentionHolder(ctx context.Context, s registryState, node, domain string, fence domainFence, now time.Time) (Enrollment, control.Config, control.Domain, bool) {
+	enrollment, e := VerifyEnrollment(s.Enrollments[node], r.owner)
+	admission, allowed := enrollment.Domain(domain)
+	if e != nil || !allowed || enrollment.Class != "trusted" || !enrollment.Active(now) || enrollment.Tenant != fence.Tenant || admission.Repository != fence.Repository || admission.Epoch != fence.Epoch {
+		return enrollment, control.Config{}, control.Domain{}, false
+	}
+	cfg, _, e := r.configuration(ctx, s, node)
+	d, present := cfg.DomainByID(domain)
+	configuredNode, known := cfg.NodeByID(node)
+	ok := e == nil && present && known && configuredNode.Class == "trusted" && cfg.Active(now) == nil &&
+		d.Trust.Repository == fence.Repository && d.Trust.Epoch == fence.Epoch && slices.Contains(d.Placement.Holders, node)
+	return enrollment, cfg, d, ok
+}
+
+func (r *Registry) retentionState(ctx context.Context) (registryState, error) {
+	var state registryState
+	e := r.store.WithLock(ctx, func() error {
+		if e := r.check(ctx); e != nil {
+			return e
+		}
+		var e error
+		state, e = r.load()
+		return e
+	})
+	return state, e
+}
+
+func (r *Registry) checkRetentionRevision(ctx context.Context, revision uint64) error {
+	current, e := r.retentionState(ctx)
+	if e != nil {
+		return e
+	}
+	if current.Revision != revision {
+		return ErrConflict
+	}
+	return nil
 }

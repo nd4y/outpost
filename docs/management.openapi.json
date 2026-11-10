@@ -1821,6 +1821,131 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/draft": {
+      "post": {
+        "operationId": "retentionPermitDraft",
+        "summary": "Build an unsigned maintenance draft from matching signed survivor proofs",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unsigned draft or missing generation evidence at one registry revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Registry changed, window expired, or operation already submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tenants/{tenant}/domains/{domain}/retention/preview": {
       "post": {
         "operationId": "retentionCoveragePreview",
@@ -2543,6 +2668,378 @@
       "ID": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$"
+      },
+      "RetentionDraftRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-draft-request-1"
+          },
+          "preview": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "outpost-maintenance-permit-2"
+              },
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "repository": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "epoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "operation": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "retire": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "minItems": 1,
+                "maxItems": 64
+              },
+              "window": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "startUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "expiresUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  }
+                },
+                "required": ["node", "startUnix", "expiresUnix"]
+              }
+            },
+            "required": [
+              "format",
+              "domain",
+              "repository",
+              "epoch",
+              "revision",
+              "operation",
+              "retire",
+              "window"
+            ]
+          },
+          "holdCommands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Sorted command operation IDs for completed HOLD commands."
+          }
+        },
+        "required": ["format", "preview", "holdCommands"]
+      },
+      "RetentionDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-draft-1"
+          },
+          "state": {
+            "enum": ["INSUFFICIENT_EVIDENCE", "READY_TO_SIGN"]
+          },
+          "authorization": {
+            "const": "NONE"
+          },
+          "registryRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "targetConfigurationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "evaluatedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "minimumCopies": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "missingGenerations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 0,
+            "maxItems": 64
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "generation": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "node": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "commandOperationId": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "reportDigest": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "proofDigest": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "observedUnix": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1099511627776
+                }
+              },
+              "required": [
+                "generation",
+                "node",
+                "commandOperationId",
+                "reportDigest",
+                "proofDigest",
+                "observedUnix"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 64
+          },
+          "permit": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "outpost-maintenance-permit-3"
+              },
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "repository": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "epoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "operation": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "retire": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "minItems": 1,
+                "maxItems": 64
+              },
+              "window": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "startUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "expiresUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  }
+                },
+                "required": ["node", "startUnix", "expiresUnix"]
+              },
+              "coverage": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "minimumCopies": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "witnesses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "format": {
+                          "const": "outpost-retention-protection-receipt-1"
+                        },
+                        "node": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "nodeKey": {
+                          "type": "string",
+                          "contentEncoding": "base64",
+                          "minLength": 44,
+                          "maxLength": 44
+                        },
+                        "domain": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "repository": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "epoch": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "operationId": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "generation": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "state": {
+                          "const": "HELD"
+                        },
+                        "grantDigest": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "holdDigest": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "retirement": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "node": {
+                              "$ref": "#/components/schemas/ID"
+                            },
+                            "operationId": {
+                              "$ref": "#/components/schemas/ID"
+                            }
+                          },
+                          "required": ["node", "operationId"]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "observedUnix": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1099511627776
+                        },
+                        "signature": {
+                          "type": "string",
+                          "contentEncoding": "base64",
+                          "minLength": 88,
+                          "maxLength": 88
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "node",
+                        "nodeKey",
+                        "domain",
+                        "repository",
+                        "epoch",
+                        "operationId",
+                        "generation",
+                        "state",
+                        "grantDigest",
+                        "holdDigest",
+                        "retirement",
+                        "revision",
+                        "observedUnix",
+                        "signature"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 64
+                  }
+                },
+                "required": ["minimumCopies", "witnesses"]
+              }
+            },
+            "required": [
+              "format",
+              "domain",
+              "repository",
+              "epoch",
+              "revision",
+              "operation",
+              "retire",
+              "window",
+              "coverage"
+            ]
+          }
+        },
+        "required": [
+          "format",
+          "state",
+          "authorization",
+          "registryRevision",
+          "targetConfigurationRevision",
+          "evaluatedUnix",
+          "minimumCopies",
+          "missingGenerations",
+          "sources"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "READY_TO_SIGN"
+                }
+              }
+            },
+            "then": {
+              "required": ["permit"]
+            },
+            "else": {
+              "not": {
+                "required": ["permit"]
+              }
+            }
+          }
+        ]
       },
       "RetentionCoverageRequest": {
         "type": "object",

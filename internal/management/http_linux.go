@@ -354,6 +354,20 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeHTTP(w, 200, out)
 		return
 	}
+	if len(parts) == 8 && parts[4] == "domains" && parts[6] == "retention" && parts[7] == "draft" && r.Method == http.MethodPost {
+		var input RetentionDraftRequest
+		if e := readHTTP(w, r, &input, 16<<10); e != nil {
+			failHTTP(w, e)
+			return
+		}
+		out, e := h.registry.PrepareRetentionDraft(ctx, p, tenant, parts[5], input, h.maxAge)
+		if e != nil {
+			failHTTP(w, e)
+			return
+		}
+		writeHTTP(w, 200, out)
+		return
+	}
 	if len(parts) == 5 && parts[4] == "nodes" && r.Method == http.MethodGet {
 		limit, token, e := pageQuery(r)
 		if e != nil {
