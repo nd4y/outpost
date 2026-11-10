@@ -2958,10 +2958,27 @@
       "id": "REQ-30",
       "workstream": "archive",
       "state": "SEPARATE_PROFILE",
-      "implementation": [],
-      "checks": [],
+      "implementation": [
+        "internal/storage/archive.go",
+        "cmd/outpost/external_archive_linux.go",
+        "internal/upload/plan_linux.go"
+      ],
+      "checks": [
+        {
+          "path": "cmd/outpost/external_archive_linux_test.go",
+          "name": "TestCLIArchiveRetrievalRestartsExpiresAndRestoresSelectedVersion"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4IndependentVectors"
+        },
+        {
+          "path": "internal/generation/maintenance_replay_linux_test.go",
+          "name": "TestMaintenanceFrozenReplayPreservesLaterOrphansAndCurrentReferences"
+        }
+      ],
       "acceptance": ["AT-28"],
-      "remaining": "Separate delayed-archive profile M5; unavailable until its distinct restore, GC and latency acceptance."
+      "remaining": "A separate delayed-access path checks online metadata, estimates request costs, reconciles current availability and restores a selected version in a synthetic S3-compatible fixture. Admit a real class and its lifecycle, confirm retention and GC constraints, and measure recovery latency and costs before accepting M5."
     },
     {
       "id": "REQ-31",

@@ -25,7 +25,8 @@ import (
 func TestCLIExternalRestoreReadsOnlySelectedCloudDependencies(t *testing.T) {
 	for _, protocol := range []string{"s3", "webdav"} {
 		t.Run(protocol, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+			// Publication and failure fixtures include durable writes on rotational test volumes.
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			root := teststore.Root(t)
 			must := func(err error) {

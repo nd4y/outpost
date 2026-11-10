@@ -31,7 +31,7 @@ The endpoint is an explicitly configured HTTPS URL for an existing bucket prefix
 | Ranges and listing    | Neither is required. Bounded read retries tolerate short visibility delays. Only the explicit MOVE profile requires a same-namespace move.                                                                                                 |
 | Quotas and throttling | Local size admission, 413/507 capacity errors and bounded retries for 409/429/transient server errors. `Retry-After` affects all queues sharing the exact target profile in one worker process. The delay is bounded by credential expiry. |
 | Bounds                | 1-4 concurrent requests, 1-1000 request admissions per second and 1-3 attempts per request. The timeout includes admission and backoff, with a maximum of 5 minutes and additional context and expiry bounds.                              |
-| Retention and archive | No delete, listing-based GC or delayed-retrieval archive tier. Probes do not prove physical durability, future persistence or actual ACL restrictions.                                                                                     |
+| Retention and archive | No delete or listing-based GC. [Delayed recovery](archive-recovery.md) has a separate admission profile. Probes do not prove physical durability, future persistence or actual ACL restrictions.                                           |
 
 Admission requires the capabilities of the signed target profile. Run capability and failure tests against the actual endpoint before using it for backups. The current checks use synthetic endpoints.
 

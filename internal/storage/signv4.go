@@ -37,10 +37,19 @@ func uriPath(s string) string {
 // signV4 signs bounded non-streaming S3 requests. Credentials are never logged.
 func signV4(r *http.Request, payload []byte, access, secret, token, region string, now time.Time) error {
 	bad := errors.New("invalid request signing input")
-	if r == nil || r.URL == nil || r.URL.Scheme != "https" || r.URL.Host == "" || r.URL.User != nil || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" || r.URL.Opaque != "" || access == "" || secret == "" || !safeName(region, 64) || strings.ContainsAny(access+secret+token, "\r\n") || strings.ContainsAny(access, " /,\t") {
+	if r == nil || r.URL == nil || r.URL.Scheme != "https" || r.URL.Host == "" || r.URL.User != nil || r.URL.ForceQuery || r.URL.Fragment != "" || r.URL.Opaque != "" || access == "" || secret == "" || !safeName(region, 64) || strings.ContainsAny(access+secret+token, "\r\n") || strings.ContainsAny(access, " /,\t") {
 		return bad
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodPut && r.Method != http.MethodHead {
+	switch r.Method {
+	case http.MethodGet, http.MethodPut, http.MethodHead:
+		if r.URL.RawQuery != "" {
+			return bad
+		}
+	case http.MethodPost:
+		if r.URL.RawQuery != restoreQuery || len(payload) == 0 {
+			return bad
+		}
+	default:
 		return bad
 	}
 	now = now.UTC()
@@ -84,7 +93,7 @@ func signV4(r *http.Request, payload []byte, access, secret, token, region strin
 		headers.WriteString(name + ":" + values[name] + "\n")
 	}
 	signed := strings.Join(names, ";")
-	canonical := r.Method + "\n" + uriPath(r.URL.Path) + "\n\n" + headers.String() + "\n" + signed + "\n" + digest
+	canonical := r.Method + "\n" + uriPath(r.URL.Path) + "\n" + r.URL.RawQuery + "\n" + headers.String() + "\n" + signed + "\n" + digest
 	scope := date + "/" + region + "/s3/aws4_request"
 	stringToSign := "AWS4-HMAC-SHA256\n" + stamp + "\n" + scope + "\n" + Hash([]byte(canonical))
 	key := mac([]byte("AWS4"+secret), date)

@@ -92,7 +92,7 @@ for (const item of product.requirements) {
       );
       continue;
     }
-    assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z_]+_test\.go$/.test(check.path));
+    assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z][a-z0-9_]*_test\.go$/.test(check.path));
     assert(/^Test[A-Za-z0-9]+$/.test(check.name));
     assert(
       read(check.path).includes(`func ${check.name}(t *testing.T)`),

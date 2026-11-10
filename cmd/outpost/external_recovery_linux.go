@@ -21,24 +21,37 @@ type externalRecoveryProfile struct {
 	Profile        storage.Profile `json:"profile"`
 	CredentialFile string          `json:"credentialFile"`
 	CAFile         string          `json:"caFile,omitempty"`
+	Archive        *archiveReader  `json:"archive,omitempty"`
+}
+
+func loadExternalReader(profileFile string, trust generation.Trust) (externalRecoveryProfile, error) {
+	var profile externalRecoveryProfile
+	raw, err := worker.ReadPrivate(profileFile, 65536)
+	if err != nil {
+		return profile, err
+	}
+	if worker.DecodeInput(raw, &profile, 65536) != nil || profile.Format != externalRecoveryFormat ||
+		profile.Profile.Validate() != nil || profile.Profile.ID() != profile.Target || !filepath.IsAbs(profile.CredentialFile) ||
+		(profile.CAFile != "" && !filepath.IsAbs(profile.CAFile)) || profile.Archive != nil && !profile.Archive.valid(profile.Profile) {
+		return profile, errUsage
+	}
+	if profile.Profile.Namespace != storage.Hash([]byte(trust.Domain+"/"+trust.Repository)) {
+		return profile, storage.ErrDenied
+	}
+	return profile, nil
+}
+
+func (p externalRecoveryProfile) open(ctx context.Context) (*storage.Backend, error) {
+	reader := worker.Bootstrap{StorageCAFile: p.CAFile, Credentials: map[string]string{p.Target: p.CredentialFile}}
+	return reader.Resolve(ctx, p.Profile)
 }
 
 func openExternalReader(ctx context.Context, profileFile string, trust generation.Trust) (*storage.Backend, error) {
-	raw, err := worker.ReadPrivate(profileFile, 65536)
+	profile, err := loadExternalReader(profileFile, trust)
 	if err != nil {
 		return nil, err
 	}
-	var profile externalRecoveryProfile
-	if worker.DecodeInput(raw, &profile, 65536) != nil || profile.Format != externalRecoveryFormat ||
-		profile.Profile.Validate() != nil || profile.Profile.ID() != profile.Target || !filepath.IsAbs(profile.CredentialFile) ||
-		(profile.CAFile != "" && !filepath.IsAbs(profile.CAFile)) {
-		return nil, errUsage
-	}
-	if profile.Profile.Namespace != storage.Hash([]byte(trust.Domain+"/"+trust.Repository)) {
-		return nil, storage.ErrDenied
-	}
-	reader := worker.Bootstrap{StorageCAFile: profile.CAFile, Credentials: map[string]string{profile.Target: profile.CredentialFile}}
-	return reader.Resolve(ctx, profile.Profile)
+	return profile.open(ctx)
 }
 
 func restoreExternal(ctx context.Context, profileFile, expected, dest string, trust generation.Trust, owner filekit.Owner, selection generation.RecoverySelection) (generation.RecoveryReceipt, error) {

@@ -278,6 +278,7 @@ type requestOptions struct {
 	stage       bool
 	objectStage bool
 	destination string
+	archive     *archiveReply
 }
 
 func (b *Backend) resourceURL(key string) string {
@@ -309,6 +310,18 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		if b.profile.WriteMode != WebDAVMoveMode || method != "MOVE" || !moveTemporary(key) || !safeName(options.destination, 170) || moveTemporary(options.destination) || len(payload) != 0 {
 			return nil, 0, ErrDenied
 		}
+	}
+	if options.archive != nil {
+		if b.profile.Kind != "s3" || !strings.HasPrefix(key, "part-") || !ID(strings.TrimPrefix(key, "part-")) ||
+			(method != http.MethodHead && method != http.MethodPost) {
+			return nil, 0, ErrDenied
+		}
+		if method == http.MethodPost {
+			// After an uncertain request the caller must read HEAD before retrying.
+			attempts = 1
+		}
+	} else if method == http.MethodPost {
+		return nil, 0, ErrDenied
 	}
 	var book WriteAttempts
 	if options.stage || method == "MOVE" {
@@ -355,6 +368,11 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		}
 		req.Header.Set("Accept-Encoding", "identity")
 		req.Header.Set("Content-Type", "application/octet-stream")
+		if method == http.MethodPost {
+			req.URL.RawQuery = restoreQuery
+			req.Header.Set("Content-Type", "application/xml")
+			req.GetBody = nil
+		}
 		if options.stage {
 			req.GetBody = nil
 		} else if method == http.MethodPut {
@@ -377,6 +395,11 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		delay := time.Duration(attempt+1) * 50 * time.Millisecond
 		if e == nil {
 			last = res.StatusCode
+			if options.archive != nil && options.archive.handles(method, last) {
+				err := options.archive.read(ctx, method, res, b.bodyBudget, traffic)
+				res.Body.Close()
+				return nil, last, err
+			}
 			if res.StatusCode == 200 || res.StatusCode == 201 || res.StatusCode == 204 {
 				if res.Header.Get("Content-Encoding") != "" || res.ContentLength > int64(b.profile.MaxObjectBytes) {
 					res.Body.Close()

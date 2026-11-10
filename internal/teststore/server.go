@@ -162,7 +162,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.requests++
 	s.mu.Unlock()
-	if r.URL.RawQuery != "" || !strings.HasPrefix(r.URL.Path, "/objects/"+s.Options.Namespace+"-") {
+	query := r.URL.RawQuery
+	archive := s.Options.Kind == "s3" && r.Method == http.MethodPost && query == "restore="
+	if ((r.Method == http.MethodPost || query != "") && !archive) || !strings.HasPrefix(r.URL.Path, "/objects/"+s.Options.Namespace+"-") {
 		w.WriteHeader(403)
 		return
 	}
@@ -193,7 +195,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	target := filepath.Join(s.Options.Directory, name)
 	switch r.Method {
-	case http.MethodGet:
+	case http.MethodGet, http.MethodHead:
 		data, e := os.ReadFile(target)
 		if os.IsNotExist(e) {
 			w.WriteHeader(404)
@@ -205,7 +207,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.Header().Set("ETag", `"`+hash(data)+`"`)
-		_, _ = w.Write(data)
+		if r.Method == http.MethodGet {
+			_, _ = w.Write(data)
+		}
 	case http.MethodPut:
 		staging := strings.HasPrefix(key, "attempt-") || strings.HasPrefix(key, "probe-stage-")
 		if s.Options.MoveOnly && (!staging || r.Header.Get("If-None-Match") != "") ||
