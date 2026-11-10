@@ -281,6 +281,12 @@ func (j *Journal) Status(ctx context.Context) (State, error) {
 	return j.load()
 }
 
+func (j *Journal) moveBookOptions() storage.MoveBookOptions {
+	return storage.MoveBookOptions{Parent: j.root, Directory: "move-attempts",
+		Scope:   storage.Hash([]byte(moveJournalFormat + "/" + j.planID + "/" + j.worker)),
+		Profile: j.plan.Profile, Guard: j.Guard}
+}
+
 // openMoveBook runs under the worker lease, before the first external write.
 // Its ready bit prevents a lost directory from becoming a fresh attempt scope.
 func (j *Journal) openMoveBook(ctx context.Context) (*storage.MoveBook, error) {
@@ -294,10 +300,9 @@ func (j *Journal) openMoveBook(ctx context.Context) (*storage.MoveBook, error) {
 			return j.Admit("move-attempts/"+name, size)
 		}
 	}
-	book, e := storage.OpenMoveBook(ctx, storage.MoveBookOptions{
-		Parent: j.root, Directory: "move-attempts", Scope: storage.Hash([]byte(moveJournalFormat + "/" + j.planID + "/" + j.worker)),
-		Profile: j.plan.Profile, Initialize: !s.MoveBookReady, Admission: admit, Guard: j.Guard, Fault: j.Fault,
-	})
+	options := j.moveBookOptions()
+	options.Initialize, options.Admission, options.Fault = !s.MoveBookReady, admit, j.Fault
+	book, e := storage.OpenMoveBook(ctx, options)
 	if e != nil {
 		return nil, e
 	}

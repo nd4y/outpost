@@ -1177,6 +1177,14 @@
       ],
       "checks": [
         {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan"
+        },
+        {
           "path": "internal/upload/abandonment_linux_test.go",
           "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
         },
@@ -3256,6 +3264,14 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan"
+        },
         {
           "path": "internal/upload/abandonment_linux_test.go",
           "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"

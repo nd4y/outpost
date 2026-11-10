@@ -38,6 +38,14 @@
       "remaining": "Automatic plan delivery/renewal, abandoned job and claim collection, large-history and account-wide overload admission",
       "tests": [
         {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan"
+        },
+        {
           "path": "internal/upload/abandonment_linux_test.go",
           "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
         },

@@ -61,6 +61,10 @@ An uncertain write is read back before retrying. If the previous attempt still h
 
 The mode keeps the same part, descriptor, catalog and complete-marker formats. A prior writer that does not recognize the profile fields refuses the configuration. The owner can recover existing ciphertext with a compatible reader and the same endpoint, namespace, part size, generation and keys.
 
+On a stopped worker, `outpost worker-upload-staging-status --bootstrap FILE --domain ID --operation ID` reads the local MOVE book for one admitted upload. Each page returns at most one bucket, with the exact temporary names, expected sizes and digests, recorded phase and write start. Pass `move.nextAfter` as `--after` for the next page. Keep the worker stopped between pages for a stable inventory.
+
+The report returns `remotePresence: NOT_CHECKED` and performs no target requests. `PUBLISHED` records verification of the final name, so the temporary name may still exist. An `ALLOCATING` bucket is an interrupted local allocation. A missing or damaged initialized book or bucket fails instead of returning an empty inventory. `NOT_STARTED` means the local MOVE book has not been initialized and `NOT_APPLICABLE` means the plan does not use MOVE. Store the report privately. It does not inventory the fixed collision probe, other workers' records or historical claims outside this local book.
+
 ## Complete generations and recovery
 
 Completed immutable parts remain completed when assignment slots rotate. If a publication read discovers an absent part, only that part loses its local completion mark. Other verified progress survives. This prevents a slow executor from repeatedly restarting its completed prefix while preserving full publication checks. A delayed-slot test also physically removes an acknowledged fixture part and requires its independent reupload before recovery.

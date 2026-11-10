@@ -292,3 +292,97 @@ func TestMoveBookRejectsClockRollbackAndProfileDowngrade(t *testing.T) {
 		t.Fatal("legacy canonical profile changed")
 	}
 }
+
+func TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts(t *testing.T) {
+	base, options := moveBookFixture(t)
+	b := openMoveTest(t, options)
+	ctx := context.Background()
+	check := func(e error) {
+		t.Helper()
+		if e != nil {
+			t.Fatal(e)
+		}
+	}
+	digest := Hash([]byte("four"))
+	keys := []string{"part-" + Hash([]byte("first")), "part-" + Hash([]byte("second"))}
+	if Hash([]byte(keys[0])) > Hash([]byte(keys[1])) {
+		keys[0], keys[1] = keys[1], keys[0]
+	}
+	first, second := Hash([]byte(keys[0]))[:3], Hash([]byte(keys[1]))[:3]
+	if first == second {
+		t.Fatal("expected distinct bucket fixtures")
+	}
+	expected := []string{}
+	check(b.WithRecord(ctx, options.Profile.ID(), keys[0], digest, 4, func(tx MoveTransaction) error {
+		for _, phase := range []string{"ABANDONED", "PUBLISHED", "ALLOCATED"} {
+			a, e := tx.Allocate()
+			if e != nil {
+				return e
+			}
+			name, e := tx.Temporary(a)
+			if e != nil {
+				return e
+			}
+			expected = append(expected, name)
+			if phase == "ALLOCATED" {
+				continue
+			}
+			if e = tx.Transition(a.Nonce, "WRITING"); e != nil {
+				return e
+			}
+			if e = tx.Transition(a.Nonce, phase); e != nil {
+				return e
+			}
+		}
+		return nil
+	}))
+	cut := errors.New("interrupted bucket allocation")
+	b.o.Fault = func(point string) error {
+		if point == "move-bucket-intent" {
+			return cut
+		}
+		return nil
+	}
+	if e := b.WithRecord(ctx, options.Profile.ID(), keys[1], digest, 4, func(MoveTransaction) error { return nil }); !errors.Is(e, cut) {
+		t.Fatal("allocation fault did not occur", e)
+	}
+	check(b.Close())
+	options.Initialize = false
+	b = openMoveTest(t, options)
+	defer b.Close()
+	header := filepath.Join(base, "attempts", "book.json")
+	before, e := os.ReadFile(header)
+	check(e)
+	page, e := b.InspectStaging(ctx, "")
+	check(e)
+	if page.State != "READY" || page.Bucket != first || page.NextAfter != first || len(page.Attempts) != 3 {
+		t.Fatal("wrong first page", page)
+	}
+	for i, phase := range []string{"ABANDONED", "PUBLISHED", "ALLOCATED"} {
+		a := page.Attempts[i]
+		if a.Temporary != expected[i] || a.Phase != phase || a.Digest != digest || a.Bytes != 4 ||
+			(a.WriteStartedMillis == 0) != (phase == "ALLOCATED") {
+			t.Fatal("local attempt history changed", a)
+		}
+	}
+	page, e = b.InspectStaging(ctx, page.NextAfter)
+	check(e)
+	if page.State != "ALLOCATING" || page.Bucket != second || len(page.Attempts) != 0 || page.NextAfter != "" {
+		t.Fatal("unfinished bucket misclassified", page)
+	}
+	after, e := os.ReadFile(header)
+	check(e)
+	if string(before) != string(after) {
+		t.Fatal("inspection changed the attempt book")
+	}
+	if _, e = os.Stat(filepath.Join(base, "attempts", "bucket-"+second+".json")); !errors.Is(e, os.ErrNotExist) {
+		t.Fatal("inspection initialized the unfinished bucket", e)
+	}
+	if _, e = b.InspectStaging(ctx, "../"); !errors.Is(e, ErrDenied) {
+		t.Fatal("invalid cursor accepted", e)
+	}
+	check(os.Remove(filepath.Join(base, "attempts", "bucket-"+first+".json")))
+	if page, e = b.InspectStaging(ctx, ""); e == nil || page.State != "" {
+		t.Fatal("missing initialized bucket reported as observed", page, e)
+	}
+}

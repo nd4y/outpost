@@ -210,7 +210,7 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 		defer r.Close()
 		op := storage.Hash([]byte("expired upload"))
 		profile := storage.Profile{Kind: "webdav", Endpoint: "https://target.invalid", Namespace: storage.Hash([]byte(domain + "/" + repository)),
-			MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true}
+			MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true, WriteMode: storage.WebDAVMoveMode, MaxStagingAttempts: 3}
 		limits := upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}
 		queueDir := filepath.Join(filepath.Dir(dir), "uploads", op)
 		must(os.MkdirAll(queueDir, 0700))
@@ -224,6 +224,13 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 		must(q.Enqueue(ctx, r, plan))
 		must(q.Close())
 		time.Sleep(time.Until(time.Unix(end, 0)))
+		statusArgs := []string{"worker-upload-staging-status", "--bootstrap", bootstrap, "--domain", domain, "--operation", op}
+		status, e := run(ctx, statusArgs)
+		must(e)
+		staging := status.(upload.StagingStatus)
+		if staging.State != "NOT_STARTED" || staging.RemotePresence != "NOT_CHECKED" || staging.Operation != op || staging.Plan != storage.Hash(plan) {
+			t.Fatal("wrong staging status for unopened MOVE book", staging)
+		}
 
 		draft := filepath.Join(base, "upload-abandonment.json")
 		grantFile := filepath.Join(base, "upload-abandonment-signed.json")

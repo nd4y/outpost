@@ -188,34 +188,38 @@ func validMoveRecord(r MoveRecord, maxAttempts, maxBytes int) bool {
 	}
 	return true
 }
-func (b *MoveBook) bucket(ctx context.Context, h *moveBookHeader, prefix string) (moveBucket, error) {
-	name := "bucket-" + prefix + ".json"
+func (b *MoveBook) readBucket(prefix string) (moveBucket, error) {
 	out := moveBucket{Format: MoveBookFormat, Scope: b.o.Scope, Prefix: prefix, Records: map[string]MoveRecord{}}
+	raw, e := b.store.Read("bucket-" + prefix + ".json")
+	if e != nil {
+		return out, e
+	}
+	if Decode(raw, &out, moveBookBytes) != nil || out.Format != MoveBookFormat || out.Scope != b.o.Scope || out.Prefix != prefix || out.Records == nil || len(out.Records) > moveBucketLimit {
+		return out, ErrConflict
+	}
+	for id, record := range out.Records {
+		if !ID(id) || id[:3] != prefix || id != Hash([]byte(record.Key)) || !validMoveRecord(record, b.o.Profile.MaxStagingAttempts, b.o.Profile.MaxObjectBytes) {
+			return out, ErrConflict
+		}
+	}
+	return out, nil
+}
+
+func (b *MoveBook) bucket(ctx context.Context, h *moveBookHeader, prefix string) (moveBucket, error) {
 	phase, known := h.Buckets[prefix]
 	if !known {
 		h.Buckets[prefix] = "ALLOCATING"
 		if e := b.persist(ctx, "book.json", h, "move-bucket-intent"); e != nil {
-			return out, e
+			return moveBucket{}, e
 		}
 		phase = "ALLOCATING"
 	}
-	raw, e := b.store.Read(name)
+	out, e := b.readBucket(prefix)
 	if errors.Is(e, os.ErrNotExist) && phase == "ALLOCATING" {
-		if e = b.persist(ctx, name, out, "move-bucket-created"); e != nil {
-			return out, e
-		}
-	} else {
-		if e != nil {
-			return out, e
-		}
-		if Decode(raw, &out, moveBookBytes) != nil || out.Format != MoveBookFormat || out.Scope != b.o.Scope || out.Prefix != prefix || out.Records == nil || len(out.Records) > moveBucketLimit {
-			return out, ErrConflict
-		}
-		for id, record := range out.Records {
-			if !ID(id) || id[:3] != prefix || id != Hash([]byte(record.Key)) || !validMoveRecord(record, b.o.Profile.MaxStagingAttempts, b.o.Profile.MaxObjectBytes) {
-				return out, ErrConflict
-			}
-		}
+		e = b.persist(ctx, "bucket-"+prefix+".json", out, "move-bucket-created")
+	}
+	if e != nil {
+		return out, e
 	}
 	if phase == "ALLOCATING" {
 		if len(out.Records) != 0 {
@@ -228,6 +232,7 @@ func (b *MoveBook) bucket(ctx context.Context, h *moveBookHeader, prefix string)
 	}
 	return out, nil
 }
+
 func (b *MoveBook) WithRecord(ctx context.Context, profile, key, digest string, size int, fn func(MoveTransaction) error) error {
 	if profile != b.o.Profile.ID() || !safeName(key, 170) || !ID(digest) || size < 1 || size > b.o.Profile.MaxObjectBytes || fn == nil {
 		return ErrDenied
@@ -362,5 +367,5 @@ func (t *moveTransaction) Temporary(a MoveAttempt) (string, error) {
 	if !found {
 		return "", ErrDenied
 	}
-	return "attempt-" + Hash([]byte(MoveBookFormat+"/"+t.book.o.Scope+"/"+t.book.o.Profile.ID()+"/"+t.record.Key+"/"+t.record.Digest+"/"+a.Nonce)), nil
+	return t.book.temporaryName(t.record, a), nil
 }

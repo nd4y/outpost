@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 )
 
@@ -145,5 +146,53 @@ func TestWebDAVMoveQueueReopensWithDurableAttemptBook(t *testing.T) {
 	must(t, err)
 	if inner.Format != moveJournalFormat || !inner.MoveBookReady || inner.Phase != "COMPLETE" {
 		t.Fatal("queue did not use durable MOVE journal", inner.Format, inner.Phase)
+	}
+}
+
+func TestWebDAVMoveQueueStagingInspectionUsesRetainedPlan(t *testing.T) {
+	f := fixtureBytes(t, 32<<10)
+	target := f.externalServer(t, teststore.Options{Kind: "webdav", MoveOnly: true})
+	plan := f.plan(t, target, 1, 60000)
+	q, _ := queueFor(t, f, queueLimits())
+	ctx := context.Background()
+	must(t, q.Enqueue(ctx, f.replicas[0], plan))
+	op := planOperation(t, plan, f.authority)
+	out, e := q.InspectStaging(ctx, op, "")
+	must(t, e)
+	if out.State != "NOT_STARTED" || out.RemotePresence != "NOT_CHECKED" || out.Move != nil {
+		t.Fatal("unexpected staging status before the writer starts", out)
+	}
+	s, e := q.Status(ctx)
+	must(t, e)
+	j, e := q.journal(s.Jobs[op], false)
+	must(t, e)
+	defer j.Close()
+	book, e := j.openMoveBook(ctx)
+	must(t, e)
+	defer book.Close()
+	var name string
+	digest := storage.Hash([]byte("four"))
+	e = book.WithRecord(ctx, j.plan.Profile.ID(), "part-"+digest, digest, 4, func(tx storage.MoveTransaction) error {
+		a, e := tx.Allocate()
+		if e != nil {
+			return e
+		}
+		name, e = tx.Temporary(a)
+		if e != nil {
+			return e
+		}
+		return tx.Transition(a.Nonce, "WRITING")
+	})
+	must(t, e)
+
+	out, e = q.InspectStaging(ctx, op, "")
+	must(t, e)
+	if out.State != "RECORDED" || out.RemotePresence != "NOT_CHECKED" || out.Plan != storage.Hash(plan) ||
+		out.Target != j.plan.Profile.ID() || out.Move == nil || len(out.Move.Attempts) != 1 ||
+		out.Move.Attempts[0].Temporary != name || out.Move.Attempts[0].Phase != "WRITING" {
+		t.Fatal("staging evidence did not match the retained plan", out)
+	}
+	if target.Snapshot().Requests != 0 {
+		t.Fatal("local inspection contacted the target")
 	}
 }

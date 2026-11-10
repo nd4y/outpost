@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/nd4y/outpost/internal/upload"
 )
 
-func (w *Worker) withUploadAbandonmentQueue(ctx context.Context, domain, operation string, write bool, action func(*upload.Queue) error) error {
+func (w *Worker) withLocalUploadQueue(ctx context.Context, domain, operation string, write bool, action func(*upload.Queue) error) error {
 	if !storage.ID(domain) || !storage.ID(operation) {
 		return ErrDenied
 	}
@@ -47,7 +48,7 @@ func (w *Worker) withUploadAbandonmentQueue(ctx context.Context, domain, operati
 
 func (w *Worker) PreviewUploadAbandonment(ctx context.Context, domain, operation string) (upload.AbandonmentGrant, error) {
 	var out upload.AbandonmentGrant
-	e := w.withUploadAbandonmentQueue(ctx, domain, operation, false, func(q *upload.Queue) error {
+	e := w.withLocalUploadQueue(ctx, domain, operation, false, func(q *upload.Queue) error {
 		var e error
 		out, e = q.PreviewAbandonment(ctx, operation)
 		return e
@@ -61,9 +62,24 @@ func (w *Worker) AbandonUpload(ctx context.Context, domain, operation string, ra
 		return out, ErrDenied
 	}
 	e := w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
-		return w.withUploadAbandonmentQueue(ctx, domain, operation, true, func(q *upload.Queue) error {
+		return w.withLocalUploadQueue(ctx, domain, operation, true, func(q *upload.Queue) error {
 			var e error
 			out, e = q.Abandon(ctx, replica, operation, raw)
+			return e
+		})
+	})
+	return out, e
+}
+
+func (w *Worker) UploadStagingStatus(ctx context.Context, domain, operation, after string) (upload.StagingStatus, error) {
+	var out upload.StagingStatus
+	if !storage.ID(domain) || !storage.ID(operation) {
+		return out, ErrDenied
+	}
+	e := w.withStoppedReplica(ctx, domain, func(_ *os.Root, _ string, _ generation.Trust, _ statefile.Admission) error {
+		return w.withLocalUploadQueue(ctx, domain, operation, false, func(q *upload.Queue) error {
+			var e error
+			out, e = q.InspectStaging(ctx, operation, after)
 			return e
 		})
 	})
