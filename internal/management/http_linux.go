@@ -340,6 +340,20 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenant := parts[3]
+	if len(parts) == 8 && parts[4] == "domains" && parts[6] == "retention" && parts[7] == "preview" && r.Method == http.MethodPost {
+		var input RetentionCoverageRequest
+		if e := readHTTP(w, r, &input, 8<<10); e != nil {
+			failHTTP(w, e)
+			return
+		}
+		out, e := h.registry.PreviewRetentionCoverage(ctx, p, tenant, parts[5], input, h.maxAge)
+		if e != nil {
+			failHTTP(w, e)
+			return
+		}
+		writeHTTP(w, 200, out)
+		return
+	}
 	if len(parts) == 5 && parts[4] == "nodes" && r.Method == http.MethodGet {
 		limit, token, e := pageQuery(r)
 		if e != nil {

@@ -3055,6 +3055,14 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/management/retention_coverage_linux_test.go",
+          "name": "TestManagementRetentionCoverageUsesCurrentPinnedSurvivors"
+        },
+        {
+          "path": "internal/management/retention_coverage_linux_test.go",
+          "name": "TestManagementRetentionCoverageHTTPSRolesAndBounds"
+        },
+        {
           "path": "internal/generation/retention_preview_linux_test.go",
           "name": "TestRetentionPreviewProtectsPinsReceivingAndCurrentRevision"
         },
@@ -5908,6 +5916,14 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/management/retention_coverage_linux_test.go",
+          "name": "TestManagementRetentionCoverageUsesCurrentPinnedSurvivors"
+        },
+        {
+          "path": "internal/management/retention_coverage_linux_test.go",
+          "name": "TestManagementRetentionCoverageHTTPSRolesAndBounds"
+        },
         {
           "path": "internal/management/config_linux_test.go",
           "name": "TestManagementConfigurationPreviewExactApplyReplayAndTenantBoundary"

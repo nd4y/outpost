@@ -131,7 +131,8 @@ func newHTTPFixtureWithRelay(t *testing.T, allowRelay bool) *httpFixture {
 	must(t, e)
 	f.p.Actor = identity(ownerKey.Public().(ed25519.PublicKey))
 	viewer := Principal{Actor: identity(viewerKey.Public().(ed25519.PublicKey)), Roles: []string{"viewer"}, Scopes: append([]Scope(nil), f.p.Scopes...)}
-	options := HTTPOptions{Principals: []Principal{f.p, viewer}, Origin: "https://management.invalid", Concurrency: 2, Timeout: 500 * time.Millisecond, ReportMaxAge: 5 * time.Second}
+	// Functional requests include durable writes on the fixture's HDD.
+	options := HTTPOptions{Principals: []Principal{f.p, viewer}, Origin: "https://management.invalid", Concurrency: 2, Timeout: 2 * time.Second, ReportMaxAge: 5 * time.Second}
 	if allowRelay {
 		options.Relays = map[string][]string{viewer.Actor: {f.e.Node}}
 	}

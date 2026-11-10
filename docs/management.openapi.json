@@ -1821,6 +1821,131 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/preview": {
+      "post": {
+        "operationId": "retentionCoveragePreview",
+        "summary": "Preview trusted pinned copies surviving a proposed retirement",
+        "x-required-roles": ["owner", "operator"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionCoverageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed surviving coverage at one registry revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionCoverage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Registry changed during evaluation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tenants/{tenant}/audit": {
       "get": {
         "operationId": "audit",
@@ -2418,6 +2543,157 @@
       "ID": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$"
+      },
+      "RetentionCoverageRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-coverage-request-1"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "retiringNodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "generations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true
+          },
+          "minimumCopies": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        "required": ["format", "nodes", "retiringNodes", "generations", "minimumCopies"]
+      },
+      "RetentionCoverage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-coverage-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "registryRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evaluatedUnix": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minimumCopies": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "authorization": {
+            "const": "NONE"
+          },
+          "generations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "generation": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "state": {
+                  "enum": ["OBSERVED_MINIMUM_MET", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE"]
+                },
+                "witnesses": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "node": {
+                        "$ref": "#/components/schemas/ID"
+                      },
+                      "reportDigest": {
+                        "$ref": "#/components/schemas/ID"
+                      },
+                      "reportSequence": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "observedUnix": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "verifiedUnix": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "configurationRevision": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": [
+                      "node",
+                      "reportDigest",
+                      "reportSequence",
+                      "observedUnix",
+                      "verifiedUnix",
+                      "configurationRevision"
+                    ]
+                  },
+                  "minItems": 0,
+                  "maxItems": 8
+                }
+              },
+              "required": ["generation", "state", "witnesses"]
+            },
+            "minItems": 1,
+            "maxItems": 64
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "domain",
+          "repository",
+          "epoch",
+          "registryRevision",
+          "evaluatedUnix",
+          "minimumCopies",
+          "authorization",
+          "generations"
+        ]
       },
       "Error": {
         "type": "object",
