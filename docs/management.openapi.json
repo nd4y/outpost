@@ -1821,6 +1821,246 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans": {
+      "post": {
+        "operationId": "registerRetentionPlan",
+        "summary": "Register an immutable retention plan without dispatching commands",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionPlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original registered plan, including on an identical replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Identifier already occupied, request differs, or window expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans/{operationId}": {
+      "get": {
+        "operationId": "readRetentionPlanStatus",
+        "summary": "Read the registered plan and current command evidence without replaying it",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan, draft or confirmed retirement status at one registry revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionPlanStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan unavailable in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Registry changed during observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tenants/{tenant}/domains/{domain}/retention/draft": {
       "post": {
         "operationId": "retentionPermitDraft",
@@ -2668,6 +2908,178 @@
       "ID": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$"
+      },
+      "RetentionPlanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-plan-request-1"
+          },
+          "preview": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "outpost-maintenance-permit-2"
+              },
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "repository": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "epoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "operation": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "retire": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "minItems": 1,
+                "maxItems": 64
+              },
+              "window": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "startUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "expiresUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  }
+                },
+                "required": ["node", "startUnix", "expiresUnix"]
+              }
+            },
+            "required": [
+              "format",
+              "domain",
+              "repository",
+              "epoch",
+              "revision",
+              "operation",
+              "retire",
+              "window"
+            ]
+          },
+          "holdCommands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Sorted command operation IDs for completed HOLD commands."
+          }
+        },
+        "required": ["format", "preview", "holdCommands"]
+      },
+      "RetentionPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-plan-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "registeredUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "registrationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "request": {
+            "$ref": "#/components/schemas/RetentionPlanRequest"
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "actor",
+          "registeredUnix",
+          "registrationRevision",
+          "request"
+        ]
+      },
+      "RetentionPlanStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-plan-status-1"
+          },
+          "state": {
+            "enum": [
+              "WAITING_FOR_HOLDS",
+              "READY_TO_SIGN",
+              "WINDOW_EXPIRED",
+              "POLICY_BLOCKED",
+              "COMMAND_CONFLICT",
+              "RETIREMENT_INTENT_RECORDED",
+              "RETIREMENT_QUEUED",
+              "RETIREMENT_REPORTED_COMPLETE",
+              "RETIREMENT_EFFECT_UNCONFIRMED"
+            ]
+          },
+          "authorization": {
+            "const": "NONE"
+          },
+          "registryRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "plan": {
+            "$ref": "#/components/schemas/RetentionPlan"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/RetentionDraft"
+          },
+          "retirement": {
+            "$ref": "#/components/schemas/Receipt"
+          },
+          "closeRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "format",
+          "state",
+          "authorization",
+          "registryRevision",
+          "plan",
+          "closeRequired"
+        ]
       },
       "RetentionDraftRequest": {
         "type": "object",

@@ -368,6 +368,31 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeHTTP(w, 200, out)
 		return
 	}
+	if len(parts) >= 8 && parts[4] == "domains" && parts[6] == "retention" && parts[7] == "plans" {
+		if len(parts) == 8 && r.Method == http.MethodPost {
+			var input RetentionDraftRequest
+			if e := readHTTP(w, r, &input, 16<<10); e != nil {
+				failHTTP(w, e)
+				return
+			}
+			out, e := h.registry.RegisterRetentionPlan(ctx, p, tenant, parts[5], input)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+		if len(parts) == 9 && r.Method == http.MethodGet {
+			out, e := h.registry.RetentionPlanStatus(ctx, p, tenant, parts[5], parts[8], h.maxAge)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+	}
 	if len(parts) == 5 && parts[4] == "nodes" && r.Method == http.MethodGet {
 		limit, token, e := pageQuery(r)
 		if e != nil {

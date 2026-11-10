@@ -314,6 +314,9 @@ func (r *Registry) ResolveUnpublished(ctx context.Context, p Principal, tenant, 
 		if _, e = r.resolutionTarget(s, input.Operation); !errors.Is(e, ErrUnavailable) {
 			return ErrConflict
 		}
+		if _, used := s.RetentionPlans[input.Operation]; used {
+			return ErrConflict
+		}
 		if resolutionID(s, input.Operation) {
 			return ErrConflict
 		}

@@ -1,6 +1,7 @@
 package management
 
 import (
+	"bytes"
 	"context"
 	"slices"
 	"sort"
@@ -53,17 +54,27 @@ func (r *Registry) PrepareRetentionDraft(ctx context.Context, p Principal, tenan
 	if p.Validate() != nil || !p.Allows(tenant, domain) || !p.Role("owner") {
 		return out, ErrDenied
 	}
-	permit := input.Preview
-	if !storage.ID(tenant) || !storage.ID(domain) || input.Format != RetentionDraftRequestFormat ||
-		permit.Format != generation.PermitWindowFormat || permit.Domain != domain || permit.Revision == 0 ||
-		!validRetentionIDs(permit.Retire, 64) || !validRetentionIDs(input.HoldCommands, 64) ||
-		maxAge < time.Second || maxAge > 24*time.Hour || generation.ValidatePermitDraft(permit) != nil {
+	if !storage.ID(tenant) || !storage.ID(domain) || !validRetentionDraftInput(input, domain, RetentionDraftRequestFormat) ||
+		maxAge < time.Second || maxAge > 24*time.Hour {
 		return out, ErrInvalid
 	}
 	s, e := r.retentionState(ctx)
 	if e != nil {
 		return out, e
 	}
+	return r.prepareRetentionDraft(ctx, s, tenant, domain, input, nil, maxAge)
+}
+
+func validRetentionDraftInput(input RetentionDraftRequest, domain, format string) bool {
+	p := input.Preview
+	return input.Format == format && p.Format == generation.PermitWindowFormat && p.Domain == domain &&
+		p.Revision != 0 && validRetentionIDs(p.Retire, 64) && validRetentionIDs(input.HoldCommands, 64) &&
+		!slices.Contains(input.HoldCommands, p.Operation) && generation.ValidatePermitDraft(p) == nil
+}
+
+func (r *Registry) prepareRetentionDraft(ctx context.Context, s registryState, tenant, domain string, input RetentionDraftRequest, expected *generation.Trust, maxAge time.Duration) (RetentionDraft, error) {
+	var out RetentionDraft
+	permit := input.Preview
 	fence, found := s.Domains[domain]
 	if !found || fence.Tenant != tenant {
 		return out, ErrUnavailable
@@ -80,7 +91,8 @@ func (r *Registry) PrepareRetentionDraft(ctx context.Context, p Principal, tenan
 	}
 	_, cfg, target, ok := r.retentionHolder(ctx, s, permit.Window.Node, domain, fence, now)
 	if !ok || target.RetirementMinimumCopies == 0 || permit.Window.StartUnix >= cfg.ExpiresUnix ||
-		permit.Repository != fence.Repository || permit.Epoch != fence.Epoch {
+		permit.Repository != fence.Repository || permit.Epoch != fence.Epoch ||
+		expected != nil && (!bytes.Equal(target.Trust.Writer, expected.Writer) || !bytes.Equal(target.Trust.Maintenance, expected.Maintenance)) {
 		return out, ErrDenied
 	}
 	minimum := target.RetirementMinimumCopies
@@ -108,7 +120,7 @@ func (r *Registry) PrepareRetentionDraft(ctx context.Context, p Principal, tenan
 	chosen := make(map[string][]draftWitness, len(permit.Retire))
 	binding := generation.RetirementBinding{Node: permit.Window.Node, Operation: permit.Operation}
 	for _, node := range nodes {
-		if e = ctx.Err(); e != nil {
+		if e := ctx.Err(); e != nil {
 			return out, e
 		}
 		report, pointer, cutoff, ok := r.retentionReport(ctx, s, node, domain, fence, now, maxAge)
@@ -145,7 +157,7 @@ func (r *Registry) PrepareRetentionDraft(ctx context.Context, p Principal, tenan
 			}})
 		}
 	}
-	if e = r.checkRetentionRevision(ctx, s.Revision); e != nil {
+	if e := r.checkRetentionRevision(ctx, s.Revision); e != nil {
 		return out, e
 	}
 	if permit.Window.ExpiresUnix <= time.Now().Unix() || cfg.Active(time.Now()) != nil {

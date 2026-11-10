@@ -20,7 +20,7 @@ import (
 	"github.com/nd4y/outpost/internal/storage"
 )
 
-func TestManagementRetentionDraftMatchesAcknowledgedHolds(t *testing.T) {
+func TestManagementRetentionPlanReconcilesAcknowledgedHolds(t *testing.T) {
 	h := newHTTPFixture(t)
 	f := h.f
 	f.enroll(t)
@@ -52,10 +52,14 @@ func TestManagementRetentionDraftMatchesAcknowledgedHolds(t *testing.T) {
 		t.Helper()
 		c := cfg
 		c.Node = peer.e.Node
+		kinds := []string{"retention"}
+		if peer == f {
+			kinds = append(kinds, "maintenance")
+		}
 		grant, e := command.SignAuthority(command.Authority{
 			Format: command.AuthorityFormat, Service: f.options.Signer.Public().(ed25519.PublicKey),
 			Node: c.Node, Tenant: f.e.Tenant, Domain: trust.Domain, Repository: trust.Repository,
-			WriterEpoch: trust.Epoch, AuthorityEpoch: 1, Kinds: []string{"retention"},
+			WriterEpoch: trust.Epoch, AuthorityEpoch: 1, Kinds: kinds,
 			NotBefore: c.NotBefore, ExpiresUnix: c.ExpiresUnix,
 		}, f.owner)
 		must(t, e)
@@ -68,7 +72,7 @@ func TestManagementRetentionDraftMatchesAcknowledgedHolds(t *testing.T) {
 		must(t, e)
 		return c, grant
 	}
-	targetCfg, _ := configure(f)
+	targetCfg, targetAuthority := configure(f)
 	_, authorityA := configure(a)
 	_, authorityB := configure(b)
 	now := time.Now().Unix()
@@ -114,6 +118,53 @@ func TestManagementRetentionDraftMatchesAcknowledgedHolds(t *testing.T) {
 	}
 	if status, _ = h.request(t, h.viewer, "POST", path, request); status != 403 {
 		t.Fatal("viewer can prepare deletion draft", status)
+	}
+
+	planInput := request
+	planInput.Format = RetentionPlanRequestFormat
+	planPath := "/api/v1/tenants/" + f.e.Tenant + "/domains/" + trust.Domain + "/retention/plans"
+	lost := errors.New("lost reply after durable plan")
+	f.r.Fault = func(point string) error {
+		if point == "management-retention-plan-durable" {
+			return lost
+		}
+		return nil
+	}
+	if status, _ = h.request(t, h.owner, "POST", planPath, planInput); status != 503 {
+		t.Fatal("expected simulated lost response", status)
+	}
+	var waiting RetentionPlanStatus
+	status, raw = h.request(t, h.owner, "GET", planPath+"/"+op, nil)
+	if status != 200 {
+		t.Fatalf("plan status %d %s", status, raw)
+	}
+	must(t, json.Unmarshal(raw, &waiting))
+	if waiting.State != "WAITING_FOR_HOLDS" || waiting.Authorization != "NONE" || waiting.Draft == nil || waiting.Draft.Permit != nil {
+		t.Fatal(waiting)
+	}
+	if status, _ = h.request(t, h.viewer, "GET", planPath+"/"+op, nil); status != 403 {
+		t.Fatal("viewer can access a retirement plan", status)
+	}
+	f.reopen(t)
+	plan, e := f.r.RegisterRetentionPlan(ctx, f.p, f.e.Tenant, trust.Domain, planInput)
+	must(t, e)
+	if plan.RegistrationRevision != waiting.Plan.RegistrationRevision || plan.RegisteredUnix != waiting.Plan.RegisteredUnix {
+		t.Fatal("registration replay changed the original record", plan)
+	}
+	altered := planInput
+	altered.Preview.Revision++
+	if _, e = f.r.RegisterRetentionPlan(ctx, f.p, f.e.Tenant, trust.Domain, altered); !errors.Is(e, ErrConflict) {
+		t.Fatal("plan could be rewritten", e)
+	}
+	checkPlan := func(expected string, closeRequired bool) RetentionPlanStatus {
+		t.Helper()
+		result, e := f.r.RetentionPlanStatus(ctx, f.p, f.e.Tenant, trust.Domain, op, time.Minute)
+		must(t, e)
+		if result.State != expected || result.CloseRequired != closeRequired || result.Authorization != "NONE" ||
+			result.Plan.RegistrationRevision != plan.RegistrationRevision {
+			t.Fatal(result)
+		}
+		return result
 	}
 
 	hold := func(peer *fixture, r *generation.Replica, authority []byte, suffix string) (CommandObservation, []byte, Principal) {
@@ -192,6 +243,10 @@ func TestManagementRetentionDraftMatchesAcknowledgedHolds(t *testing.T) {
 	before, e := f.r.store.Read("registry.json")
 	must(t, e)
 	result := check("READY_TO_SIGN", 2)
+	ready := checkPlan("READY_TO_SIGN", false)
+	if ready.Draft == nil || ready.Draft.Permit == nil || len(ready.Draft.Sources) != 2 {
+		t.Fatal("registered plan did not recover the coverage", ready)
+	}
 	after, e := f.r.store.Read("registry.json")
 	must(t, e)
 	if !bytes.Equal(before, after) || len(result.Permit.Signature) != 0 || result.Permit.Revision != request.Preview.Revision {
@@ -204,7 +259,48 @@ func TestManagementRetentionDraftMatchesAcknowledgedHolds(t *testing.T) {
 	must(t, e)
 	reused := request
 	reused.Preview.Operation = a1.Operation
+	reused.HoldCommands = []string{a2.Operation, b1.Operation}
+	sort.Strings(reused.HoldCommands)
 	if _, e = f.r.PrepareRetentionDraft(ctx, f.p, f.e.Tenant, trust.Domain, reused, time.Minute); !errors.Is(e, ErrConflict) {
 		t.Fatal("retirement draft reused a command operation", e)
+	}
+	req := command.Request{Operation: op, Reason: "OWNER_MAINTENANCE", Tenant: f.e.Tenant, Domain: trust.Domain,
+		Kind: "maintenance", ExpectedRevision: targetCfg.Revision, Authority: targetAuthority,
+		ExpiresUnix: now + 300, MaintenancePermit: signed}
+	wrongPermit := *result.Permit
+	wrongPermit.Revision++
+	req.MaintenancePermit, e = generation.SignPermit(wrongPermit, signer)
+	must(t, e)
+	if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req); !errors.Is(e, ErrConflict) {
+		t.Fatal("planned operation accepted a different replica revision", e)
+	}
+	req.MaintenancePermit = signed
+	f.r.Fault = func(point string) error {
+		if point == "management-command-intent-durable" {
+			return lost
+		}
+		return nil
+	}
+	if _, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req); !errors.Is(e, lost) {
+		t.Fatal("command intent fault not reached", e)
+	}
+	f.reopen(t)
+	checkPlan("RETIREMENT_INTENT_RECORDED", false)
+	_, e = f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req)
+	must(t, e)
+	checkPlan("RETIREMENT_QUEUED", false)
+	targetNode := Principal{Actor: f.e.Node, Roles: []string{"node"}, Scopes: []Scope{{f.e.Tenant, trust.Domain}}}
+	list, _, e := f.r.Commands(ctx, targetNode, f.e.Tenant, f.e.Node, 0, 32)
+	must(t, e)
+	if len(list) != 1 {
+		t.Fatal("operation replay queued a duplicate", list)
+	}
+	ack = commandAck(t, f, list[0].Document)
+	done, e := f.r.AcknowledgeCommand(ctx, targetNode, f.e.Tenant, f.e.Node, op, ack)
+	must(t, e)
+	f.reopen(t)
+	afterRestart := checkPlan("RETIREMENT_REPORTED_COMPLETE", true)
+	if afterRestart.Retirement == nil || *afterRestart.Retirement != done {
+		t.Fatal("plan lost original retirement acknowledgement", afterRestart)
 	}
 }
