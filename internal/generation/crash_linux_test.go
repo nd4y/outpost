@@ -7,9 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 type crashInput struct {
@@ -111,9 +114,27 @@ func TestReplicaSIGKILLBoundaries(t *testing.T) {
 				if tc.point != "state-durable" && state.LatestComplete != old {
 					t.Fatal("window published before durable boundary")
 				}
-				result, e := r.VerifyWindow(ctx, id, Hash([]byte("crash-window")), 2, MaxObject)
+				window := Hash([]byte("crash-window"))
+				catalog, e := VerifyCatalog(b, trust)
 				ok(t, e)
-				if !result.Complete || result.ReadBytes != 0 {
+				dependencies, e := closure(catalog)
+				ok(t, e)
+				checkpoint, found, e := r.verification(id, window, dependencies)
+				ok(t, e)
+				if !found || checkpoint.CompletedAt <= 0 {
+					t.Fatal("verification checkpoint did not survive SIGKILL")
+				}
+				// Disk admission can still allow the index write while
+				// refusing another copy of the unchanged checkpoint.
+				r.Admit = func(name string, _ int) (func(bool) error, error) {
+					if strings.HasPrefix(name, "verification/") {
+						return nil, statefile.ErrCapacity
+					}
+					return func(bool) error { return nil }, nil
+				}
+				result, e := r.VerifyWindow(ctx, id, window, 2, MaxObject)
+				ok(t, e)
+				if !result.Complete || result.ReadBytes != 0 || result.VerifiedAt != verificationTime(checkpoint) {
 					t.Fatal("durable window lost after SIGKILL", result)
 				}
 			} else if state.LatestComplete != id {

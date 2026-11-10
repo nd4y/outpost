@@ -2560,6 +2560,10 @@
           "name": "TestBatchedReceptionSyncsParentUntilFirstCheckpointIsDurable"
         },
         {
+          "path": "internal/generation/crash_linux_test.go",
+          "name": "TestReplicaSIGKILLBoundaries"
+        },
+        {
           "path": "cmd/outpost/main_linux_test.go",
           "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
         },

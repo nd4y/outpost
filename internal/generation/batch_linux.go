@@ -357,6 +357,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		if e != nil {
 			return e
 		}
+		savedCount, savedAt := len(v.Objects), v.CompletedAt
 		for key, checked := range verified {
 			v.Objects[key] = checked
 		}
@@ -380,8 +381,12 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		} else {
 			v.CompletedAt = 0
 		}
-		if e = r.saveVerification(v, hasCheckpoint); e != nil {
-			return e
+		// A crash can leave a complete checkpoint before the index is
+		// published. Keep its original proof if the stamp check changed nothing.
+		if !hasCheckpoint || len(verified) != 0 || len(v.Objects) != savedCount || v.CompletedAt != savedAt {
+			if e = r.saveVerification(v, hasCheckpoint); e != nil {
+				return e
+			}
 		}
 		result.VerifiedObjects = len(v.Objects)
 		if len(v.Objects) != len(refs) {
