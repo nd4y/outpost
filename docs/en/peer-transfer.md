@@ -55,7 +55,21 @@ Create a private index with the absolute path to each available peer document. O
 
 The signed reference defines the expected holders and transit nodes. Omitted documents appear in `missingPeers`. Each supplied document must be active, signed by the same owner and addressed to its listed node. Duplicate or unexpected nodes and invalid documents cause an error. The index is limited to 256 KiB and the signed documents together to 128 MiB.
 
-A report with `complete: true` has every expected document. `consistent: true` also requires every supplied graph and domain trust to match. Use the per-peer `differences` to locate discrepancies. The audit checks the supplied snapshot, with no network access. Verify active worker revisions, replication permissions and connectivity before deployment.
+A report with `complete: true` has every expected document. `consistent: true` also requires every supplied graph and domain trust to match. Use the per-peer `differences` to locate discrepancies.
+
+The `replication` array checks each directed edge in the reference. For push, the executor is the sender. For pull, the executor is the recipient. The audit compares the exact rule identities used by the workers and the executor's minimum peer revision with the supplied peer revision.
+
+| State                   | Meaning                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| `RULES_MATCH`           | Both documents authorize the same rule at the required revision. |
+| `UNDELEGATED`           | Neither document delegates autonomous replication on the edge.   |
+| `DOCUMENT_MISSING`      | A document for one or both endpoints is missing.                 |
+| `EXECUTOR_RULE_MISSING` | Only the HTTPS peer declares a rule.                             |
+| `PEER_RULE_MISSING`     | The executor's rule has no peer counterpart.                     |
+| `PEER_REVISION_TOO_OLD` | The supplied peer revision is below the required minimum.        |
+| `RULE_MISMATCH`         | The documents declare different rule identities.                 |
+
+`consistent` still describes placement and domain trust. Check `replication` separately for every edge intended for autonomous operation. The audit uses local documents. Before deployment, verify the revisions active on workers, their credentials and connectivity. Explicit per-generation jobs use separate authorizations.
 
 ## Transfer and publication
 

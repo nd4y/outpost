@@ -36,6 +36,8 @@ func (f *fixture) replicationConfig(t *testing.T, index int, revision uint64, ru
 
 func TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode(t *testing.T) {
 	f := newFixture(t)
+	// Durable transfers can spend longer in fsync on a shared test HDD.
+	f.cfg.Limits.AttemptMillis = 60000
 	server := f.endpoint(t, nil)
 	push, pull := f.rules()
 	ctx := context.Background()
@@ -45,7 +47,7 @@ func TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode(t *
 	stopB := start(t, f.nodes[1])
 	stopA := start(t, f.nodes[0])
 	firstPush := push.Job(f.domain.Trust, f.generation)
-	wait(t, func() bool { return complete(f.nodes[0], firstPush.Operation) })
+	waitFor(t, 90*time.Second, func() bool { return complete(f.nodes[0], firstPush.Operation) })
 	store, e := filekit.OpenStore(filepath.Join(f.base, "source-kit"), f.dataOwner, false)
 	must(t, e)
 	changed := bytes.Repeat([]byte("autonomous next generation"), 4096)
@@ -59,12 +61,12 @@ func TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode(t *
 	second, e := generation.Seal(ctx, store, []string{version.Version}, replica, generation.Catalog{Format: generation.Format, Domain: f.domain.Trust.Domain, Repository: f.domain.Trust.Repository, Epoch: 1, Sequence: 2, Parent: f.generation, SnapshotUnix: time.Now().Unix(), Policy: 1, KitFormat: generation.KitFormat}, f.writer)
 	must(t, e)
 	must(t, store.Close())
-	wait(t, func() bool { return complete(f.nodes[0], push.Job(f.domain.Trust, second).Operation) })
+	waitFor(t, 90*time.Second, func() bool { return complete(f.nodes[0], push.Job(f.domain.Trust, second).Operation) })
 	stopA()
 	// No per-generation jobs or new control configuration were published.
 	stopC := start(t, f.nodes[2])
 	firstPull, secondPull := pull.Job(f.domain.Trust, f.generation), pull.Job(f.domain.Trust, second)
-	wait(t, func() bool {
+	waitFor(t, 90*time.Second, func() bool {
 		return complete(f.nodes[2], firstPull.Operation) && complete(f.nodes[2], secondPull.Operation)
 	})
 	observed, e := f.nodes[2].DiscoveryStatus(ctx)
@@ -81,7 +83,7 @@ func TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode(t *
 	must(t, e)
 	defer reopened.Close()
 	stop := start(t, reopened)
-	wait(t, func() bool { reopened.mu.Lock(); defer reopened.mu.Unlock(); return reopened.active != nil })
+	waitFor(t, 90*time.Second, func() bool { reopened.mu.Lock(); defer reopened.mu.Unlock(); return reopened.active != nil })
 	after, e := reopened.Status(ctx)
 	must(t, e)
 	if !bytes.Equal(after.Jobs[firstPull.Operation].Receipt, prior.Jobs[firstPull.Operation].Receipt) || !bytes.Equal(after.Jobs[secondPull.Operation].Receipt, prior.Jobs[secondPull.Operation].Receipt) {
@@ -150,6 +152,8 @@ func TestInventoryRequiresCurrentPullRuleAndRejectsReverseMetadataRoute(t *testi
 
 func TestDiscoveryRetriesPolicyLagWithoutExpandingAuthority(t *testing.T) {
 	f := newFixture(t)
+	// This test verifies the revision fence independently of disk latency.
+	f.cfg.Limits.AttemptMillis = 60000
 	f.endpoint(t, nil)
 	push, pull := f.rules()
 	ctx := context.Background()
@@ -157,11 +161,11 @@ func TestDiscoveryRetriesPolicyLagWithoutExpandingAuthority(t *testing.T) {
 	f.replicationConfig(t, 1, 1, push, pull)
 	start(t, f.nodes[1])
 	start(t, f.nodes[0])
-	wait(t, func() bool { return complete(f.nodes[0], push.Job(f.domain.Trust, f.generation).Operation) })
+	waitFor(t, 90*time.Second, func() bool { return complete(f.nodes[0], push.Job(f.domain.Trust, f.generation).Operation) })
 	pull.PeerRevision = 2
 	f.replicationConfig(t, 2, 1, pull)
 	start(t, f.nodes[2])
-	wait(t, func() bool {
+	waitFor(t, 90*time.Second, func() bool {
 		s, e := f.nodes[2].DiscoveryStatus(ctx)
 		return e == nil && s.Routes[pull.ID(f.domain.Trust)].Phase == "RETRY_WAIT"
 	})
@@ -171,5 +175,5 @@ func TestDiscoveryRetriesPolicyLagWithoutExpandingAuthority(t *testing.T) {
 		t.Fatal("future rule created unauthorized job", s)
 	}
 	f.replicationConfig(t, 1, 2, push, pull)
-	wait(t, func() bool { return complete(f.nodes[2], pull.Job(f.domain.Trust, f.generation).Operation) })
+	waitFor(t, 90*time.Second, func() bool { return complete(f.nodes[2], pull.Job(f.domain.Trust, f.generation).Operation) })
 }

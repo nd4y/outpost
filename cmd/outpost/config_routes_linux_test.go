@@ -202,14 +202,14 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 	})
 
 	t.Run("audit every signed peer", func(t *testing.T) {
-		runAudit := func(ctx context.Context, peers []routeAuditEntry) (any, error) {
+		runAudit := func(ctx context.Context, reference string, peers []routeAuditEntry) (any, error) {
 			index := routeAuditIndex{Format: "outpost-config-route-index-1", Peers: peers}
 			rawIndex, err := json.Marshal(index)
 			if err != nil {
 				t.Fatal(err)
 			}
 			return run(ctx, []string{
-				"config-route-audit", "--input", input, "--node", source,
+				"config-route-audit", "--input", reference, "--node", source,
 				"--peer-configs", write("route index.json", rawIndex), "--trust", trustFile, "--domain", domain,
 			})
 		}
@@ -230,7 +230,7 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 			entries = append(entries, routeAuditEntry{Node: id, Config: write(id+".json", sign(peerConfig(id)))})
 		}
 		ctx := context.Background()
-		result, err := runAudit(ctx, entries)
+		result, err := runAudit(ctx, input, entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -254,7 +254,7 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 				changed[i] = driftEntry
 			}
 		}
-		result, err = runAudit(ctx, changed)
+		result, err = runAudit(ctx, input, changed)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,7 +262,7 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 		if !report.Complete || report.Consistent || len(report.MissingPeers) != 0 {
 			t.Fatalf("complete graph with drift was not distinguished: %+v", report)
 		}
-		result, err = runAudit(ctx, []routeAuditEntry{driftEntry})
+		result, err = runAudit(ctx, input, []routeAuditEntry{driftEntry})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -285,14 +285,87 @@ func TestCLIConfigRoutesVerifiesAuthorityAndPreservesDirectedPaths(t *testing.T)
 			{"wrong recipient", []routeAuditEntry{{Node: outbound, Config: input}}, control.ErrDenied},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				if _, err := runAudit(ctx, tc.peers); !errors.Is(err, tc.want) {
+				if _, err := runAudit(ctx, input, tc.peers); !errors.Is(err, tc.want) {
 					t.Fatalf("got %v, want %v", err, tc.want)
 				}
 			})
 		}
+		t.Run("autonomous replication rules", func(t *testing.T) {
+			push := control.Replication{Domain: domain, From: source, To: bridge, Mode: "push", Epoch: 1, PeerRevision: 5}
+			pull := control.Replication{Domain: domain, From: bridge, To: outbound, Mode: "pull", Epoch: 1, PeerRevision: 5}
+			ref := peerConfig(source)
+			ref.Replication = []control.Replication{push}
+			refPath := write("replication-reference.json", sign(ref))
+			for _, tc := range []struct {
+				name           string
+				mutate         func(*control.Config, *control.Config)
+				omitBridge     bool
+				pushState      string
+				pullState      string
+				remainingState string
+			}{
+				{"matching signed push and pull", nil, false, "RULES_MATCH", "RULES_MATCH", "UNDELEGATED"},
+				{"peer lacks push rule", func(b, _ *control.Config) {
+					b.Replication = b.Replication[1:]
+				}, false, "PEER_RULE_MISSING", "RULES_MATCH", "UNDELEGATED"},
+				{"executor lacks pull rule", func(_, c *control.Config) {
+					c.Replication = nil
+				}, false, "RULES_MATCH", "EXECUTOR_RULE_MISSING", "UNDELEGATED"},
+				{"peer revision too old", func(b, _ *control.Config) {
+					b.Revision--
+					b.Replication = nil
+				}, false, "PEER_REVISION_TOO_OLD", "PEER_REVISION_TOO_OLD", "UNDELEGATED"},
+				{"different route epoch and repair right", func(b, c *control.Config) {
+					b.Replication[0].Epoch++
+					c.Replication[0].Repair = true
+				}, false, "RULE_MISMATCH", "RULE_MISMATCH", "UNDELEGATED"},
+				{"bridge document missing", nil, true, "DOCUMENT_MISSING", "DOCUMENT_MISSING", "DOCUMENT_MISSING"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					b, c := peerConfig(bridge), peerConfig(outbound)
+					b.Replication = []control.Replication{push, pull}
+					c.Replication = []control.Replication{pull}
+					if tc.mutate != nil {
+						tc.mutate(&b, &c)
+					}
+					peers := []routeAuditEntry{{Node: outbound, Config: write("replication-outbound.json", sign(c))}}
+					for _, entry := range entries {
+						if entry.Node == disconnected {
+							peers = append(peers, entry)
+						}
+					}
+					if !tc.omitBridge {
+						peers = append(peers, routeAuditEntry{Node: bridge, Config: write("replication-bridge.json", sign(b))})
+					}
+					got, err := runAudit(ctx, refPath, peers)
+					if err != nil {
+						t.Fatal(err)
+					}
+					audit := got.(routeAuditReport)
+					if audit.Consistent == tc.omitBridge || len(audit.Replication) != 3 {
+						t.Fatalf("unexpected graph consistency or rules: %+v", audit)
+					}
+					pushResult, pullResult := audit.Replication[0], audit.Replication[1]
+					if pushResult.Edge != hops[0] || pullResult.Edge != hops[1] ||
+						pushResult.Executor != source || pushResult.Peer != bridge ||
+						pullResult.Executor != outbound || pullResult.Peer != bridge ||
+						pushResult.State != tc.pushState || pullResult.State != tc.pullState ||
+						audit.Replication[2].State != tc.remainingState {
+						t.Fatalf("unexpected replication audit: %+v", audit.Replication)
+					}
+					if pushResult.ExecutorRule != push.ID(ref.Domains[0].Trust) ||
+						pushResult.RequiredPeerRevision != push.PeerRevision ||
+						!tc.omitBridge && pushResult.PeerRevision != b.Revision ||
+						tc.omitBridge && (pushResult.PeerRevision != 0 || pushResult.PeerRule != "") {
+						t.Fatalf("incorrect revision or rule evidence: %+v", pushResult)
+					}
+				})
+			}
+		})
+
 		canceled, cancel := context.WithCancel(ctx)
 		cancel()
-		if _, err := runAudit(canceled, entries); !errors.Is(err, context.Canceled) {
+		if _, err := runAudit(canceled, input, entries); !errors.Is(err, context.Canceled) {
 			t.Fatalf("got %v for canceled audit", err)
 		}
 	})

@@ -31,13 +31,14 @@ type routeAuditPeer struct {
 }
 
 type routeAuditReport struct {
-	Format       string              `json:"format"`
-	Domain       string              `json:"domain"`
-	Reference    routeConfigIdentity `json:"reference"`
-	Complete     bool                `json:"complete"`
-	Consistent   bool                `json:"consistent"`
-	Peers        []routeAuditPeer    `json:"peers"`
-	MissingPeers []string            `json:"missingPeers"`
+	Format       string                  `json:"format"`
+	Domain       string                  `json:"domain"`
+	Reference    routeConfigIdentity     `json:"reference"`
+	Complete     bool                    `json:"complete"`
+	Consistent   bool                    `json:"consistent"`
+	Peers        []routeAuditPeer        `json:"peers"`
+	MissingPeers []string                `json:"missingPeers"`
+	Replication  []routeAuditReplication `json:"replication"`
 }
 
 func auditConfigRoutes(ctx context.Context, input, indexFile, trustFile, node, domain string, now time.Time) (routeAuditReport, error) {
@@ -81,6 +82,7 @@ func auditConfigRoutes(ctx context.Context, input, indexFile, trustFile, node, d
 		Complete: len(paths) == len(expected), Consistent: len(paths) == len(expected),
 		Peers: []routeAuditPeer{}, MissingPeers: []string{},
 	}
+	configs := map[string]auditReplicationConfig{node: reference.replicationAuditView()}
 	remaining := routeAuditConfigBudget - reference.size
 	for _, id := range slices.Sorted(maps.Keys(expected)) {
 		if err := ctx.Err(); err != nil {
@@ -96,9 +98,11 @@ func auditConfigRoutes(ctx context.Context, input, indexFile, trustFile, node, d
 			return empty, err
 		}
 		remaining -= peer.size
+		configs[id] = peer.replicationAuditView()
 		differences := peerRouteDifferences(reference, peer)
 		report.Peers = append(report.Peers, routeAuditPeer{Document: peer.identity(), Differences: differences})
 		report.Consistent = report.Consistent && len(differences) == 0
 	}
+	report.Replication = auditReplicationEdges(reference.domain.Placement.Edges, configs)
 	return report, ctx.Err()
 }
