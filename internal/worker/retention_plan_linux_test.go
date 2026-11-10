@@ -20,6 +20,11 @@ import (
 )
 
 func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
+	t.Run("Retired", func(t *testing.T) { testWorkerStagedRetentionPlan(t, false) })
+	t.Run("ExpiredWindow", func(t *testing.T) { testWorkerStagedRetentionPlan(t, true) })
+}
+
+func testWorkerStagedRetentionPlan(t *testing.T, expire bool) {
 	f := newFixture(t)
 	f.cfg.Limits.AttemptMillis = 60000
 	f.domain.RetirementMinimumCopies = 1
@@ -56,7 +61,7 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 	scope := []management.Scope{{Tenant: tenant, Domain: trust.Domain}}
 	owner := management.Principal{Actor: id("owner"), Roles: []string{"owner"}, Scopes: scope}
 	handler, e := management.Handler(registry, management.HTTPOptions{Principals: []management.Principal{owner},
-		Origin: "https://management.invalid", Concurrency: 2, Timeout: time.Second, ReportMaxAge: time.Minute})
+		Origin: "https://management.invalid", Concurrency: 2, Timeout: 8 * time.Second, ReportMaxAge: time.Minute})
 	must(t, e)
 	server := httptest.NewUnstartedServer(handler)
 	server.TLS = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{cert},
@@ -71,7 +76,6 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 	}
 	type participant struct {
 		worker    *Worker
-		principal management.Principal
 		authority []byte
 		reporter  *Reporter
 		client    *management.ReportClient
@@ -104,16 +108,20 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 		reporter, e := w.OpenReporter(ctx, serviceID, trust.Domain, enrolled, true)
 		must(t, e)
 		t.Cleanup(func() { reporter.Close() })
-		client, e := management.NewReportClient(server.URL, serviceID, w.node, w.cert, f.ca.pool, 5*time.Second)
+		client, e := management.NewReportClient(server.URL, serviceID, w.node, w.cert, f.ca.pool, 10*time.Second)
 		must(t, e)
 		t.Cleanup(client.Close)
-		return participant{worker: w, principal: management.Principal{Actor: w.node, Roles: []string{"node"}, Scopes: scope},
+		return participant{worker: w,
 			authority: authority, reporter: reporter, client: client, enrolled: enrolled}
 	}
 	target := configure(0, []string{"maintenance", "retention"})
 	holder := configure(1, []string{"retention"})
 
 	now := time.Now().Unix()
+	windowEnd := now + 300
+	if expire {
+		windowEnd = now + 65
+	}
 	op, holdOp := id("retirement"), id("hold")
 	status, e := r.Status(ctx)
 	must(t, e)
@@ -121,7 +129,7 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 		Format: management.RetentionPlanRequestFormat, HoldCommands: []string{holdOp},
 		Preview: generation.Permit{Format: generation.PermitWindowFormat, Domain: trust.Domain, Repository: trust.Repository,
 			Epoch: trust.Epoch, Revision: status.Revision, Operation: op, Retire: []string{f.generation},
-			Window: &generation.PermitWindow{Node: retiring.node, StartUnix: now, ExpiresUnix: now + 300}},
+			Window: &generation.PermitWindow{Node: retiring.node, StartUnix: now, ExpiresUnix: windowEnd}},
 	})
 	must(t, e)
 	plan := func(expected string) management.RetentionPlanStatus {
@@ -141,7 +149,7 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 		t.Helper()
 		grant.Format, grant.Node, grant.Domain = generation.RetentionProtectionFormat, p.worker.node, trust.Domain
 		grant.Repository, grant.Epoch = trust.Repository, trust.Epoch
-		grant.NotBefore, grant.ExpiresUnix = now-1, now+180
+		grant.NotBefore, grant.ExpiresUnix = now-1, now+300
 		req := request(p, operation, "retention")
 		var e error
 		req.RetentionGrant, e = generation.SignRetentionProtection(grant, f.maintenance)
@@ -167,40 +175,36 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 	}
 	run := func(p participant, operation string) CommandRecord {
 		t.Helper()
-		items, _, e := registry.Commands(ctx, p.principal, tenant, p.worker.node, 0, 2)
-		must(t, e)
-		if len(items) != 1 {
-			t.Fatalf("expected one queued operation, got %d", len(items))
+		delivery, e := p.worker.CommandOnce(ctx, p.client, p.enrolled)
+		if e != nil {
+			t.Fatalf("poll signed command: %v", e)
 		}
-		raw := items[0].Document
-		env, _, e := command.VerifyEnvelope(raw, p.worker.owner)
-		must(t, e)
-		if env.Request.Operation != operation {
-			t.Fatal("unexpected operation", env.Request.Operation)
-		}
-		ack, e := p.worker.ExecuteCommand(ctx, raw)
-		must(t, e)
-		if len(ack) != 0 {
-			t.Fatal("worker admission claimed an outcome")
+		if delivery.Operation != operation || delivery.State != "EXECUTING" {
+			t.Fatal("expected the worker to queue the signed command", delivery)
 		}
 		stop := start(t, p.worker)
 		var result CommandRecord
 		waitFor(t, 60*time.Second, func() bool {
-			result = actionRecord(t, p.worker, raw)
+			status, e := p.worker.Status(ctx)
+			must(t, e)
+			result = status.Controls.Operations[operation]
 			return len(result.Ack) != 0
 		})
 		stop()
-		if got := verifyWorkerAck(t, p.worker, raw, result.Ack); got.State != "COMPLETE" {
-			t.Fatal("worker did not complete command", got)
+		delivery, e = p.worker.CommandOnce(ctx, p.client, p.enrolled)
+		if e != nil {
+			t.Fatalf("send durable acknowledgement: %v", e)
 		}
-		_, e = registry.AcknowledgeCommand(ctx, p.principal, tenant, p.worker.node, operation, result.Ack)
-		must(t, e)
+		if delivery.Operation != operation || delivery.State != "COMPLETE" {
+			t.Fatal("expected the worker to deliver its durable acknowledgement", delivery)
+		}
 		snapshot, e := p.worker.ManagementSnapshot(ctx, p.enrolled, trust.Domain)
 		must(t, e)
 		_, e = p.reporter.Enqueue(ctx, snapshot)
 		must(t, e)
-		_, e = p.reporter.Deliver(ctx, p.client)
-		must(t, e)
+		if _, e = p.reporter.Deliver(ctx, p.client); e != nil {
+			t.Fatalf("deliver signed report: %v", e)
+		}
 		return result
 	}
 
@@ -222,27 +226,66 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 	retire.MaintenancePermit, e = generation.SignPermit(*ready.Draft.Permit, f.maintenance)
 	must(t, e)
 	stage(target, retire)
-	reconcile(op, "PUBLISHED")
-	plan("RETIREMENT_QUEUED")
-	must(t, r.VerifyComplete(ctx, f.generation))
-	run(target, op)
-	outcome, e := r.MaintenanceResult(ctx, op)
-	must(t, e)
-	if outcome.AbsentCatalogs != 1 || outcome.AbsentObjects < 1 {
-		t.Fatal("worker did not remove the retired catalog and its unshared objects", outcome)
-	}
-	if e = r.VerifyComplete(ctx, f.generation); !errors.Is(e, generation.ErrIncomplete) {
-		t.Fatal("retired generation remained complete", e)
+	if expire {
+		interrupted := errors.New("interrupted before retirement publication")
+		registry.Fault = func(point string) error {
+			if point == "management-command-intent-durable" {
+				return interrupted
+			}
+			return nil
+		}
+		reconcile(op, "BLOCKED")
+		registry.Fault = nil
+		plan("RETIREMENT_INTENT_RECORDED")
+		delivery, e := retiring.CommandOnce(ctx, target.client, target.enrolled)
+		must(t, e)
+		if delivery.State != "IDLE" {
+			t.Fatal("worker received the interrupted retirement", delivery)
+		}
+		time.Sleep(time.Until(time.Unix(windowEnd, 0)))
+		if p := plan("RETIREMENT_INTENT_RECORDED"); !p.CloseRequired {
+			t.Fatal("expired intent did not require closure", p.State)
+		}
+		must(t, r.VerifyComplete(ctx, f.generation))
+	} else {
+		reconcile(op, "PUBLISHED")
+		plan("RETIREMENT_QUEUED")
+		must(t, r.VerifyComplete(ctx, f.generation))
+		run(target, op)
+		outcome, e := r.MaintenanceResult(ctx, op)
+		must(t, e)
+		if outcome.AbsentCatalogs != 1 || outcome.AbsentObjects < 1 {
+			t.Fatal("worker did not remove the retired catalog and its unshared objects", outcome)
+		}
+		if e = r.VerifyComplete(ctx, f.generation); !errors.Is(e, generation.ErrIncomplete) {
+			t.Fatal("retired generation remained complete", e)
+		}
+		plan("RETIREMENT_REPORTED_COMPLETE")
 	}
 	must(t, r.VerifyComplete(ctx, head))
 	must(t, copy.VerifyComplete(ctx, f.generation))
-	plan("RETIREMENT_REPORTED_COMPLETE")
+	survivorPinned := func() bool {
+		status, e := copy.Status(ctx)
+		must(t, e)
+		for _, pin := range status.Pins {
+			if pin.Generation == f.generation && pin.Kind == "retention" {
+				return true
+			}
+		}
+		return false
+	}
+	if !survivorPinned() {
+		t.Fatal("surviving generation lost its hold before closure")
+	}
 
 	reconcile(closeOp, "PUBLISHED")
 	closed := run(target, closeOp)
 	closure, e := generation.VerifyRetentionProtectionReceipt(closed.Result, retiring.node)
 	must(t, e)
 	plan("CLOSED_AWAITING_RELEASES")
+	if !survivorPinned() {
+		t.Fatal("closure removed the survivor hold before its signed release")
+	}
 	releaseOp := id("release")
 	hold.Action, hold.HoldDigest, hold.Closure = "RELEASE", witness.HoldDigest, &closure
 	stage(holder, protection(holder, releaseOp, hold))
@@ -252,5 +295,14 @@ func TestWorkerExecutesStagedRetentionPlan(t *testing.T) {
 	if len(settled.Holds) != 1 || settled.Holds[0].State != "RELEASED" {
 		t.Fatal("survivor hold did not settle", settled.Holds)
 	}
+	if survivorPinned() {
+		t.Fatal("signed release did not remove the survivor hold")
+	}
 	must(t, copy.VerifyComplete(ctx, f.generation))
+	if expire {
+		must(t, r.VerifyComplete(ctx, f.generation))
+		if _, e := r.MaintenanceResult(ctx, op); !errors.Is(e, generation.ErrMigrationRequired) {
+			t.Fatal("expired operation produced a maintenance outcome", e)
+		}
+	}
 }
