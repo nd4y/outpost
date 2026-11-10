@@ -38,7 +38,7 @@ type SessionOptions struct {
 
 const maxPublicationGrants = 16
 const MaxReceiptDocument = 8192
-const maxSessionDocument = generation.MaxCatalog + 6*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
+const maxSessionDocument = generation.MaxCatalog + 8*MaxDocument + 4096 + (maxPublicationGrants+1)*MaxSettlementDocument + MaxReceiptDocument
 
 type sessionState struct {
 	Format            string               `json:"format"`
@@ -317,6 +317,13 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 			canonicalIntent(pending.Origin.Intent, pending.Origin.Authority, o.Owner, &origin) != nil ||
 			origin.Ingress == i.Ingress || !sameCapture(origin, i) {
 			return fail(ErrConflict)
+		}
+		if pending.Fallback != nil {
+			var fallback Intent
+			if canonicalIntent(pending.Fallback.Intent, pending.Fallback.Authority, o.Owner, &fallback) != nil ||
+				fallback.Ingress == origin.Ingress || fallback.Ingress == i.Ingress || !sameCapture(fallback, i) {
+				return fail(ErrConflict)
+			}
 		}
 	}
 	if s.state.CoveragePeer != nil {

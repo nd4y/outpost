@@ -46,10 +46,11 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	objects[extraID] = extra
 	required, err := generation.Dependencies(catalog, f.authority.Trust)
 	must(t, err)
-	if len(required) == 0 {
-		t.Fatal("fixture has no catalog dependencies")
+	if len(required) < 2 {
+		t.Fatal("fixture needs two distinct catalog dependencies")
 	}
 	probe := filekit.Object{ID: required[0].ID, Bytes: required[0].Bytes}
+	fallbackRef := filekit.Object{ID: required[1].ID, Bytes: required[1].Bytes}
 	limits := peer.Limits{Concurrency: 1, Timeout: 60 * time.Second, Attempts: 1}
 	newOptions := func(name, id string, cert tls.Certificate, replica *generation.Replica, staging *StagingRoutes) (RegistryOptions, []byte) {
 		t.Helper()
@@ -165,7 +166,7 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatalf("paused capture advanced: %v, %v", advanced, err)
 	}
 	for id, data := range objects {
-		if id != probe.ID && id != extraID {
+		if id != probe.ID && id != extraID && id != fallbackRef.ID {
 			must(t, final.PullStaged(ctx, bridge, filekit.Object{ID: id, Bytes: len(data)}))
 		}
 	}
@@ -215,6 +216,43 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatalf("rebound import did not finish with the bridge offline: %v, %v", advanced, err)
 	}
 	must(t, final.Check(ctx, extraRef))
+
+	// The primary is still allowed by policy but offline. A fallback must
+	// be admitted both when the source queues it and when the worker uses it.
+	stopFinal()
+	finalRoutes.Origins[bridgeID] = bridgeURL
+	delete(finalRoutes.Origins, firstID)
+	final, _, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if err := final.QueueStagedWithFallback(ctx, bridge, first, fallbackRef); !errors.Is(err, ErrDenied) {
+		t.Fatalf("unadmitted fallback entered the queue: %v", err)
+	}
+	stopFinal()
+	finalRoutes.Origins[firstID] = firstURL
+	final, _, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	must(t, final.QueueStagedWithFallback(ctx, bridge, first, fallbackRef))
+	must(t, final.QueueStagedWithFallback(ctx, bridge, first, fallbackRef))
+	if err := final.QueueStaged(ctx, bridge, fallbackRef); !errors.Is(err, ErrConflict) {
+		t.Fatalf("nonidentical request replaced the fallback: %v", err)
+	}
+	stopFinal()
+	delete(finalRoutes.Origins, firstID)
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); !errors.Is(err, ErrDenied) || advanced {
+		t.Fatalf("withdrawn fallback was used: %v, %v", advanced, err)
+	}
+	if err := final.Check(ctx, fallbackRef); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("object arrived through the withdrawn fallback: %v", err)
+	}
+	stopFinal()
+	finalRoutes.Origins[firstID] = firstURL
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
+		t.Fatalf("admitted fallback did not finish with the primary offline: %v, %v", advanced, err)
+	}
+	must(t, final.Check(ctx, fallbackRef))
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || advanced {
+		t.Fatalf("completed fallback did not leave the queue: %v, %v", advanced, err)
+	}
 	stopFirst()
 
 	var receipt *Receipt

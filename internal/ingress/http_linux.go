@@ -437,6 +437,9 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		case http.StatusPreconditionFailed:
 			return 0, nil, nil, ErrIncomplete
 		default:
+			if c.stagingReader && response.StatusCode < 500 && response.StatusCode != http.StatusTooManyRequests {
+				return 0, nil, nil, ErrProtocol
+			}
 			return 0, nil, nil, ErrUnavailable
 		}
 	}

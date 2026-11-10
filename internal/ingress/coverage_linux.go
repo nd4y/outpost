@@ -280,7 +280,7 @@ func (g *Registry) AdvanceCoverage(ctx context.Context, paused func(string) bool
 			g.mu.Unlock()
 			locked = false
 			ref := filekit.Object{ID: object.ID, Bytes: object.Bytes}
-			err = g.importStaged(bounded, i, intent, *origin, ref, true)
+			err = g.importStaged(bounded, i, intent, *origin, nil, ref, true)
 			return err == nil, err
 		}
 	}

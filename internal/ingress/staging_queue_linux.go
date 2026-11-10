@@ -11,13 +11,21 @@ import (
 )
 
 type queuedStagingImport struct {
-	Origin stagingOrigin  `json:"origin"`
-	Object filekit.Object `json:"object"`
+	Origin   stagingOrigin  `json:"origin"`
+	Object   filekit.Object `json:"object"`
+	Fallback *stagingOrigin `json:"fallback,omitempty"`
 }
 
-func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []byte, origin stagingOrigin, ref filekit.Object) error {
-	if _, _, err := g.stagingPeer(target, origin); err != nil {
+func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []byte, request queuedStagingImport) error {
+	primary, _, err := g.stagingPeer(target, request.Origin)
+	if err != nil {
 		return err
+	}
+	if request.Fallback != nil {
+		fallback, _, err := g.stagingPeer(target, *request.Fallback)
+		if err != nil || fallback.Ingress == primary.Ingress {
+			return ErrDenied
+		}
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -30,15 +38,15 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 		if s.state.Complete || len(s.state.Catalog) != 0 {
 			return ErrConflict
 		}
-		if _, err := s.read(ctx, ref); !errors.Is(err, os.ErrNotExist) {
+		if _, err := s.read(ctx, request.Object); !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 		pending := s.state.PendingImport
 		if pending != nil {
-			if pending.Object != ref {
+			if pending.Object != request.Object {
 				return ErrConflict
 			}
-			if bytes.Equal(pending.Origin.Authority, origin.Authority) && bytes.Equal(pending.Origin.Intent, origin.Intent) {
+			if sameStagingOrigin(&pending.Origin, &request.Origin) && sameStagingOrigin(pending.Fallback, request.Fallback) {
 				return nil
 			}
 			// The current view must withdraw the original origin before
@@ -49,7 +57,7 @@ func (g *Registry) queueStagedImport(ctx context.Context, target Intent, raw []b
 				return ErrConflict
 			}
 		}
-		s.state.PendingImport = &queuedStagingImport{Origin: origin, Object: ref}
+		s.state.PendingImport = &request
 		if err := s.save(); err != nil {
 			s.state.PendingImport = pending
 			return err
@@ -96,7 +104,7 @@ func (g *Registry) AdvanceStagedImport(ctx context.Context, paused func(string) 
 	raw := bytes.Clone(g.state.Intent)
 	g.mu.Unlock()
 
-	if err = g.importStaged(bounded, intent, raw, pending.Origin, pending.Object, false); err != nil {
+	if err = g.importStaged(bounded, intent, raw, pending.Origin, pending.Fallback, pending.Object, false); err != nil {
 		return false, err
 	}
 	g.mu.Lock()

@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/nd4y/outpost/internal/filekit"
@@ -30,6 +31,18 @@ type stagingOrigin struct {
 	Intent    json.RawMessage `json:"intent"`
 }
 
+type stagingImportRequest struct {
+	stagingOrigin
+	Fallback *stagingOrigin `json:"fallback,omitempty"`
+}
+
+func sameStagingOrigin(a, b *stagingOrigin) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return bytes.Equal(a.Authority, b.Authority) && bytes.Equal(a.Intent, b.Intent)
+}
+
 // Matching intents name the same capture but are signed separately for each
 // receiver and bind to that receiver's own owner capability.
 func sameCapture(a, b Intent) bool {
@@ -41,20 +54,36 @@ func sameCapture(a, b Intent) bool {
 }
 
 func (c *Client) PullStaged(ctx context.Context, origin *Client, ref filekit.Object) error {
-	return c.requestStagedImport(ctx, origin, ref, "imports/", http.StatusOK)
+	return c.requestStagedImport(ctx, origin, nil, ref, "imports/", http.StatusOK)
 }
 
 // QueueStaged acknowledges a durable request, which the receiving worker may
 // fulfill later. Check confirms whether the object is available for the capture.
 func (c *Client) QueueStaged(ctx context.Context, origin *Client, ref filekit.Object) error {
-	return c.requestStagedImport(ctx, origin, ref, "queued-imports/", http.StatusAccepted)
+	return c.requestStagedImport(ctx, origin, nil, ref, "queued-imports/", http.StatusAccepted)
 }
 
-func (c *Client) requestStagedImport(ctx context.Context, origin *Client, ref filekit.Object, resource string, expected int) error {
+// QueueStagedWithFallback queues one object with a second, independently
+// authorized origin for the receiving worker to use if the first is unavailable.
+func (c *Client) QueueStagedWithFallback(ctx context.Context, origin, fallback *Client, ref filekit.Object) error {
+	if fallback == nil {
+		return ErrDenied
+	}
+	return c.requestStagedImport(ctx, origin, fallback, ref, "queued-imports/", http.StatusAccepted)
+}
+
+func (c *Client) requestStagedImport(ctx context.Context, origin, fallback *Client, ref filekit.Object, resource string, expected int) error {
 	if origin == nil || origin.intent.Ingress == c.intent.Ingress || !sameCapture(c.intent, origin.intent) || !validObject(ref) {
 		return ErrDenied
 	}
-	raw, e := json.Marshal(stagingOrigin{Authority: origin.authority, Intent: origin.intentRaw})
+	request := stagingImportRequest{stagingOrigin: stagingOrigin{Authority: origin.authority, Intent: origin.intentRaw}}
+	if fallback != nil {
+		if fallback.intent.Ingress == origin.intent.Ingress || fallback.intent.Ingress == c.intent.Ingress || !sameCapture(c.intent, fallback.intent) {
+			return ErrDenied
+		}
+		request.Fallback = &stagingOrigin{Authority: fallback.authority, Intent: fallback.intentRaw}
+	}
+	raw, e := json.Marshal(request)
 	if e != nil {
 		return e
 	}
@@ -214,21 +243,27 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	}
 	g.mu.Unlock()
 
-	body, e := readBody(w, r, 2*MaxDocument+4096)
-	var origin stagingOrigin
-	if e != nil || decodeReply(body, &origin) != nil {
+	queued := parts[1] == "queued-imports"
+	maxBody := 2*MaxDocument + 4096
+	if queued {
+		maxBody += 2 * MaxDocument
+	}
+	body, e := readBody(w, r, maxBody)
+	var request stagingImportRequest
+	if e != nil || decodeReply(body, &request) != nil || !queued && request.Fallback != nil {
 		fail(w, ErrDenied)
 		return true
 	}
-	if parts[1] == "queued-imports" {
-		if e = g.queueStagedImport(ctx, i, raw, origin, ref); e != nil {
+	if queued {
+		importRequest := queuedStagingImport{Origin: request.stagingOrigin, Object: ref, Fallback: request.Fallback}
+		if e = g.queueStagedImport(ctx, i, raw, importRequest); e != nil {
 			fail(w, e)
 			return true
 		}
 		w.WriteHeader(http.StatusAccepted)
 		return true
 	}
-	if e = g.importStaged(ctx, i, raw, origin, ref, false); e != nil {
+	if e = g.importStaged(ctx, i, raw, request.stagingOrigin, nil, ref, false); e != nil {
 		fail(w, e)
 		return true
 	}
@@ -256,7 +291,7 @@ func (g *Registry) stagingPeer(target Intent, origin stagingOrigin) (Intent, str
 	return i, endpoint, nil
 }
 
-func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []byte, origin stagingOrigin, ref filekit.Object, assembling bool) error {
+func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []byte, origin stagingOrigin, fallback *stagingOrigin, ref filekit.Object, assembling bool) error {
 	i, endpoint, e := g.stagingPeer(target, origin)
 	if e != nil {
 		return e
@@ -270,24 +305,23 @@ func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []
 	if !errors.Is(e, os.ErrNotExist) {
 		return e
 	}
-	// No registry or session lock is held during the remote read. In
-	// particular, opposite authorized pulls can both make progress.
-	client, e := clientWithIdentity(endpoint, target.Ingress, i, origin.Authority, origin.Intent,
-		g.options.Owner, g.options.Certificate, g.options.Roots, g.options.Limits, false)
-	if e != nil {
-		return e
+	// Keep part of the attempt available for the alternate. Both reads run
+	// without a registry or session lock and use the same verified object ID.
+	primaryCtx := ctx
+	if fallback != nil {
+		deadline, _ := ctx.Deadline() // queued imports always have an attempt deadline
+		var cancel context.CancelFunc
+		primaryCtx, cancel = context.WithTimeout(ctx, time.Until(deadline)/2)
+		defer cancel()
 	}
-	defer client.Close()
-	client.stagingReader = true
-	if g.settlementPurpose == SettlementPublish {
-		grant, err := VerifySettlement(g.options.Settlement, g.options.Authority, g.options.SettlementIntent, g.options.Owner, time.Now())
+	b, e := g.fetchStaged(primaryCtx, target, i, endpoint, origin, ref)
+	if fallback != nil && ctx.Err() == nil && stagedOriginUnavailable(e) {
+		alternate, alternateEndpoint, err := g.stagingPeer(target, *fallback)
 		if err != nil {
 			return err
 		}
-		client.peerPublicationDeadline = time.Unix(grant.ExpiresUnix, 0)
-		client.peerPublicationGrant = g.options.Settlement
+		b, e = g.fetchStaged(ctx, target, alternate, alternateEndpoint, *fallback, ref)
 	}
-	b, e := client.readObjectResource(ctx, ref, "staged/")
 	if e != nil {
 		return e
 	}
@@ -306,6 +340,32 @@ func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []
 		_, e := s.write(ctx, ref, b, assembling)
 		return e
 	})
+}
+
+func stagedOriginUnavailable(err error) bool {
+	return errors.Is(err, os.ErrNotExist) || errors.Is(err, ErrUnavailable) ||
+		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ENETUNREACH) ||
+		errors.Is(err, syscall.EHOSTUNREACH)
+}
+
+func (g *Registry) fetchStaged(ctx context.Context, target, peerIntent Intent, endpoint string, origin stagingOrigin, ref filekit.Object) ([]byte, error) {
+	client, err := clientWithIdentity(endpoint, target.Ingress, peerIntent, origin.Authority, origin.Intent,
+		g.options.Owner, g.options.Certificate, g.options.Roots, g.options.Limits, false)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+	client.stagingReader = true
+	if g.settlementPurpose == SettlementPublish {
+		grant, err := VerifySettlement(g.options.Settlement, g.options.Authority, g.options.SettlementIntent, g.options.Owner, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		client.peerPublicationDeadline = time.Unix(grant.ExpiresUnix, 0)
+		client.peerPublicationGrant = g.options.Settlement
+	}
+	return client.readObjectResource(ctx, ref, "staged/")
 }
 
 func (g *Registry) withStagingSession(ctx context.Context, raw []byte, fn func(*Session) error) error {
