@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -272,6 +273,8 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+var errStagingRouteWithdrawn = fmt.Errorf("staging origin absent from current policy: %w", ErrDenied)
+
 func (g *Registry) stagingPeer(target Intent, origin stagingOrigin) (Intent, string, error) {
 	if g.options.Staging == nil {
 		return Intent{}, "", ErrDenied
@@ -283,17 +286,24 @@ func (g *Registry) stagingPeer(target Intent, origin stagingOrigin) (Intent, str
 			authority, e = VerifyAuthorityDocument(origin.Authority, g.options.Owner)
 		}
 	}
-	endpoint := g.options.Staging.Origins[i.Ingress]
 	authority.Ingress = target.Ingress
-	if e != nil || endpoint == "" || i.Ingress == target.Ingress || !sameCapture(i, target) ||
+	if e != nil || i.Ingress == target.Ingress || !sameCapture(i, target) ||
 		!SameAuthorityScope(authority, g.authority) {
 		return Intent{}, "", ErrDenied
+	}
+	endpoint := g.options.Staging.Origins[i.Ingress]
+	if endpoint == "" {
+		return Intent{}, "", errStagingRouteWithdrawn
 	}
 	return i, endpoint, nil
 }
 
 func (g *Registry) importStaged(ctx context.Context, target Intent, targetRaw []byte, origin stagingOrigin, fallback *stagingOrigin, ref filekit.Object, assembling bool) error {
 	i, endpoint, e := g.stagingPeer(target, origin)
+	if fallback != nil && errors.Is(e, errStagingRouteWithdrawn) {
+		origin, fallback = *fallback, nil
+		i, endpoint, e = g.stagingPeer(target, origin)
+	}
 	if e != nil {
 		return e
 	}

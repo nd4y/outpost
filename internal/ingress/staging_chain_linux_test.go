@@ -66,6 +66,9 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	extra := []byte("unreferenced staged ciphertext")
 	extraID := storage.Hash(extra)
 	objects[extraID] = extra
+	withdrawn := []byte("staged ciphertext for a withdrawn primary route")
+	withdrawnRef := filekit.Object{ID: storage.Hash(withdrawn), Bytes: len(withdrawn)}
+	objects[withdrawnRef.ID] = withdrawn
 	required, err := generation.Dependencies(catalog, f.authority.Trust)
 	must(t, err)
 	if len(required) < 2 {
@@ -188,7 +191,7 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 		t.Fatalf("paused capture advanced: %v, %v", advanced, err)
 	}
 	for id, data := range objects {
-		if id != probe.ID && id != extraID && id != fallbackRef.ID {
+		if id != probe.ID && id != extraID && id != fallbackRef.ID && id != withdrawnRef.ID {
 			must(t, final.PullStaged(ctx, bridge, filekit.Object{ID: id, Bytes: len(data)}))
 		}
 	}
@@ -275,6 +278,29 @@ func TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen(t *testing.T) 
 	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || advanced {
 		t.Fatalf("completed fallback did not leave the queue: %v, %v", advanced, err)
 	}
+
+	// Remote denial on an admitted route still stops the attempt. Removing
+	// that route locally lets the worker use the independently admitted fallback.
+	stopFinal()
+	delete(bridgeRoutes.Readers, finalID)
+	bridge, _, bridgeURL, stopBridge = open(bridgeOptions, bridgeIntent, bridgeID)
+	finalRoutes.Origins[bridgeID] = bridgeURL
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	must(t, final.QueueStagedWithFallback(ctx, bridge, first, withdrawnRef))
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); !errors.Is(err, ErrDenied) || advanced {
+		t.Fatalf("remote denial should stop the queued import: %v, %v", advanced, err)
+	}
+	if err := final.Check(ctx, withdrawnRef); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("remote denial allowed fallback: %v", err)
+	}
+	stopFinal()
+	delete(finalRoutes.Origins, bridgeID)
+	final, finalRegistry, _, stopFinal = open(finalOptions, finalIntent, finalID)
+	if advanced, err := finalRegistry.AdvanceStagedImport(ctx, unpaused); err != nil || !advanced {
+		t.Fatalf("still admitted fallback did not finish after primary withdrawal: %v, %v", advanced, err)
+	}
+	must(t, final.Check(ctx, withdrawnRef))
+	stopBridge()
 	stopFirst()
 
 	var receipt *Receipt
