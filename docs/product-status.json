@@ -1177,6 +1177,14 @@
       ],
       "checks": [
         {
+          "path": "internal/upload/abandonment_linux_test.go",
+          "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
+        },
+        {
+          "path": "cmd/outpost/reporting_linux_test.go",
+          "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
+        {
           "path": "internal/management/registry_journal_linux_test.go",
           "name": "TestManagementRegistryJournalInitialCopyResumesExactBytes"
         },
@@ -3055,6 +3063,14 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/upload/abandonment_linux_test.go",
+          "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
+        },
+        {
+          "path": "cmd/outpost/reporting_linux_test.go",
+          "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
+        {
           "path": "internal/generation/retention_pending_hold_linux_test.go",
           "name": "TestRetentionReleaseFencesUndeliveredHoldAcrossRestart"
         },
@@ -3240,6 +3256,14 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/upload/abandonment_linux_test.go",
+          "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
+        },
+        {
+          "path": "cmd/outpost/reporting_linux_test.go",
+          "name": "TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew"
+        },
         {
           "path": "internal/generation/retention_pending_hold_linux_test.go",
           "name": "TestRetentionReleaseFencesUndeliveredHoldAcrossRestart"

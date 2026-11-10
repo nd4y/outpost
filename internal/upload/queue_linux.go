@@ -41,13 +41,14 @@ func (l QueueLimits) valid() bool {
 }
 
 type QueueJob struct {
-	Plan           json.RawMessage `json:"plan"`
-	Phase          string          `json:"phase"`
-	Attempts       uint64          `json:"attempts"`
-	NextMillis     int64           `json:"nextMillis"`
-	ErrorCode      string          `json:"errorCode,omitempty"`
-	Receipt        *Receipt        `json:"receipt,omitempty"`
-	CleanupPending bool            `json:"cleanupPending"`
+	Plan           json.RawMessage   `json:"plan"`
+	Phase          string            `json:"phase"`
+	Attempts       uint64            `json:"attempts"`
+	NextMillis     int64             `json:"nextMillis"`
+	ErrorCode      string            `json:"errorCode,omitempty"`
+	Receipt        *Receipt          `json:"receipt,omitempty"`
+	CleanupPending bool              `json:"cleanupPending"`
+	Abandonment    *queueAbandonment `json:"abandonment,omitempty"`
 }
 type QueueState struct {
 	Format   string                `json:"format"`
@@ -177,6 +178,9 @@ func (q *Queue) load() (QueueState, error) {
 		if j.NextMillis < 0 || j.NextMillis > p.ExpiresUnix*1000 || (j.Phase == "COMPLETE") != (j.Receipt != nil) || j.CleanupPending && j.Phase != "COMPLETE" {
 			return s, ErrDenied
 		}
+		if !q.validAbandonment(s, p, j) {
+			return s, ErrDenied
+		}
 		if j.Receipt != nil {
 			r := j.Receipt
 			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
@@ -298,7 +302,7 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 		return nil, e
 	}
 	name := "jobs/" + p.Operation
-	r, e := localfs.OpenAt(q.root, name, true)
+	r, e := localfs.OpenAt(q.root, name, resumeAdmission)
 	if e != nil {
 		return nil, e
 	}
@@ -649,8 +653,7 @@ func (q *Queue) release(ctx context.Context, source *generation.Replica, op stri
 	if e := source.ReleasePin(ctx, q.pin(op)); e != nil {
 		return e
 	}
-	workerPin := storage.Hash([]byte(Format + "/pin/" + storage.Hash(j.Plan) + "/" + q.worker))
-	if e := source.ReleasePin(ctx, workerPin); e != nil {
+	if e := source.ReleasePin(ctx, workerPin(storage.Hash(j.Plan), q.worker)); e != nil {
 		return e
 	}
 	return q.edit(ctx, func(s *QueueState) error { v := s.Jobs[op]; v.CleanupPending = false; s.Jobs[op] = v; return nil })

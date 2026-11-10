@@ -35,8 +35,12 @@
       "id": "REQ-19",
       "acceptanceSubset": ["AT-15", "AT-22"],
       "scope": "Stable bound operations, durable journals, cached signed assignment, actual process restart/takeover and bounded retries; bounded durable multi-job admission, autonomous retry/cooldown and actual queue SIGKILL recovery",
-      "remaining": "Automatic plan delivery/renewal, abandoned job/pin/claim retention, large-history and account-wide overload admission",
+      "remaining": "Automatic plan delivery/renewal, abandoned job and claim collection, large-history and account-wide overload admission",
       "tests": [
+        {
+          "path": "internal/upload/abandonment_linux_test.go",
+          "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
+        },
         {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestLostReplyRestartAndDuplicateTransfer"

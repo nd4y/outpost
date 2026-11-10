@@ -193,7 +193,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 	if !bytes.Equal(catalog, j.plan.Catalog) {
 		return result, storage.ErrIntegrity
 	}
-	pin := storage.Hash([]byte(Format + "/pin/" + j.planID + "/" + j.worker))
+	pin := workerPin(j.planID, j.worker)
 	if e = source.Pin(ctx, pin, j.plan.Generation, "generation"); e != nil {
 		return result, e
 	}
@@ -339,6 +339,10 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 	}
+}
+
+func workerPin(plan, worker string) string {
+	return storage.Hash([]byte(Format + "/pin/" + plan + "/" + worker))
 }
 
 func (j *Journal) completeTarget(ctx context.Context, source *generation.Replica, b *storage.Backend, pin string, audit *cloudAudit) (Result, error) {

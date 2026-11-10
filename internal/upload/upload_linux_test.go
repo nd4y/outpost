@@ -33,18 +33,18 @@ func must(t *testing.T, e error) {
 }
 
 type fixture struct {
-	base, input, id, version string
-	data                     []byte
-	owner                    filekit.Owner
-	store                    *filekit.Store
-	authority                Authority
-	planner, writer          ed25519.PrivateKey
-	replicas                 []*generation.Replica
-	dirs                     []string
-	workers                  []Worker
-	keys                     []ed25519.PrivateKey
-	serial                   int
-	childTimeout             time.Duration
+	base, input, id, version     string
+	data                         []byte
+	owner                        filekit.Owner
+	store                        *filekit.Store
+	authority                    Authority
+	planner, writer, maintenance ed25519.PrivateKey
+	replicas                     []*generation.Replica
+	dirs                         []string
+	workers                      []Worker
+	keys                         []ed25519.PrivateKey
+	serial                       int
+	childTimeout                 time.Duration
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -57,12 +57,13 @@ func fixtureBytes(t *testing.T, size int) *fixture {
 	must(t, e)
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
-	maintenance, _, e := ed25519.GenerateKey(rand.Reader)
+	maintenance, maintenanceKey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	plannerPub, planner, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	f.writer = key
 	f.planner = planner
+	f.maintenance = maintenanceKey
 	f.authority = Authority{generation.Trust{Domain: f.owner.Domain, Repository: storage.Hash([]byte("synthetic repository")), Epoch: 1, Writer: pub, Maintenance: maintenance}, plannerPub}
 	f.store, e = filekit.OpenStore(filepath.Join(f.base, "source-store"), f.owner, true)
 	must(t, e)

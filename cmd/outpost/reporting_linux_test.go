@@ -22,6 +22,7 @@ import (
 	"github.com/nd4y/outpost/internal/policy"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
+	"github.com/nd4y/outpost/internal/upload"
 	"github.com/nd4y/outpost/internal/volume"
 	"github.com/nd4y/outpost/internal/worker"
 )
@@ -44,7 +45,7 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 	nodeKey, nodePrivate := key()
 	writer, writerKey := key()
 	maintenance, maintenanceKey := key()
-	planner, _ := key()
+	planner, plannerKey := key()
 	now := time.Now()
 	template := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}}
 	der, e := x509.CreateCertificate(rand.Reader, template, template, nodeKey, nodePrivate)
@@ -203,6 +204,51 @@ func TestCLIReportingOwnerEnrollmentScheduleStatusAndExplicitRenew(t *testing.T)
 		if closed.Revision <= released.Revision {
 			t.Fatal("closure did not advance the replica revision")
 		}
+		// Prepare an expired, locally pinned queue without contacting its target.
+		r, e = generation.Open(dir, trust, false)
+		must(e)
+		defer r.Close()
+		op := storage.Hash([]byte("expired upload"))
+		profile := storage.Profile{Kind: "webdav", Endpoint: "https://target.invalid", Namespace: storage.Hash([]byte(domain + "/" + repository)),
+			MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true}
+		limits := upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}
+		queueDir := filepath.Join(filepath.Dir(dir), "uploads", op)
+		must(os.MkdirAll(queueDir, 0700))
+		q, e := upload.OpenQueue(queueDir, node, upload.Authority{Generation: trust, Planner: planner}, limits, true)
+		must(e)
+		end := time.Now().Add(5 * time.Second).Unix()
+		plan, e := upload.Build(ctx, r, id, upload.Plan{Format: upload.Format, Operation: op, Profile: profile, AllowExternal: true,
+			AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{{ID: node, Class: "trusted", PublicKey: nodeKey}},
+			StartMillis: time.Now().UnixMilli(), ExpiresUnix: end, SlotMillis: 1000}, plannerKey)
+		must(e)
+		must(q.Enqueue(ctx, r, plan))
+		must(q.Close())
+		time.Sleep(time.Until(time.Unix(end, 0)))
+
+		draft := filepath.Join(base, "upload-abandonment.json")
+		grantFile := filepath.Join(base, "upload-abandonment-signed.json")
+		_, e = run(ctx, []string{"worker-upload-abandon-preview", "--bootstrap", bootstrap, "--domain", domain, "--operation", op, "--output", draft})
+		must(e)
+		_, e = run(ctx, []string{"upload-abandon-sign", "--key", maintenanceFile, "--input", draft, "--output", grantFile})
+		must(e)
+		abandonArgs := []string{"worker-upload-abandon", "--bootstrap", bootstrap, "--domain", domain, "--operation", op, "--input", grantFile}
+		result, e := run(ctx, abandonArgs)
+		must(e)
+		receipt := result.(upload.AbandonmentReceipt)
+		if receipt.Operation != op || receipt.Plan != storage.Hash(plan) || receipt.ReleasedUnix < end {
+			t.Fatal(receipt)
+		}
+		again, e := run(ctx, abandonArgs)
+		must(e)
+		if again.(upload.AbandonmentReceipt) != receipt {
+			t.Fatal("CLI replay changed abandonment receipt")
+		}
+		after, e := r.Status(ctx)
+		must(e)
+		if len(after.Pins) != 0 {
+			t.Fatal("upload pins remained", after.Pins)
+		}
+		must(r.VerifyComplete(ctx, id))
 	}
 	checkCLICommands(t, base, bootstrap, ownerFile, cfg, ownerKey)
 }

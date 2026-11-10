@@ -24,6 +24,14 @@ Create one queue in an explicitly admitted persistent directory. Its identity bi
 
 Completion is persisted with `CleanupPending` before releasing queue/worker pins. A crash after receipt storage therefore allows local pin release to finish on reopening. Releasing a pin does not itself remove any data; G2 maintenance still requires separate authority. Expiry, cancellation and blocked work retain pins. Error classes are stable bounded codes, not raw endpoint errors that could expose credentials. Operator `Retry` only requeues a blocked, still-valid plan after its cause is corrected; it cannot change the plan or revive expiry. Terminal duplicate admission performs no upload.
 
+## Abandon an expired upload locally
+
+On the admitted worker, generate an unsigned request with `outpost worker-upload-abandon-preview --bootstrap FILE --domain ID --operation ID --output NEW_PRIVATE_REQUEST`. Review the node, domain, epoch, queue instance, generation and exact signed plan digest. A missing or corrupt worker journal, a known successful upload, or a plan within its signed window blocks abandonment.
+
+Sign the exact request offline with `outpost upload-abandon-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_REQUEST --output NEW_SIGNED_GRANT`. Run `outpost worker-upload-abandon --bootstrap FILE --domain ID --operation ID --input SIGNED_GRANT` with the worker stopped. The grant is checked against current policy, expires within 24 hours, and authorizes only the queue and worker generation pins for this job. The queue records the authorization before atomically releasing those pins. Interruption before the receipt can be retried with an active grant. If it expires, prepare a fresh grant for the same binding. Once complete, replay reads the original receipt.
+
+The job stays `EXPIRED`, with its signed plan, worker journal and abandonment receipt retained. Other job, restore and retention pins stay in force. The operation makes no external requests and removes no data. Data retirement and garbage collection still require separate authorization. Old readers reject queues containing abandonment records. For recovery after first use, retain a compatible reader.
+
 ## Minimal consumer sequence and bounds
 
 1. Open the admitted G2 source replica. Call `OpenQueue(absoluteDir, workerID, authority, limits, true)` once; reopen with `false` thereafter.

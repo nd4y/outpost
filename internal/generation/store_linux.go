@@ -652,3 +652,29 @@ func (r *Replica) ReleasePin(ctx context.Context, id string) error {
 		return r.save(*s)
 	})
 }
+
+// ReleaseGenerationPins atomically removes two scoped upload pins. An absent
+// pin is an idempotent replay; a pin bound to other data blocks the whole change.
+func (r *Replica) ReleaseGenerationPins(ctx context.Context, generation, first, second string) error {
+	if !validID(generation) || !validID(first) || !validID(second) || first == second {
+		return ErrInvalid
+	}
+	return r.locked(ctx, func(s *state) error {
+		want := Pin{Generation: generation, Kind: "generation"}
+		changed := false
+		for _, id := range []string{first, second} {
+			if pin, ok := s.Pins[id]; ok {
+				if pin != want {
+					return ErrConflict
+				}
+				delete(s.Pins, id)
+				changed = true
+			}
+		}
+		if !changed {
+			return nil
+		}
+		s.Revision++
+		return r.save(*s)
+	})
+}

@@ -362,20 +362,27 @@ func TestQueueThrottleDeadlineSurvivesReopen(t *testing.T) {
 }
 
 func TestQueueInstancesKeepIndependentPins(t *testing.T) {
-	f := newFixture(t)
+	// The assertion is about independent pins, not the transfer rate.
+	f := fixtureBytes(t, 32<<10)
 	target := f.server(t, "webdav", 0, nil)
-	first, _ := queueFor(t, f, queueLimits())
-	second, _ := queueFor(t, f, queueLimits())
+	limits := queueLimits()
+	limits.AttemptMillis = 60000
+	first, _ := queueFor(t, f, limits)
+	second, _ := queueFor(t, f, limits)
 	raw := f.plan(t, target, 1, 1000)
 	op := planOperation(t, raw, f.authority)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 125*time.Second)
 	defer cancel()
 	must(t, first.Enqueue(ctx, f.replicas[0], raw))
 	must(t, second.Enqueue(ctx, f.replicas[0], raw))
 	if first.pin(op) == second.pin(op) {
 		t.Fatal("independent queues share a pin")
 	}
-	must(t, first.Run(ctx, f.replicas[0], f.resolve(t, target), f.keys[0]))
+	if e := first.Run(ctx, f.replicas[0], f.resolve(t, target), f.keys[0]); e != nil {
+		state, _ := first.Status(context.Background())
+		job := state.Jobs[op]
+		t.Fatalf("first queue: %v (phase %s, attempts %d, error %s)", e, job.Phase, job.Attempts, job.ErrorCode)
+	}
 	pins, e := f.replicas[0].Status(ctx)
 	must(t, e)
 	if len(pins.Pins) != 1 || pins.Pins[second.pin(op)].Generation != f.id {
