@@ -83,14 +83,21 @@ type Service struct {
 }
 
 func Open(ctx context.Context, p Profile, initialize bool) (*Service, error) {
-	return open(ctx, p, initialize, false)
+	return open(ctx, p, initialize, nil)
 }
 
 func RecoverRegistry(ctx context.Context, p Profile) (Status, error) {
 	if !p.RegistryJournalCopy {
 		return Status{}, management.ErrDenied
 	}
-	s, e := open(ctx, p, false, true)
+	s, e := open(ctx, p, false, func(s *Service, options management.Options) error {
+		if _, e := s.loadProfile(true); e != nil {
+			return e
+		}
+		var e error
+		s.registry, e = management.RecoverRegistry(ctx, options)
+		return e
+	})
 	if e != nil {
 		return Status{}, e
 	}
@@ -98,7 +105,42 @@ func RecoverRegistry(ctx context.Context, p Profile) (Status, error) {
 	return s.Status(ctx)
 }
 
-func open(ctx context.Context, p Profile, initialize, recoverJournal bool) (*Service, error) {
+func EnableRegistryJournal(ctx context.Context, p Profile) (Status, error) {
+	if !p.RegistryJournalCopy {
+		return Status{}, management.ErrDenied
+	}
+	s, e := open(ctx, p, false, func(s *Service, options management.Options) error {
+		old, e := s.loadProfile(false)
+		if e != nil {
+			return e
+		}
+		if old.Revision == s.p.Revision && old.ProfileDigest == s.p.digest() {
+			s.registry, e = management.Open(options)
+			return e
+		}
+		if s.p.Revision < 2 || old.Revision != s.p.Revision-1 {
+			return management.ErrConflict
+		}
+		previous := s.p
+		previous.Revision--
+		previous.RegistryJournalCopy = false
+		if old.ProfileDigest != previous.digest() {
+			return management.ErrConflict
+		}
+		s.registry, e = management.EnableRegistryJournal(ctx, options)
+		if e != nil {
+			return e
+		}
+		return s.saveProfile(old)
+	})
+	if e != nil {
+		return Status{}, e
+	}
+	defer s.Close()
+	return s.Status(ctx)
+}
+
+func open(ctx context.Context, p Profile, initialize bool, underLease func(*Service, management.Options) error) (*Service, error) {
 	if p.Format != Format || p.Revision == 0 || p.Revision > management.MaxSafeInteger || p.Local.Format != worker.BootstrapFormat || p.Local.Volume.Scope != p.Local.Node || !storage.ID(p.Local.Node) || len(p.Local.Owner) != 32 || !filepath.IsAbs(p.Local.Directory) || p.Local.ControlEndpoint != "" || p.Local.ControlIdentity != "" || p.Local.Listen != "" || p.Local.StorageCAFile != "" || len(p.Local.Credentials) != 0 || p.ReconcileSeconds < 1 || p.ReconcileSeconds > 3600 {
 		return nil, management.ErrInvalid
 	}
@@ -191,14 +233,9 @@ func open(ctx context.Context, p Profile, initialize, recoverJournal bool) (*Ser
 			}
 			return s.saveProfile(serviceState{})
 		})
-	} else if recoverJournal {
+	} else if underLease != nil {
 		e = s.lease.WithLock(ctx, func() error {
-			if _, e := s.loadProfile(true); e != nil {
-				return e
-			}
-			var repairErr error
-			s.registry, repairErr = management.RecoverRegistry(ctx, options)
-			return repairErr
+			return underLease(s, options)
 		})
 	} else {
 		if _, e = s.loadProfile(false); e == nil {

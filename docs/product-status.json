@@ -1177,6 +1177,14 @@
       ],
       "checks": [
         {
+          "path": "internal/management/registry_journal_linux_test.go",
+          "name": "TestManagementRegistryJournalEnablesFromExactLegacyPredecessor"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceJournalEnableResumesAfterRegistryCommit"
+        },
+        {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestLostReplyRestartAndDuplicateTransfer"
         },
@@ -7473,6 +7481,14 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/management/registry_journal_linux_test.go",
+          "name": "TestManagementRegistryJournalEnablesFromExactLegacyPredecessor"
+        },
+        {
+          "path": "internal/managementservice/service_linux_test.go",
+          "name": "TestManagementServiceJournalEnableResumesAfterRegistryCommit"
+        },
         {
           "path": "internal/generation/maintenance_replay_linux_test.go",
           "name": "TestMaintenanceLegacyReceiptNeedsNewAuthorityAndOldReaderRejectsV3"

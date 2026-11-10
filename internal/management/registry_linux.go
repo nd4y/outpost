@@ -102,18 +102,32 @@ type Registry struct {
 	Fault func(string) error
 }
 
+type registryOpenMode uint8
+
+const (
+	registryNormal registryOpenMode = iota
+	registryRepair
+	registryEnableCopy
+)
+
 func Open(o Options) (*Registry, error) {
-	return openRegistry(context.Background(), o, false)
+	return openRegistry(context.Background(), o, registryNormal)
 }
 
 // RecoverRegistry opens the exact repaired registry. The management service
 // supplies the stopped-service lease and the admitted storage guard.
 func RecoverRegistry(ctx context.Context, o Options) (*Registry, error) {
-	return openRegistry(ctx, o, true)
+	return openRegistry(ctx, o, registryRepair)
 }
 
-func openRegistry(ctx context.Context, o Options, recoverJournal bool) (*Registry, error) {
-	if recoverJournal && (o.Initialize || !o.JournalCopy) {
+// EnableRegistryJournal converts an admitted registry to journal-copy mode.
+// The management service supplies the stopped-service lease and profile fence.
+func EnableRegistryJournal(ctx context.Context, o Options) (*Registry, error) {
+	return openRegistry(ctx, o, registryEnableCopy)
+}
+
+func openRegistry(ctx context.Context, o Options, mode registryOpenMode) (*Registry, error) {
+	if mode != registryNormal && (o.Initialize || !o.JournalCopy) {
 		return nil, ErrInvalid
 	}
 	if len(o.Owner) != 32 || len(o.Signer) != 64 || bytes.Equal(o.Owner, o.Signer.Public().(ed25519.PublicKey)) {
@@ -152,8 +166,11 @@ func openRegistry(ctx context.Context, o Options, recoverJournal bool) (*Registr
 				return e
 			}
 		}
-		if recoverJournal {
-			return r.recoverRegistryJournal(ctx)
+		switch mode {
+		case registryRepair:
+			return r.recoverRegistryJournal(ctx, false)
+		case registryEnableCopy:
+			return r.enableRegistryJournal(ctx)
 		}
 		_, e := r.load()
 		if o.Initialize {

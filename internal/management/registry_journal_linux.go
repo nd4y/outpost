@@ -95,7 +95,28 @@ func (r *Registry) checkRegistryJournal(raw []byte) error {
 	return nil
 }
 
-func (r *Registry) recoverRegistryJournal(ctx context.Context) error {
+func (r *Registry) enableRegistryJournal(ctx context.Context) error {
+	raw, e := r.store.Read("registry.json")
+	if errors.Is(e, os.ErrNotExist) {
+		return r.recoverRegistryJournal(ctx, true)
+	}
+	if e != nil {
+		return e
+	}
+	s, e := validateRegistry(raw, r.owner, r.signer.Public().(ed25519.PublicKey))
+	if e != nil {
+		return e
+	}
+	if s.JournalCopy || r.requireNoJournalCopy() != nil {
+		return r.recoverRegistryJournal(ctx, true)
+	}
+	if e = r.verifyRegistryDependencies(ctx, s); e != nil {
+		return e
+	}
+	return r.save(s)
+}
+
+func (r *Registry) recoverRegistryJournal(ctx context.Context, enabling bool) error {
 	prior, e := r.store.Read("registry.json")
 	missing := errors.Is(e, os.ErrNotExist)
 	if e != nil && !missing {
@@ -106,12 +127,13 @@ func (r *Registry) recoverRegistryJournal(ctx context.Context) error {
 		return e
 	}
 	anchor, e := r.store.Read(registryJournalAnchorName)
-	if e != nil {
+	unanchored := enabling && errors.Is(e, os.ErrNotExist)
+	if e != nil && !unanchored {
 		return errors.Join(ErrRegistryJournal, e)
 	}
 	next := storage.Hash(copy.Registry)
 	current := bytes.Equal(prior, copy.Registry)
-	if string(anchor) != next && (missing || current || string(anchor) != copy.Previous) {
+	if string(anchor) != next && (missing || current || !unanchored && string(anchor) != copy.Previous) {
 		return ErrRegistryJournal
 	}
 	signer := r.signer.Public().(ed25519.PublicKey)
@@ -121,10 +143,42 @@ func (r *Registry) recoverRegistryJournal(ctx context.Context) error {
 	}
 	if !missing && !current {
 		before, e := validateRegistry(prior, r.owner, signer)
-		if e != nil || !before.JournalCopy || copy.Previous != storage.Hash(prior) || s.Revision != before.Revision+1 {
+		if e != nil || copy.Previous != storage.Hash(prior) || s.Revision != before.Revision+1 {
 			return errors.Join(ErrRegistryJournal, e)
 		}
+		if before.JournalCopy {
+			if unanchored {
+				return ErrRegistryJournal
+			}
+		} else if !enabling || !sameRegistryAfterEnabling(before, s) {
+			return ErrRegistryJournal
+		}
 	}
+	if e = r.verifyRegistryDependencies(ctx, s); e != nil || current {
+		return e
+	}
+	if string(anchor) != next {
+		if e = r.store.Write(registryJournalAnchorName, []byte(next)); e != nil {
+			return e
+		}
+	}
+	return errors.Join(r.store.Write("registry.json", copy.Registry), r.check(ctx))
+}
+
+func sameRegistryAfterEnabling(before, after registryState) bool {
+	if after.ObservedUnix < before.ObservedUnix {
+		return false
+	}
+	before.JournalCopy = true
+	before.Revision = after.Revision
+	before.ObservedUnix = after.ObservedUnix
+	before.Signature = after.Signature
+	prior, priorErr := json.Marshal(before)
+	next, nextErr := json.Marshal(after)
+	return priorErr == nil && nextErr == nil && bytes.Equal(prior, next)
+}
+
+func (r *Registry) verifyRegistryDependencies(ctx context.Context, s registryState) error {
 	for _, ref := range snapshotRefs(s)[1:] {
 		if e := ctx.Err(); e != nil {
 			return e
@@ -137,13 +191,5 @@ func (r *Registry) recoverRegistryJournal(ctx context.Context) error {
 			return errors.Join(ErrRegistryJournal, e)
 		}
 	}
-	if e = r.check(ctx); e != nil || current {
-		return e
-	}
-	if string(anchor) != next {
-		if e = r.store.Write(registryJournalAnchorName, []byte(next)); e != nil {
-			return e
-		}
-	}
-	return errors.Join(r.store.Write("registry.json", copy.Registry), r.check(ctx))
+	return r.check(ctx)
 }

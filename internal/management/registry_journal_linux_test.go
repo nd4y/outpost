@@ -9,6 +9,57 @@ import (
 	"testing"
 )
 
+func TestManagementRegistryJournalEnablesFromExactLegacyPredecessor(t *testing.T) {
+	for _, point := range []string{"management-registry-copy-durable", "management-registry-anchor-durable"} {
+		t.Run(point, func(t *testing.T) {
+			f := newFixture(t)
+			ctx := context.Background()
+			_, req, _ := commandFixture(t, f)
+			receipt, e := f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req)
+			must(t, e)
+			before, e := f.r.load()
+			must(t, e)
+			f.r.journalCopy = true
+			f.r.Fault = interruptAt(point)
+			e = f.r.store.WithLock(ctx, func() error { return f.r.enableRegistryJournal(ctx) })
+			if e == nil {
+				t.Fatal("missing migration interruption")
+			}
+			pending, e := f.r.readRegistryJournal()
+			must(t, e)
+			must(t, f.r.Close())
+			f.r = nil
+			if r, e := Open(f.options); !errors.Is(e, ErrRegistryJournal) {
+				if r != nil {
+					r.Close()
+				}
+				t.Fatal("old profile bypassed pending migration", e)
+			}
+			f.options.JournalCopy = true
+			if r, e := RecoverRegistry(ctx, f.options); !errors.Is(e, ErrRegistryJournal) {
+				if r != nil {
+					r.Close()
+				}
+				t.Fatal("ordinary recovery performed profile migration", e)
+			}
+			f.r, e = EnableRegistryJournal(ctx, f.options)
+			must(t, e)
+			actual, e := f.r.store.Read("registry.json")
+			must(t, e)
+			after, e := f.r.load()
+			must(t, e)
+			if !bytes.Equal(actual, pending.Registry) || !sameRegistryAfterEnabling(before, after) || after.Revision != before.Revision+1 {
+				t.Fatal("migration changed original state")
+			}
+			repeated, e := f.r.AdmitCommand(ctx, f.p, f.e.Tenant, f.e.Node, req)
+			must(t, e)
+			if repeated != receipt {
+				t.Fatal("migration changed original receipt", repeated)
+			}
+		})
+	}
+}
+
 func TestManagementRegistryJournalRepairsInterruptedCommit(t *testing.T) {
 	for _, point := range []string{"management-registry-copy-durable", "management-registry-anchor-durable"} {
 		t.Run(point, func(t *testing.T) {

@@ -36,6 +36,41 @@ func must(t *testing.T, e error) {
 }
 func id(s string) string { return storage.Hash([]byte(s)) }
 
+func TestManagementServiceJournalEnableResumesAfterRegistryCommit(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	s, e := Open(ctx, f.p, true)
+	must(t, e)
+	// Simulate the durable registry commit followed by a lost process before
+	// the new profile receipt. Only the exact old profile can authorize retry.
+	must(t, s.lease.WithLock(ctx, func() error {
+		r, e := management.EnableRegistryJournal(ctx, management.Options{Root: s.root, Directory: "registry", Owner: f.p.Local.Owner, Signer: s.signer, JournalCopy: true, Guard: s.guard, Admission: s.admission("registry")})
+		if e != nil {
+			return e
+		}
+		return r.Close()
+	}))
+	must(t, s.Close())
+	candidate := f.p
+	candidate.RegistryJournalCopy = true
+	candidate.Revision++
+	changed := candidate
+	changed.ReconcileSeconds++
+	if _, e = EnableRegistryJournal(ctx, changed); !errors.Is(e, management.ErrConflict) {
+		t.Fatal("migration accepted unrelated profile changes", e)
+	}
+	status, e := EnableRegistryJournal(ctx, candidate)
+	must(t, e)
+	if status.ProfileRevision != candidate.Revision || status.ProfileDigest != candidate.digest() {
+		t.Fatal(status)
+	}
+	repeated, e := EnableRegistryJournal(ctx, candidate)
+	must(t, e)
+	if repeated.ProfileDigest != status.ProfileDigest {
+		t.Fatal("retry changed admitted profile", repeated)
+	}
+}
+
 type fixture struct {
 	p                      Profile
 	owner                  ed25519.PrivateKey

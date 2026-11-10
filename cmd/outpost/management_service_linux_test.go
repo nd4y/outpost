@@ -64,7 +64,6 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	must(listener.Close())
 	profile := managementservice.Profile{Format: managementservice.Format, Revision: 1, Local: worker.Bootstrap{Format: worker.BootstrapFormat, Node: node, Owner: owner, Directory: filepath.Join(root, "management"), Volume: binding, CertificateFile: certFile, PrivateKeyFile: keyFile, CAFile: certFile}, Listen: address, Origin: "https://" + address, Principals: []management.Principal{{Actor: node, Roles: []string{"owner"}, Scopes: []management.Scope{{Tenant: storage.Hash([]byte("tenant")), Domain: storage.Hash([]byte("domain"))}}}}, Limits: diskbudget.Limits{Capacity: 64 << 20, Reserve: 8 << 20, Spool: 16 << 20, Telemetry: 1 << 20}, Concurrency: 1, TimeoutMillis: 500, ReportMaxAgeSeconds: 30, ReconcileSeconds: 1}
 	file := filepath.Join(base, "private-profile.json")
-	profile.RegistryJournalCopy = true
 	write := func() { raw, e := json.Marshal(profile); must(e); must(os.WriteFile(file, raw, 0600)) }
 	write()
 	invoke := func(name string) any {
@@ -118,6 +117,11 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	if _, e = run(ctx, []string{"management-init", "--input", file}); e == nil {
 		t.Fatal("runtime reinitialized")
 	}
+	profile.Revision = 2
+	profile.RegistryJournalCopy = true
+	write()
+	invoke("management-registry-copy-enable")
+	invoke("management-registry-copy-enable")
 	registryPath := filepath.Join(profile.Local.Directory, "registry", "registry.json")
 	registry, e := os.ReadFile(registryPath)
 	must(e)
@@ -131,17 +135,17 @@ func TestCLIManagementPrivateEnrollmentProfileRevisionAndTLSRun(t *testing.T) {
 	if !bytes.Equal(registry, actual) {
 		t.Fatal("CLI changed recovered registry bytes")
 	}
-	profile.Revision = 2
+	profile.Revision = 3
 	write()
 	invoke("management-profile-set")
 	invoke("management-profile-set")
 	invoke("management-status")
-	profile.Revision = 1
+	profile.Revision = 2
 	write()
 	if _, e = run(ctx, []string{"management-status", "--input", file}); e == nil {
 		t.Fatal("old profile admitted")
 	}
-	profile.Revision = 2
+	profile.Revision = 3
 	write()
 	roots := x509.NewCertPool()
 	roots.AddCert(leaf)
