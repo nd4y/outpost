@@ -25,11 +25,13 @@ def main():
     p.add_argument("--bytes", type=int, default=100 << 30)
     p.add_argument("--container-image", default="")
     p.add_argument("--filesystem-uuid", default="")
+    p.add_argument("--phase-timeout-seconds", type=int, default=7200)
     a = p.parse_args()
     limits = json.loads(a.limits.read_text())
     root = a.root
     assert root.is_absolute() and not root.exists(), "new isolated root required"
     assert 128 << 20 <= a.bytes <= 100 << 30
+    assert 60 <= a.phase_timeout_seconds <= 43200, "phase timeout must be between 60 and 43200 seconds"
     for binary in (a.kit_binary, a.fixture_binary):
         assert binary.is_absolute() and binary.is_file()
     if a.container_image:
@@ -72,6 +74,7 @@ def main():
                   "baselineBytes": a.bytes, "fullScale": a.bytes == limits["sourceBytes"],
                   "isolation": "networkless-container" if a.container_image else "native-fixture",
                   "image": a.container_image, "filesystemUUID": a.filesystem_uuid,
+                  "phaseTimeoutSeconds": a.phase_timeout_seconds,
                   "filesystemBytes": initial.total, "peakObservedFilesystemUsed": peak_used,
                   "minimumObservedFilesystemFreeRatio": min_free, "operations": receipts,
                   "binarySha256": {"kit": hashlib.sha256(a.kit_binary.read_bytes()).hexdigest(),
@@ -111,7 +114,7 @@ def main():
         stderr_path = root / ("results/" + label + ".stderr")
         with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr:
             process = subprocess.Popen(cmd, stdout=stdout, stderr=stderr, text=True)
-            deadline = time.monotonic() + 7200
+            deadline = time.monotonic() + a.phase_timeout_seconds
             try:
                 while process.poll() is None:
                     capacity()

@@ -61,6 +61,15 @@ runpy.run_path(sys.argv[0],run_name='__main__')
         self.assertIn("pin the container image", result.stderr)
         self.assertFalse(self.root.exists())
 
+    def test_phase_timeout_is_bounded_before_root_creation(self):
+        self.stub("raise SystemExit('must not execute')\n")
+        for seconds in (0, 59, 43201):
+            with self.subTest(seconds=seconds):
+                result = self.invoke(extra=("--phase-timeout-seconds", str(seconds)))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("phase timeout must be between", result.stderr)
+                self.assertFalse(self.root.exists())
+
     def test_successful_subprocess_cannot_hide_failed_postcondition(self):
         self.stub("""import json, pathlib, sys
 if len(sys.argv)>1 and sys.argv[1]=='recovery-key':
@@ -71,7 +80,7 @@ if '-op' in sys.argv and sys.argv[sys.argv.index('-op')+1]=='generate':
     pathlib.Path(sys.argv[sys.argv.index('-file')+1]).write_bytes(b'x')
 print(json.dumps({'maxRSSKiB':0,'result':{'sourceBytes':0}}))
 """)
-        result = self.invoke()
+        result = self.invoke(extra=("--phase-timeout-seconds", "21600"))
         self.assertNotEqual(result.returncode, 0)
         report = json.loads((self.root / "results/report.json").read_text())
         self.assertEqual(report["status"], "FAIL")
@@ -79,6 +88,7 @@ print(json.dumps({'maxRSSKiB':0,'result':{'sourceBytes':0}}))
         self.assertEqual(report["operations"][-1]["status"], "PASS")
         self.assertFalse(report["fullScale"])
         self.assertEqual(report["filesystemUUID"], "")
+        self.assertEqual(report["phaseTimeoutSeconds"], 21600)
         self.assertGreater(report["filesystemBytes"], 0)
         self.assertFalse((self.root / "results/PASS").exists())
         self.assertEqual([p.name for p in (self.root / "recovery").iterdir()], ["owner.json"])
@@ -91,6 +101,7 @@ print(json.dumps({'maxRSSKiB':0,'result':{'sourceBytes':0}}))
         raw = (self.root / "results/report.json").read_text()
         report = json.loads(raw)
         self.assertEqual(report["status"], "FAIL")
+        self.assertEqual(report["phaseTimeoutSeconds"], 7200)
         self.assertEqual(report["failure"], {"afterLabel": "keygen", "errorType": "RuntimeError"})
         self.assertEqual(report["operations"], [{"label": "keygen", "exitCode": 3, "status": "FAIL"}])
         self.assertNotIn("sensitive diagnostic text", raw)
