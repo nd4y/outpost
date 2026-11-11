@@ -1,6 +1,6 @@
 # Private source agent
 
-[Русский](../ru/source-agent.md)
+[Р СѓСЃСЃРєРёР№](../ru/source-agent.md)
 
 The Linux agent joins the [source lifecycle](source-jobs.md) to an enrolled [runtime volume](runtime-volume.md), private metadata cache and HTTPS ingress. The installed tree provider declares `best-effort` consistency. It verifies the enrolled filesystem/root inode, rejects links and overlap with runtime storage, and never deletes, unmounts or changes source files when releasing its view.
 
@@ -38,6 +38,8 @@ Apply `outpost-control-2` to both receivers with the other receiver's ID in `cap
 The source keeps at most two payload packs in flight. With the default full-copy policy and the two-holder coverage policy, it starts with equal allocation of initial ciphertext bytes, then uses smoothed throughput from successful durable PUTs of at least 256 KiB. The target ratio for initial bytes is capped at 4:1. The source starts measuring again after a restart. Small metadata, skipped uploads and peer pulls do not influence the measured rate. A receiver reads an accepted object directly from its peer over mTLS. The object is durable before the destination confirms it. The source records pack progress after both writes and seals the generation only after all required packs and metadata are available. An accepted exact ciphertext object can be reused on retry. The two holders verify the complete catalog independently in bounded steps. After a transient publication timeout the source replays the same catalog with a limited number of attempts. By default, snapshot release waits for the verified two-copy checkpoint.
 
 The bootstrap anchors and signed companion receipt are private installation state. Preserve them and both receiver histories across restart. With a fixed pair, both configured holders remain required throughout the operation.
+
+Payload writes keep the backend-declared bounded window. Any durably completed write frees its slot, allowing another write to start while an older transfer remains pending. The encrypted progress hash chain records accepted block sets in completion order; replay validates them and rescans the source. The file descriptor is published after every payload write has been confirmed. Full-replica and distributed-coverage release thresholds are checked separately.
 
 ### Release on durable coverage from both holders
 

@@ -149,39 +149,39 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 		}
 	}
 	type acceptance struct {
-		created bool
-		err     error
-	}
-	type pendingPack struct {
 		ref        Object
 		checkpoint []Block
-		result     <-chan acceptance
+		created    bool
+		err        error
 	}
-	var writes []pendingPack
+	var completed chan acceptance
+	inFlight := 0
 	writeCtx := ctx
 	if width > 1 {
+		completed = make(chan acceptance, width)
 		var cancel context.CancelFunc
 		writeCtx, cancel = context.WithCancel(ctx)
 		defer func() {
 			cancel()
-			for _, write := range writes {
-				<-write.result
+			for inFlight > 0 {
+				<-completed
+				inFlight--
 			}
 		}()
 	}
-	commitFirst := func() error {
-		write := writes[0]
-		writes[0] = pendingPack{}
-		writes = writes[1:]
-		result := <-write.result
+	commitCompleted := func() error {
+		result := <-completed
+		inFlight--
 		if result.err != nil {
 			return result.err
 		}
-		if e := s.recordRemoteWrite(write.ref, false, result.created); e != nil {
+		if e := s.recordRemoteWrite(result.ref, false, result.created); e != nil {
 			return e
 		}
 		if progress != nil {
-			return progress.append(ctx, write.checkpoint)
+			// Progress is a set of accepted blocks, not a source cursor.
+			// Its serial hash chain may follow durable completion order.
+			return progress.append(ctx, result.checkpoint)
 		}
 		return nil
 	}
@@ -197,8 +197,8 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 				return e
 			}
 		} else {
-			if len(writes) == width {
-				if e := commitFirst(); e != nil {
+			if inFlight == width {
+				if e := commitCompleted(); e != nil {
 					return e
 				}
 			}
@@ -218,11 +218,10 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 			}
 		}
 		if width > 1 {
-			result := make(chan acceptance, 1)
-			writes = append(writes, pendingPack{ref: ref, checkpoint: checkpoint, result: result})
+			inFlight++
 			go func(payload []byte) {
 				created, e := s.backend.Write(writeCtx, ref, payload)
-				result <- acceptance{created: created, err: e}
+				completed <- acceptance{ref: ref, checkpoint: checkpoint, created: created, err: e}
 			}(pack)
 			pack = make([]byte, 0, MaxObject)
 		} else {
@@ -287,8 +286,8 @@ func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (
 	if err = flush(); err != nil {
 		return s.Stats, err
 	}
-	for len(writes) != 0 {
-		if err = commitFirst(); err != nil {
+	for inFlight != 0 {
+		if err = commitCompleted(); err != nil {
 			return s.Stats, err
 		}
 	}
