@@ -146,6 +146,7 @@ func newFixtureWithAuthority(t *testing.T, ca *authority) *fixture {
 	_, e = rand.Read(f.old)
 	must(t, e)
 	must(t, os.WriteFile(f.input, f.old, 0640))
+	must(t, os.Chmod(f.input, 0640))
 	return f
 }
 func (f *fixture) policy(n *node, peers ...*node) Policy {

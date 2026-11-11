@@ -35,6 +35,10 @@ jobs:
           CGO_ENABLED=0 go build -trimpath -o out/outpost-fixture ./cmd/outpost-fixture
       - name: File-kit runner admission and failure evidence
         run: python3 -m unittest discover -s experiments/filekit -p test_run.py -v
+      - name: Retained-history metadata under restrictive file creation
+        run: |
+          umask 077
+          go test -p=1 -count=1 -run '^TestOfflineHistoryAcrossMaintenanceAndPolicyChange$' ./internal/peer
       - name: Independent file-kit fixture (bounded, not full-scale acceptance)
         run: |
           python3 experiments/filekit/run.py --root "$RUNNER_TEMP/outpost-filekit" \

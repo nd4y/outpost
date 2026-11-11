@@ -8,6 +8,8 @@ Status: bounded Linux library candidate in `internal/peer`, built on the [G2 rep
 
 ## Trust and routes
 
+The retained-history recovery fixture explicitly sets the source file permissions before capture. Its metadata oracle therefore checks the same declared permissions under restrictive and ordinary process umasks. Restored aliases must still refer to one inode, and restored permission bits must match the captured source.
+
 Each domain/repository/epoch uses an explicitly provisioned `Policy`, a CA-verified TLS certificate and pinned peer public-key identities (SHA-256 of the certificate SPKI). The policy defines the local class, allowed classes and concrete peer grants for push/pull with expiry. Trusted status grants no decryption key. An external S3-compatible or WebDAV target is not a peer.
 
 The client accepts one explicit HTTPS origin. It validates the CA, hostname and pinned identity; it follows no redirects, ambient proxy settings, discovery or alternate routes. The server requires a verified client certificate, TLS 1.3 and an allowed peer/operation on every request. Grants and leaf certificates are checked for expiry, including reused connections. Requests are scoped to a domain; the replica's immutable public trust binds the repository, epoch and catalog author. A sender cannot supply a replacement author key or classify itself as trusted.
