@@ -23,7 +23,7 @@ import (
 )
 
 func testSchedule() Schedule {
-	return Schedule{ScheduleFormat, 1, true, 3600, 1, 10, time.Now().Unix()}
+	return Schedule{Format: ScheduleFormat, Revision: 1, Enabled: true, IntervalSeconds: 3600, RetrySeconds: 1, AttemptSeconds: 10, StartUnix: time.Now().Unix()}
 }
 func TestSourceScheduleReconcilesAcceptedHeadAndRestoresSuccessiveGenerations(t *testing.T) {
 	f := newFixture(t)

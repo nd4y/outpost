@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/nd4y/outpost/internal/capture"
@@ -14,6 +15,7 @@ import (
 	"github.com/nd4y/outpost/internal/observation"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/worker"
 )
 
 const ScheduleFormat = "outpost-source-schedule-1"
@@ -41,17 +43,42 @@ func (c *ScheduleControl) Configure(ctx context.Context, s Schedule) error {
 }
 
 type Schedule struct {
-	Format          string `json:"format"`
-	Revision        uint64 `json:"revision"`
-	Enabled         bool   `json:"enabled"`
-	IntervalSeconds int64  `json:"intervalSeconds"`
-	RetrySeconds    int64  `json:"retrySeconds"`
-	AttemptSeconds  int64  `json:"attemptSeconds"`
-	StartUnix       int64  `json:"startUnix"`
+	Format               string `json:"format"`
+	Revision             uint64 `json:"revision"`
+	Enabled              bool   `json:"enabled"`
+	IntervalSeconds      int64  `json:"intervalSeconds"`
+	RetrySeconds         int64  `json:"retrySeconds"`
+	AttemptSeconds       int64  `json:"attemptSeconds"`
+	StartUnix            int64  `json:"startUnix"`
+	RelayAuthorityFile   string `json:"relayAuthorityFile,omitempty"`
+	RelayAuthoritySHA256 string `json:"relayAuthoritySHA256,omitempty"`
 }
 
 func (s Schedule) valid() bool {
-	return s.Format == ScheduleFormat && s.Revision > 0 && s.IntervalSeconds >= 1 && s.IntervalSeconds <= 31622400 && s.RetrySeconds >= 1 && s.RetrySeconds <= 3600 && s.AttemptSeconds >= 1 && s.AttemptSeconds <= 86400 && s.StartUnix >= 1 && s.StartUnix <= 1<<40
+	return s.Format == ScheduleFormat && s.Revision > 0 && s.IntervalSeconds >= 1 && s.IntervalSeconds <= 31622400 && s.RetrySeconds >= 1 && s.RetrySeconds <= 3600 && s.AttemptSeconds >= 1 && s.AttemptSeconds <= 86400 && s.StartUnix >= 1 && s.StartUnix <= 1<<40 &&
+		(s.RelayAuthorityFile == "" && s.RelayAuthoritySHA256 == "" || filepath.IsAbs(s.RelayAuthorityFile) && storage.ID(s.RelayAuthoritySHA256))
+}
+
+func (a *Agent) scheduledRelayAuthority(c Schedule) ([]byte, error) {
+	if c.RelayAuthorityFile == "" {
+		return nil, nil
+	}
+	raw, err := worker.ReadPrivate(c.RelayAuthorityFile, ingress.MaxDocument)
+	if err != nil {
+		return nil, err
+	}
+	if storage.Hash(raw) != c.RelayAuthoritySHA256 {
+		return nil, ingress.ErrDenied
+	}
+	recipient, err := ingress.VerifyAuthorityDocument(raw, a.b.Local.Owner)
+	if err != nil || recipient.Ingress == a.anchor.Ingress || recipient.Ingress == a.companion.Ingress || recipient.Ingress == a.reserve.Ingress {
+		return nil, ingress.ErrDenied
+	}
+	recipient.Ingress = a.anchor.Ingress
+	if !ingress.SameAuthorityScope(recipient, a.anchor) {
+		return nil, ingress.ErrDenied
+	}
+	return raw, nil
 }
 
 type ScheduleStatus struct {
@@ -184,6 +211,9 @@ func (a *Agent) ConfigureSchedule(ctx context.Context, c Schedule) error {
 				return nil
 			}
 		}
+		if _, e = a.scheduledRelayAuthority(c); e != nil {
+			return e
+		}
 		s.Config = c
 		s.NextUnix = max(c.StartUnix, time.Now().Unix())
 		s.RetryUnix = 0
@@ -279,6 +309,10 @@ func (a *Agent) attemptSchedule(ctx context.Context, expected Schedule) error {
 		if now < status.RetryUnix || (head.Phase == "IDLE" || head.Phase == "COMPLETE" || head.Phase == "ABANDONED") && now < status.NextUnix {
 			return nil
 		}
+		relay, e := a.scheduledRelayAuthority(expected)
+		if e != nil {
+			return e
+		}
 		e = a.store.WithLock(ctx, func() error {
 			s, e := a.loadSchedule()
 			if e != nil {
@@ -323,7 +357,7 @@ func (a *Agent) attemptSchedule(ctx context.Context, expected Schedule) error {
 		if e != nil {
 			return e
 		}
-		if e = a.run(ctx); e != nil {
+		if e = a.runCapture(ctx, nil, nil, relay); e != nil {
 			return e
 		}
 		head, e = a.load()

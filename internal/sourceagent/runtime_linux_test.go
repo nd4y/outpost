@@ -80,7 +80,7 @@ func TestSourceRunOffersRelayBeforeUploading(t *testing.T) {
 	grant.Ingress = storage.Hash([]byte("downstream recipient"))
 	authority, err := ingress.SignAuthority(grant, f.ownerSigner)
 	must(t, err)
-	var offered, uploadAfterOffer atomic.Bool
+	var offered, uploadAfterOffer atomic.Int64
 	f.registryMu.Lock()
 	f.intercept = func(w http.ResponseWriter, r *http.Request) bool {
 		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/relay-intent") {
@@ -97,7 +97,7 @@ func TestSourceRunOffersRelayBeforeUploading(t *testing.T) {
 				http.Error(w, "invalid offer", http.StatusBadRequest)
 				return true
 			}
-			offered.Store(true)
+			offered.Add(1)
 			w.WriteHeader(http.StatusAccepted)
 			return true
 		}
@@ -110,13 +110,35 @@ func TestSourceRunOffersRelayBeforeUploading(t *testing.T) {
 	}
 	f.registryMu.Unlock()
 	must(t, f.a.Prepare(ctx, original))
-	if err = f.a.RunWithRelay(ctx, authority); err == nil || !offered.Load() || !uploadAfterOffer.Load() {
+	if err = f.a.RunWithRelay(ctx, authority); err == nil || offered.Load() != 1 || uploadAfterOffer.Load() != 1 {
 		t.Fatalf("source did not offer admission before uploading: %v", err)
 	}
 	status, err := f.a.Status(ctx)
 	must(t, err)
 	if status.Phase != "ACTIVE" || status.Operation != i.Operation {
 		t.Fatalf("interrupted source lost the original active capture: %+v", status)
+	}
+
+	path := filepath.Join(f.base, "signed-recipient.json")
+	must(t, os.WriteFile(path, authority, 0600))
+	schedule := Schedule{Format: ScheduleFormat, Revision: 1, Enabled: true, IntervalSeconds: 60, RetrySeconds: 1, AttemptSeconds: 60, StartUnix: time.Now().Unix(), RelayAuthorityFile: path, RelayAuthoritySHA256: storage.Hash(authority)}
+	must(t, f.a.ConfigureSchedule(ctx, schedule))
+	changed := grant
+	changed.Revision++
+	modified, err := ingress.SignAuthority(changed, f.ownerSigner)
+	must(t, err)
+	must(t, os.WriteFile(path, modified, 0600))
+	if err = f.a.attemptSchedule(ctx, schedule); !errors.Is(err, ingress.ErrDenied) || offered.Load() != 1 {
+		t.Fatalf("scheduled capture used a replacement authority: %v", err)
+	}
+	must(t, os.WriteFile(path, authority, 0600))
+	if err = f.a.attemptSchedule(ctx, schedule); err == nil || offered.Load() != 2 || uploadAfterOffer.Load() != 2 {
+		t.Fatalf("scheduled retry did not offer the same intent before uploading: %v", err)
+	}
+	scheduled, err := f.a.ScheduleStatus(ctx)
+	must(t, err)
+	if scheduled.Config != schedule || scheduled.Operation != i.Operation || scheduled.Attempts != 1 {
+		t.Fatalf("schedule did not retain its active intent and exact revision: %+v", scheduled)
 	}
 }
 func newFixtureLifetime(t *testing.T, seconds int64) *fixture {
