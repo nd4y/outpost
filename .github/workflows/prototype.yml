@@ -33,6 +33,8 @@ jobs:
           CGO_ENABLED=0 go build -trimpath -o out/outpost-lab ./cmd/outpost-lab
           CGO_ENABLED=0 go build -trimpath -o out/outpost-kit ./cmd/outpost-kit
           CGO_ENABLED=0 go build -trimpath -o out/outpost-fixture ./cmd/outpost-fixture
+      - name: File-kit runner admission and failure evidence
+        run: python3 -m unittest discover -s experiments/filekit -p test_run.py -v
       - name: Independent file-kit fixture (bounded, not full-scale acceptance)
         run: |
           python3 experiments/filekit/run.py --root "$RUNNER_TEMP/outpost-filekit" \
