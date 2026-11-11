@@ -84,7 +84,7 @@ jobs:
           export OUTPOST_RECOVERY_MANIFEST_SHA256="$current_hash"
           export OUTPOST_RECOVERY_REQUIRE_CLI=1
           go test -count=1 -timeout=150s \
-            -run 'RecoveryPackage|SourceRecoveryExport|SourceRecoveryPackage|CLIOwnerRecoveryPackage' \
+            -run 'RecoveryPackage|SourceRecoveryExport|SourceRecoveryPackage|CLIOwnerRecoveryPackage|OwnerEpochCLI|WriterFence' \
             -v ./internal/recoverybundle ./internal/sourceagent ./cmd/outpost
       - name: Settle an expired source through the selected native CLI
         env:

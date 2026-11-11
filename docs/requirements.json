@@ -233,7 +233,7 @@
       "stage": "release",
       "milestones": ["M1"],
       "level": "MUST",
-      "acceptance": ["AT-01", "AT-24"],
+      "acceptance": ["AT-01", "AT-18", "AT-24"],
       "id": "REQ-08"
     },
     {

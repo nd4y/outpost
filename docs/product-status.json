@@ -618,8 +618,8 @@
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
         }
       ],
-      "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Offline epoch preparation authenticates the preceding package and checkpoint and creates distinct keys and repository trust. The old source accepts an exact owner-signed local writer fence after successor proof. Complete the live transition, revoke old credentials at holders, admit retirement of superseded key material and verify recovery at scale."
+      "acceptance": ["AT-01", "AT-18", "AT-24"],
+      "remaining": "The bounded owner procedure authenticates the preceding recovery package, prepares distinct keys through the selected CLI, restores the successor and durably fences the old writer with the actual successor checkpoint. Reopen preserves the old checkpoint and rejects another capture; both retained epochs remain independently restorable after sources and receivers shut down. Holder credential revocation, retirement of superseded key material and admitted-scale lifecycle acceptance remain open."
     },
     {
       "id": "REQ-09",
@@ -2030,7 +2030,13 @@
       "id": "REQ-21",
       "workstream": "generations",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/generation", "internal/peer", "internal/upload"],
+      "implementation": [
+        "internal/generation",
+        "internal/peer",
+        "internal/upload",
+        "internal/sourceagent/epoch_fence_linux.go",
+        "internal/recoverybundle/epoch_linux.go"
+      ],
       "checks": [
         {
           "path": "internal/generation/generation_linux_test.go",
@@ -2075,10 +2081,18 @@
         {
           "path": "internal/worker/maintenance_linux_test.go",
           "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
+        },
+        {
+          "path": "internal/sourceagent/epoch_fence_linux_test.go",
+          "name": "TestWriterFencePreservesOldCheckpointAndBlocksNewCaptureAfterRestart"
+        },
+        {
+          "path": "internal/sourceagent/epoch_recovery_cli_linux_test.go",
+          "name": "TestOwnerEpochCLIProducesIndependentOldAndNewRecovery"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Maintenance scheduling and holder-side epoch policy/revocation, recovery after journal loss and full product target-readiness reporting. The bounded owner procedure now connects a real prepared successor, independent restoration and a persistent old-writer fence across reopen; it preserves both retained epochs."
     },
     {
       "id": "REQ-22",
@@ -8040,7 +8054,16 @@
     {
       "id": "AT-18",
       "state": "NOT_VERIFIED",
-      "requirements": ["REQ-17", "REQ-18", "REQ-19", "REQ-20", "REQ-21", "REQ-26", "REQ-31"]
+      "requirements": [
+        "REQ-08",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19",
+        "REQ-20",
+        "REQ-21",
+        "REQ-26",
+        "REQ-31"
+      ]
     },
     {
       "id": "AT-19",

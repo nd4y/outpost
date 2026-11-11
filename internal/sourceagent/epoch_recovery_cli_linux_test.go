@@ -140,17 +140,52 @@ func TestOwnerEpochCLIProducesIndependentOldAndNewRecovery(t *testing.T) {
 	if nextReceipt.Epoch != receipt.Result.Trust.Epoch || nextReceipt.Repository != receipt.Result.Trust.Repository {
 		t.Fatal("successor package was not bound to the prepared epoch")
 	}
+	restore := func(f *fixture, kit, id, output string, wantSuccess bool) {
+		t.Helper()
+		command(wantSuccess, "restore-replica", "--store", f.replicaPath, "--generation", id, "--output", output,
+			"--key", filepath.Join(kit, "recovery-owner.json"), "--trust", filepath.Join(kit, "trust.json"))
+	}
+	oldCheckpoint, err := old.a.Checkpoint(ctx)
+	must(t, err)
+	nextCheckpoint, err := next.a.Checkpoint(ctx)
+	must(t, err)
+	preliminary := filepath.Join(private, "preliminary-next-restored")
+	restore(next, nextKit, nextReceipt.Generation, preliminary, true)
+	preliminaryBytes, err := os.ReadFile(filepath.Join(preliminary, "private.bin"))
+	must(t, err)
+	if !bytes.Equal(preliminaryBytes, nextBytes) {
+		t.Fatal("preliminary successor restore changed bytes")
+	}
+	preparation, err := os.ReadFile(receiptPath)
+	must(t, err)
+	if !bytes.Equal(preparation, before) {
+		t.Fatal("prepared material changed before fencing")
+	}
+	now := time.Now()
+	fence := WriterFence{Format: WriterFenceFormat, Operation: storage.Hash([]byte("fence old writer after successor recovery")),
+		Source: old.grant.Source, Profile: old.grant.Profile, PreviousCheckpoint: storage.Hash(oldCheckpoint),
+		Preparation: preparation, SuccessorCheckpoint: nextCheckpoint, RestoreEvidence: storage.Hash(preliminaryBytes),
+		NotBefore: now.Unix() - 1, ExpiresUnix: now.Add(time.Hour).Unix()}
+	signed, err := SignWriterFence(fence, old.ownerSigner, now)
+	must(t, err)
+	_, err = old.a.FenceWriter(ctx, signed)
+	must(t, err)
+	old.reopen(t)
+	if err = old.a.Next(ctx); !errors.Is(err, ErrWriterFenced) {
+		t.Fatalf("fenced old writer started new capture: %v", err)
+	}
+	again, err := old.a.Checkpoint(ctx)
+	must(t, err)
+	if !bytes.Equal(again, oldCheckpoint) {
+		t.Fatal("fence rewrote the historical old checkpoint")
+	}
+	t.Log("real prepared epoch and restored successor fenced the old writer across reopen")
 	for _, f := range []*fixture{old, next} {
 		must(t, f.a.Close())
 		f.a = nil
 		f.server.Close()
 		must(t, os.Rename(f.tree, f.tree+"-unavailable"))
 		must(t, os.Rename(f.b.Local.Volume.Root, f.b.Local.Volume.Root+"-unavailable"))
-	}
-	restore := func(f *fixture, kit, id, output string, wantSuccess bool) {
-		t.Helper()
-		command(wantSuccess, "restore-replica", "--store", f.replicaPath, "--generation", id, "--output", output,
-			"--key", filepath.Join(kit, "recovery-owner.json"), "--trust", filepath.Join(kit, "trust.json"))
 	}
 	oldOut, nextOut := filepath.Join(private, "old-restored"), filepath.Join(private, "next-restored")
 	restore(old, oldKit, oldReceipt.Generation, oldOut, true)
