@@ -96,7 +96,9 @@ func TestConcurrentStreamingCheckpointsLaterAcceptanceBeforeCancellation(t *test
 	s, err = OpenStreamingStore(cache, local.Owner, false, sink)
 	entryOK(t, err)
 	defer s.Close()
-	stats, err := s.Backup(ctx, input, opt)
+	resumeCtx, resumeCancel := context.WithTimeout(t.Context(), 45*time.Second)
+	defer resumeCancel()
+	stats, err := s.Backup(resumeCtx, input, opt)
 	entryOK(t, err)
 	if stats.SourceBytes != int64(len(want)) || stats.NewPayloadBytes+accepted > int64(len(want))+(64<<10) {
 		t.Fatal("confirmed later pack was resent or source reads hidden", stats, accepted)

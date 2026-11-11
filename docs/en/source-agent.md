@@ -41,6 +41,8 @@ The bootstrap anchors and signed companion receipt are private installation stat
 
 Payload writes keep the backend-declared bounded window. Any durably completed write frees its slot, allowing another write to start while an older transfer remains pending. The encrypted progress hash chain records accepted block sets in completion order; replay validates them and rescans the source. The file descriptor is published after every payload write has been confirmed. Full-replica and distributed-coverage release thresholds are checked separately.
 
+Cancellation preserves confirmed payload progress. Resume the same operation with a fresh request deadline; time already spent by the interrupted request does not belong to the new attempt. Reopening still checks the original source identity and accepted ciphertext before reuse.
+
 ### Release on durable coverage from both holders
 
 Set `profile.releasePolicy` to `two-holder-coverage` in a new paired installation with two selected holders. Each holder persists the signed catalog and confirms its complete dependency inventory over authenticated HTTPS. The source checks both holder identities, exact signed intents and the dependency digest, then signs and syncs a separate coverage checkpoint before releasing the view. If a dependency or required receipt is missing, the view stays open.
