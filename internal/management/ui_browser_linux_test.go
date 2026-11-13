@@ -31,6 +31,10 @@ func TestManagementBrowserFixture(t *testing.T) {
 	must(t, os.Mkdir(dir, 0700))
 	h := newHTTPFixture(t)
 	f := h.f
+	// The owner explicitly admits the second metadata journal before unseen refusals.
+	f.r.journalCopy = true
+	must(t, f.r.store.WithLock(context.Background(), func() error { return f.r.enableRegistryJournal(context.Background()) }))
+	f.options.JournalCopy = true
 	cfg := domainPolicyFixture(t, h)
 	pending := command.Request{Operation: id("browser-unpublished"), Reason: "OPERATOR_REQUEST", Tenant: f.e.Tenant, Domain: id("domain"), Kind: "pause", ExpectedRevision: cfg.Revision, Authority: cfg.Commands[0], ExpiresUnix: time.Now().Unix() + 600}
 	f.r.Fault = interruptAt("management-command-intent-durable")

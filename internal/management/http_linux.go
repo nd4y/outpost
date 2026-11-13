@@ -435,6 +435,44 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeHTTP(w, 200, out)
 		return
 	}
+	if len(parts) == 7 && parts[4] == "operations" && storage.ID(parts[5]) && oneOf(parts[6], "refusal-preview", "refusal") && r.URL.RawQuery == "" {
+		// Reject non-owners before reading a potentially large signed candidate.
+		if !p.Role("owner") {
+			failHTTP(w, ErrDenied)
+			return
+		}
+		if r.Method != http.MethodPost {
+			failHTTP(w, ErrInvalid)
+			return
+		}
+		limit := 2*max(control.MaxConfig, command.MaxRequest) + 4096
+		if parts[6] == "refusal-preview" {
+			var input UnseenRequest
+			if e := readHTTP(w, r, &input, limit); e != nil {
+				failHTTP(w, e)
+				return
+			}
+			out, e := h.registry.UnseenRefusalPreview(ctx, p, tenant, parts[5], input)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, out)
+			return
+		}
+		var input UnseenResolutionRequest
+		if e := readHTTP(w, r, &input, limit); e != nil {
+			failHTTP(w, e)
+			return
+		}
+		out, e := h.registry.RefuseUnseen(ctx, p, tenant, parts[5], input)
+		if e != nil {
+			failHTTP(w, e)
+			return
+		}
+		writeHTTP(w, 200, out)
+		return
+	}
 	if len(parts) == 7 && parts[4] == "operations" && storage.ID(parts[5]) && parts[6] == "resolution" && r.URL.RawQuery == "" {
 		if r.Method == http.MethodGet {
 			out, e := h.registry.ResolutionPreview(ctx, p, tenant, parts[5])

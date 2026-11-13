@@ -188,3 +188,7 @@ Owner-only resolution preview and mutation are described in the [service lifecyc
 Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.
 
 Report6 and view6 carry the latest scoped scheduled audit alongside that historical receipt, with separate observation and expiry times.
+
+## Never-admitted request refusal
+
+Owner-only POST `/api/v1/tenants/{tenant}/operations/{operation}/refusal-preview` verifies the retained original command or signed configuration. POST to the sibling `/refusal` confirms the separately identified resolution and atomically fences both IDs. This requires the admitted healthy registry journal copy;404 alone is not absence proof. Receipt reads and ordinary resolution retries support lost replies. See the [service contract](management-service.md#never-admitted-request-refusal) and [browser flow](management-ui.md#never-admitted-request-refusal).

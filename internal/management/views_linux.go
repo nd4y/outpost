@@ -235,6 +235,18 @@ func (r *Registry) Operation(ctx context.Context, p Principal, tenant, operation
 		if e != nil {
 			return e
 		}
+		for target, v := range s.UnseenRefusals {
+			if target == operation || v.Receipt.Operation == operation {
+				if v.Audit.Tenant != tenant || !allowsDomains(p, tenant, v.Domains) {
+					return ErrUnavailable
+				}
+				out = v.Receipt
+				if target == operation {
+					out = v.Target
+				}
+				return nil
+			}
+		}
 		if v, ok := s.Resolutions[operation]; ok && !allowsDomains(p, tenant, v.Domains) {
 			return ErrUnavailable
 		}

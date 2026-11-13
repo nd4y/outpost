@@ -63,18 +63,20 @@ type registryState struct {
 	ObservedUnix int64             `json:"observedUnix"`
 	Enrollments  map[string][]byte `json:"enrollments"`
 	// Removed domains retain tenant/repository/epoch fences.
-	Domains           map[string]domainFence         `json:"domains"`
-	Operations        map[string]enrollmentOperation `json:"operations"`
-	Reports           map[string]reportPointer       `json:"reports"`
-	Configurations    map[string]configPointer       `json:"configurations"`
-	ConfigOperations  map[string]configOperation     `json:"configOperations"`
-	CommandOperations map[string]commandOperation    `json:"commandOperations,omitempty"`
-	RetentionPlans    map[string]retentionPlanRecord `json:"retentionPlans,omitempty"`
-	RetentionSteps    map[string]retentionStepRecord `json:"retentionSteps,omitempty"`
-	Resolutions       map[string]intentResolution    `json:"resolutions,omitempty"`
-	LegacyCheckpoint  string                         `json:"legacyCheckpoint,omitempty"`
-	JournalCopy       bool                           `json:"journalCopy,omitempty"`
-	Signature         []byte                         `json:"signature,omitempty"`
+	Domains            map[string]domainFence         `json:"domains"`
+	Operations         map[string]enrollmentOperation `json:"operations"`
+	Reports            map[string]reportPointer       `json:"reports"`
+	Configurations     map[string]configPointer       `json:"configurations"`
+	ConfigOperations   map[string]configOperation     `json:"configOperations"`
+	CommandOperations  map[string]commandOperation    `json:"commandOperations,omitempty"`
+	RetentionPlans     map[string]retentionPlanRecord `json:"retentionPlans,omitempty"`
+	RetentionSteps     map[string]retentionStepRecord `json:"retentionSteps,omitempty"`
+	Resolutions        map[string]intentResolution    `json:"resolutions,omitempty"`
+	LegacyCheckpoint   string                         `json:"legacyCheckpoint,omitempty"`
+	UnseenRefusals     map[string]unseenRefusal       `json:"unseenRefusals,omitempty"`
+	RefusalPredecessor *registryPredecessor           `json:"refusalPredecessor,omitempty"`
+	JournalCopy        bool                           `json:"journalCopy,omitempty"`
+	Signature          []byte                         `json:"signature,omitempty"`
 }
 type domainFence struct {
 	Tenant     string `json:"tenant"`
@@ -260,7 +262,7 @@ func (r *Registry) load() (registryState, error) {
 func validateRegistry(raw []byte, owner, signer ed25519.PublicKey) (registryState, error) {
 	var s registryState
 	r := &Registry{owner: owner}
-	if canonical(raw, &s, maxRegistry) != nil || (s.Format != registryFormat && s.Format != resolutionFormat) || !bytes.Equal(s.Owner, r.owner) || !bytes.Equal(s.Signer, signer) || !safe(s.Revision) || !validTime(s.ObservedUnix) || s.ObservedUnix > time.Now().Unix() || s.Enrollments == nil || len(s.Enrollments) > 128 || s.Domains == nil || len(s.Domains) > 128 || s.Operations == nil || len(s.Operations) > maxOperations || s.Reports == nil || len(s.Reports) > 16384 {
+	if canonical(raw, &s, maxRegistry) != nil || !oneOf(s.Format, registryFormat, resolutionFormat, unseenFormat) || !bytes.Equal(s.Owner, r.owner) || !bytes.Equal(s.Signer, signer) || !safe(s.Revision) || !validTime(s.ObservedUnix) || s.ObservedUnix > time.Now().Unix() || s.Enrollments == nil || len(s.Enrollments) > 128 || s.Domains == nil || len(s.Domains) > 128 || s.Operations == nil || len(s.Operations) > maxOperations || s.Reports == nil || len(s.Reports) > 16384 {
 		return s, ErrInvalid
 	}
 	sig := s.Signature
@@ -303,7 +305,7 @@ func validateRegistry(raw []byte, owner, signer ed25519.PublicKey) (registryStat
 			return s, ErrInvalid
 		}
 	}
-	if s.Configurations == nil || s.ConfigOperations == nil || len(s.Configurations) > 128 || len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) > maxOperations {
+	if s.Configurations == nil || s.ConfigOperations == nil || len(s.Configurations) > 128 || registryIntentCount(s) > maxOperations {
 		return s, ErrInvalid
 	}
 	if e := r.validateConfigState(s); e != nil {
@@ -313,6 +315,9 @@ func validateRegistry(raw []byte, owner, signer ed25519.PublicKey) (registryStat
 		return s, e
 	}
 	if e := r.validateResolutions(s); e != nil {
+		return s, e
+	}
+	if e := r.validateUnseen(s); e != nil {
 		return s, e
 	}
 	if e := validateRetentionPlans(s); e != nil {
@@ -462,7 +467,7 @@ func (r *Registry) ApplyEnrollment(ctx context.Context, p Principal, operation, 
 				return nil
 			}
 		} else {
-			if len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) >= maxOperations {
+			if registryIntentCount(s) >= maxOperations {
 				return ErrCapacity
 			}
 			// Do not let a later enrollment overtake an uncertain earlier effect.
@@ -610,6 +615,11 @@ func (r *Registry) Audit(ctx context.Context, p Principal, tenant string, after 
 			}
 		}
 		for _, v := range s.Resolutions {
+			if v.Audit.Tenant == tenant && v.Audit.Sequence > after && allowsDomains(p, tenant, v.Domains) {
+				out = append(out, v.Audit)
+			}
+		}
+		for _, v := range s.UnseenRefusals {
 			if v.Audit.Tenant == tenant && v.Audit.Sequence > after && allowsDomains(p, tenant, v.Domains) {
 				out = append(out, v.Audit)
 			}

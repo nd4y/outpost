@@ -68,7 +68,7 @@ const words = {
     readReceipt: "Read receipt",
     resolutionTitle: "Abandon an unpublished request",
     resolutionHelp:
-      "Only requests with no published effect are eligible. The original request and audit remain retained. This does not cancel work already published to a node.",
+      "Only requests with no published effect are eligible. A never-admitted request requires a durable server refusal; a missing receipt alone is insufficient. For configuration, select the original signed file again. The original request and audit remain retained. This does not cancel work already published to a node.",
     reviewResolution: "Review abandonment",
     confirmResolution: "Confirm abandonment",
     resolutionReady:
@@ -284,7 +284,7 @@ const words = {
     readReceipt: "Прочитать квитанцию",
     resolutionTitle: "Отказ от неопубликованного запроса",
     resolutionHelp:
-      "Допустимы только запросы без опубликованного эффекта. Исходный запрос и аудит сохраняются. Работа, уже опубликованная ноде, этим действием не отменяется.",
+      "Допустимы только запросы без опубликованного эффекта. Для ещё не принятого запроса нужен сохранённый сервером отказ; отсутствия квитанции недостаточно. Для конфигурации выберите исходный подписанный файл повторно. Исходный запрос и аудит сохраняются. Работа, уже опубликованная ноде, этим действием не отменяется.",
     reviewResolution: "Проверить возможность отказа",
     confirmResolution: "Подтвердить отказ",
     resolutionReady:
@@ -450,6 +450,7 @@ const stateNames = {
     "cached-target-readback": "Чтение с сохранением возраста прежних проверок",
     COMPLETE: "Завершено",
     ABANDONED: "Отказ до публикации",
+    ABANDON_UNSEEN: "Отказ от ещё не принятого запроса",
     INCOMPLETE: "Не завершено",
     CORRUPT: "Повреждено",
     NONE: "Нет проверки",
@@ -479,6 +480,7 @@ const stateNames = {
   },
   en: {
     ABANDONED: "Abandoned before publication",
+    ABANDON_UNSEEN: "Refused a never-admitted request",
     FRESH: "Fresh when retrieved",
     CURRENT: "Current when retrieved",
     pause: "Pause",
@@ -702,12 +704,15 @@ async function api(path, options = {}) {
     } catch {
       throw new Error("INVALID");
     }
-    if (!response.ok)
-      throw new Error(
+    if (!response.ok) {
+      const error = new Error(
         ["DENIED", "CONFLICT", "CAPACITY", "BUSY", "UNAVAILABLE", "INVALID"].includes(result.code)
           ? result.code
           : "UNAVAILABLE",
       );
+      error.status = response.status;
+      throw error;
+    }
     if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("INVALID");
     return result;
   } catch (e) {
@@ -1564,12 +1569,39 @@ function resolutionPath(record) {
   if (!ID.test(record.tenant) || !ID.test(record.operation)) throw new Error("INVALID");
   return `/api/v1/tenants/${record.tenant}/operations/${record.operation}/resolution`;
 }
+async function retainedUnseenRequest(record) {
+  if (record.type === "command" && record.body?.operationId === record.operation)
+    return { node: record.node, command: record.body };
+  if (record.type !== "config" || !ID.test(record.digest)) throw new Error("INVALID");
+  const file = await fileBytes("config-file", 32 << 20);
+  if ((await hash(file)) !== record.digest) throw new Error("CONFLICT");
+  return {
+    node: record.node,
+    configuration: {
+      operationId: record.operation,
+      reason: "POLICY_CHANGE",
+      document: base64(file),
+      expectedRevision: record.expected,
+      previewDigest: record.digest,
+    },
+  };
+}
 async function reviewResolution(record) {
   if (state.busy || !state.session?.roles.includes("owner")) throw new Error("DENIED");
   const epoch = state.epoch;
   await currentAuthority(record);
   if (!state.session.roles.includes("owner")) throw new Error("DENIED");
-  const preview = await api(resolutionPath(record));
+  let preview, original;
+  try {
+    preview = await api(resolutionPath(record));
+  } catch (error) {
+    if (error.message !== "UNAVAILABLE" || error.status !== 404) throw error;
+    original = await retainedUnseenRequest(record);
+    preview = await api(resolutionPath(record).replace(/resolution$/, "refusal-preview"), {
+      method: "POST",
+      body: original,
+    });
+  }
   if (epoch !== state.epoch) return;
   if (
     preview.format !== "outpost-management-resolution-preview-1" ||
@@ -1592,6 +1624,7 @@ async function reviewResolution(record) {
     record: retained,
     body,
     preview,
+    original,
     allowed: preview.canAbandon || Boolean(retry),
   };
   $("resolution-summary").textContent = JSON.stringify(
@@ -1624,7 +1657,13 @@ async function submitResolution() {
       );
       let result;
       try {
-        result = await api(resolutionPath(review.record), { method: "POST", body });
+        const path = review.original
+          ? resolutionPath(review.record).replace(/resolution$/, "refusal")
+          : resolutionPath(review.record);
+        result = await api(path, {
+          method: "POST",
+          body: review.original ? { resolution: body, original: review.original } : body,
+        });
       } catch (e) {
         if (["OFFLINE", "UNAVAILABLE"].includes(e.message)) notice("uncertain", "error");
         else showError(e);
@@ -1769,6 +1808,10 @@ on("config-file", "change", () => {
   state.configEdit++;
   state.config = null;
   $("config-preview").hidden = true;
+  if (state.resolution?.original?.configuration) {
+    state.resolution = null;
+    $("resolution-review").hidden = true;
+  }
 });
 on("config-form", "submit", previewConfig);
 on("apply-config", "click", () =>

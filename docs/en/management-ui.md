@@ -18,11 +18,11 @@ The English/Russian interface uses native controls, explicit labels, visible key
 
 ## Isolated checks
 
-The [browser suite](../../scripts/browser/check.mjs) runs a real loopback mTLS management fixture with disposable identities. Twenty-eight browser journeys cover original report age, unknown space, bounded tables, keyboard focus, English/Russian accessibility scans, 320-pixel reflow and 200% text size, scope changes, offline/forbidden/empty states, role isolation and storage failure before mutation. It drops responses after actual command/configuration admission, reloads the page and verifies identical request bytes and operation identifiers. A competing signed policy publication rejects a stale browser preview.
+The [browser suite](../../scripts/browser/check.mjs) runs a real loopback mTLS management fixture with disposable identities. Thirty-one browser journeys cover original report age, unknown space, bounded tables, keyboard focus, English/Russian accessibility scans, 320-pixel reflow and 200% text size, scope changes, offline/forbidden/empty states, role isolation and storage failure before mutation. It drops responses after actual command/configuration admission, reloads the page and verifies identical request bytes and operation identifiers. A competing signed policy publication rejects a stale browser preview.
 
 Playwright and axe versions and integrity hashes are pinned in the [test lockfile](../../scripts/browser/package-lock.json); the [CI job](../../.github/workflows/browser.yml) pins its browser image by digest. These are test-only dependencies. The product embeds static files in its Go binary. Both languages passed the automated checks with no reported violations; contrast checks on clipped table cells remain manual-review items. Screenshots and scripted focus/text-resize checks do not claim full WCAG conformance or screen-reader acceptance. The recovery journey checks exact admission and receipt display; actual recovered bytes are covered by the separate trusted recovery checks.
 
-Unconfirmed-request resolution and registry journal lifecycle, full manual accessibility and installed-service admission remain open. A report with no target evidence does not certify a cloud copy.
+Never-admitted request refusal is a bounded implementation candidate below; registry lifecycle, full manual accessibility and installed-service admission remain open. A report with no target evidence does not certify a cloud copy.
 
 A local storage failure after remote admission reports that a receipt was received; the original request remains retained. Manual receipt lookup preserves its original replay metadata across reload. Local removal affects only a completed tracking record, never the remote operation.
 
@@ -31,3 +31,9 @@ Browser lifecycle checks additionally cover simultaneous tabs, actual persistent
 An owner can review abandonment from a retained operation row. The service checks the original request digest and proves no published effect again at confirmation. A published or unknown effect disables confirmation. Resolution has a separate identifier persisted inside the original record, so a full 16-record journal still permits it. Lost resolution replies reuse that identifier and exact bytes; `ABANDONED` means confirmed refusal before publication, not cancellation of already running work. Only then may the local tracking record be removed.
 
 Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.
+
+## Never-admitted request refusal
+
+The owner review uses the ordinary resolution preview first. Only a404 response can lead to a separate server-checked refusal preview;503 and transport failure retain the unconfirmed record. The original command bytes remain in the journal. For a configuration, reselect the original signed file; its SHA256 and retained expected revision must match. Substituting another file cannot confirm refusal, and changing that selection invalidates its preview.
+
+Explicit confirmation first saves the same resolution identifier inside the existing browser-journal2 record, even when all16 slots are occupied. If the refusal reply is lost, reload reads the durable server fence and retries the ordinary resolution route with the identical resolution fields; it does not submit a new command. The service repeats current authority and ID checks under lock. Only a confirmed terminal receipt permits local removal. These bounded browser checks do not establish whole-environment recovery freshness or installed-service acceptance.

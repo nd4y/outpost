@@ -1979,6 +1979,58 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAtomicReceiptReplayAndNoDelivery"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenConfigurationRefusalKeepsExactSignedBytesAndSnapshot"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalRequiresJournalCurrentOwnerAndExactScope"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAcceptsExpiredExecutionWithoutExecutingIt"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalCompetesWithAdmissionUnderOneLock"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreservesRegistry2AndFencesEveryAdmissionID"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenIDCollisionAndMissingJournalNeverForgetRequest"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenCapacityCancellationAndGuardFailBeforeFence"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenHTTPExplicitPreviewConfirmationAndReadback"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreviousReaderRefusesWithoutChangingState"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenSIGKILLBeforeAndAfterAtomicFence"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2562,6 +2614,14 @@
         {
           "path": "internal/sourceagent/parallel_linux_test.go",
           "name": "TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -4217,10 +4277,62 @@
         {
           "path": "internal/worker/external_traffic_linux_test.go",
           "name": "TestScheduledExternalAuditTelemetryBoundsFullPageAndKeepsAge"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAtomicReceiptReplayAndNoDelivery"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenConfigurationRefusalKeepsExactSignedBytesAndSnapshot"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalRequiresJournalCurrentOwnerAndExactScope"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAcceptsExpiredExecutionWithoutExecutingIt"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalCompetesWithAdmissionUnderOneLock"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreservesRegistry2AndFencesEveryAdmissionID"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenIDCollisionAndMissingJournalNeverForgetRequest"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenCapacityCancellationAndGuardFailBeforeFence"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenHTTPExplicitPreviewConfirmationAndReadback"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreviousReaderRefusesWithoutChangingState"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenSIGKILLBeforeAndAfterAtomicFence"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-38",
@@ -4506,10 +4618,62 @@
         {
           "path": "internal/managementservice/service_linux_test.go",
           "name": "TestManagementServiceProfileOwnsNestedMemoryAfterOpen"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAtomicReceiptReplayAndNoDelivery"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenConfigurationRefusalKeepsExactSignedBytesAndSnapshot"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalRequiresJournalCurrentOwnerAndExactScope"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAcceptsExpiredExecutionWithoutExecutingIt"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalCompetesWithAdmissionUnderOneLock"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreservesRegistry2AndFencesEveryAdmissionID"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenIDCollisionAndMissingJournalNeverForgetRequest"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenCapacityCancellationAndGuardFailBeforeFence"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenHTTPExplicitPreviewConfirmationAndReadback"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreviousReaderRefusesWithoutChangingState"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenSIGKILLBeforeAndAfterAtomicFence"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-39",
@@ -4814,7 +4978,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -5337,7 +5501,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-42",
@@ -5500,7 +5664,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. Full-scale snapshot retention, first independent restore and readiness timing for every assigned replica remain open."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. Full-scale snapshot retention, first independent restore and readiness timing for every assigned replica remain open."
     },
     {
       "id": "REQ-43",
@@ -5777,7 +5941,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-44",
@@ -6092,7 +6256,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-45",
@@ -6442,10 +6606,62 @@
         {
           "path": "internal/sourceagent/recovery_cli_linux_test.go",
           "name": "TestSourceRecoveryPackageActualReaderRestoresCompleteReplicaAfterSourceLoss"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAtomicReceiptReplayAndNoDelivery"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenConfigurationRefusalKeepsExactSignedBytesAndSnapshot"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalRequiresJournalCurrentOwnerAndExactScope"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAcceptsExpiredExecutionWithoutExecutingIt"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalCompetesWithAdmissionUnderOneLock"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreservesRegistry2AndFencesEveryAdmissionID"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenIDCollisionAndMissingJournalNeverForgetRequest"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenCapacityCancellationAndGuardFailBeforeFence"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenHTTPExplicitPreviewConfirmationAndReadback"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreviousReaderRefusesWithoutChangingState"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenSIGKILLBeforeAndAfterAtomicFence"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-46",
@@ -7469,6 +7685,58 @@
         {
           "path": "internal/upload/delegation_linux_test.go",
           "name": "TestSignedWeightedAssignmentsKeepEligibleFallbackAndLegacyPublication"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAtomicReceiptReplayAndNoDelivery"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenConfigurationRefusalKeepsExactSignedBytesAndSnapshot"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalRequiresJournalCurrentOwnerAndExactScope"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAcceptsExpiredExecutionWithoutExecutingIt"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalCompetesWithAdmissionUnderOneLock"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreservesRegistry2AndFencesEveryAdmissionID"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenIDCollisionAndMissingJournalNeverForgetRequest"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenCapacityCancellationAndGuardFailBeforeFence"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenHTTPExplicitPreviewConfirmationAndReadback"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreviousReaderRefusesWithoutChangingState"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenSIGKILLBeforeAndAfterAtomicFence"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -7690,10 +7958,62 @@
         {
           "path": "cmd/outpost/upload_plan_linux_test.go",
           "name": "TestCLIUploadPlanBuildRepairsMissingExternalParts"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAtomicReceiptReplayAndNoDelivery"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenConfigurationRefusalKeepsExactSignedBytesAndSnapshot"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalRequiresJournalCurrentOwnerAndExactScope"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalAcceptsExpiredExecutionWithoutExecutingIt"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenRefusalCompetesWithAdmissionUnderOneLock"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreservesRegistry2AndFencesEveryAdmissionID"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenIDCollisionAndMissingJournalNeverForgetRequest"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenCapacityCancellationAndGuardFailBeforeFence"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenHTTPExplicitPreviewConfirmationAndReadback"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenPreviousReaderRefusesWithoutChangingState"
+        },
+        {
+          "path": "internal/management/unseen_linux_test.go",
+          "name": "TestManagementUnseenSIGKILLBeforeAndAfterAtomicFence"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted command requires a durable refusal and survives lost reply and reload"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "never-admitted configuration requires the exact reselected signed file"
         }
       ],
       "acceptance": ["AT-31"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-50",
@@ -7782,7 +8102,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25", "AT-33"],
-      "remaining": "Unconfirmed-request resolution, manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-51",

@@ -84,6 +84,9 @@ func snapshotRefs(s registryState) []snapshotRef {
 	if s.LegacyCheckpoint != "" {
 		add("registry-v1-"+s.LegacyCheckpoint+".json", s.LegacyCheckpoint, "checkpoint", "", false)
 	}
+	for _, ref := range unseenSnapshotRefs(s) {
+		refs[ref.path] = ref
+	}
 	nodes := map[string]bool{}
 	for node := range s.Configurations {
 		nodes[node] = true
@@ -162,9 +165,14 @@ func checkSnapshotDependency(s registryState, ref snapshotRef, raw []byte) error
 		if old.Format != registryFormat || old.Revision >= s.Revision {
 			return ErrInvalid
 		}
+	case "unseen-checkpoint", "unseen-request":
+		return checkUnseenDependency(s, ref, raw)
 	case "candidate":
 		_, e := control.Verify(raw, s.Owner, ref.node)
-		return e
+		if e != nil {
+			return e
+		}
+		return checkUnseenDependency(s, ref, raw)
 	case "request":
 		var request command.Request
 		if canonical(raw, &request, command.MaxRequest) != nil {
@@ -488,6 +496,10 @@ func inspectSnapshot(ctx context.Context, reader io.Reader, trust SnapshotTrust,
 	for _, resolution := range state.Resolutions {
 		out.Receipts = append(out.Receipts, resolution.Receipt)
 		out.Audit = append(out.Audit, resolution.Audit)
+	}
+	for _, refusal := range state.UnseenRefusals {
+		out.Receipts = append(out.Receipts, refusal.Target, refusal.Receipt)
+		out.Audit = append(out.Audit, refusal.Audit)
 	}
 	sort.Slice(out.Receipts, func(i, j int) bool { return strings.Compare(out.Receipts[i].Operation, out.Receipts[j].Operation) < 0 })
 	sort.Slice(out.Audit, func(i, j int) bool { return out.Audit[i].Sequence < out.Audit[j].Sequence })

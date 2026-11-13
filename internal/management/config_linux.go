@@ -360,6 +360,10 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 		if e != nil {
 			return e
 		}
+		if receipt, ok, err := unseenTargetReceipt(s, p, tenant, node, "configuration", input.Operation, requestDigest); ok {
+			out = receipt
+			return err
+		}
 		if resolutionID(s, input.Operation) {
 			return ErrConflict
 		}
@@ -402,7 +406,7 @@ func (r *Registry) ApplyConfiguration(ctx context.Context, p Principal, tenant, 
 				return nil
 			}
 		} else {
-			if len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) >= maxOperations {
+			if registryIntentCount(s) >= maxOperations {
 				return ErrCapacity
 			}
 			for _, o := range s.ConfigOperations {

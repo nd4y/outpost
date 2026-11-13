@@ -493,6 +493,155 @@ try {
     assert.equal(resolved.state, "COMPLETE");
     await resolving.close();
   });
+  await test("never-admitted command requires a durable refusal and survives lost reply and reload", async () => {
+    const session = await (await owner.request.get(`${meta.url}/api/v1/session`)).json();
+    const operation = "c1".repeat(32);
+    const record = {
+      tenant: meta.tenant,
+      node: meta.node,
+      domain: meta.domain,
+      type: "command",
+      operation,
+      fingerprint: operation,
+      body: { ...meta.pendingCommand, operationId: operation },
+      saved: true,
+    };
+    const resolving = await context("owner");
+    await resolving.addInitScript(
+      ({ actor, record }) => {
+        const key = `outpost-operations-2-${actor}`;
+        if (!localStorage.getItem(key))
+          localStorage.setItem(
+            key,
+            JSON.stringify({
+              format: "outpost-browser-journal-2",
+              revision: 1,
+              records: [record],
+            }),
+          );
+      },
+      { actor: session.actor, record },
+    );
+    let view = await resolving.newPage();
+    let unavailable = true;
+    let previewRequests = 0;
+    const bodies = [];
+    await resolving.route("**/operations/*/resolution", async (route) => {
+      if (route.request().method() === "GET" && unavailable)
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: '{"code":"UNAVAILABLE"}',
+        });
+      if (route.request().method() === "POST") bodies.push(route.request().postDataJSON());
+      return route.continue();
+    });
+    await resolving.route("**/operations/*/refusal-preview", async (route) => {
+      previewRequests++;
+      return route.continue();
+    });
+    await resolving.route("**/operations/*/refusal", async (route) => {
+      bodies.push(route.request().postDataJSON().resolution);
+      assert.deepEqual(route.request().postDataJSON().original.command, record.body);
+      const response = await route.fetch();
+      assert.equal(response.status(), 200);
+      await route.abort("failed");
+    });
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    const row = () => view.locator("#operations tbody tr").filter({ hasText: operation });
+    await row().getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#notice", "unavailable");
+    assert.equal(previewRequests, 0);
+    assert.equal(await view.locator("#resolution-review").isHidden(), true);
+    unavailable = false;
+    await row().getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#resolution-summary", "UNSEEN_UNPUBLISHED");
+    assert.equal(
+      await row()
+        .getByRole("button", {
+          name: "Remove completed local record",
+          exact: true,
+        })
+        .count(),
+      0,
+    );
+    await view.locator("#confirm-resolution").click();
+    await contains(view, "#notice", "Reply unavailable");
+    await view.close();
+    view = await resolving.newPage();
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    await row().getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#resolution-summary", "ALREADY_ABANDONED");
+    await view.locator("#confirm-resolution").click();
+    await contains(view, "#operations", "Abandoned before publication");
+    assert.equal(bodies.length, 2);
+    assert.deepEqual(bodies[0], bodies[1]);
+    const receipt = await (
+      await resolving.request.get(
+        `${meta.url}/api/v1/tenants/${meta.tenant}/operations/${operation}`,
+      )
+    ).json();
+    assert.equal(receipt.state, "ABANDONED");
+    await resolving.close();
+  });
+  await test("never-admitted configuration requires the exact reselected signed file", async () => {
+    const session = await (await owner.request.get(`${meta.url}/api/v1/session`)).json();
+    const file = await fs.readFile(meta.config);
+    const operation = "c2".repeat(32);
+    const record = {
+      tenant: meta.tenant,
+      node: meta.node,
+      domain: meta.domain,
+      accessDomains: session.scopes.filter((s) => s.tenant === meta.tenant).map((s) => s.domain),
+      type: "config",
+      operation,
+      fingerprint: operation,
+      digest: createHash("sha256").update(file).digest("hex"),
+      expected: 0,
+      saved: true,
+    };
+    const resolving = await context("owner");
+    await resolving.addInitScript(
+      ({ actor, record }) => {
+        localStorage.setItem(
+          `outpost-operations-2-${actor}`,
+          JSON.stringify({
+            format: "outpost-browser-journal-2",
+            revision: 1,
+            records: [record],
+          }),
+        );
+      },
+      { actor: session.actor, record },
+    );
+    const view = await resolving.newPage();
+    await view.goto(meta.url);
+    await selectScope(view, meta);
+    const row = view.locator("#operations tbody tr").filter({ hasText: operation });
+    await view.locator("#config-file").setInputFiles(meta.futureConfig);
+    await row.getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#notice", "operation conflicts");
+    assert.equal(await view.locator("#resolution-review").isHidden(), true);
+    await view.locator("#config-file").setInputFiles(meta.config);
+    await row.getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#resolution-summary", "UNSEEN_UNPUBLISHED");
+    await view.locator("#config-file").setInputFiles(meta.futureConfig);
+    assert.equal(await view.locator("#resolution-review").isHidden(), true);
+    await view.locator("#config-file").setInputFiles(meta.config);
+    await row.getByRole("button", { name: "Review abandonment", exact: true }).click();
+    await contains(view, "#resolution-summary", "UNSEEN_UNPUBLISHED");
+    await view.locator("#confirm-resolution").click();
+    await contains(view, "#operations", "Abandoned before publication");
+    const receipt = await (
+      await resolving.request.get(
+        `${meta.url}/api/v1/tenants/${meta.tenant}/operations/${operation}`,
+      )
+    ).json();
+    assert.equal(receipt.state, "ABANDONED");
+    await resolving.close();
+  });
   await test("viewer has no mutation controls or cross-scope API access", async () => {
     const viewer = await context("viewer"),
       view = await viewer.newPage();

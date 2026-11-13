@@ -88,6 +88,11 @@ func resolutionReceipt(s registryState, receipt Receipt) Receipt {
 	return receipt
 }
 func resolutionID(s registryState, operation string) bool {
+	for target, v := range s.UnseenRefusals {
+		if target == operation || v.Receipt.Operation == operation {
+			return true
+		}
+	}
 	for _, v := range s.Resolutions {
 		if v.Receipt.Operation == operation {
 			return true
@@ -116,7 +121,7 @@ func (r *Registry) validateResolutions(s registryState) error {
 		}
 		return nil
 	}
-	if s.Format != resolutionFormat || !storage.ID(s.LegacyCheckpoint) || len(s.Resolutions) == 0 || len(s.Resolutions) > maxOperations {
+	if !oneOf(s.Format, resolutionFormat, unseenFormat) || !storage.ID(s.LegacyCheckpoint) || s.Format == resolutionFormat && len(s.Resolutions) == 0 || len(s.Resolutions) > maxOperations {
 		return ErrInvalid
 	}
 	ids := map[string]bool{}
@@ -215,6 +220,13 @@ func (r *Registry) ResolutionPreview(ctx context.Context, p Principal, tenant, o
 		if e != nil {
 			return e
 		}
+		if v, ok := s.UnseenRefusals[operation]; ok {
+			if v.Audit.Tenant != tenant || !allowsDomains(p, tenant, v.Domains) {
+				return ErrUnavailable
+			}
+			out = ResolutionPreview{"outpost-management-resolution-preview-1", operation, v.Target.RequestDigest, v.Node, append([]string(nil), v.Domains...), "ABANDONED", false, "ALREADY_ABANDONED"}
+			return nil
+		}
 		t, e := r.resolutionTarget(s, operation)
 		if e != nil {
 			return e
@@ -283,6 +295,10 @@ func (r *Registry) ResolveUnpublished(ctx context.Context, p Principal, tenant, 
 		s, e := r.load()
 		if e != nil {
 			return e
+		}
+		if receipt, ok, err := unseenResolutionReplay(s, p, tenant, target, input); ok {
+			out = receipt
+			return err
 		}
 		t, e := r.resolutionTarget(s, target)
 		if e != nil {
@@ -358,6 +374,9 @@ func (r *Registry) ResolveUnpublished(ctx context.Context, p Principal, tenant, 
 		result := resolutionResult(target, input.TargetDigest, domains)
 		receipt := Receipt{Format: "outpost-management-receipt-1", Operation: input.Operation, RequestDigest: digest, State: "COMPLETE", ObservedUnix: now, ResultDigest: result}
 		audit := Audit{Sequence: s.Revision + 1, Actor: p.Actor, Tenant: tenant, Operation: input.Operation, Reason: input.Reason, Action: "ABANDON_INTENT", State: "COMPLETE", ObservedUnix: now, RequestDigest: digest, ResultDigest: result}
+		if s.Resolutions == nil {
+			s.Resolutions = map[string]intentResolution{}
+		}
 		s.Resolutions[target] = intentResolution{target, input.TargetDigest, domains, receipt, audit}
 		if e = r.save(s); e != nil {
 			return e

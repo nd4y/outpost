@@ -32,7 +32,7 @@ A new private `.partial-snapshot-*` file receives the stream and is synced befor
 
 ## Recovery boundary
 
-These commands recover administrative history for review. They do not activate an old runtime. Snapshot integrity and selection do not prove global freshness, fencing of an old service instance, or absence of later commands. Never copy an old registry or its format1 checkpoint over current format2 state: doing so could forget abandonment fences. Active control-plane recovery, identity transition and bounded audit retention remain separate implementation/acceptance work. Old backup data remains independently readable through the existing recovery tools.
+These commands recover administrative history for review. They do not activate an old runtime. Snapshot integrity and selection do not prove global freshness, fencing of an old service instance, or absence of later commands. Never copy an old registry or its predecessor checkpoint over current format2/3 state: doing so could forget abandonment fences. Active control-plane recovery, identity transition and bounded audit retention remain separate implementation/acceptance work. Old backup data remains independently readable through the existing recovery tools.
 
 ## Repair an enrolled local registry
 
@@ -43,3 +43,7 @@ For a stopped existing runtime, prepare a private copy of the admitted profile w
 With the service stopped and its original private profile, identity and bound volume available, run `outpost management-registry-recover --input /private/management.json`. The command takes the service and registry locks. It verifies the current anchor, signed state, and retained command, configuration and report dependencies. It can restore a missing primary or finish a write if the surviving primary is the exact signed predecessor. Repeat the command to verify the same state. Then run the ordinary status and startup commands under the usual deployment authorization.
 
 This repair covers single-file loss on the original volume and interruption between durable writes. The copy and anchor share the same volume. Missing or inconsistent support files, a stale copy and a changed profile require separate investigation. Whole-volume loss and takeover by another identity remain open.
+
+## Never-admitted request refusal
+
+Registry3 adds terminal never-admitted request fences. Its independently derived snapshot closure contains the exact registry1/2 predecessor, original command requests or signed configuration candidates, both receipts and the refusal audit. An omitted or corrupt dependency is rejected. Inspection stays historical and keyless; activating a predecessor would forget later fences and is unsupported. An old reader must reject registry3 without changing its bytes.

@@ -199,6 +199,14 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 		if e != nil {
 			return e
 		}
+		if _, ok := s.UnseenRefusals[input.Operation]; ok {
+			if p.Validate() != nil || !p.Allows(tenant, input.Domain) || input.Tenant != tenant || !commandRole(p, input.Kind) {
+				return ErrDenied
+			}
+			receipt, _, err := unseenTargetReceipt(s, p, tenant, node, "command", input.Operation, digest)
+			out = receipt
+			return err
+		}
 		if resolutionID(s, input.Operation) {
 			return ErrConflict
 		}
@@ -236,7 +244,7 @@ func (r *Registry) AdmitCommand(ctx context.Context, p Principal, tenant, node s
 			return e
 		}
 		if !exists {
-			if len(s.Operations)+len(s.ConfigOperations)+len(s.CommandOperations) >= maxOperations {
+			if registryIntentCount(s) >= maxOperations {
 				return ErrCapacity
 			}
 			request, _ := json.Marshal(input)
