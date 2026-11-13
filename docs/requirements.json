@@ -22,10 +22,11 @@
     "G1": {
       "milestone": "M0",
       "requirements": ["REQ-09", "REQ-10", "REQ-11"],
-      "status": "NOT_VERIFIED",
+      "status": "PASS",
       "evidencePlan": "docs/en/g1-acceptance.md",
       "limits": "docs/g1-acceptance.json",
-      "implementation": "internal/filekit"
+      "implementation": "internal/filekit",
+      "scaleEvidence": "docs/g1-scale-evidence.json"
     }
   },
   "standardVersion": "0.4.0",

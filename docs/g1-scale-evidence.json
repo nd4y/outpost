@@ -1,0 +1,535 @@
+{
+  "format": "outpost-g1-scale-evidence-1",
+  "status": "PASS",
+  "scope": "G1 independent regular-file architecture only; whole-product, distributed, source-profile and production acceptance remain separate",
+  "testedSourceCommit": "68bede552755edc0f37fba1060cebde0501a1861",
+  "testedSourceTree": "624b6115be2eefe61898adc5f49d4d4d82afd481",
+  "started": "2026-11-11T16:17:22.891888+00:00",
+  "observedAt": "2026-11-13T02:10:11.807567+00:00",
+  "originalMetadataReceiptSha256": "fc0cf1baa150a1f9cf0f2a1c463f5a6bdffb744ecf281f438f8ad77c0c32bfd7",
+  "binarySha256": {
+    "kit": "c687a53c170991ea6d627fedc085255892efcf857cacda2a6a0ed3d7ecb3ce4c",
+    "fixture": "7aa16e002a72b26171373fe3f230f0ff831201c7d5765d2780e1ac7a4b40484d"
+  },
+  "testedLimitsSha256": "d6cbe6f169f9e0881342567b9ec0aa6a6a0a9a8c28ad6ecb736cb59746ef203e",
+  "environment": {
+    "platform": "linux/amd64",
+    "filesystem": "ext4 with POSIX ACL and user xattr support",
+    "hardware": "virtual Westmere CPU; AES/SHA acceleration not exposed",
+    "containerImage": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef",
+    "network": "none",
+    "cpus": 1,
+    "memoryBytes": 805306368,
+    "swapBytes": 0,
+    "pids": 128,
+    "nonRoot": true,
+    "rootFilesystem": "read-only",
+    "capabilities": "none",
+    "noNewPrivileges": true,
+    "phaseTimeoutSeconds": 21600
+  },
+  "fullScale": true,
+  "baselineBytes": 107374182400,
+  "peakObservedFilesystemUsed": 325515743232,
+  "insertCase": "1MiB inserted64MiB before EOF, shifting the64MiB suffix",
+  "memoryNote": "Per-command maxRSSKiB is kernel RUSAGE. Container cgroup usage and page cache are separate observations; Docker working-set display is not process RSS.",
+  "phases": [
+    {
+      "label": "keygen",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "keygen",
+        "elapsedSeconds": 0.052035012,
+        "maxRSSKiB": 13156,
+        "heapSystemBytes": 3833856,
+        "counters": {}
+      }
+    },
+    {
+      "label": "recovery-key",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "recovery-key",
+        "elapsedSeconds": 0.08507513,
+        "maxRSSKiB": 13388,
+        "heapSystemBytes": 3833856
+      }
+    },
+    {
+      "label": "generate",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "generate",
+        "phase": "base",
+        "elapsedSeconds": 3250.203594992,
+        "maxRSSKiB": 19744,
+        "allocatedBytes": 107374211072,
+        "attributesVerified": false,
+        "bytesProcessed": 107374182400,
+        "compressionRatio": 1.00008225440979,
+        "fileBytes": 107374182400,
+        "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1"
+      }
+    },
+    {
+      "label": "backup-base",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "backup",
+        "elapsedSeconds": 14701.4953495,
+        "maxRSSKiB": 121364,
+        "heapSystemBytes": 154730496,
+        "counters": {
+          "sourceBytes": 107374182400,
+          "verifiedReadBytes": 0,
+          "newPayloadBytes": 107376512308,
+          "newMetadataBytes": 18965196,
+          "newObjects": 14547,
+          "blocks": 83211,
+          "peakBufferBytes": 146800640
+        }
+      }
+    },
+    {
+      "label": "inspect-base",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "inspect",
+        "elapsedSeconds": 1.6376516429999999,
+        "maxRSSKiB": 149956,
+        "heapSystemBytes": 158957568,
+        "counters": {
+          "blocks": 83211,
+          "size": 107374182400,
+          "descriptorParts": 5,
+          "objects": 14547,
+          "storedBytes": 107395476684
+        }
+      }
+    },
+    {
+      "label": "patch",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "mutate",
+        "phase": "patched",
+        "elapsedSeconds": 0.254977513,
+        "maxRSSKiB": 13020,
+        "allocatedBytes": 107374211072,
+        "attributesVerified": false,
+        "bytesProcessed": 8388608,
+        "compressionRatio": 0,
+        "fileBytes": 107374182400,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "backup-patched",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "backup",
+        "elapsedSeconds": 3321.055771687,
+        "maxRSSKiB": 146124,
+        "heapSystemBytes": 154730496,
+        "counters": {
+          "sourceBytes": 107374182400,
+          "verifiedReadBytes": 18964376,
+          "newPayloadBytes": 12138474,
+          "newMetadataBytes": 18964744,
+          "newObjects": 7,
+          "blocks": 83209,
+          "peakBufferBytes": 146800640
+        }
+      }
+    },
+    {
+      "label": "backup-unchanged",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "backup",
+        "elapsedSeconds": 3389.336057838,
+        "maxRSSKiB": 176672,
+        "heapSystemBytes": 175702016,
+        "counters": {
+          "sourceBytes": 107374182400,
+          "verifiedReadBytes": 37927848,
+          "newPayloadBytes": 0,
+          "newMetadataBytes": 0,
+          "newObjects": 0,
+          "blocks": 83209,
+          "peakBufferBytes": 146800640
+        }
+      }
+    },
+    {
+      "label": "backup-renamed",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "backup",
+        "elapsedSeconds": 3348.398353743,
+        "maxRSSKiB": 148760,
+        "heapSystemBytes": 154730496,
+        "counters": {
+          "sourceBytes": 107374182400,
+          "verifiedReadBytes": 18963924,
+          "newPayloadBytes": 0,
+          "newMetadataBytes": 18964747,
+          "newObjects": 5,
+          "blocks": 83209,
+          "peakBufferBytes": 146800640
+        }
+      }
+    },
+    {
+      "label": "scatter",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "mutate",
+        "phase": "scattered",
+        "elapsedSeconds": 0.255863231,
+        "maxRSSKiB": 14724,
+        "allocatedBytes": 107374211072,
+        "attributesVerified": false,
+        "bytesProcessed": 8388608,
+        "compressionRatio": 0,
+        "fileBytes": 107374182400,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "backup-scattered",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "backup",
+        "elapsedSeconds": 3122.113472193,
+        "maxRSSKiB": 147052,
+        "heapSystemBytes": 163119104,
+        "counters": {
+          "sourceBytes": 107374182400,
+          "verifiedReadBytes": 18963927,
+          "newPayloadBytes": 21045198,
+          "newMetadataBytes": 18964511,
+          "newObjects": 9,
+          "blocks": 83208,
+          "peakBufferBytes": 146800640
+        }
+      }
+    },
+    {
+      "label": "insert",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "mutate",
+        "phase": "inserted",
+        "elapsedSeconds": 0.453928577,
+        "maxRSSKiB": 12892,
+        "allocatedBytes": 107375259648,
+        "attributesVerified": false,
+        "bytesProcessed": 68157440,
+        "compressionRatio": 0,
+        "fileBytes": 107375230976,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "label": "backup-inserted",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "backup",
+        "elapsedSeconds": 3157.05427078,
+        "maxRSSKiB": 160248,
+        "heapSystemBytes": 167313408,
+        "counters": {
+          "sourceBytes": 107375230976,
+          "verifiedReadBytes": 18963691,
+          "newPayloadBytes": 1961989,
+          "newMetadataBytes": 18964735,
+          "newObjects": 6,
+          "blocks": 83209,
+          "peakBufferBytes": 146800640
+        }
+      }
+    },
+    {
+      "label": "restore-inserted",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "restore-store",
+        "elapsedSeconds": 10425.382702314,
+        "maxRSSKiB": 160584,
+        "heapSystemBytes": 167346176,
+        "counters": {
+          "size": 107375230976,
+          "aliases": 2,
+          "io": {
+            "sourceBytes": 0,
+            "verifiedReadBytes": 107488116404,
+            "newPayloadBytes": 0,
+            "newMetadataBytes": 0,
+            "newObjects": 0,
+            "blocks": 0,
+            "peakBufferBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "restore-inserted-oracle",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "verify",
+        "phase": "inserted",
+        "elapsedSeconds": 3274.670297844,
+        "maxRSSKiB": 13636,
+        "allocatedBytes": 107375251456,
+        "attributesVerified": true,
+        "bytesProcessed": 107375230976,
+        "compressionRatio": 0,
+        "fileBytes": 107375230976,
+        "sha256": "b64b75fc475ca406cb27d70e06e17e8fe46651a9240b4d70246f39487a49f1aa"
+      }
+    },
+    {
+      "label": "export-before-maintenance",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "export",
+        "elapsedSeconds": 11657.217707297,
+        "maxRSSKiB": 162552,
+        "heapSystemBytes": 171507712,
+        "counters": {
+          "sourceBytes": 0,
+          "verifiedReadBytes": 107414441060,
+          "newPayloadBytes": 0,
+          "newMetadataBytes": 0,
+          "newObjects": 0,
+          "blocks": 0,
+          "peakBufferBytes": 0
+        }
+      }
+    },
+    {
+      "label": "repack",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "repack",
+        "elapsedSeconds": 13912.433861023,
+        "maxRSSKiB": 231444,
+        "heapSystemBytes": 247005184,
+        "counters": {
+          "oldPayloadObjects": 14549,
+          "newPayloadObjects": 20306,
+          "payloadObjectsReplaced": 14547,
+          "garbageObjectsRemoved": 14572,
+          "retiredVersions": 0,
+          "io": {
+            "sourceBytes": 0,
+            "verifiedReadBytes": 107790756741,
+            "newPayloadBytes": 107403269305,
+            "newMetadataBytes": 94643373,
+            "newObjects": 20329,
+            "blocks": 0,
+            "peakBufferBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "retire",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "retire",
+        "elapsedSeconds": 19.423802104,
+        "maxRSSKiB": 179280,
+        "heapSystemBytes": 188317696,
+        "counters": {
+          "oldPayloadObjects": 0,
+          "newPayloadObjects": 0,
+          "payloadObjectsReplaced": 0,
+          "garbageObjectsRemoved": 15,
+          "retiredVersions": 3,
+          "io": {
+            "sourceBytes": 0,
+            "verifiedReadBytes": 189278546,
+            "newPayloadBytes": 0,
+            "newMetadataBytes": 0,
+            "newObjects": 0,
+            "blocks": 0,
+            "peakBufferBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "independent-old-after-maintenance",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "restore",
+        "elapsedSeconds": 11941.228065829,
+        "maxRSSKiB": 146400,
+        "heapSystemBytes": 154730496,
+        "counters": {
+          "size": 107374182400,
+          "aliases": 2,
+          "io": {
+            "sourceBytes": 0,
+            "verifiedReadBytes": 107395476684,
+            "newPayloadBytes": 0,
+            "newMetadataBytes": 0,
+            "newObjects": 0,
+            "blocks": 0,
+            "peakBufferBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "independent-old-after-maintenance-oracle",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "verify",
+        "phase": "base",
+        "elapsedSeconds": 3193.746765209,
+        "maxRSSKiB": 13664,
+        "allocatedBytes": 107374202880,
+        "attributesVerified": true,
+        "bytesProcessed": 107374182400,
+        "compressionRatio": 0,
+        "fileBytes": 107374182400,
+        "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1"
+      }
+    },
+    {
+      "label": "export-retained-new",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "export",
+        "elapsedSeconds": 13421.864406603,
+        "maxRSSKiB": 147796,
+        "heapSystemBytes": 158924800,
+        "counters": {
+          "sourceBytes": 0,
+          "verifiedReadBytes": 107438521284,
+          "newPayloadBytes": 0,
+          "newMetadataBytes": 0,
+          "newObjects": 0,
+          "blocks": 0,
+          "peakBufferBytes": 0
+        }
+      }
+    },
+    {
+      "label": "independent-new-after-maintenance",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "restore",
+        "elapsedSeconds": 16422.378144041,
+        "maxRSSKiB": 159760,
+        "heapSystemBytes": 167313408,
+        "counters": {
+          "size": 107374182400,
+          "aliases": 2,
+          "io": {
+            "sourceBytes": 0,
+            "verifiedReadBytes": 167566472935,
+            "newPayloadBytes": 0,
+            "newMetadataBytes": 0,
+            "newObjects": 0,
+            "blocks": 0,
+            "peakBufferBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "label": "independent-new-after-maintenance-oracle",
+      "status": "PASS",
+      "exitCode": 0,
+      "measurements": {
+        "operation": "verify",
+        "phase": "patched",
+        "elapsedSeconds": 3307.608192862,
+        "maxRSSKiB": 15720,
+        "allocatedBytes": 107374198784,
+        "attributesVerified": true,
+        "bytesProcessed": 107374182400,
+        "compressionRatio": 0,
+        "fileBytes": 107374182400,
+        "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe"
+      }
+    }
+  ],
+  "testedLimitsDocument": "{\n  \"schemaVersion\": 1,\n  \"format\": \"outpost-filekit-1\",\n  \"status\": \"NOT_VERIFIED\",\n  \"sourceBytes\": 107374182400,\n  \"contiguousChangeBytes\": 8388608,\n  \"maximumIncrementalBytes\": 134217728,\n  \"maximumInitialKitRatio\": 1.08,\n  \"maximumSelectedKitObjects\": 32768,\n  \"maximumRestoreReadRatio\": 4,\n  \"restoreReadAllowanceBytes\": 134217728,\n  \"maximumSourceTemporaryBytes\": 2147483648,\n  \"containerMemoryBytes\": 805306368,\n  \"minimumFilesystemFreeRatio\": 0.2,\n  \"unchangedPayloadBytes\": 0,\n  \"renamePayloadBytes\": 0,\n  \"maximumObjectBytes\": 8388608,\n  \"maximumDescriptorPartBytes\": 4194304,\n  \"maximumDescriptorBytes\": 67108864,\n  \"maximumFileBytes\": 137438953472,\n  \"maximumBlocks\": 524288,\n  \"sourceReadRule\": \"exactly one full sequential source read per capture; no full source-local temporary repository\",\n  \"restoreRule\": \"materialized regular file checked byte-for-byte by the independent synthetic oracle, with metadata and hard-link identity\",\n  \"costCases\": [\n    \"baseline\",\n    \"8-MiB replacement\",\n    \"unchanged\",\n    \"rename\",\n    \"8 scattered 1-MiB changes\",\n    \"1-MiB insertion 64-MiB before EOF\",\n    \"physical repack\",\n    \"retirement\"\n  ],\n  \"independentRecovery\": \"pre-created copied kit, recovery-only owner key and expected version receipt; isolated container has no source, canonical store or other files' payloads\",\n  \"requirements\": [\"REQ-09\", \"REQ-10\", \"REQ-11\"],\n  \"gatesStillSeparate\": [\n    \"G2 distributed retention and offline pins\",\n    \"G3 transport/cloud acknowledgement and fencing\",\n    \"production deployment\"\n  ]\n}\n",
+  "terminal": {
+    "exitCode": 0,
+    "passMarkerVerified": true,
+    "sourceFilesVerified": 642,
+    "wrapperSha256": "686d2b0f942a7a81f85175bcd825202a87c15f471d2b12f2295becbb07c5bb06",
+    "method": "Unchanged admitted wrapper explicit exit receipt; original unit lifetime checked. Collected transient-unit defaults are not terminal proof."
+  },
+  "observedCgroups": {
+    "sampleCount": 1501,
+    "sampling": "Point observations of14long phases; not continuous monitoring of all23phases.",
+    "memoryMaxBytes": 805306368,
+    "swapMaxBytes": 0,
+    "cpuMax": "100000 100000",
+    "pidsMax": 128,
+    "maximumMemoryPeakBytes": 805572608,
+    "maximumObservedSwapBytes": 0,
+    "maximumObservedOOMKills": 0,
+    "maximumObservedOOMEvents": 0,
+    "peakNote": "memory.peak includes charged cache and kernel memory and transiently exceeded memory.max by266240bytes. Per-command kernel maxRSS is a separate measurement.",
+    "semantics": "https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files"
+  },
+  "filesystemReserveMaintained": true,
+  "minimumRequiredFreeRatio": 0.2,
+  "storageMeasurementScope": "Peak used bytes on the dedicated test filesystem, an upper bound for fixture storage including test artifacts; not an enforced per-process filesystem quota. Volume identity and total capacity remain private.",
+  "versionReferences": {
+    "backup-base": {
+      "version": "a2bee00b0ee7e469849d969c9e6bed099de5f64fe36006ae592396b27e0dc5f8",
+      "file": "19edeaf5b18b99c658dfdd21b8e64fc72052def2e2033ad6b9681d051567bb31"
+    },
+    "backup-patched": {
+      "version": "ad900af1267367d6705637b291465156dd9f39f865fcac24ada6155790023789",
+      "file": "19edeaf5b18b99c658dfdd21b8e64fc72052def2e2033ad6b9681d051567bb31"
+    },
+    "backup-unchanged": {
+      "version": "ad900af1267367d6705637b291465156dd9f39f865fcac24ada6155790023789",
+      "file": "19edeaf5b18b99c658dfdd21b8e64fc72052def2e2033ad6b9681d051567bb31"
+    },
+    "backup-renamed": {
+      "version": "2980b18f63f57f0b7de868e7a027cc039c07eb8556e8dc3c08a98e389b46f2a0",
+      "file": "19edeaf5b18b99c658dfdd21b8e64fc72052def2e2033ad6b9681d051567bb31"
+    },
+    "backup-scattered": {
+      "version": "d3dc9f8a31e5db3b1f7c6ac3568165968ff0188433d871b8db607f0625ed8dca",
+      "file": "19edeaf5b18b99c658dfdd21b8e64fc72052def2e2033ad6b9681d051567bb31"
+    },
+    "backup-inserted": {
+      "version": "65397e269976a5e14098c0bb16ba179587e9feebd3a91e3bb3456e47fec48ae6",
+      "file": "19edeaf5b18b99c658dfdd21b8e64fc72052def2e2033ad6b9681d051567bb31"
+    }
+  }
+}

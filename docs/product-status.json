@@ -472,7 +472,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-06", "AT-20", "AT-21", "AT-27"],
-      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
     },
     {
       "id": "REQ-08",
@@ -693,7 +693,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-03"],
-      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
     },
     {
       "id": "REQ-10",
@@ -731,7 +731,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-06", "AT-12", "AT-26"],
-      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
     },
     {
       "id": "REQ-11",
@@ -765,7 +765,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12"],
-      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
     },
     {
       "id": "REQ-12",
@@ -787,7 +787,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
-      "remaining": "Integrated recovery and retained-version checks at the admitted scale; final G1 measurements."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
     },
     {
       "id": "REQ-13",

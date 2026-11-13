@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { validateG1Evidence } from "./g1-evidence.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (name) => fs.readFileSync(path.join(root, name), "utf8");
@@ -112,6 +113,13 @@ for (const item of product.acceptance) {
 }
 // Keep the G1 trace attached to existing checks. Existence is not execution.
 const g1Trace = JSON.parse(read("docs/g1-trace.json"));
+assert.equal(catalog.gates.G1.scaleEvidence, "docs/g1-scale-evidence.json");
+validateG1Evidence(
+  JSON.parse(read(catalog.gates.G1.scaleEvidence)),
+  JSON.parse(read(catalog.gates.G1.limits)),
+  catalog.gates.G1,
+);
+execFileSync(process.execPath, [path.join(root, "scripts/g1-evidence.test.mjs")]);
 assert.equal(g1Trace.schemaVersion, 1);
 assert.equal(g1Trace.gate, "G1");
 assert.deepEqual(

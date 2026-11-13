@@ -2,7 +2,29 @@
 
 [Русский](../ru/g1-acceptance.md)
 
-G1 covers the independent file-kit architecture in REQ-09/10/11. The [format decision](file-kit-format.md) and [numeric limits](../g1-acceptance.json) define its contract. Full-scale acceptance is still pending the recorded 100 GiB run and reviewed source publication. Passing the smaller fixture or CI alone does not close G1.
+G1 is accepted for the independent regular-file architecture in REQ-09/10/11 on the exact source and environment in the [full-scale receipt](../g1-scale-evidence.json). The [format decision](file-kit-format.md) and [numeric limits](../g1-acceptance.json) retain the tested bounds. The physical 100 GiB run passed all 23 phases, including independent old/new recovery after physical repack and retirement. This accepts G1 only; whole-product scenarios, G2/G3 and deployment remain separate.
+
+## Recorded full-scale result
+
+The tested commit is `68bede552755edc0f37fba1060cebde0501a1861`, tree `624b6115be2eefe61898adc5f49d4d4d82afd481`. The original run completed on 2026-11-13 at 02:10 UTC. Its unchanged wrapper returned zero and created the complete PASS marker. Binary and original limit-document hashes are retained in the receipt; the later acceptance-status change does not alter any numeric limit. Raw metadata and execution logs remain in the private evidence archive, without publishing recovery keys, volume identity or owner inventory.
+
+| Measurement                   | Accepted observation                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| Source                        | 107,374,182,400 physically allocated bytes, compression ratio 1.000082                           |
+| 8 MiB replacement             | 31,103,218 added encrypted payload and metadata bytes, below 128 MiB                             |
+| Unchanged capture             | Zero new payload, metadata and objects; same version                                             |
+| Rename                        | Zero new payload; new encrypted metadata                                                         |
+| Scattered changes / insertion | 40,009,709 / 20,926,724 added bytes; insertion is 1 MiB at 64 MiB before EOF                     |
+| Independent recovery          | Both 100 GiB versions pass every byte, attributes and hard-link oracle after maintenance         |
+| Physical maintenance          | 14,547 payload objects replaced; 14,572 garbage objects removed; three selected versions retired |
+| Process memory                | Maximum kernel `maxRSSKiB` 231,444 under the 768 MiB container limit                             |
+| Storage                       | Peak used test-filesystem bytes 325,515,743,232; required 20% reserve maintained                 |
+
+Storage is an upper bound including test artifacts, not an enforced per-process filesystem quota. Every capture still reads the whole source once. These are local-kit costs, not measured cloud wire traffic or a production RPO/RTO promise. The benchmark used one virtual Linux/amd64 CPU without exposed AES/SHA acceleration; per-phase timings are in the receipt.
+
+The 1,501 cgroup observations are point samples of 14 long phases, not continuous coverage of all phases. They record the configured one CPU, 805,306,368-byte memory limit, zero swap limit and 128 PIDs, with no observed swap or OOM. Raw `memory.peak` reached 805,572,608 bytes, 266,240 above `memory.max`; it includes charged cache/kernel memory and the [kernel-documented transient excess](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files). This value is retained separately from process RSS and has not been rounded down. All 23 commands report kernel RSS independently.
+
+The accepted scale run exercises the serial local-kit path on the recorded source. Later optional concurrent-write changes have separate bounded regressions; this receipt does not establish full-scale asymmetric WAN throughput, native source consistency or installed-service acceptance. The documentation check validates the scoped receipt, original limits, phase sequence and negative metadata cases. It does not execute the benchmark or independently certify its private runtime evidence.
 
 ## Requirement-to-check trace
 
@@ -60,4 +82,4 @@ Restore verifies full packs, so bytes read may exceed file length when versions 
 
 A bounded external DeepSeek review through RouterAI examined publication/GC invariants. It required aborting GC on any invalid root, deleting whole packs only when unreferenced, signing an ordered descriptor-part list and testing process-kill boundaries. The implementation and named checks address these points. This is an independent design review, not a third-party cryptographic certification or proof of executed tests; the maintainer owns execution and acceptance.
 
-Hardware power failure, source disk disappearance during active I/O, cold boot, distributed fencing/pins, real S3-compatible/WebDAV endpoints and production rollout remain separate. No working service, legacy data or device is changed by G1 source acceptance. Retained evidence is reviewed before marking G1 PASS in the requirement catalog and roadmap.
+Hardware power failure, source disk disappearance during active I/O, cold boot, distributed fencing/pins, real S3-compatible/WebDAV endpoints and production rollout remain separate. No working service, legacy data or device is changed by G1 source acceptance. The recorded G1 evidence is accepted; those separate gates retain their own outstanding criteria.
