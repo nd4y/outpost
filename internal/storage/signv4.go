@@ -1,37 +1,21 @@
 package storage
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/smithy-go/encoding/httpbinding"
 )
 
-func mac(key []byte, s string) []byte {
-	h := hmac.New(sha256.New, key)
-	h.Write([]byte(s))
-	return h.Sum(nil)
-}
 func uriPath(s string) string {
 	if s == "" {
 		return "/"
 	}
-	const digits = "0123456789ABCDEF"
-	var out strings.Builder
-	for _, c := range []byte(s) {
-		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("-._~/", rune(c)) {
-			out.WriteByte(c)
-		} else {
-			out.WriteByte('%')
-			out.WriteByte(digits[c>>4])
-			out.WriteByte(digits[c&15])
-		}
-	}
-	return out.String()
+	return httpbinding.EscapePath(s, false)
 }
 
 // signV4 signs bounded non-streaming S3 requests. Credentials are never logged.
@@ -39,6 +23,9 @@ func signV4(r *http.Request, payload []byte, access, secret, token, region strin
 	bad := errors.New("invalid request signing input")
 	if r == nil || r.URL == nil || r.URL.Scheme != "https" || r.URL.Host == "" || r.URL.User != nil || r.URL.ForceQuery || r.URL.Fragment != "" || r.URL.Opaque != "" || access == "" || secret == "" || !safeName(region, 64) || strings.ContainsAny(access+secret+token, "\r\n") || strings.ContainsAny(access, " /,\t") {
 		return bad
+	}
+	if e := r.Context().Err(); e != nil {
+		return e
 	}
 	switch r.Method {
 	case http.MethodGet, http.MethodPut, http.MethodHead:
@@ -52,54 +39,38 @@ func signV4(r *http.Request, payload []byte, access, secret, token, region strin
 	default:
 		return bad
 	}
-	now = now.UTC()
-	date := now.Format("20060102")
-	stamp := now.Format("20060102T150405Z")
-	digest := Hash(payload)
+	path := uriPath(r.URL.Path)
+	// S3 signs the path sent on the wire without an additional escaping pass.
+	// Refuse an alternative RawPath instead of changing an encoded separator.
+	if r.URL.RawPath != "" && r.URL.RawPath != path || strings.ContainsAny(r.Host+r.URL.Host, "\r\n") {
+		return bad
+	}
+	for _, values := range r.Header {
+		for _, value := range values {
+			if strings.ContainsAny(value, "\r\n") {
+				return bad
+			}
+		}
+	}
 	if r.Header == nil {
 		r.Header = make(http.Header)
 	}
-	r.Header.Set("X-Amz-Date", stamp)
+	digest := Hash(payload)
 	r.Header.Set("X-Amz-Content-Sha256", digest)
 	r.Header.Del("X-Amz-Security-Token")
-	if token != "" {
-		r.Header.Set("X-Amz-Security-Token", token)
+	if r.URL.Path == "" {
+		r.URL.Path = "/"
 	}
-	host := r.URL.Host
-	if r.Host != "" {
-		host = r.Host
-	}
-	values := map[string]string{"host": host}
-	for name, all := range r.Header {
-		lower := strings.ToLower(name)
-		if strings.HasPrefix(lower, "x-amz-") || lower == "range" || lower == "if-none-match" {
-			v := strings.Join(all, ",")
-			if strings.ContainsAny(v, "\r\n") {
-				return bad
-			}
-			values[lower] = strings.Join(strings.Fields(v), " ")
-		}
-	}
-	if strings.ContainsAny(host, "\r\n") {
+	r.URL.RawPath = path
+	// SignHTTP performs no I/O. Credential discovery, endpoint selection and
+	// retries stay outside the SDK and retain the admitted Outpost bounds.
+	credentials := aws.Credentials{AccessKeyID: access, SecretAccessKey: secret, SessionToken: token}
+	signer := v4.NewSigner(func(o *v4.SignerOptions) {
+		o.DisableURIPathEscaping = true
+		o.LogSigning = false
+	})
+	if e := signer.SignHTTP(r.Context(), credentials, r, digest, "s3", region, now.UTC()); e != nil {
 		return bad
 	}
-	names := make([]string, 0, len(values))
-	for name := range values {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	var headers strings.Builder
-	for _, name := range names {
-		headers.WriteString(name + ":" + values[name] + "\n")
-	}
-	signed := strings.Join(names, ";")
-	canonical := r.Method + "\n" + uriPath(r.URL.Path) + "\n" + r.URL.RawQuery + "\n" + headers.String() + "\n" + signed + "\n" + digest
-	scope := date + "/" + region + "/s3/aws4_request"
-	stringToSign := "AWS4-HMAC-SHA256\n" + stamp + "\n" + scope + "\n" + Hash([]byte(canonical))
-	key := mac([]byte("AWS4"+secret), date)
-	key = mac(key, region)
-	key = mac(key, "s3")
-	key = mac(key, "aws4_request")
-	r.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential="+access+"/"+scope+", SignedHeaders="+signed+", Signature="+hex.EncodeToString(mac(key, stringToSign)))
 	return nil
 }

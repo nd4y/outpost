@@ -384,6 +384,9 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		}
 		if b.profile.Kind == "s3" {
 			if e = signV4(req, payload, b.credentials.Access, b.credentials.Secret, b.credentials.SessionToken, b.profile.Region, time.Now()); e != nil {
+				if errors.Is(e, context.Canceled) || errors.Is(e, context.DeadlineExceeded) {
+					return nil, 0, e
+				}
 				return nil, 0, ErrDenied
 			}
 		} else {

@@ -69,6 +69,16 @@ To check one recorded temporary name, run `outpost worker-upload-staging-check -
 
 The result is an observation at read time. Another worker or a delayed request can change the target afterward. The command never publishes, moves or removes objects.
 
+## Request signing components
+
+S3-compatible requests use the pinned v2 SigV4 signer and HTTP-binding URI encoder listed in [go.mod](../../go.mod) and [go.sum](../../go.sum). Their [upstream signing API](https://github.com/aws/aws-sdk-go-v2/blob/v1.48.0/aws/signer/v4/v4.go) signs an explicitly supplied payload digest, service, region, time and credentials. Component names and [license notices](../../THIRD_PARTY_NOTICES.md) identify dependencies; storage compatibility is defined by the protocol and admitted endpoint capabilities.
+
+Outpost supplies the existing access key, secret and optional session token directly. The signer performs no credential discovery, endpoint selection, metadata request or automatic retry. HTTPS, namespace, allowed methods/archive query, TLS roots, credential expiry, request/body budgets and immutable readback retain their existing checks. SDK signing logs are disabled. The URI encoder supplies canonical escaping; an alternative noncanonical `RawPath` is refused before signing instead of rewriting an encoded separator.
+
+Independent frozen signatures cover ordinary reads, archive requests and a conditional write with escaped UTF-8 path, session token and implicit `Content-Length`. A real TLS fixture verifies that signed length, conditional creation and returned bytes agree. Missing explicit credentials fail even when ambient SDK credential variables exist. File-kit, catalog, complete-marker and credential-storage formats are unchanged. These component checks do not admit a real endpoint or close the separate G3 throughput/installation gates.
+
+The [bounded signing receipt](../s3-signing-evidence.json) records six focused and 27 storage checks, both static architecture builds, nine distribution and eleven candidate checks, and binary-bound SBOMs. The worker/CLI inventories identify the signing modules; the independent `outpost-kit` binaries do not link them. The packaging selection uses an explicit synthetic tree/run, so actual native CI, endpoint and full-product acceptance remain separate.
+
 ## Complete generations and recovery
 
 The [polling receipt](../upload-idle-evidence.json) records38/39 original versus5/5 candidate marker GETs per2.1s, real idle-process restart and cancellation, and ordinary old/new cloud restoration on both protocols. The unchanged12s rotation/lost-part test fails on both original and candidate binaries while sharing the HDD with a full-size job, including without race instrumentation. That regression and the150ms throughput profile remain unaccepted; no identical retry or relaxed assertion is used.

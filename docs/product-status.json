@@ -18,9 +18,30 @@
         "internal/observation",
         "internal/policy"
       ],
-      "checks": [],
+      "checks": [
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4IndependentVectors"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4SDKSignsImplicitLengthAndWirePath"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4SDKRefusesAmbiguousPathsAndCancelledRequests"
+        },
+        {
+          "path": "internal/storage/sdk_signing_test.go",
+          "name": "TestSDKSignatureCoversActualConditionalPutLength"
+        },
+        {
+          "path": "internal/storage/sdk_signing_test.go",
+          "name": "TestSDKIntegrationDoesNotDiscoverCredentials"
+        }
+      ],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs. Pinned SDK request signing and HTTP URI encoding now have independent frozen vectors and actual signed-framing/explicit-credential checks; distribution, native CI and publication acceptance remain separate."
     },
     {
       "id": "REQ-02",
@@ -3282,6 +3303,26 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4IndependentVectors"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4SDKSignsImplicitLengthAndWirePath"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4SDKRefusesAmbiguousPathsAndCancelledRequests"
+        },
+        {
+          "path": "internal/storage/sdk_signing_test.go",
+          "name": "TestSDKSignatureCoversActualConditionalPutLength"
+        },
+        {
+          "path": "internal/storage/sdk_signing_test.go",
+          "name": "TestSDKIntegrationDoesNotDiscoverCredentials"
         }
       ],
       "acceptance": ["AT-16"],
@@ -8586,6 +8627,26 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4IndependentVectors"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4SDKSignsImplicitLengthAndWirePath"
+        },
+        {
+          "path": "internal/storage/signv4_test.go",
+          "name": "TestSigV4SDKRefusesAmbiguousPathsAndCancelledRequests"
+        },
+        {
+          "path": "internal/storage/sdk_signing_test.go",
+          "name": "TestSDKSignatureCoversActualConditionalPutLength"
+        },
+        {
+          "path": "internal/storage/sdk_signing_test.go",
+          "name": "TestSDKIntegrationDoesNotDiscoverCredentials"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

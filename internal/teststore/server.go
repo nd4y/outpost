@@ -145,6 +145,9 @@ func (s *Server) actor(r *http.Request, body []byte) (string, bool) {
 		value := r.Header.Get(name)
 		if name == "host" {
 			value = r.Host
+		} else if name == "content-length" {
+			// net/http parses this framing field separately from ordinary headers.
+			value = strconv.FormatInt(r.ContentLength, 10)
 		}
 		headers += name + ":" + strings.Join(strings.Fields(value), " ") + "\n"
 	}
