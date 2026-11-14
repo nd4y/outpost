@@ -20,7 +20,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -107,7 +107,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23", "AT-30"],
-      "remaining": "The native Btrfs candidate creates one read-only snapshot for a signed producer intent and reuses it on restart. A separate producer disposes the exact snapshot using the source's signed release ticket. Admit the real source profile, privileges, retention and performance and the remaining filesystem and application profiles."
+      "remaining": "Native Btrfs acquisition/reuse, privileged signed disposal and two independent offline versions are verified by the scoped native kernel receipt on1cb174e. Real source profile/privilege admission, retained-snapshot scale/performance and remaining filesystem/application profiles remain open."
     },
     {
       "id": "REQ-03",
@@ -166,7 +166,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -273,7 +273,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -436,7 +436,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, whole-runtime and receiver journal recovery, separate failure-domain admission and recovery-package lifecycle across key epochs. New source runtimes can enroll a separate signed journal copy and repair the main file when the supporting records survive. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection and retirement of proven unadmitted or intact unsealed ACTIVE across all possible holders. An opt-in ACTIVE replacement before durable catalog supports single-copy standby and a third receiver for two-copy mode, with signed restart state and staged-pack reuse. Its synthetic Worker test restores the same file that was accepted before the injected outage and logs seal and catalog-request timing. A surviving complete ciphertext closure allows paired replacement after sealing without changing the catalog. The replaced receiver reclaims its slot after verified catch-up. Physical long-offline rejoin, recovery when no reachable holder has a required ciphertext dependency, and measured asymmetric 500/500/100 acceptance remain open. Full-copy initial transfers adapt to measured durable ingress throughput with a bounded weight ratio; split coverage retains deterministic ownership. The bounded payload window now frees any completed write and journals its accepted blocks without waiting for an older pending transfer. The descriptor still waits for every write; actual full-scale asymmetric throughput and release timing remain unaccepted."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, whole-runtime and receiver journal recovery, separate failure-domain admission and recovery-package lifecycle across key epochs. New source runtimes can enroll a separate signed journal copy and repair the main file when the supporting records survive. The fixed pair implements parallel ingress, early staged forwarding for two-copy capture and optional release on complete or partitioned durable coverage. Single-copy capture selects an authorized standby before admission. Fresh exact owner grants support local and paired staged publication and authenticated inspection and retirement of proven unadmitted or intact unsealed ACTIVE across all possible holders. An opt-in ACTIVE replacement before durable catalog supports single-copy standby and a third receiver for two-copy mode, with signed restart state and staged-pack reuse. Its synthetic Worker test restores the same file that was accepted before the injected outage and logs seal and catalog-request timing. A surviving complete ciphertext closure allows paired replacement after sealing without changing the catalog. The replaced receiver reclaims its slot after verified catch-up. Physical long-offline rejoin, recovery when no reachable holder has a required ciphertext dependency, and measured asymmetric 500/500/100 acceptance remain open. Full-copy initial transfers adapt to measured durable ingress throughput with a bounded weight ratio; split coverage retains deterministic ownership. The bounded payload window now frees any completed write and journals its accepted blocks without waiting for an older pending transfer. The descriptor still waits for every write; actual full-scale asymmetric throughput and release timing remain unaccepted."
     },
     {
       "id": "REQ-06",
@@ -454,7 +454,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -844,7 +844,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native filesystem snapshot acquisition and application-specific producer admission/retention/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
