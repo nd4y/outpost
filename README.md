@@ -151,3 +151,5 @@ Stopped workers can export an index-bound metadata checkpoint and explicitly rec
 Native CI now prepares allowlisted downloadable development candidates with commit/run selection, checksums, binary-bound SBOM and [bilingual candidate notes](docs/en/release-notes.md). [Independent download verification](docs/en/distribution.md#downloadable-ci-candidates) remains separate from runtime acceptance and release.
 
 The [downloaded installation evidence](docs/downloaded-install-evidence.json) records seven isolated amd64 install/upgrade/rollback/recovery checks using real CI candidate binaries; cold-host and production admission remain separate.
+
+The [interactive keyboard receipt](docs/manual-keyboard-evidence.json) records a scoped English/Russian review and visible focus at320px alongside the automated accessibility checks.

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "status": "SCOPED_INTERACTIVE_KEYBOARD_AND_NARROW_FOCUS_OBSERVATIONS_PASS",
+  "observedAt": "2026-11-14T14:16:26.388549+00:00",
+  "frontendCommit": "59a944d1d25a0972b081a4515c3b73541d12b2f6",
+  "frontendFiles": {
+    "internal/management/ui/app.css": "84b4fb6265c517658c42d6ada436ec21d419c100a5ea3f267f7c16a1805244c8",
+    "internal/management/ui/app.js": "00156210efd31b07464f1cac5270d74b81267736ec6718d09d203914282fb5dc",
+    "internal/management/ui/index.html": "3af8e444fde02c0902e907a8c4c59fee2833fc22831098c1d907e0fb7642306b",
+    "internal/management/ui/journal.js": "2f59e631cdbeef07ff77c64b2c9acfd9f42143574395be37e296d12062969eb7",
+    "internal/management/ui_linux.go": "f44ff342b293c6980534880baf0ec17c63f47194a38c82f4909f0f975c4c3f1c"
+  },
+  "helperDelta": "Only the existing synthetic browser fixture exported its already selected public server certificate for explicit test-client TLS trust. Frontend/product code and four-minute fixture deadline were unchanged.",
+  "method": "Direct interactive browser keyboard actions and AX/DOM observations, with final screenshots visually inspected in the review chat. No mouse activation or scripted DOM mutation.",
+  "manualRole": "synthetic owner",
+  "cases": [
+    {
+      "case": "Skip-to-content",
+      "observation": "Initial Tab reaches the Russian skip link; Enter moves the navigation start into main. Focus-visible CSS outline and bounds read from the actual focused link."
+    },
+    {
+      "case": "Scope keyboard selection",
+      "observation": "Tab and native arrows select the intended synthetic node and domain. Unknown/stale and temporary busy states remain explicit; one deliberate Refresh resolves the busy view without a mutation retry."
+    },
+    {
+      "case": "Language change",
+      "observation": "Shift-Tab reaches the language selector and keyboard changes Russian to English. A later targeted keyboard focus/arrow returns to Russian; both control labels and review messages change."
+    },
+    {
+      "case": "English restore review and return",
+      "observation": "Tab navigation reaches Operations, Restore and exact-generation/preset inputs. Keyboard input then Review shows the exact immutable selection and Nothing has been submitted; focus moves to Submit reviewed operation. Tab/Enter returns to editing. No Submit action was taken."
+    },
+    {
+      "case": "Russian restore review and return",
+      "observation": "Keyboard activates the same review in Russian, shows Запрос ещё не отправлен and focuses Отправить проверенную операцию. Tab/Enter returns to the operation selector; no Submit action was taken."
+    },
+    {
+      "case": "320px focus and wrapping",
+      "observation": "Russian confirmation remains readable with two-line button text, visible 2.4px brown focus outline and no page-level horizontal overflow. The final screenshot and DOM measurement agree.",
+      "viewport": {
+        "width": 320,
+        "height": 800
+      },
+      "documentScrollWidth": 305,
+      "focusedButtonRect": {
+        "x": 29.6,
+        "y": 365.6875,
+        "width": 245.6,
+        "height": 68.8
+      }
+    }
+  ],
+  "imageEvidence": "Native interactive screenshots remain in the review chat. Intermediate input frames were not treated as final proof; the final English and320px Russian confirmation frames were checked against actual focused DOM state. No screenshot byte files were exported or relabelled.",
+  "runtime": {
+    "compilerMemoryMaxBytes": 536870912,
+    "compilerMemoryPeakBytes": 216961024,
+    "manualMemoryMaxBytes": 268435456,
+    "manualMemoryPeakBytes": 21946368,
+    "cleanupControlMemoryPeakBytes": 32813056,
+    "swapOOM": 0
+  },
+  "fixtureTransport": "Fixed loopback test-client adapter presents a synthetic owner mTLS identity upstream and verifies the explicitly exported fixture server certificate with hostname checking. Client private keys stay on the test HDD. The helper uses the host network namespace only for127.0.0.1 listeners; it is not an ordinary worker isolation or product TLS/authentication acceptance result.",
+  "firstController": {
+    "exit": 1,
+    "cause": "The manual walkthrough reached its unchanged235s controller budget. Finally sent SIGTERM; Go fixture exited0 and listeners/container/tunnel closed. Failure retained."
+  },
+  "shutdownControl": {
+    "exit": 0,
+    "stoppedByOwnedMarker": true,
+    "fixtureExit": 0,
+    "tunnelClosedAfterJoin": true,
+    "scope": "Fresh tiny fixture with the identical helper/controller and unchanged deadlines; health identity checked then immediate owner stop. No second keyboard walkthrough or compiler run."
+  },
+  "remaining": [
+    "Manual screen-reader/assistive technology use and wider browser/device coverage were not performed",
+    "Signed-policy upload and actual command admission/execution are covered separately; this manual sample does not claim them",
+    "Full source/restore scale, cold-host admission and whole-product acceptance remain separate"
+  ],
+  "fullProductAcceptance": false
+}
