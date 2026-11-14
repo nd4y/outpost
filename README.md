@@ -152,4 +152,6 @@ Native CI now prepares allowlisted downloadable development candidates with comm
 
 The [downloaded installation evidence](docs/downloaded-install-evidence.json) records seven isolated amd64 install/upgrade/rollback/recovery checks using real CI candidate binaries; cold-host and production admission remain separate.
 
-The [interactive keyboard receipt](docs/manual-keyboard-evidence.json) records a scoped English/Russian review and visible focus at320px alongside the automated accessibility checks.
+The [interactive keyboard receipt](docs/manual-keyboard-evidence.json) records a scoped English/Russian review and visible focus at 320px alongside the automated accessibility checks.
+
+The [replacement dataset check](docs/dataset-rebuild-evidence.json) exercises a fresh owner-enrolled node through an actual selected CLI after loss of all old local runtime/replica data, with independent two-version recovery. Its bounded HDD result remains separate from native/physical/full-scale acceptance.

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "status": "ACTUAL_CLI_LOGICAL_DATASET_REBUILD_HDD_PASS_NATIVE_PENDING",
+  "observedAt": "2026-11-14T14:59:07.398012+00:00",
+  "testSourceBaseCommit": "94942f127dca72e0e67621271d624a287964cc2a",
+  "testSourceTree": "b9247b43682a2fda4d1533bc749b18277de90704",
+  "testTreeIsUncommittedSnapshot": true,
+  "testFile": "internal/worker/dataset_rebuild_cli_linux_test.go",
+  "testFileSHA256": "349c4634466b2a982ce17d4edad333f49be854d24875088cbab94e007ca08385",
+  "nativeWorkflowSHA256": "6f6dc9bcc4b5250d4639c552a34286e9252078d304d39a2a7ae1d65d26391468",
+  "actualSelectedCLICommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+  "actualSelectedCLISHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+  "selection": {
+    "archiveSHA256": "954d66a6c85343fb493a5b7235e4996989cb09e39426a7138a049b7d8bffdc71",
+    "artifactId": 14115396258,
+    "artifactSHA256": "862606aff3dc27c1e23bbcca0dc201e1a659b90335dcd60132ea875ca2c7eb5c",
+    "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43597711032/artifacts/14115396258",
+    "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "format": "outpost-ci-artifact-selection-1",
+    "kind": "outpost-ci-candidate-1",
+    "manifestSHA256": "f7aaa4952308b8b5a80f258d6d7ecdad55e730ccac70e3875898d263f1249fbc",
+    "nativeArchitecture": "amd64",
+    "repository": "nd4y/outpost",
+    "runAttempt": 1,
+    "runId": 43597711032
+  },
+  "productionBinding": "Committed cmd/internal/go.mod/go.sum inputs at 94942f1 equal the actual downloaded 0ad4d17 runtime inputs. The new opt-in test is not a replacement product binary. Native CI will select its own exact-head distribution binary independently.",
+  "fixture": {
+    "retainedGenerations": 2,
+    "sourceBytesPerVersion": 262144,
+    "modifiedRangeBytes": 8192,
+    "immutableRecoveryFiles": 8,
+    "oldDatasetIncludes": [
+      "worker runtime",
+      "primary index and local ledger",
+      "catalogs and ciphertext objects",
+      "old operation receipts"
+    ],
+    "replacement": "Fresh owner-enrolled dataset and node identity with cached signed autonomous pull rule; no individual generation jobs or live controller endpoint.",
+    "lossModel": "The complete old logical dataset is held unavailable on the same admitted filesystem. This is not physical filesystem replacement, a new hardware failure domain or cold-host boot."
+  },
+  "checks": [
+    "Both retained generations first reached the old holder",
+    "Missing original dataset root rejects volume guard and a valid new configuration without creating a fallback root",
+    "Source plaintext and encrypted source cache removed before the replacement process starts",
+    "Old mTLS identity receives403 after its inventory rule is withdrawn",
+    "CLI volume-probe/enroll/init/config-apply creates only the new owner-admitted dataset identity and empty job state",
+    "Controlled holder503 produces no complete job or accepted receipt",
+    "The actual CLI discovers and retrieves both catalogs/ciphertext using cached policy when availability returns",
+    "New job receipts are durable and do not reuse the old node operation",
+    "SIGTERM joins the replacement process; all helper workers and peer server stop",
+    "Only new-target immutable catalogs/objects, separate recovery key and public trust reach the offline CLI reader",
+    "Both Unicode-path file versions match every byte; catalogs retain exact original signed bytes and snapshot age"
+  ],
+  "restores": [
+    {
+      "version": "old",
+      "bytes": 262144,
+      "sha256": "8089a26ccf6cb842388d5d4d6693875c73a76373bcecd6527713ae0971d5abea"
+    },
+    {
+      "version": "new",
+      "bytes": 262144,
+      "sha256": "7afe58a7ad5f056f495d35dac671da424c148a2f11b6d7496a4f7cc9c903c376"
+    }
+  ],
+  "durationSeconds": 145.49,
+  "resources": {
+    "cpuMax": "100000 100000",
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 386494464,
+    "swapAdditionalBytes": 0,
+    "oom": 0,
+    "pidsLimit": 128,
+    "network": "none",
+    "race": true,
+    "vet": "PASS",
+    "scope": "Cgroup totals cover the bounded parent fixture and its CLI children; they are not a standalone worker heap budget or admitted-scale RTO."
+  },
+  "pending": [
+    "Same combined scenario on both selected native CI architectures",
+    "Exact committed publication and required CI",
+    "Physical filesystem migration/cold-host ordering and real infrastructure admission",
+    "Large retained-history/100GiB and separate G3 performance acceptance"
+  ],
+  "fullProductAcceptance": false
+}

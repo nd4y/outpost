@@ -62,6 +62,15 @@ jobs:
             --manifest-sha256 "$current_hash" --previous-root "$RUNNER_TEMP/previous" \
             --previous-manifest-sha256 "$previous_hash" --fixture-binary "$RUNNER_TEMP/container-fixture.test" \
             --work "$RUNNER_TEMP/container-checks"
+      - name: Rebuild a lost node dataset with the selected native CLI
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/dataset-rebuild-tests"
+          export TMPDIR="$RUNNER_TEMP/dataset-rebuild-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_DATASET_REBUILD_CLI="$RUNNER_TEMP/current/linux_$NATIVE_ARCHITECTURE/outpost"
+          export OUTPOST_DATASET_REBUILD_REVISION="$SOURCE_COMMIT"
+          export OUTPOST_DATASET_REBUILD_SHA256="$(python3 -c 'import json,os; m=json.load(open(os.environ["RUNNER_TEMP"]+"/current/manifest.json")); print(m["files"]["linux_"+os.environ["NATIVE_ARCHITECTURE"]+"/outpost"]["sha256"])')"
+          go test -count=1 -timeout=300s -run '^TestReplacementDatasetRebuildActualCLI$' -v ./internal/worker
       - name: Generate binary-bound CycloneDX inventories
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
