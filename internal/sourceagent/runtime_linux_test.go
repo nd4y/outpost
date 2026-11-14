@@ -166,6 +166,7 @@ type fixtureOptions struct {
 	Limits              diskbudget.Limits
 	CertificateLifetime time.Duration
 	InitialSource       func(*testing.T, string)
+	RetainContext       bool
 }
 
 func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epoch *fixtureEpoch) *fixture {
@@ -248,7 +249,7 @@ func newFixtureWithOptions(t *testing.T, seconds int64, extra *tls.Certificate, 
 		return cert, cp, kp
 	}
 	src, cp, kp := newCert(2)
-	dst, _, _ := newCert(3)
+	dst, destinationCertificate, destinationKey := newCert(3)
 	f.destination = dst
 	f.replicaCertificate, _, _ = newCert(4)
 	if extra != nil {
@@ -319,6 +320,31 @@ func newFixtureWithOptions(t *testing.T, seconds int64, extra *tls.Certificate, 
 	tree, e := capture.ProbeTree(ctx, f.tree, origin)
 	must(t, e)
 	f.b = Bootstrap{Format: Format, Local: worker.Bootstrap{Format: worker.BootstrapFormat, Volume: binding, Directory: filepath.Join(vol, "agent"), Node: id(src), Owner: ownerPub, CertificateFile: write("source.pem", cp), PrivateKeyFile: write("source-key.pem", kp), CAFile: caFile}, Profile: capture.Profile{ID: f.grant.Profile, Origin: origin, Consistency: "best-effort", Selection: source.Selection{Rules: []policy.Rule{{Prefix: ".", Domain: f.owner.Domain}}, Domains: map[string]bool{f.owner.Domain: true}, EntryLimit: 128}, MaxSourceBytes: maxSourceBytes, MinimumCopies: 1, CopyTargets: []string{id(dst)}}, Tree: tree, DataKeyFile: write("data-key.json", marshal(f.owner)), WriterKeyFile: write("writer-key.json", marshal(map[string]any{"privateKey": key})), AuthorityFile: write("authority.json", f.authority), Endpoint: s.URL, Limits: limits}
+	if opts.RetainContext {
+		if opts.Directory == "" {
+			t.Fatal("private fixture context requires an explicitly retained admitted directory")
+		}
+		// These synthetic keys never leave the private fixture. Keeping only
+		// public certificates would lose the original receiver identity when
+		// the test process exits, preventing authenticated diagnosis/resumption.
+		name := write("fixture-context.json", marshal(struct {
+			Format                                                string
+			Bootstrap                                             Bootstrap
+			Authority                                             []byte
+			DataOwner                                             filekit.Owner
+			ControlOwnerKey, WriterKey                            ed25519.PrivateKey
+			SourceCertificate, SourceKey                          []byte
+			DestinationCertificate, DestinationKey, CertificateCA []byte
+		}{"outpost-private-synthetic-fixture-1", f.b, f.authority, f.owner, ownerKey, key, cp, kp, destinationCertificate, destinationKey, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}))
+		retained, err := os.Open(name)
+		must(t, err)
+		must(t, retained.Sync())
+		must(t, retained.Close())
+		directory, err := os.Open(f.base)
+		must(t, err)
+		must(t, directory.Sync())
+		must(t, directory.Close())
+	}
 	f.a, e = Open(ctx, f.b, true)
 	must(t, e)
 	t.Cleanup(func() {

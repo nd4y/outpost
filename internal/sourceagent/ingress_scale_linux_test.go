@@ -98,6 +98,7 @@ func TestSourceIngressScaleAndOfflineMaterializedReplica(t *testing.T) {
 		MaxSourceBytes: size, MaxBytes: 128 << 30, MaxObjects: generation.MaxObjects,
 		Limits:              diskbudget.Limits{Capacity: 2 << 30, Reserve: 256 << 20, Spool: 1 << 30, Telemetry: 1 << 20},
 		CertificateLifetime: 48 * time.Hour,
+		RetainContext:       true,
 		InitialSource: func(t *testing.T, tree string) {
 			name := filepath.Join(tree, "private.bin")
 			t.Logf("INGRESS_SCALE_GENERATING bytes=%d", size)
@@ -175,7 +176,24 @@ func TestSourceIngressScaleAndOfflineMaterializedReplica(t *testing.T) {
 		}
 		objectsMu.Unlock()
 		must(t, f.a.Next(ctx))
-		must(t, f.a.Run(ctx))
+		for attempt := 1; ; attempt++ {
+			err := f.a.Run(ctx)
+			if err == nil {
+				break
+			}
+			t.Logf("INGRESS_SCALE_ATTEMPT phase=%s attempt=%d error=%v", phase, attempt, err)
+			// The executable source loop retries a durable operation after an
+			// individual transport timeout. Exercise that supported path without
+			// changing its intent, receipt, request deadline or body accounting.
+			if attempt == 3 || ctx.Err() != nil || !retryablePublication(err) {
+				must(t, err)
+			}
+			select {
+			case <-ctx.Done():
+				must(t, ctx.Err())
+			case <-time.After(time.Second):
+			}
+		}
 		checkpoint, e := f.a.Checkpoint(ctx)
 		must(t, e)
 		c, e := capture.VerifyCheckpoint(checkpoint, f.grant.Trust)
@@ -284,6 +302,7 @@ func TestSourceIngressScaleAndOfflineMaterializedReplica(t *testing.T) {
 	// Only exact directories and key files created by this retained fixture.
 	must(t, os.RemoveAll(f.tree))
 	must(t, os.RemoveAll(f.b.Local.Volume.Root))
+	must(t, os.Remove(filepath.Join(f.base, "fixture-context.json")))
 	for _, name := range []string{f.b.DataKeyFile, f.b.WriterKeyFile, f.b.AuthorityFile, f.b.Local.CertificateFile, f.b.Local.PrivateKeyFile, f.b.Local.CAFile} {
 		must(t, os.Remove(name))
 	}

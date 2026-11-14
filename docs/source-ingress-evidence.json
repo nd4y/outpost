@@ -171,5 +171,11 @@
     "S3-compatible and WebDAV throughput profile",
     "power loss, cold boot and real endpoint admission",
     "complete product or production readiness"
-  ]
+  ],
+  "catalogPublicationFollowup": {
+    "receipt": "docs/catalog-publication-evidence.json",
+    "status": "BOUNDED_CATALOG_PUBLICATION_FIXED_48_ORDINARY_RACE_AND_128MIB_CLEAN_CONSUMERS_PASS_FULL100GIB_PENDING",
+    "sourceTree": "216408366493caa4080209c87a066c2f53975169",
+    "full100GiB": "ORIGINAL_FAIL_CORRECTED_REPEAT_PENDING"
+  }
 }

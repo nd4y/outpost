@@ -157,3 +157,5 @@ The [interactive keyboard receipt](docs/manual-keyboard-evidence.json) records a
 The [replacement dataset check](docs/dataset-rebuild-evidence.json) exercises a fresh owner-enrolled node through an actual selected CLI after loss of all old local runtime/replica data, with independent two-version recovery. Its bounded HDD result remains separate from native/physical/full-scale acceptance.
 
 The [guest-kernel evidence](docs/vm-powerloss-evidence.json) records four actual virtual power cuts and five cold volume-ordering cases using independently selected recovery CLIs. All 14 phases passed in a bounded networkless guest; physical host power loss, real disk unlocking and full-scale acceptance remain separate.
+
+The [catalog publication evidence](docs/catalog-publication-evidence.json) records the original100GiB catalog timeout and its exact partial batch, followed by a bounded8MiB publication fix,48 ordinary ingress regressions, a cancellation-bound race control and128MiB two-version recovery through fresh independently selected CLI consumers. The corrected100GiB and G3 quantitative gates remain open; see [publication behavior](docs/en/catalog-publication.md).

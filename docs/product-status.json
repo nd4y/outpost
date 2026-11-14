@@ -2839,10 +2839,14 @@
         {
           "path": "internal/upload/idle_poll_linux_test.go",
           "name": "TestWaitingUploadBackoffCancellationKeepsPin"
+        },
+        {
+          "path": "internal/ingress/catalog_deadline_linux_test.go",
+          "name": "TestCatalogDeadlineBoundsAndReopenedVerificationProgress"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting. Paired capture keeps independent readiness and the existing signed two-copy release threshold. Distributed coverage and full timing acceptance remain open."
+      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting. Paired capture keeps independent readiness and the existing signed two-copy release threshold. Distributed coverage and full timing acceptance remain open. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open."
     },
     {
       "id": "REQ-24",
@@ -6574,10 +6578,14 @@
         {
           "path": "internal/sourceagent/ingress_scale_linux_test.go",
           "name": "TestSourceIngressScaleAndOfflineMaterializedReplica"
+        },
+        {
+          "path": "internal/ingress/catalog_deadline_linux_test.go",
+          "name": "TestCatalogDeadlineBoundsAndReopenedVerificationProgress"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open."
     },
     {
       "id": "REQ-45",
@@ -7097,10 +7105,14 @@
         {
           "path": "internal/sourceagent/ingress_scale_linux_test.go",
           "name": "TestSourceIngressScaleAndOfflineMaterializedReplica"
+        },
+        {
+          "path": "internal/ingress/catalog_deadline_linux_test.go",
+          "name": "TestCatalogDeadlineBoundsAndReopenedVerificationProgress"
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open."
     },
     {
       "id": "REQ-47",

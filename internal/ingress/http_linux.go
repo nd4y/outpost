@@ -86,7 +86,11 @@ func jsonReply(w http.ResponseWriter, status int, v any) {
 // NewServer serves one admitted session. It never listens itself or grants a
 // new session; a worker registry must admit and route dynamic capture intents.
 func NewServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits) (*http.Server, error) {
-	return newServer(s, cert, roots, limits, 256, 256<<20)
+	// Return useful durable progress within the same bounded request window
+	// used to upload one object. A large batch can time out on synchronous
+	// storage before its verification checkpoint is saved, even though some
+	// payload has already been written. The client continues through HTTP 202.
+	return newServer(s, cert, roots, limits, 256, generation.MaxObject)
 }
 
 func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits peer.Limits, batchObjects int, batchBytes int64) (*http.Server, error) {
