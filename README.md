@@ -141,3 +141,5 @@ The [receiver renewal workflow](docs/en/receiver-renewal.md) admits a fresh same
 WebDAV targets without conditional `PUT` can use the explicit MOVE profile. Workers save each staging attempt, verify the ciphertext and publish with `Overwrite: F`. The process fixture restarts workers on both sides of MOVE and restores two retained generations independently. [External upload](docs/en/external-upload.md).
 
 `restore-external` restores a selected file version, directory or generation directly from an S3-compatible or WebDAV copy with read-only credentials and the owner kit. It verifies the selected checkpoint and publishes the output atomically. [Independent external recovery](docs/en/external-upload.md#independent-external-recovery).
+
+Stopped workers can export an index-bound metadata checkpoint and explicitly recover simultaneous loss of the primary index, retention ledger and pending frozen plans while the current signed index copy and anchor survive. See [the prerequisites and replay procedure](docs/en/generation-replicas.md#combined-replica-metadata-loss). Complete-volume recovery and whole-product acceptance remain separate.

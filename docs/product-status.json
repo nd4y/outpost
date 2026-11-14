@@ -838,10 +838,30 @@
         {
           "path": "internal/worker/maintenance_checkpoint_cli_linux_test.go",
           "name": "TestWorkerMaintenancePlanCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRecoversCombinedLossAndFrozenScope"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRejectsUnprovenRecovery"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointSIGKILLPartialReplay"
+        },
+        {
+          "path": "internal/worker/metadata_checkpoint_cli_linux_test.go",
+          "name": "TestWorkerReplicaMetadataCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointPartialQuotaAndCancellation"
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting. Exact frozen-plan checkpoint recovery requires the surviving current index and signed retention ledger; combined metadata loss and independently retained checkpoint lifecycle remain open."
+      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json."
     },
     {
       "id": "REQ-14",
@@ -2137,10 +2157,30 @@
         {
           "path": "internal/worker/maintenance_checkpoint_cli_linux_test.go",
           "name": "TestWorkerMaintenancePlanCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRecoversCombinedLossAndFrozenScope"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRejectsUnprovenRecovery"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointSIGKILLPartialReplay"
+        },
+        {
+          "path": "internal/worker/metadata_checkpoint_cli_linux_test.go",
+          "name": "TestWorkerReplicaMetadataCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointPartialQuotaAndCancellation"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
-      "remaining": "Actual180-update catch-up with policy changes, maintenance and interrupted final receive has bounded evidence; large catalog/history cost, recovery after complete journal loss and full product target-readiness reporting remain open. Exact frozen-plan checkpoint recovery requires the surviving current index and signed retention ledger; combined metadata loss and independently retained checkpoint lifecycle remain open."
+      "remaining": "Actual180-update catch-up, policy changes, maintenance and interrupted final receive have bounded evidence. Large catalog/history cost, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json."
     },
     {
       "id": "REQ-21",
@@ -2359,10 +2399,30 @@
         {
           "path": "internal/worker/maintenance_checkpoint_cli_linux_test.go",
           "name": "TestWorkerMaintenancePlanCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRecoversCombinedLossAndFrozenScope"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRejectsUnprovenRecovery"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointSIGKILLPartialReplay"
+        },
+        {
+          "path": "internal/worker/metadata_checkpoint_cli_linux_test.go",
+          "name": "TestWorkerReplicaMetadataCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointPartialQuotaAndCancellation"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting. Exact frozen-plan checkpoint recovery requires the surviving current index and signed retention ledger; combined metadata loss and independently retained checkpoint lifecycle remain open."
+      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json."
     },
     {
       "id": "REQ-23",
@@ -3518,10 +3578,30 @@
         {
           "path": "internal/worker/maintenance_checkpoint_cli_linux_test.go",
           "name": "TestWorkerMaintenancePlanCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRecoversCombinedLossAndFrozenScope"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointRejectsUnprovenRecovery"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointSIGKILLPartialReplay"
+        },
+        {
+          "path": "internal/worker/metadata_checkpoint_cli_linux_test.go",
+          "name": "TestWorkerReplicaMetadataCheckpointActualCLI"
+        },
+        {
+          "path": "internal/generation/metadata_checkpoint_linux_test.go",
+          "name": "TestReplicaMetadataCheckpointPartialQuotaAndCancellation"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting. Exact frozen-plan checkpoint recovery requires the surviving current index and signed retention ledger; combined metadata loss and independently retained checkpoint lifecycle remain open."
+      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json."
     },
     {
       "id": "REQ-33",

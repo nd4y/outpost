@@ -201,8 +201,12 @@ func (r *Replica) verifyIndexDependencies(ctx context.Context, s *state) error {
 			return e
 		}
 	}
+	return r.verifyIndexContents(ctx, s)
+}
+
+func (r *Replica) verifyIndexContents(ctx context.Context, s *state) error {
 	for id, item := range s.Generations {
-		if e = ctx.Err(); e != nil {
+		if e := ctx.Err(); e != nil {
 			return e
 		}
 		_, refs, e := r.catalogEntry(id, item, true)

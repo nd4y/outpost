@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "scope": "Bounded combined loss of primary replica index, retention ledger and pending frozen GC plans; the current signed index copy and its exact anti-rollback anchor must survive.",
+  "status": "BOUNDED_HDD_PASS_PUBLICATION_PENDING",
+  "sourceBaseCommit": "4d61901055d1742bcd50c57aed3eada1e9a304a3",
+  "productionAndCLI_Tree": "27b61c055a868e2562223c1ecd743f391335634e",
+  "strengthenedCrashAssertionsTree": "f7c73c838e72b32d382468fcb54030c1d1abe07e",
+  "selectedCLI_SHA256": "5ec987cd8dc856cbbbb969a1d9d9b6e8a177f631feea2666204805b4185c8536",
+  "environment": {
+    "platform": "linux/amd64",
+    "storage": "Isolated HDD fixture",
+    "cpuMax": "50000 100000",
+    "memoryMaxBytes": 536870912,
+    "generationMemoryPeakBytes": 64098304,
+    "continuationMemoryPeakBytes": 38883328,
+    "swapOOM": 0,
+    "network": "none",
+    "performanceAcceptance": false
+  },
+  "assertions": {
+    "combinedMissingFilesRestoredExactly": true,
+    "originalPinsReceiptsTombstonesAndFrozenCandidatesPreserved": true,
+    "laterOrphanPreserved": true,
+    "fifteenNegativeRecoveryControls": true,
+    "actualSIGKILLBeforePrimaryPublication": true,
+    "supportingFileSurvivesWithSameInode": true,
+    "partialQuotaAndMidflightCancellationReplay": true,
+    "stoppedEnrolledWorkerActualCLI": true,
+    "foreignDomainAndActiveWorkerRefused": true,
+    "wrongHashAndExistingExportRefused": true,
+    "oldSignedIndexRetentionAndPlanRecoveryRegressions": true,
+    "raceAndVet": true
+  },
+  "nonAcceptance": [
+    "Lost signed index copy or lost anchor",
+    "Complete replica volume loss",
+    "Automated independent checkpoint retention",
+    "Host power-loss or physical media guarantee",
+    "Performance under the concurrently running full-size source test",
+    "Whole product or production deployment"
+  ],
+  "priorFailure": {
+    "tree": "3c02469d615c28344ac6fd613cef2ced28d9876c",
+    "result": "Compile failure before behavioral tests: extracted error variable scope and two incorrect test Admission signatures. Corrected in the tested trees; original failure retained."
+  },
+  "proofSHA256": {
+    "replica-metadata-short-20261114-084730-results-build.log": "750362ecc550dcf4cce0ecd88570214a26b31bcd665c6ddce23a4724ac3f567d",
+    "replica-metadata-short-20261114-084730-results-generation.log": "cfda8a9014bbb627f5bd82bfc8754c4706759149f44cebc44659c6561258b36f",
+    "replica-metadata-short-20261114-084730-results-worker.log": "fddf4aef0d34665b882480961b975332141534798b9fab3f63d7baf0c42f430e",
+    "replica-metadata-continuation-20261114-085415-results-build.log": "531b6e0eb8997efd294f5f39f3804c85b098efa0bb8c960b086dc20f0aa3a7c2",
+    "replica-metadata-continuation-20261114-085415-results-generation.log": "99435301b6588f573372431d4cf3410edeb0874533b9e59d832eb7e7eabd4adb"
+  }
+}

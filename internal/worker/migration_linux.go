@@ -117,6 +117,26 @@ func (w *Worker) EnableReplicaIndexCopy(ctx context.Context, domain string) erro
 	})
 }
 
+func (w *Worker) ReplicaMetadataCheckpoint(ctx context.Context, domain string) ([]byte, error) {
+	var raw []byte
+	err := w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
+		var err error
+		raw, err = replica.MetadataCheckpoint(ctx)
+		return err
+	})
+	return raw, err
+}
+
+func (w *Worker) RestoreReplicaMetadataCheckpoint(ctx context.Context, domain string, raw []byte, expected string) (bool, error) {
+	var restored bool
+	err := w.withStoppedReplica(ctx, domain, func(root *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
+		var err error
+		restored, err = generation.RestoreMetadataCheckpointAt(root, ctx, path, trust, w.cert.PrivateKey.(ed25519.PrivateKey), admit, raw, expected)
+		return err
+	})
+	return restored, err
+}
+
 func (w *Worker) RecoverReplicaIndexCopy(ctx context.Context, domain string) (bool, error) {
 	var changed bool
 	e := w.withStoppedReplica(ctx, domain, func(root *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
