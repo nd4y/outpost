@@ -2,15 +2,98 @@
 
 [Русский](../ru/peer-transfer.md)
 
+The [bounded verification-window contract](verification-windows.md) specifies the compatible HTTPS extension and original-time receipts for resumable verification.
+
 Status: bounded Linux library candidate in `internal/peer`, built on the [G2 replica](generation-replicas.md). It transfers real encrypted file kits over mutually authenticated HTTPS. Full G3, distributed external upload, large-file bandwidth and operational acceptance remain **NOT_VERIFIED**. No worker daemon, live certificates or network configuration are installed by this change.
 
 ## Trust and routes
+
+The retained-history recovery fixture explicitly sets the source file permissions before capture. Its metadata oracle therefore checks the same declared permissions under restrictive and ordinary process umasks. Restored aliases must still refer to one inode, and restored permission bits must match the captured source.
 
 Each domain/repository/epoch uses an explicitly provisioned `Policy`, a CA-verified TLS certificate and pinned peer public-key identities (SHA-256 of the certificate SPKI). The policy defines the local class, allowed classes and concrete peer grants for push/pull with expiry. Trusted status grants no decryption key. An external S3-compatible or WebDAV target is not a peer.
 
 The client accepts one explicit HTTPS origin. It validates the CA, hostname and pinned identity; it follows no redirects, ambient proxy settings, discovery or alternate routes. The server requires a verified client certificate, TLS 1.3 and an allowed peer/operation on every request. Grants and leaf certificates are checked for expiry, including reused connections. Requests are scoped to a domain; the replica's immutable public trust binds the repository, epoch and catalog author. A sender cannot supply a replacement author key or classify itself as trusted.
 
-Policies and certificates are fixed for each constructed client/server. Provisioning, hot reload, owner-signed policy distribution, global graph validation, host firewall enforcement and revocation of already distributed ciphertext remain separate work. This candidate enforces configured edges at its own endpoints; it cannot make a compromised authorized holder obey transit policy.
+Policies and certificates are fixed for each constructed client/server. Provisioning, hot reload, owner-signed policy distribution, verification of live replication permissions, host firewall enforcement and revocation of already distributed ciphertext remain separate work. This candidate enforces configured edges at its own endpoints; it cannot make a compromised authorized holder obey transit policy.
+
+### Inspect declared routes offline
+
+```sh
+outpost config-routes --input /private/signed-config.json \
+  --trust /private/owner-public.json --node NODE_ID --domain DOMAIN_ID
+```
+
+The trust file contains the owner's independently obtained public key as a JSON `publicKey` field (base64). The command verifies the signature, intended node and validity period, then reports the signed document's SHA-256 and revision. It lists every holder in the selected domain, sorted by opaque ID, with a shortest declared path in data-flow order. On a pull edge, the receiving node dials the sender. A reachable local holder has no hops. An unreachable holder has `reachable: false` and no hops. The command also accepts an origin assigned only for transit.
+
+The report describes one signed document. Keep it private with the configuration. The command opens no connections and leaves the applied worker configuration untouched.
+
+### Compare two signed peer configurations
+
+```sh
+outpost config-route-compare --input /private/signed-config.json --node NODE_ID \
+  --peer-config /private/signed-peer.json --peer PEER_ID \
+  --trust /private/owner-public.json --domain DOMAIN_ID
+```
+
+Both documents must be active, addressed to the specified distinct nodes and signed by the same trusted owner. Each node must have a holder or transit role in the selected domain of its document. The report identifies each document by node, revision and SHA-256. It compares domain trust, allowed peer classes, holder and transit sets, directed peer edges, and the class and endpoint of each placed node. Array order, configuration revision and policies for external targets do not affect the comparison.
+
+Check `consistent` and the `differences` array in the returned JSON. The command returns a report for valid documents that disagree and an error for invalid, expired or misaddressed input. Keep the report private. Check the configuration of each participating node and verify replication permissions, credentials and network access separately before deployment.
+
+### Audit the signed topology for one domain
+
+```sh
+outpost config-route-audit --input /private/signed-reference.json --node REFERENCE_ID \
+  --peer-configs /private/route-index.json --trust /private/owner-public.json --domain DOMAIN_ID
+```
+
+Create a private index with the absolute path to each available peer document. Omit the reference node, whose document is passed separately.
+
+```json
+{
+  "format": "outpost-config-route-index-1",
+  "peers": [{ "node": "PEER_ID", "config": "/private/signed-peer.json" }]
+}
+```
+
+The signed reference defines the expected holders and transit nodes. Omitted documents appear in `missingPeers`. Each supplied document must be active, signed by the same owner and addressed to its listed node. Duplicate or unexpected nodes and invalid documents cause an error. The index is limited to 256 KiB and the signed documents together to 128 MiB.
+
+A report with `complete: true` has every expected document. `consistent: true` also requires every supplied graph and domain trust to match. Use the per-peer `differences` to locate discrepancies.
+
+The `replication` array checks each directed edge in the reference. For push, the executor is the sender. For pull, the executor is the recipient. The audit compares the exact rule identities used by the workers and the executor's minimum peer revision with the supplied peer revision.
+
+| State                   | Meaning                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| `RULES_MATCH`           | Both documents authorize the same rule at the required revision. |
+| `UNDELEGATED`           | Neither document delegates autonomous replication on the edge.   |
+| `DOCUMENT_MISSING`      | A document for one or both endpoints is missing.                 |
+| `EXECUTOR_RULE_MISSING` | Only the HTTPS peer declares a rule.                             |
+| `PEER_RULE_MISSING`     | The executor's rule has no peer counterpart.                     |
+| `PEER_REVISION_TOO_OLD` | The supplied peer revision is below the required minimum.        |
+| `RULE_MISMATCH`         | The documents declare different rule identities.                 |
+
+`consistent` still describes placement and domain trust. Check `replication` separately for every edge intended for autonomous operation. The audit uses local documents. Before deployment, verify the revisions active on workers, their credentials and connectivity. Explicit per-generation jobs use separate authorizations.
+
+### Staged objects across two authorized hops
+
+A receiver can serve an object it previously imported and durably accepted into the same capture. Each adjacent hop uses its own admitted intent, explicit origin and reader, and mutually authenticated HTTPS. The registry keeps a fixed copy of its admitted routes for the lifetime of that view.
+
+An isolated check stages ciphertext at the first receiver, imports it at the bridge, then closes the first receiver and reopens the bridge on its retained state. The source requests the second hop using the bridge. The last receiver refuses an undeclared shortcut, keeps the unsealed capture out of complete inventory and publishes only after verifying the signed catalog. It restores independently after the first receiver and bridge are offline.
+
+The source can queue up to four object imports per admitted capture with `Client.QueueStaged`. The `queued-imports` endpoint returns HTTP 202 after durable acceptance or when the exact object is already available. Check object availability separately. Repeating the same request reuses the pending record, even at capacity. A new object returns HTTP 409 when the queue is full. A staging-enabled worker can clear an interrupted queue entry after checking the size and digest of the already stored object, even if the current policy has withdrawn all of its origins. An absent object waits for an authorized route. The source can rebind the same object to another origin in the same capture after the current policy withdraws the previous route and admits the new one. While the previous route remains admitted, a different origin returns HTTP 409.
+
+With `Client.QueueStagedWithFallback`, the source can include one alternate for the same object. Both origins require separate signed authority and intent for the capture and a route in the recipient's current policy. After a restart, the worker can use the alternate if the primary cannot be reached, does not respond in time, is busy, or lacks the object. The primary read uses at most half of the remaining attempt time so that a stalled request leaves time for the alternate. If the current policy removes a queued primary route, the worker can go directly to the stored alternate. The worker checks the alternate against the current policy before reading and verifies the same length and digest before writing. A denial or invalid response from a remote node ends the attempt. Requests without an alternate keep their existing format. Before rolling back to a binary that predates this feature, complete pending imports that include an alternate.
+
+During a paired capture, the source asks the destination to queue an import after a temporary synchronous failure if the origin already confirmed the object. The capture keeps the failed handoff pending until the destination confirms the object is available.
+
+The worker tries one queued object per attempt while the capture is active and unpaused. It advances to the next entry even if the current route fails. A failed request remains queued and each attempt checks the current policy. The staging test sends SIGKILL at two points. After the recipient saves the queued request but before it returns HTTP 202, reopening preserves the request and the source can repeat it without creating a second entry. The test also kills the recipient after it saves the object and before it clears the queued import. After the bridge goes offline, the reopened recipient confirms the local object and clears that entry. A second reopen with four queued objects shows that three can arrive while the first route still denies access. The signed catalog controls publication, and the test independently restores the published generation. If the capture is sealed, publication owns the remaining work. Complete publication or signed retirement clears pending imports. Before downgrading the receiver, finish the queued imports, publish, or retire the capture using this version. Scheduling a whole chain without source admission for each hop remains open.
+
+Capture imports and coverage verification share the worker's concurrency limit with ordinary transfers. When ordinary transfers occupy all slots, the next free slot gives a due capture attempt a turn. After that turn, ordinary transfers get the next opportunity. With a one-slot limit, a worker integration test queues a capture import during one pull and confirms delivery over the signed staging route before the next pull starts.
+
+For automatic staging on a directed pull edge, add each endpoint to the other endpoint's `captureAutomaticPeers` in its signed domain configuration. Each entry must also be in `captureStagingPeers`. With matching admitted capture intents on both endpoints, the recipient discovers the origin's accepted objects over mTLS and imports missing ciphertext without a source request for each object. The origin lists at most 64 object identifiers and sizes per response. Only explicitly enabled readers for the same capture can list them. The recipient verifies the origin's signed intent and authority, the current route, and the size and digest of each imported object. It reads at most one missing object per attempt. A reopened origin starts a new scan, and the recipient skips objects already accepted locally. Manual queued imports take precedence. The integration test imports from the bridge before and after it reopens. Omit `captureAutomaticPeers` from signed documents before downgrading to a worker that predates this field.
+
+For initial admission through a bridge, also list both endpoints in each other's `captureRelayPeers`. The signed placement must allow a source-to-bridge push and a bridge-to-recipient pull. Install the recipient's own owner-signed ingress authority in its configuration. Pass the same document as `--input` to `source-run`. The source signs the recipient's intent for the current capture and offers it to the bridge before uploading. The bridge retains it in the capture journal and serves it only to that recipient over mTLS. An empty recipient registry pulls the offer and checks its local authority, the bridge proof and the predecessor before creating a slot. The recipient can run with only outbound HTTPS. Before downgrading, remove `captureRelayPeers` from signed documents and retire or drain sessions carrying relay offers with this version.
+
+While the signed capture remains active, the bridge can serve its verified catalog and objects in that catalog after the source acknowledges its copy and staging is cleaned. The recipient verifies the exact signed catalog, reuses locally staged dependencies, pulls missing objects and materializes its own full replica. After the bridge reports source acknowledgement and the recipient durably records its own verified receipt, the recipient cleans its staging in bounded steps. A later capture can use that slot only after local acknowledgement and cleanup and when its signed predecessor matches the recipient's complete replica. The test verifies that the previous file still restores independently during the next capture. The source's required release copies exclude this additional recipient.
 
 ## Transfer and publication
 
@@ -33,7 +116,7 @@ An asynchronous bridge holds complete generations durably. A source may push to 
 
 ## Retry, durability and resource limits
 
-The journal binds a stable operation ID to kind, domain/repository/epoch, generation, peer, executor and expected catalog digest. Attempts, phase, last receipt and counters survive reopening. A changed binding under the same peer/operation conflicts. Per-operation local locks prevent concurrent execution of the same job; immutable writes tolerate duplicate remote deliveries. Repeating the same API call resumes from verified present objects. Automatic job scheduling and distributed executor leases are not implemented.
+The journal binds a stable operation ID to kind, domain/repository/epoch, generation, peer, executor and expected catalog digest. Attempts, phase, last receipt and counters survive reopening. A changed binding under the same peer/operation conflicts. Per-operation local locks prevent concurrent execution of the same job; immutable writes tolerate duplicate remote deliveries. Repeating the same API call resumes from verified present objects. The integrating worker provides [owner-authorized discovery](autonomous-replication.md); the library does not create routes or grant distributed executor leases.
 
 Journal updates use file flush, atomic rename and directory flush under a process lock. Incomplete scratch files are never authoritative. A crash between replica commit and journal/response can leave a complete target with a retryable sender; replay verifies it again. Interrupted source pins remain, conservatively preventing collection. Successful transfer with failed pin release returns `CleanupPending`; it does not roll back verified publication. Expired/abandoned lease recovery and bounded journal/pin retention need a separately authorized maintenance design before unattended operation.
 
@@ -42,7 +125,7 @@ Journal updates use file flush, atomic rename and directory flush under a proces
 - Objects/catalogs inherit G2's 8 MiB bounds; a journal holds at most 1024 jobs and 4 MiB. Capacity exhaustion rejects new work. There is no claim of months of continuous scheduling within this fixed journal.
 - `objectBytesSubmitted` sums full object request bodies per attempt, not actual socket bytes. `objectBytesReceived` counts verified payloads fetched by pull. `readbackBytes` counts successful catalog/object audit reads in the last attempt. These omit failed partial responses, protocol overhead and metadata requests.
 
-Missing-object transfer avoids resending valid ciphertext, but **push currently rereads the entire generation in the reverse direction**, even on a duplicate. The counters expose that cost separately. This is not acceptance of the 100 GiB delta-bandwidth target; a cheaper evidence protocol needs its own threat model and measurement.
+By default, push independently rereads the full generation in reverse. An explicit owner [readback-reuse policy](readback-reuse.md) permits previous immutable-object evidence for the exact reader, endpoint, target and trust scope. The new `client-cached-readback` receipt retains the oldest supporting read time; it is distinct from a fresh full read and from the target's claim. An unchanged retry then reads only the catalog, while a changed generation reads new objects. Short 16 MiB checks measure endpoint response payloads and recover both versions independently. Full wire cost, local scans, scheduled fresh verification and the 100 GiB target remain unaccepted.
 
 ## Bounded verification and remaining acceptance
 
@@ -52,4 +135,8 @@ The 2 MiB integration fixture transfers two generations through a bridge, remove
 
 The corruption fixture requires an actual injected data fault and forwards cancelled sibling requests as cancellation responses. This avoids confusing normal parallel cancellation with a broken fault fixture.
 
+`TestOfflineHistoryAcrossMaintenanceAndPolicyChange` simulates three daily updates by default. It keeps one recipient offline while the bridge's permitted peers change and the other holders retire previous complete generations. An interrupted final HTTPS pull leaves the recipient's old complete generation available. The retry fetches the final generation directly and restores both versions after the source and bridge stop. The final-scale variant uses `OUTPOST_OFFLINE_180=1` with `OUTPOST_TEST_ROOT` on the admitted HDD. It simulates 180 daily updates and uses 187-day authority. The fixture does not change the system clock or measure 180 days of operation.
+
 The [G3 trace](../g3-trace.json) links scoped implementation checks to all six gate requirements. The [external-upload candidate](external-upload.md) extends REQ-27 coverage with three independent processes, cached signed assignment, SIGKILL takeover, multipart adapters and complete external-target recovery. Peer tests alone remain prerequisites. Real S3-compatible/WebDAV limits and ACLs, power loss, large history, long partitions, low-memory deployment, full traffic accounting and heavy G1-G3 acceptance remain open. Keep the [roadmap](roadmap.md) and private deployment holds in force.
+
+The current peer client uses operation-bound [verification windows](verification-windows.md). New peers return `target-window-read` or `local-window-read` with the oldest supporting read time; legacy peers retain full-read receipts. Metadata presence never substitutes for the mandatory final hash verification. A new operation starts a fresh window. Payload work is bounded per request, while the final catalog/stamp scan still needs large-scale acceptance.

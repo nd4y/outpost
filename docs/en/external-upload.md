@@ -2,7 +2,7 @@
 
 [Русский](../ru/external-upload.md)
 
-The G3 candidate adds S3-compatible and WebDAV adapters in `internal/storage` and cached signed upload plans in `internal/upload`. Three independent Linux worker processes can upload different ciphertext parts of the same file, take over after a worker stops and publish a complete generation. No continuously available control plane or coordinator is required after plan delivery. This is a library implementation, not an installed worker service. Full G3 and M3 acceptance remain **NOT_VERIFIED**.
+The G3 candidate adds S3-compatible and WebDAV adapters in `internal/storage` and cached signed upload plans in `internal/upload`. Three independent Linux worker processes can upload different ciphertext parts of the same file, take over after a worker stops and publish a complete generation. No continuously available control plane or coordinator is required after plan delivery. The installed worker uses the same durable upload queue and backend adapters. Full G3 and M3 acceptance remain **NOT_VERIFIED**.
 
 The [durable upload queue](upload-queue.md) can admit and drain multiple signed plans with automatic retries, independent target progress and source protection across process restarts. Direct `Journal.Run` remains available for one operation.
 
@@ -20,24 +20,76 @@ Each worker has its own durable journal and source-generation pin. Journal write
 
 The endpoint is an explicitly configured HTTPS URL for an existing bucket prefix or WebDAV collection. There is no provider allowlist, automatic provisioning, redirect following, ambient proxy or plaintext fallback. All remote names are flat namespace-prefixed opaque IDs; source names and file metadata stay encrypted by G1. Ciphertext hashes and part sizes can still reveal equality and size information within the admitted namespace.
 
-| Capability             | Implemented contract                                                                                                                                                                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Authentication         | S3 Signature V4 with configured region and optional session token; WebDAV Basic over verified TLS. Credentials have an explicit expiry and are excluded from serialized profiles/plans.                                                         |
-| TLS and routing        | TLS 1.2 or later, CA and hostname verification; explicit endpoint, no redirects. Private CA roots may be supplied. Endpoint/egress admission remains the operator's responsibility.                                                             |
-| Object size            | Configured physical part limit from 64 KiB to 8 MiB; a logical encrypted object is at most 8 MiB and at most 128 parts. Large original files consist of many G1 objects.                                                                        |
-| Creation               | `PUT` with `If-None-Match: *` is mandatory. A duplicate is accepted only after exact readback. No overwrites or deletes.                                                                                                                        |
-| Capability probe       | Random nonsensitive object checks successful readback, rejection of a conflicting conditional PUT and unchanged bytes. A namespace layout record binds the part limit. An incompatible endpoint or changed layout fails closed.                 |
-| Resume and integrity   | Resume at verified physical-part boundaries. Part hash/length and reconstructed logical hash must match. No native provider multipart session or partial-range resume is required.                                                              |
-| Range, listing, rename | Not used. No assumption of atomic rename, current listing or immediately visible writes; bounded read retries tolerate short visibility delays. Longer delays remain retryable.                                                                 |
-| Quotas and throttling  | Local size admission; 413/507 capacity errors; bounded retries for 409/429/transient server errors. `Retry-After` persists across calls on the same backend, bounded by credential expiry. Each request budget includes queue and backoff time. |
-| Bounds                 | 1-4 concurrent requests, 1-1000 requests/second and 1-3 attempts per backend; timeout at most 5 minutes, also limited by context/expiry. Limits are per worker, not a shared account-wide quota.                                                |
-| Retention and archive  | No delete, listing-based GC or delayed-retrieval archive tier. Probes do not prove physical durability, future persistence or actual ACL restrictions.                                                                                          |
+| Capability            | Implemented contract                                                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Authentication        | S3 Signature V4 with configured region and optional session token; WebDAV Basic over verified TLS. Credentials have an explicit expiry and are excluded from serialized profiles/plans.                                                    |
+| TLS and routing       | TLS 1.2 or later, CA and hostname verification; explicit endpoint, no redirects. Private CA roots may be supplied. Endpoint/egress admission remains the operator's responsibility.                                                        |
+| Object size           | Configured physical part limit from 64 KiB to 8 MiB; a logical encrypted object is at most 8 MiB and at most 128 parts. Large original files consist of many G1 objects.                                                                   |
+| Creation              | S3-compatible storage and the default WebDAV profile use conditional `PUT`. The explicit `webdav-move-1` profile uses verified staging and `MOVE` with `Overwrite: F`. Both require exact readback of the canonical object.                |
+| Capability probe      | Fixed public diagnostic bytes check readback and refusal to replace a destination in the selected mode. An immutable layout record binds the part size. Incompatible endpoints and layout changes fail closed.                             |
+| Resume and integrity  | Resume at verified physical-part boundaries. Part hash/length and reconstructed logical hash must match. No native provider multipart session or partial-range resume is required.                                                         |
+| Ranges and listing    | Neither is required. Bounded read retries tolerate short visibility delays. Only the explicit MOVE profile requires a same-namespace move.                                                                                                 |
+| Quotas and throttling | Local size admission, 413/507 capacity errors and bounded retries for 409/429/transient server errors. `Retry-After` affects all queues sharing the exact target profile in one worker process. The delay is bounded by credential expiry. |
+| Bounds                | 1-4 concurrent requests, 1-1000 request admissions per second and 1-3 attempts per request. The timeout includes admission and backoff, with a maximum of 5 minutes and additional context and expiry bounds.                              |
+| Retention and archive | No delete or listing-based GC. [Delayed recovery](archive-recovery.md) has a separate admission profile. Probes do not prove physical durability, future persistence or actual ACL restrictions.                                           |
 
-Targets that cannot honor the conditional-create contract are rejected. Compatibility with a protocol name alone is insufficient: use capability and failure tests against each actual target before admission. The current tests exercise synthetic protocol servers only.
+Admission requires the capabilities of the signed target profile. Run capability and failure tests against the actual endpoint before using it for backups. The current checks use synthetic endpoints.
+
+Concurrent jobs share request slots and pacing for an exact signed profile in the same worker process. An in-process configuration refresh preserves the gate for retained profiles. Each queue keeps its own transport and privately resolves credentials. Distinct profiles use independent target gates and can also share a private account allowance.
+
+### Private account allowances
+
+In the local `outpost-bootstrap-2` file, `externalRequestBudgets` optionally defines an array of groups. Each group lists exact storage profile IDs in `targets` and sets `concurrency` from 1 to 4 and `requestsPerSecond` from 1 to 1000. Once configured, every key in `credentialFiles` must belong to exactly one nonempty group. Unknown, duplicate and unassigned targets block bootstrap before volume admission. Omit the field to keep the existing profile-only admission.
+
+Set each group to the allowance allocated to this worker for that account. Requests must satisfy both target and account limits. A `Retry-After` response delays all targets in that group. Different groups remain independent. The private bootstrap owns the grouping. Shared jobs cannot increase it, and the group is never sent with plans or telemetry.
+
+The account limit covers this worker process. Configuration refresh retains its state, and restart reopens the private bootstrap. Queues preserve their own durable retry deadlines. Coordinating slices across workers or constraining shared physical links requires separate evidence. Upgrade the worker before adding the option. An older strict bootstrap reader refuses the new field.
+
+### Private link allowances
+
+Use `externalLinkBudgets` to group credential-bearing target profiles that share this worker's external link. In each group set `targets` to the exact profile IDs and `bodyBytesPerSecond` to an integer from 65536 to 1073741824. The link groups independently partition every key in `credentialFiles` and can be configured together with account groups. Omit the field to keep the previous behavior.
+
+Each group shares one allowance for reading outgoing request bodies and consuming incoming response bodies, including verification and retries. Reads reserve up to 32 KiB at a time. Short reads can leave some of a reservation unused. The existing request deadline includes time spent pacing. The transport can buffer bytes, and TLS, TCP, IP, peer replication and traffic from other processes are outside this allowance. The configured rate represents this process's share of the link. Measure a real shared link separately before choosing combined rates for several workers.
+
+## WebDAV targets without conditional PUT
+
+In the signed storage profile set `kind` to `webdav`, `writeMode` to `webdav-move-1`, and `maxStagingAttempts` to a value from 1 to 8. Keep `noDelete` enabled. Selecting this mode changes the target profile ID. Sign and distribute the matching target, placement and upload authorization together. The old profile has both new fields omitted.
+
+Each worker saves a unique attempt name under its plan and target binding before writing ciphertext. It reads the temporary object back and compares the bytes before moving it to the final name in the same namespace. The request specifies `Overwrite: F`. The worker checks the final bytes before recording success. MOVE consumes only the worker's temporary resource. Protected objects never serve as the source of a move. A separate collision probe checks that an existing destination survives the operation. [RFC 4918, MOVE](https://www.rfc-editor.org/rfc/rfc4918.html#section-9.9) and [Overwrite](https://www.rfc-editor.org/rfc/rfc4918.html#section-10.6).
+
+An uncertain write is read back before retrying. If the previous attempt still has no usable bytes after its request window, the worker saves a different name and retains the previous record. The local attempt book uses the worker's existing disk budget. A missing initialized book or exhausted staging limit blocks the operation while retaining the previous complete copies. Budget for possible temporary objects at the target, including residue from interrupted or competing attempts. The worker issues no `DELETE` requests. Use a separately authorized process for cleanup.
+
+The mode keeps the same part, descriptor, catalog and complete-marker formats. A prior writer that does not recognize the profile fields refuses the configuration. The owner can recover existing ciphertext with a compatible reader and the same endpoint, namespace, part size, generation and keys.
+
+On a stopped worker, `outpost worker-upload-staging-status --bootstrap FILE --domain ID --operation ID` reads the local MOVE book for one admitted upload. Each page returns at most one bucket, with the exact temporary names, expected sizes and digests, recorded phase and write start. Pass `move.nextAfter` as `--after` for the next page. Keep the worker stopped between pages for a stable inventory.
+
+The report returns `remotePresence: NOT_CHECKED` and performs no target requests. `PUBLISHED` records verification of the final name, so the temporary name may still exist. An `ALLOCATING` bucket is an interrupted local allocation. A missing or damaged initialized book or bucket fails instead of returning an empty inventory. `NOT_STARTED` means the local MOVE book has not been initialized and `NOT_APPLICABLE` means the plan does not use MOVE. Store the report privately. It does not inventory the fixed collision probe, other workers' records or historical claims outside this local book.
+
+To check one recorded temporary name, run `outpost worker-upload-staging-check --bootstrap FILE --domain ID --operation ID --input PRIVATE_READER --temporary NAME`. Supply the same `--after` cursor used for the page with that name. Use a private [external recovery reader profile](#independent-external-recovery) with read access and the exact target ID from the signed plan. The command performs bounded GET readback for that name. `MATCHED` means size and digest agree, `MISMATCH` means the returned bytes differ, `MISSING_AT_READ` means the endpoint returned 404, and `UNAVAILABLE` preserves access, protocol or transport failure. A name with no recorded write yields `NOT_CHECKED`.
+
+The result is an observation at read time. Another worker or a delayed request can change the target afterward. The command never publishes, moves or removes objects.
+
+## Request signing components
+
+S3-compatible requests use the pinned v2 SigV4 signer and HTTP-binding URI encoder listed in [go.mod](../../go.mod) and [go.sum](../../go.sum). Their [upstream signing API](https://github.com/aws/aws-sdk-go-v2/blob/v1.48.0/aws/signer/v4/v4.go) signs an explicitly supplied payload digest, service, region, time and credentials. Component names and [license notices](../../THIRD_PARTY_NOTICES.md) identify dependencies; storage compatibility is defined by the protocol and admitted endpoint capabilities.
+
+Outpost supplies the existing access key, secret and optional session token directly. The signer performs no credential discovery, endpoint selection, metadata request or automatic retry. HTTPS, namespace, allowed methods/archive query, TLS roots, credential expiry, request/body budgets and immutable readback retain their existing checks. SDK signing logs are disabled. The URI encoder supplies canonical escaping; an alternative noncanonical `RawPath` is refused before signing instead of rewriting an encoded separator.
+
+Independent frozen signatures cover ordinary reads, archive requests and a conditional write with escaped UTF-8 path, session token and implicit `Content-Length`. A real TLS fixture verifies that signed length, conditional creation and returned bytes agree. Missing explicit credentials fail even when ambient SDK credential variables exist. File-kit, catalog, complete-marker and credential-storage formats are unchanged. These component checks do not admit a real endpoint or close the separate G3 throughput/installation gates.
+
+The [bounded signing receipt](../s3-signing-evidence.json) records six focused and 27 storage checks, both static architecture builds, nine distribution and eleven candidate checks, and binary-bound SBOMs. The worker/CLI inventories identify the signing modules; the independent `outpost-kit` binaries do not link them. The packaging selection uses an explicit synthetic tree/run, so actual native CI, endpoint and full-product acceptance remain separate.
 
 ## Complete generations and recovery
 
-Workers upload and verify physical parts first, then seal immutable logical-object descriptors. Publication verifies **all** dependencies against the signed generation catalog, uploads that catalog and finally creates the per-generation complete marker. Each external target has its own closure and readiness; success elsewhere does not make this target complete. A complete marker is a hint, never proof by itself. `Catalog` validates the marker/catalog binding, while `Recover` and worker completion also fetch and validate every dependency. A false acknowledgment, truncated object or forged marker cannot create a verified complete replica.
+The [polling receipt](../upload-idle-evidence.json) records38/39 original versus5/5 candidate marker GETs per2.1s, real idle-process restart and cancellation, and ordinary old/new cloud restoration on both protocols. The unchanged12s rotation/lost-part test fails on both original and candidate binaries while sharing the HDD with a full-size job, including without race instrumentation. That regression and the150ms throughput profile remain unaccepted; no identical retry or relaxed assertion is used.
+
+Completed immutable parts remain completed when assignment slots rotate. If a publication read discovers an absent part, only that part loses its local completion mark. Other verified progress survives. This prevents a slow executor from repeatedly restarting its completed prefix while preserving full publication checks. A delayed-slot test also physically removes an acknowledged fixture part and requires its independent reupload before recovery.
+
+When an iteration makes no local progress, the worker increases its polling interval from the active 50ms cadence up to one second. Persisted part progress, successful publication and a new assignment round reset that interval. The wait ends by the next slot boundary and is interrupted by cancellation or the plan deadline. The source pin remains held while peers or publication are missing. Every completion still requires the same full target readback; this polling bound does not accept the separate throughput profile.
+
+A part can become durable as its slot expires before the local acknowledgment is saved. Final verification requires the exact planned blob descriptors, then reconciles recorded part completion in the same transaction as the receipt. This resolves uncertain local acknowledgments without inventing submitted-byte counts. A valid target object cannot certify a different planned part map.
+
+Workers upload and verify physical parts first, then seal immutable logical-object descriptors. Publication verifies **all** dependencies against the signed generation catalog, uploads that catalog and finally creates the per-generation complete marker. Each external target has its own closure and readiness; success elsewhere does not make this target complete. A complete marker is a hint, never proof by itself. `Catalog` validates the marker/catalog binding, while `Recover` fetches and validates every dependency. Worker completion defaults to the same full readback; explicit owner policy can use [original-age evidence](readback-reuse.md) for unchanged immutable objects. A false acknowledgment, truncated object or forged marker cannot create a verified complete replica.
 
 Old generations and shared chunks remain immutable. A later version uploads missing ciphertext parts, while both versions remain recoverable. This is reuse of G1's chunked version format, not encryption of the whole original file as one object. No mutable `latest` pointer or listing is needed. Recovery needs a selected generation ID, public generation trust, target read credentials and the owner's file-kit key for final plaintext restoration. A retained recovery inventory must supply the IDs/keys; discovery and key escrow are separate work.
 
@@ -50,6 +102,85 @@ Minimal library sequence, using the admitted resources supplied by the caller:
 
 Plans are limited to 16 MiB, 32768 distinct physical parts and 32 workers; journal state is limited to 8 MiB. Slots are 500 ms to 5 minutes. These are fail-closed prototype limits, not large-history acceptance. The APIs are internal and may change before a versioned product contract. Errors distinguish denied policy/credentials, conflicts, capacity, integrity, unsupported capability and retryable unavailability; cancellation/deadline errors remain visible. Error handling must not disable verification or release pins after failed work.
 
+The diagnostic probe is reused across retries and process restarts. Existing probes verify conflict rejection and readback, but do not prove permission to create a new object, account ACLs or physical durability. Each payload still requires its own verified upload/readback. Older random probe objects are preserved; this change performs no remote cleanup.
+
+## Independent external recovery
+
+Keep a private `outpost-external-recovery-1` JSON file with `format`, `target` (the expected profile ID), `profile` (the exact storage profile), `credentialFile` (an absolute path to read-only credentials) and optional `caFile` (an absolute path to trusted PEM roots). The credential file uses `access`, `secret`, `expiresUnix` and optional `sessionToken` for S3-compatible access. Keep the recovery owner kit and public generation trust separately. The external namespace must match that trust.
+
+```sh
+outpost restore-external --bootstrap /private/external-reader.json \
+  --key /private/recovery-owner.json --trust /private/generation-trust.json \
+  --generation EXPECTED_CHECKPOINT --version EXPECTED_VERSION \
+  --output /recovery/new-output
+```
+
+Omit `--version` to restore the selected generation. Use `--input` with the existing version-list or directory selection JSON for a narrower restore. The output must be a new directory under an existing parent. The command opens the exact complete marker and verifies the signed catalog, then reads the selected immutable dependencies. It publishes the restored tree atomically after validating and decrypting the selected content. It streams objects directly from the target and needs no source, control service, other worker or temporary ciphertext replica.
+
+A successful selection proves the restored versions match the specified checkpoint. Directory selection reads the candidate file metadata to resolve paths. An explicit version selects its metadata directly. Missing or corrupt required data prevents publication. Other versions and current target health require their own evidence. The CLI receipt contains opaque identities and restored counts.
+
+## Verify an external generation
+
+```sh
+outpost audit-external --bootstrap /private/external-reader.json \
+  --trust /private/generation-trust.json --generation EXPECTED_CHECKPOINT \
+  --output /private/new-external-audit.json
+```
+
+The audit uses the same read-only profile and public trust. It verifies the exact marker, signed catalog and every ciphertext dependency with fresh reads. `VERIFIED_CIPHERTEXT` means the complete closure was checked. If a dependency cannot be verified, the audit stops and returns a failure status. A private report records the original time window, verified count and first failed stage. The expected count is unknown until the catalog is authenticated. The outcome distinguishes missing content, invalid content, denied access, cancellation and an unavailable target.
+
+The optional `--output` saves that typed report even when the verification fails. Choose a new path. The output excludes private names, credentials and remote diagnostic text. The audit grants no repair authority. Verify plaintext by restoring with the owner kit.
+
+### Resume an audit of a retained upload
+
+For a retained complete upload, the stopped worker can reopen a verification window from its queue. Use a private `outpost-worker-external-audit-1` JSON file containing `format`, a fresh opaque 64-character hexadecimal `window` and `maxAgeSeconds` from 1 to 31622400. Use the existing enrolled worker bootstrap and original upload operation ID.
+
+```sh
+outpost worker-external-audit-init --bootstrap /private/worker.json \
+  --operation UPLOAD_ID --input /private/window.json
+outpost worker-external-audit --bootstrap /private/worker.json \
+  --operation UPLOAD_ID --input /private/window.json
+```
+
+Initialize once. The second command resumes the exact same window with its durable partial hash progress. A missing or changed scope prevents resumption. Both commands require the exclusive worker lease, current placement, the original complete queue receipt and the admitted local volume. Audit progress uses the telemetry allowance and remote reads stop on observed policy withdrawal. The report's `observedUnix` is the oldest supporting read. `finishedUnix` is the end of this invocation. A new window reads the data again. The original upload receipt remains historical.
+
+### Schedule external verification
+
+The owner can set `externalAuditIntervalSeconds` from 2 to 2592000 in a signed domain policy. Omit the field or set it to zero to disable scheduling. The worker checks the latest locally recorded complete generation and each admitted target for which it has a complete upload receipt. Audits use available worker slots after ordinary jobs and share the existing target request and link limits.
+
+Set `externalAuditGenerations` from 1 to 16 to verify that many of the newest locally retained complete generations. The default is one. Older generations in this window receive read-only verification. Narrowing the window retains earlier observations; the local status command still accepts a retained upload operation. Management reports and automatic repair use the newest generation.
+
+A scheduled audit starts under a specific signed policy revision. Its final observation is committed only while that revision and the operation's controls still authorize the audit. A response that arrives after policy replacement leaves the earlier observation available, including when the response says a part is missing.
+
+The schedule retains one window identity for the same upload operation and interval. A completed cycle waits the interval before the next pass. Its supporting evidence expires before that pass, so the next cycle reads the ciphertext again. Interrupted work can resume within the same age limit. The latest scheduled outcome uses the telemetry allocation. Scope changes retain old records, and a full allocation can prevent new audit evidence.
+
+```sh
+outpost worker-external-audit-status --bootstrap /private/worker.json --operation UPLOAD_ID
+```
+
+The status command reads local evidence only. A successful audit whose oldest supporting read has aged beyond the interval is reported as `STALE`. A missing or invalid dependency changes the scheduled observation without modifying the original upload receipt.
+
+### Enable repair of missing parts
+
+Set `externalRepairMissing` in the signed domain policy and `allowMissingRepair` in the exact active planner delegation. Both flags must be true, and the schedule must be active. The worker persists a confirmed missing part before admitting a separate repair operation. Restart can replay the same observation within the schedule interval. Use `worker-external-audit-status` to see the observation and `worker-status` to track the repair job.
+
+The repair reuses the retained part map and checks the existing completion marker, catalog and exact part. It can create that part from its complete local copy and publishes a new receipt only after fresh verification of the full target closure. Each additional missing part needs its own observation. A missing marker or descriptor, unavailable target or corrupt bytes do not authorize automatic writes. The original marker and upload receipt are retained.
+
+## Repair a selected external copy
+
+Build a fresh plan from a retained healthy holder's materialized ciphertext. The planner needs its private signing key, public generation trust and a private `outpost-upload-plan-request-1` JSON document. The document contains `format`, the expected public `planner` key and a `plan` template in `outpost-external-plan-1` format. Set the new `operationId`, exact `profile`, `allowExternal`, `allowedClasses`, eligible `workers` and the signed `startMillis`, `expiresUnix` and `slotMillis`. The builder supplies the catalog, blob map and signature.
+
+```sh
+outpost upload-plan-build --key /private/upload-planner.json \
+  --trust /private/generation-trust.json --store /recovery/materialized-holder \
+  --generation EXPECTED_CHECKPOINT --input /private/plan-request.json \
+  --output /private/new-signed-plan.json
+```
+
+The command reads the selected signed catalog from `catalogs` and the ciphertext needed to describe multipart objects from `objects`. Keep these files private. It needs no mutable replica index or remote credentials. The plan binds exact object references. The worker checks that it holds a complete admitted source before execution.
+
+The owner admits the signed plan as a fresh `upload` job in the current configuration. Use fresh target readback for repair by setting `cloudReadbackMaxAgeSeconds` to zero. Missing immutable data can be added with the existing create-only writes and checked again. A conflicting canonical object blocks completion and keeps its bytes. To replace that copy, authorize a separately provisioned target profile and verify independent restoration there before considering retirement. Original receipts retain their operation and observation time.
+
 ## Evidence and remaining costs
 
 Run `go test -count=1 ./...` and `go vet ./...` in the admitted Linux test environment. Point `TMPDIR` and `OUTPOST_TEST_ROOT` to its data volume; executable Go scratch may use a separate bounded tmpfs. The tests use ephemeral credentials, real loopback TLS and disk-backed independent S3-signature/WebDAV authentication handlers. No real storage account is contacted.
@@ -58,4 +189,16 @@ The 3 MiB fixture creates 52 physical parts, launches three actual worker proces
 
 The fixture compares one and three workers with an injected 40 ms delay per part, logging elapsed times and the ratio. This establishes a controlled concurrency scenario; it does not certify real network throughput or the AT-14 infrastructure target. See the [G3 requirement-to-check trace](../g3-trace.json) for the precise tested subsets and open work.
 
-Planning scans ciphertext; each worker verifies its complete source, and publication/completion read the target closure in full. These reads can dominate cost and do not yet satisfy the large-file delta-bandwidth target. Journal `SubmittedBytes` counts part payloads passed to upload attempts, not actual wire traffic, internal HTTP retries, verification reads or metadata overhead. Full network/cost accounting, real endpoint limits/ACLs, low-memory and large-history profiles, long partitions, power loss and heavy G1-G3 tests remain open. Keep [deployment holds](roadmap.md) until their own evidence is accepted.
+Unsplit planning uses signed references; multipart planning reads uncached objects. Each upload attempt binds and pins the exact recorded complete source catalog, verifies payload when read and checks evidence for the full target closure before completion. The default reads all target payload; optional owner-controlled reuse is reported with its original age. A separate source scrub checks current source integrity. These reads can dominate cost, and the large-file delta-bandwidth target remains open.
+
+Journal `SubmittedBytes` counts part payloads passed to upload attempts. The worker also measures HTTP body traffic for each attempt, including retries and verification reads. [Telemetry](telemetry.md#external-upload-attempts) explains the counters and their coverage.
+
+Full network and cost accounting, real endpoint limits and ACLs, low-memory and large-history profiles, long partitions, power loss and heavy G1-G3 tests remain open. [Deployment holds](roadmap.md) require their own acceptance evidence.
+
+## Controlled latency profile
+
+The opt-in `OUTPOST_UPLOAD_LATENCY_PROFILE=1` profile requires the admitted `OUTPOST_TEST_ROOT`, uses the same 3 MiB input and three independent worker processes, and fixes the part delay at150ms before execution. It checks a speedup of at least1.5 without changing the120s child timeout or180000ms assignment slot. The default40ms regression remains separate.
+
+The [full measurement receipt](../g3-latency-evidence.json) retains all three samples, including failures. The first race-enabled sample measured1.08x on S3-compatible storage and1.31x on WebDAV. Ordinary binaries also failed to achieve1.5x consistently across both protocols. Worker journals, source replicas and the synthetic target share one HDD and one CPU quota, so this fixture does not establish the absence of a shared bottleneck required by section20. No single root cause has been proven.
+
+The gated check now records request counts, part-write span, child CPU and cgroup CPU/I/O/pressure observations. A failed speedup assertion keeps the test failing while allowing the false-marker and independent old/new restoration checks to execute. Both protocols completed those correctness checks in the final sample. The ordinary default40ms recovery regression passed separately. Throughput acceptance remains open; do not select a successful single-protocol sample as a full PASS.

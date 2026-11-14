@@ -35,8 +35,20 @@
       "id": "REQ-19",
       "acceptanceSubset": ["AT-15", "AT-22"],
       "scope": "Stable bound operations, durable journals, cached signed assignment, actual process restart/takeover and bounded retries; bounded durable multi-job admission, autonomous retry/cooldown and actual queue SIGKILL recovery",
-      "remaining": "Automatic plan delivery/renewal, abandoned job/pin/claim retention, large-history and account-wide overload admission",
+      "remaining": "Automatic plan delivery/renewal, abandoned job and claim collection, large-history and account-wide overload admission",
       "tests": [
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueStagingReadbackUsesRetainedPlan"
+        },
+        {
+          "path": "internal/upload/abandonment_linux_test.go",
+          "name": "TestQueueAbandonmentFencesExpiredUploadAndPreservesOtherPins"
+        },
         {
           "path": "internal/peer/peer_linux_test.go",
           "name": "TestLostReplyRestartAndDuplicateTransfer"
@@ -76,6 +88,14 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueThrottleDeadlineSurvivesReopen"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveQueueReopensWithDurableAttemptBook"
         }
       ]
     },
@@ -150,8 +170,8 @@
     {
       "id": "REQ-25",
       "acceptanceSubset": ["AT-07", "AT-08"],
-      "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss",
-      "remaining": "Global graph validation, real host egress enforcement and long partitions",
+      "scope": "Explicit mTLS edges with asynchronous durable bridge and outbound-only recipient; old copy survives bridge loss. Offline inspection checks declared routes to each domain holder and detects absent or divergent node documents, and checks paired autonomous replication rules and peer revision floors.",
+      "remaining": "Installed topology and runtime permissions, real host egress enforcement, long partitions and autonomous multi-hop staging. The staging chain, recipient SIGKILL recovery at queue admission and local object verification after route withdrawal, source fallback, policy-authorized rebind, recipient failover to a pre-admitted alternate for the same object after outage or local route withdrawal, source selection of a confirmed alternate after an ACTIVE route change, and offline CLI checks are tracked in product-status.json.",
       "tests": [
         {
           "path": "internal/peer/peer_linux_test.go",
@@ -200,6 +220,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueSlowResolverAndCancellation"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
         }
       ]
     }
@@ -244,7 +268,7 @@
     {
       "id": "REQ-28",
       "acceptanceSubset": ["AT-16"],
-      "scope": "Size/capability probes, verified physical multipart resume, conditional writes, quota, delayed-read retries and throttling in synthetic protocols",
+      "scope": "Size/capability probes, verified physical multipart resume, conditional writes, quota, delayed-read retries and throttling in synthetic protocols; explicit WebDAV MOVE with bounded durable staging and no-overwrite publication",
       "remaining": "Actual S3-compatible/WebDAV endpoint matrix including listing/range/ACL/quota characteristics; unsupported capabilities are explicit",
       "tests": [
         {
@@ -262,6 +286,22 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolAuthorizationRoutesAndCapabilityProbe"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveLostRepliesResumeOwnedStage"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveProbeRefusesIgnoredOverwrite"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRetainsCorruptStagesAndBoundsRetries"
         }
       ]
     },
@@ -278,6 +318,10 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestThreeProcessesAndIndependentCloudRecovery"
+        },
+        {
+          "path": "internal/upload/move_linux_test.go",
+          "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
         }
       ]
     },
@@ -298,6 +342,14 @@
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolFaultsNeverBecomeVerified"
+        },
+        {
+          "path": "internal/storage/move_http_linux_test.go",
+          "name": "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests"
+        },
+        {
+          "path": "internal/storage/move_book_linux_test.go",
+          "name": "TestMoveBookMissingInitializedBucketAndBindingNeverRecreated"
         }
       ]
     },

@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 1,
+  "status": "SDK_SIGNING_NATIVE_CI_AND_ACTUAL_DOWNLOADED_BYTES_PASS",
+  "sourceBaseCommit": "4de35943dffd1155e0aa851ee5131cd3c405065f",
+  "storageSourceTree": "c3880016e10a97ce8b15d9cc4cde09d46fd5b933",
+  "distributionSourceTree": "05f64a092112d4556090d00059120288493525d9",
+  "scope": "Pinned signing/protocol components and bounded storage/packaging checks; not real endpoint admission, official release or whole-product acceptance.",
+  "modules": [
+    {
+      "Path": "github.com/aws/aws-sdk-go-v2",
+      "Version": "v1.48.0",
+      "Sum": "h1:tFU7EJVm7MfyaXLsXdYTZ0Vd6vwt9OljCyqq0gqk0Mc=",
+      "GoModSum": "h1:oeKU5p+TQBnpeLmU42WZLWvzv+ORLn+74n4QVLnm/Z0="
+    },
+    {
+      "Path": "github.com/aws/smithy-go",
+      "Version": "v1.28.9",
+      "Sum": "h1:zkZ058OpNX0iGTK24b+ZUEQSMc11CBA6oO7xtKZfzkY=",
+      "GoModSum": "h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc="
+    },
+    {
+      "Path": "github.com/restic/chunker",
+      "Version": "v0.5.0",
+      "Sum": "h1:1y+ut0MBduzxODJ298rhQCtESoEpj8v1hTydZlKaE1Y=",
+      "GoModSum": "h1:z0cH2BejpW636LXw0R/BGyv+Ey8+m9QGiOanDHItzyw="
+    },
+    {
+      "Path": "golang.org/x/sys",
+      "Version": "v0.37.0",
+      "Sum": "h1:fdNQudmxPjkdUTPnLn5mdQv7Zwvbvpaxqs831goi9kQ=",
+      "GoModSum": "h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks="
+    }
+  ],
+  "moduleChecks": "Public HTTPS Go proxy/SumDB then offline go mod verify. Existing checksums retained; SDK signer has no credential discovery, endpoint selection, metadata requests, retries or signing logs.",
+  "storageChecks": {
+    "focusedTests": [
+      "TestSDKSignatureCoversActualConditionalPutLength",
+      "TestSDKIntegrationDoesNotDiscoverCredentials",
+      "TestSigV4SDKSignsImplicitLengthAndWirePath",
+      "TestSigV4SDKRefusesAmbiguousPathsAndCancelledRequests",
+      "TestSigV4IndependentVectors",
+      "TestSigV4ConditionalTokenAndInput"
+    ],
+    "storageTests": [
+      "TestExternalAuditRefusesForeignScopeAndCanceledReads",
+      "TestHTTPBodyBudgetCloseCancelsReplayWaitingForAllowance",
+      "TestRequestGateSharesPacingAndCooldownAcrossBackends",
+      "TestProtocolMultipartAndImmutableReadback",
+      "TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply",
+      "TestProtocolRetriesAndLostReply",
+      "TestProtocolLongThrottlePersistsAcrossCalls",
+      "TestProtocolFaultsNeverBecomeVerified",
+      "TestProtocolAuthorizationRoutesAndCapabilityProbe",
+      "TestMoveBookResumesExactAttemptAndBoundsRetainedUncertainty",
+      "TestMoveBookMissingInitializedBucketAndBindingNeverRecreated",
+      "TestMoveBookInitializationFaultsPreserveIntentAndQuotaRefusal",
+      "TestMoveBookRejectsClockRollbackAndProfileDowngrade",
+      "TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts",
+      "TestWebDAVMoveLostRepliesResumeOwnedStage",
+      "TestWebDAVMoveRejectsFalsePublicationAndUnsafeRequests",
+      "TestWebDAVMoveRetainsCorruptStagesAndBoundsRetries",
+      "TestWebDAVMoveProbeRefusesIgnoredOverwrite",
+      "TestSDKSignatureCoversActualConditionalPutLength",
+      "TestSDKIntegrationDoesNotDiscoverCredentials",
+      "TestSigV4SDKSignsImplicitLengthAndWirePath",
+      "TestSigV4SDKRefusesAmbiguousPathsAndCancelledRequests",
+      "TestSigV4IndependentVectors",
+      "TestSigV4ConditionalTokenAndInput",
+      "TestHTTPMeterCountsRetriesAndDoesNotMixOperations",
+      "TestHTTPMeterDistinguishesWebDAVStagingAndFinalReadback",
+      "TestHTTPMeterMeasuresPartialReadsAndTransportBodyReplays"
+    ],
+    "vet": "PASS",
+    "network": "none",
+    "cpuMax": "100000 100000",
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 165502976,
+    "swapOOM": 0,
+    "signedHTTPHeaders": [
+      "accept-encoding",
+      "content-length",
+      "content-type",
+      "host",
+      "if-none-match",
+      "x-amz-content-sha256",
+      "x-amz-date",
+      "x-amz-security-token"
+    ]
+  },
+  "distribution": {
+    "fixtureSelectionOnly": {
+      "repository": "example/fixture",
+      "commit": "05f64a092112d4556090d00059120288493525d9",
+      "commitIsUncommittedSourceTree": true,
+      "runId": 1,
+      "runAttempt": 1,
+      "nativeArchitecture": "amd64"
+    },
+    "buildReceipt": {
+      "architectures": ["amd64", "arm64"],
+      "format": "outpost-distribution-1",
+      "manifestSHA256": "583ee6c8aaf028d9b5d7ecb508fd266aeedc6acf4ea620f174ba89a3f9a6cdaa",
+      "revision": "05f64a092112d4556090d00059120288493525d9",
+      "sourceDigest": "5bec85bf7a4d5186a86bc73179f8562d830ff90a5e023747f7e6228deac732d4"
+    },
+    "checks": [
+      {
+        "name": "test_selected_build_and_archives",
+        "result": "PASS"
+      },
+      {
+        "name": "test_wrong_manifest_never_selects_archive",
+        "result": "PASS"
+      },
+      {
+        "name": "test_changed_payload_is_rejected",
+        "result": "PASS"
+      },
+      {
+        "name": "test_wrong_elf_architecture_is_rejected_even_with_new_checksums",
+        "result": "PASS"
+      },
+      {
+        "name": "test_symlink_and_unlisted_files_are_rejected",
+        "result": "PASS"
+      },
+      {
+        "name": "test_archive_missing_dependency_and_path_injection_are_rejected",
+        "result": "PASS"
+      },
+      {
+        "name": "test_archive_generation_is_reproducible",
+        "result": "PASS"
+      },
+      {
+        "name": "test_output_collision_and_failed_build_keep_original",
+        "result": "PASS"
+      },
+      {
+        "name": "test_build_cli_emits_one_json_receipt",
+        "result": "PASS"
+      }
+    ],
+    "candidateChecks": [
+      {
+        "name": "test_selected_candidate_and_archive_roundtrip",
+        "state": "PASS"
+      },
+      {
+        "name": "test_independent_commit_run_architecture_and_digest_selection",
+        "state": "PASS"
+      },
+      {
+        "name": "test_changed_unlisted_and_symlinked_candidate_files",
+        "state": "PASS"
+      },
+      {
+        "name": "test_sbom_and_binary_binding_cannot_be_relabelled",
+        "state": "PASS"
+      },
+      {
+        "name": "test_duplicate_json_and_invalid_inventory_are_rejected",
+        "state": "PASS"
+      },
+      {
+        "name": "test_tar_paths_links_and_duplicate_members_are_rejected",
+        "state": "PASS"
+      },
+      {
+        "name": "test_special_tar_headers_are_refused_before_reading_bodies",
+        "state": "PASS"
+      },
+      {
+        "name": "test_tar_member_count_and_aggregate_size_are_bounded",
+        "state": "PASS"
+      },
+      {
+        "name": "test_actual_verifier_cli_uses_independent_selection",
+        "state": "PASS"
+      },
+      {
+        "name": "test_browser_publication_allowlist_excludes_private_fixture_files",
+        "state": "PASS"
+      },
+      {
+        "name": "test_browser_publication_refuses_failed_stale_and_linked_inputs",
+        "state": "PASS"
+      }
+    ],
+    "candidateReceipt": {
+      "archiveBytes": 25585900,
+      "archiveSHA256": "bbe51dac70c2804d0ca0a4a8d0b618201f93c4f438f213aa5e4b5082c8d60ecf",
+      "commit": "05f64a092112d4556090d00059120288493525d9",
+      "distributionManifestSHA256": "583ee6c8aaf028d9b5d7ecb508fd266aeedc6acf4ea620f174ba89a3f9a6cdaa",
+      "format": "outpost-ci-candidate-1",
+      "manifestSHA256": "debc9c9fa43b7565d4ff72ba9c7384cac557666cf49e0b5bc0e7bf8e8a65e44c",
+      "nativeArchitecture": "amd64",
+      "repository": "example/fixture",
+      "runAttempt": 1,
+      "runId": 1,
+      "runtimeAcceptance": false,
+      "state": "VERIFIED_CANDIDATE_BYTES"
+    },
+    "extractionReceipt": {
+      "commit": "05f64a092112d4556090d00059120288493525d9",
+      "distributionManifestSHA256": "583ee6c8aaf028d9b5d7ecb508fd266aeedc6acf4ea620f174ba89a3f9a6cdaa",
+      "format": "outpost-ci-candidate-1",
+      "manifestSHA256": "debc9c9fa43b7565d4ff72ba9c7384cac557666cf49e0b5bc0e7bf8e8a65e44c",
+      "nativeArchitecture": "amd64",
+      "repository": "example/fixture",
+      "runAttempt": 1,
+      "runId": 1,
+      "runtimeAcceptance": false,
+      "state": "VERIFIED_CANDIDATE_BYTES"
+    },
+    "sbom": {
+      "status": "SOURCE_BOUND_SBOM_SIGNING_MODULES_VERIFIED",
+      "artifacts": {
+        "linux_amd64/outpost-kit": {
+          "sbomSHA256": "97360158c1014b8c8405a017ec7ede385470fc2e9b2bc611ae7c58baefdc89cb",
+          "binarySHA256": "ecfa87b19dacd72f35b633193649477888c7535ee6fa0748e268b47d5f6f19a1",
+          "signingModules": {}
+        },
+        "linux_amd64/outpost": {
+          "sbomSHA256": "ccad236d2b7917f7b71a75790b58d7627c72139f79dd32ed87893897ef49cf22",
+          "binarySHA256": "ac1ee95b0b2ad812fb2e660ed8e5e6b1258d0767367cd0f887ae5a242f71063e",
+          "signingModules": {
+            "github.com/aws/aws-sdk-go-v2": "v1.48.0",
+            "github.com/aws/smithy-go": "v1.28.9"
+          }
+        },
+        "linux_arm64/outpost-kit": {
+          "sbomSHA256": "6821c29d11a5ebfedcfe4b3299066113022d5a9caafb04780e86357ac7a38f43",
+          "binarySHA256": "315b978a2d7a6103104f5673961ddb93109e6c124e5b290806fa79fdcacb680e",
+          "signingModules": {}
+        },
+        "linux_arm64/outpost": {
+          "sbomSHA256": "dd991a4783753ebceb89f57fefad8ea27204f150cf452f2ab9c9982e1ad097e3",
+          "binarySHA256": "929aafc26b9be83864b6a86ac371cefb646292a91510a7f353e99625f1c0116a",
+          "signingModules": {
+            "github.com/aws/aws-sdk-go-v2": "v1.48.0",
+            "github.com/aws/smithy-go": "v1.28.9"
+          }
+        }
+      },
+      "revision": "05f64a092112d4556090d00059120288493525d9",
+      "sourceDigest": "5bec85bf7a4d5186a86bc73179f8562d830ff90a5e023747f7e6228deac732d4"
+    },
+    "nativeAMD64VersionExecuted": true,
+    "nativeARM64ExecutedOnHDD": false,
+    "runtimeAcceptance": false,
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 805306368,
+    "memoryMaxEvents": 243,
+    "swapOOM": 0,
+    "resourceLimit": "Packaging/adversarial file copies reached the memory cap with reclaim events. No OOM/swap was observed; this does not establish RAM headroom or an installed worker budget."
+  },
+  "compatibility": "File-kit/catalog/marker/credential formats are unchanged. Explicit credentials, HTTPS/method/archive query/namespace/expiry/budget and complete readback remain. Noncanonical RawPath is refused. HTTP caller propagates cancellation/deadline instead of treating it as a credential denial.",
+  "earlierFailure": "Initialda0b1 SDK target PUT/GET and all independent signatures succeeded, but new test incorrectly assumed content-length was the first signed header. Backend also signs accept-encoding/content-type. Corrected test parses the signed-header token list while retaining actual parsed length/conditional/body equality; only that observer changed betweenda0b1anda413. Originalexit1 retained.",
+  "pending": [
+    "Installed production host and real endpoint admission remain separate; the downloaded amd64 synthetic installation is recorded in downloaded-install-evidence.json",
+    "Official artifact/release and admitted endpoint/host acceptance",
+    "Quiet-HDD slot and150ms throughput gates recorded separately",
+    "Whole-product acceptance"
+  ],
+  "previousStorageSourceTree": "224591522829f3070bbab230aa9451f4ec1b5944",
+  "sourceBinding": {
+    "distributionProductionInputsUnchanged": true,
+    "changedTest": "internal/storage/signv4_test.go",
+    "change": "The same independent synthetic HMAC vector moved into a named constant; expected bytes and every assertion remain. The exact final test source passed all six focused and 27 storage tests plus vet. Distribution receipt keeps its original tree; exact-head native CI will rebuild the published source."
+  },
+  "scannerReview": "An initial generic-api-key report identified only the frozen synthetic test HMAC next to auth. The same digest is retained as a named expectedSignature constant. Unchanged pinned staged and full-history scanners pass; no rule or allowlist changed.",
+  "acceptedExecutableCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+  "requiredCI": [
+    {
+      "name": "browser-ui",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711050/job/132455660797"
+    },
+    {
+      "name": "documentation",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711035/job/132455661023"
+    },
+    {
+      "name": "container (ubuntu-24.04, amd64)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711032/job/132455660945"
+    },
+    {
+      "name": "go-prototype",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711043/job/132455660994"
+    },
+    {
+      "name": "repository-standard",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711040/job/132455660782"
+    },
+    {
+      "name": "container (ubuntu-24.04-arm, arm64)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711032/job/132455660821"
+    }
+  ],
+  "actualActionsArtifacts": [
+    {
+      "id": 14115490381,
+      "name": "outpost-candidate-0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6-arm64-43597711032-1",
+      "size_in_bytes": 25586072,
+      "url": "https://api.github.com/repos/nd4y/outpost/actions/artifacts/14115490381",
+      "archive_download_url": "https://api.github.com/repos/nd4y/outpost/actions/artifacts/14115490381/zip",
+      "expired": false,
+      "created_at": "2026-11-14T13:13:05Z",
+      "expires_at": "2026-11-21T13:13:03Z",
+      "updated_at": "2026-11-14T13:13:05Z",
+      "digest": "sha256:1d438e75dde1a02095b8715ca079897d31824771dccd2bfb1b58ac8e36253f00",
+      "workflow_run": {
+        "id": 43597711032,
+        "repository_id": 1446655592,
+        "head_repository_id": 1446655592,
+        "head_branch": "feat/product-completion",
+        "head_sha": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6"
+      }
+    },
+    {
+      "id": 14115396258,
+      "name": "outpost-candidate-0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6-amd64-43597711032-1",
+      "size_in_bytes": 25586027,
+      "url": "https://api.github.com/repos/nd4y/outpost/actions/artifacts/14115396258",
+      "archive_download_url": "https://api.github.com/repos/nd4y/outpost/actions/artifacts/14115396258/zip",
+      "expired": false,
+      "created_at": "2026-11-14T13:12:39Z",
+      "expires_at": "2026-11-21T13:12:37Z",
+      "updated_at": "2026-11-14T13:12:39Z",
+      "digest": "sha256:862606aff3dc27c1e23bbcca0dc201e1a659b90335dcd60132ea875ca2c7eb5c",
+      "workflow_run": {
+        "id": 43597711032,
+        "repository_id": 1446655592,
+        "head_repository_id": 1446655592,
+        "head_branch": "feat/product-completion",
+        "head_sha": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6"
+      }
+    }
+  ],
+  "actualDownloadedSBOM": {
+    "status": "ACTUAL_DOWNLOADED_SDK_MODULES_AND_MINIMAL_READER_VERIFIED",
+    "candidates": {
+      "amd64": {
+        "revision": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+        "sourceDigest": "6748a1e93c9c3b5ff5ef6a7cfae32fffb221b8eabfd5e256a91c1f94c84f92a5",
+        "artifacts": {
+          "linux_amd64/outpost-kit": {
+            "binarySHA256": "43de298c3d4832d487e31f4869d85225b3328dacf37983f099bd5243fadd4aea",
+            "sbomSHA256": "2cd5bb5dac4f61f7ec3e434a08d821cb2c2c17d11800103e4444e195c08e05f3",
+            "signingModules": {}
+          },
+          "linux_amd64/outpost": {
+            "binarySHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+            "sbomSHA256": "16b829f54d33d957b6a313945f559076262ae140b0f9581be116a73814ad6790",
+            "signingModules": {
+              "github.com/aws/aws-sdk-go-v2": "v1.48.0",
+              "github.com/aws/smithy-go": "v1.28.9"
+            }
+          },
+          "linux_arm64/outpost-kit": {
+            "binarySHA256": "61685655d0d50ec9cab474a8bb600d19691cd119c5c3d713357b66b31ae080fa",
+            "sbomSHA256": "1768c1dc9ec38115b60a999bafac82114b18087ac9b9822c312df9f5266e9f98",
+            "signingModules": {}
+          },
+          "linux_arm64/outpost": {
+            "binarySHA256": "0bf804b6dae467fa7b9f5a1c1a4e64f982b68b0ec3c420172b26638c73cb3949",
+            "sbomSHA256": "937321a40f50159c4f7216aa194a7507fe3f7df75eb5da79037cae3e580bca15",
+            "signingModules": {
+              "github.com/aws/aws-sdk-go-v2": "v1.48.0",
+              "github.com/aws/smithy-go": "v1.28.9"
+            }
+          }
+        }
+      },
+      "arm64": {
+        "revision": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+        "sourceDigest": "6748a1e93c9c3b5ff5ef6a7cfae32fffb221b8eabfd5e256a91c1f94c84f92a5",
+        "artifacts": {
+          "linux_amd64/outpost-kit": {
+            "binarySHA256": "43de298c3d4832d487e31f4869d85225b3328dacf37983f099bd5243fadd4aea",
+            "sbomSHA256": "dd85135414b8bf42a34c256a4e50f54163c8c80365edba6f710dd574ff8fdf69",
+            "signingModules": {}
+          },
+          "linux_amd64/outpost": {
+            "binarySHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+            "sbomSHA256": "886bd6a68c7f7d0fb50c9868715c672387831c1dcda9dc61743bd7bd4acc4009",
+            "signingModules": {
+              "github.com/aws/aws-sdk-go-v2": "v1.48.0",
+              "github.com/aws/smithy-go": "v1.28.9"
+            }
+          },
+          "linux_arm64/outpost-kit": {
+            "binarySHA256": "61685655d0d50ec9cab474a8bb600d19691cd119c5c3d713357b66b31ae080fa",
+            "sbomSHA256": "91caf82cf9d11448073475816ac8387a88d208f079b8f9bfddbd0b9a17ae297a",
+            "signingModules": {}
+          },
+          "linux_arm64/outpost": {
+            "binarySHA256": "0bf804b6dae467fa7b9f5a1c1a4e64f982b68b0ec3c420172b26638c73cb3949",
+            "sbomSHA256": "5e3c3a72acb1ff3eb185604dc3f1badba2d8b222f2dab674e7d385e64cde0181",
+            "signingModules": {
+              "github.com/aws/aws-sdk-go-v2": "v1.48.0",
+              "github.com/aws/smithy-go": "v1.28.9"
+            }
+          }
+        }
+      }
+    }
+  }
+}

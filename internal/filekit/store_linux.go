@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/statefile"
 	"io"
 	"os"
 	"path"
@@ -15,22 +17,36 @@ import (
 )
 
 func OpenStore(dir string, owner Owner, create bool) (*Store, error) {
-	if !filepath.IsAbs(dir) {
+	return openStore(dir, owner, create, nil)
+}
+
+// OpenStreamingStore keeps only version envelopes and locking state locally.
+// All encrypted payload and descriptor objects go directly to the backend.
+// The explicit marker prevents opening this cache as a complete local store.
+func OpenStreamingStore(dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
+	if backend == nil {
 		return nil, ErrInvalid
 	}
+	return openStore(dir, owner, create, backend)
+}
+func openStore(dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
+	return openStoreAt(nil, dir, owner, create, backend)
+}
+func OpenStreamingStoreAt(parent *os.Root, dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
+	if backend == nil {
+		return nil, ErrInvalid
+	}
+	return openStoreAt(parent, dir, owner, create, backend)
+}
+func openStoreAt(parent *os.Root, dir string, owner Owner, create bool, backend ObjectBackend) (*Store, error) {
 	if err := owner.validate(); err != nil {
 		return nil, err
 	}
-	if create {
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return nil, err
-		}
-	}
-	r, err := os.OpenRoot(dir)
+	r, err := localfs.Directory(parent, dir, create)
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{root: r, Owner: owner}
+	s := &Store{root: r, Owner: owner, backend: backend}
 	if create {
 		if err = s.initialize(); err != nil {
 			r.Close()
@@ -47,13 +63,32 @@ func OpenStore(dir string, owner Owner, create bool) (*Store, error) {
 			return nil, err
 		}
 	}
+	if !create {
+		if _, e := r.Lstat("store.json"); e == nil {
+			if e = s.authorize(); e != nil {
+				r.Close()
+				return nil, e
+			}
+		} else if !errors.Is(e, os.ErrNotExist) || backend != nil {
+			r.Close()
+			return nil, ErrInvalid
+		}
+	}
 	return s, nil
 }
 func (s *Store) Close() error { return s.root.Close() }
 
 type storeMarker struct {
-	Format string `json:"format"`
-	Domain string `json:"domain"`
+	Format  string `json:"format"`
+	Domain  string `json:"domain"`
+	Objects string `json:"objects,omitempty"`
+}
+
+func (s *Store) objectMode() string {
+	if s.backend != nil {
+		return "streaming"
+	}
+	return ""
 }
 
 func (s *Store) authorize() error {
@@ -65,7 +100,7 @@ func (s *Store) authorize() error {
 	if err = decode(b, &m); err != nil {
 		return err
 	}
-	if m.Format != Format || m.Domain != s.Owner.Domain {
+	if m.Format != Format || m.Domain != s.Owner.Domain || m.Objects != s.objectMode() {
 		return ErrInvalid
 	}
 	return nil
@@ -85,11 +120,11 @@ func (s *Store) initialize() error {
 	if len(entries) != 0 || e != io.EOF {
 		return errors.New("refuse unowned nonempty destination")
 	}
-	b, err := json.Marshal(storeMarker{Format, s.Owner.Domain})
+	b, err := json.Marshal(storeMarker{Format, s.Owner.Domain, s.objectMode()})
 	if err != nil {
 		return err
 	}
-	f, err = s.root.OpenFile("store.json", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err = localfs.OpenFile(s.root, "store.json", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -113,7 +148,7 @@ func (s *Store) lock(ctx context.Context, exclusive bool) (func(), error) {
 	if err := s.authorize(); err != nil {
 		return nil, err
 	}
-	f, err := s.root.OpenFile(".lock", os.O_CREATE|os.O_RDWR, 0600)
+	f, err := localfs.OpenFile(s.root, ".lock", os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +185,7 @@ func (s *Store) syncDir(name string) error {
 }
 func (s *Store) readFile(name string, limit int) ([]byte, error) {
 	// Untrusted kit entries must not block open on a FIFO or follow a link.
-	f, err := s.root.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	f, err := localfs.OpenFile(s.root, name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -172,10 +207,22 @@ func (s *Store) readFile(name string, limit int) ([]byte, error) {
 	return b, nil
 }
 func (s *Store) readObject(ref Object) ([]byte, error) {
+	return s.readObjectContext(context.Background(), ref)
+}
+func (s *Store) readObjectContext(ctx context.Context, ref Object) ([]byte, error) {
+	if e := ctx.Err(); e != nil {
+		return nil, e
+	}
 	if !validID(ref.ID) || ref.Bytes <= 0 || ref.Bytes > MaxObject {
 		return nil, ErrInvalid
 	}
-	b, err := s.readFile(objectPath(ref.ID), ref.Bytes)
+	var b []byte
+	var err error
+	if s.backend != nil {
+		b, err = s.backend.Read(ctx, ref)
+	} else {
+		b, err = s.readFile(objectPath(ref.ID), ref.Bytes)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +234,40 @@ func (s *Store) readObject(ref Object) ([]byte, error) {
 }
 
 func (s *Store) putObject(b []byte, metadata bool) (Object, error) {
+	return s.putObjectContext(context.Background(), b, metadata)
+}
+func (s *Store) putObjectContext(ctx context.Context, b []byte, metadata bool) (Object, error) {
+	if e := ctx.Err(); e != nil {
+		return Object{}, e
+	}
+	if len(b) == 0 || len(b) > MaxObject {
+		return Object{}, ErrInvalid
+	}
+	ref := Object{ID: digest(b), Bytes: len(b)}
+	if s.backend != nil {
+		created, e := s.backend.Write(ctx, ref, b)
+		if e != nil {
+			return ref, e
+		}
+		return ref, s.recordRemoteWrite(ref, metadata, created)
+	}
+	var result Object
+	e := statefile.Guard(s.Admit, objectPath(ref.ID), len(b), func() error { var err error; result, err = s.putLocalObject(b, metadata); return err })
+	return result, e
+}
+
+func (s *Store) recordRemoteWrite(ref Object, metadata, created bool) error {
+	if created {
+		s.Stats.NewObjects++
+		if metadata {
+			s.Stats.NewMetadataBytes += int64(ref.Bytes)
+		} else {
+			s.Stats.NewPayloadBytes += int64(ref.Bytes)
+		}
+	}
+	return s.checkpoint("object-durable")
+}
+func (s *Store) putLocalObject(b []byte, metadata bool) (Object, error) {
 	ref := Object{ID: digest(b), Bytes: len(b)}
 	if len(b) == 0 || len(b) > MaxObject {
 		return ref, ErrInvalid
@@ -209,7 +290,7 @@ func (s *Store) putObject(b []byte, metadata bool) (Object, error) {
 		return ref, err
 	}
 	tmp := ".txn/" + randomID()
-	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := localfs.OpenFile(s.root, tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return ref, err
 	}
@@ -266,8 +347,11 @@ func (s *Store) writeEnvelope(name string, e Envelope) error {
 	if len(b) > MaxRoot {
 		return ErrInvalid
 	}
+	return statefile.Guard(s.Admit, name, len(b), func() error { return s.writeEnvelopeBytes(name, b) })
+}
+func (s *Store) writeEnvelopeBytes(name string, b []byte) error {
 	tmp := ".txn/" + randomID()
-	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := localfs.OpenFile(s.root, tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -302,11 +386,14 @@ func (s *Store) writeEnvelope(name string, e Envelope) error {
 }
 
 func (s *Store) sealDescriptor(d Descriptor) (Envelope, error) {
+	return s.sealDescriptorContext(context.Background(), d)
+}
+func (s *Store) sealDescriptorContext(ctx context.Context, d Descriptor) (Envelope, error) {
 	v, err := s.Owner.version(d)
 	if err != nil {
 		return Envelope{}, err
 	}
-	e := Envelope{Format: Format, Domain: d.Domain, File: d.File, Version: v}
+	e := Envelope{Format: d.Format, Domain: d.Domain, File: d.File, Version: v}
 	b, err := json.Marshal(d)
 	if err != nil {
 		return e, err
@@ -320,7 +407,7 @@ func (s *Store) sealDescriptor(d Descriptor) (Envelope, error) {
 	}
 	for len(b) > 0 {
 		n := min(len(b), DescriptorPart)
-		ref, err := s.putObject(b[:n], true)
+		ref, err := s.putObjectContext(ctx, b[:n], true)
 		if err != nil {
 			return e, err
 		}
@@ -331,8 +418,14 @@ func (s *Store) sealDescriptor(d Descriptor) (Envelope, error) {
 }
 
 func (s *Store) load(name, version string) (Envelope, Descriptor, error) {
+	return s.loadContext(context.Background(), name, version)
+}
+func (s *Store) loadContext(ctx context.Context, name, version string) (Envelope, Descriptor, error) {
 	var e Envelope
 	var d Descriptor
+	if err := ctx.Err(); err != nil {
+		return e, d, err
+	}
 	if !validID(version) {
 		return e, d, ErrInvalid
 	}
@@ -340,6 +433,18 @@ func (s *Store) load(name, version string) (Envelope, Descriptor, error) {
 	if err != nil {
 		return e, d, err
 	}
+	return s.loadEnvelope(ctx, b, version)
+}
+func (s *Store) loadEnvelope(ctx context.Context, b []byte, version string) (Envelope, Descriptor, error) {
+	var e Envelope
+	var d Descriptor
+	if err := ctx.Err(); err != nil {
+		return e, d, err
+	}
+	if !validID(version) || len(b) == 0 || len(b) > MaxRoot {
+		return e, d, ErrInvalid
+	}
+	var err error
 	if err = decode(b, &e); err != nil {
 		return e, d, err
 	}
@@ -352,7 +457,7 @@ func (s *Store) load(name, version string) (Envelope, Descriptor, error) {
 	}
 	var sealed []byte
 	for _, p := range e.Parts {
-		b, err = s.readObject(p)
+		b, err = s.readObjectContext(ctx, p)
 		if err != nil {
 			return e, d, err
 		}
@@ -368,7 +473,7 @@ func (s *Store) load(name, version string) (Envelope, Descriptor, error) {
 	if err = decode(b, &d); err != nil {
 		return e, d, err
 	}
-	if d.Domain != e.Domain || d.File != e.File {
+	if d.Domain != e.Domain || d.File != e.File || d.Format != e.Format {
 		return e, d, ErrInvalid
 	}
 	canonical, err = json.Marshal(d)
@@ -383,15 +488,23 @@ func (s *Store) load(name, version string) (Envelope, Descriptor, error) {
 }
 
 func (s *Store) LoadVersion(version string) (Envelope, Descriptor, error) {
+	return s.LoadVersionContext(context.Background(), version)
+}
+func (s *Store) LoadVersionContext(ctx context.Context, version string) (Envelope, Descriptor, error) {
 	if !validID(version) {
 		return Envelope{}, Descriptor{}, ErrInvalid
 	}
-	return s.load("versions/"+version+".json", version)
+	return s.loadContext(ctx, "versions/"+version+".json", version)
 }
 
 func ReadOwner(name string) (Owner, error) {
 	var o Owner
-	f, err := os.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	root, err := localfs.OpenRoot(filepath.Dir(name))
+	if err != nil {
+		return o, err
+	}
+	defer root.Close()
+	f, err := localfs.OpenFile(root, filepath.Base(name), os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return o, err
 	}

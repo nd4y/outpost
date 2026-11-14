@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { validateG1Evidence } from "./g1-evidence.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (name) => fs.readFileSync(path.join(root, name), "utf8");
@@ -31,8 +32,100 @@ for (const id of testIds)
     catalog.requirements.some((item) => item.acceptance.includes(id)),
     `Unmapped ${id}`,
   );
+// The completion map must retain the entire contract, including unfinished work.
+// Existing source symbols establish traceability, never runtime acceptance.
+const product = JSON.parse(read("docs/product-status.json"));
+assert.equal(product.schemaVersion, 1);
+assert.equal(product.specVersion, catalog.specVersion);
+assert.deepEqual(product.requirements.map((r) => r.id).sort(), requireIds);
+assert.deepEqual(product.acceptance.map((a) => a.id).sort(), testIds);
+for (const item of product.requirements) {
+  const requirement = catalog.requirements.find((r) => r.id === item.id);
+  assert(
+    item.workstream &&
+      item.remaining &&
+      ["IN_DEVELOPMENT", "SEPARATE_PROFILE"].includes(item.state),
+  );
+  assert.deepEqual([...item.acceptance].sort(), [...requirement.acceptance].sort());
+  for (const file of item.implementation) {
+    assert(!path.isAbsolute(file) && !file.split("/").includes(".."));
+    assert(fs.existsSync(path.join(root, file)), `Missing implementation: ${item.id} ${file}`);
+  }
+  for (const check of item.checks) {
+    if (
+      [
+        "scripts/check-release.py",
+        "scripts/check-container.py",
+        "scripts/check-candidate-release.py",
+      ].includes(check.path)
+    ) {
+      assert(/^test_[a-z0-9_]{5,160}$/.test(check.name));
+      const source = read(check.path);
+      const registration = source.match(/^TESTS\s*=\s*\[([\s\S]*?)\]/m);
+      assert(registration && /^(?:\s*test_[a-z0-9_]+\s*,?)+\s*$/.test(registration[1]));
+      const registered = registration[1].match(/test_[a-z0-9_]+/g);
+      assert.equal(new Set(registered).size, registered.length);
+      assert(
+        registered.includes(check.name),
+        `Unregistered artifact check: ${item.id} ${check.name}`,
+      );
+      assert(
+        new RegExp(`^def ${check.name}\\(`, "m").test(source),
+        `Stale artifact check: ${item.id} ${check.name}`,
+      );
+      continue;
+    }
+    if (check.path === "scripts/browser/check.mjs") {
+      assert(/^[A-Za-z0-9][A-Za-z0-9 ,%-]{10,160}$/.test(check.name));
+      assert(
+        new RegExp(`await test\\(\\s*${JSON.stringify(check.name)},`).test(read(check.path)),
+        `Stale browser scenario: ${item.id} ${check.name}`,
+      );
+      continue;
+    }
+    if (check.path === "packaging/monitoring/rules.test.yml") {
+      assert(/^[A-Za-z0-9][A-Za-z0-9 -]{10,160}$/.test(check.name));
+      assert(
+        read(check.path).split(/\r?\n/).includes(`  - name: ${check.name}`),
+        `Stale monitoring scenario: ${item.id} ${check.name}`,
+      );
+      continue;
+    }
+    if (check.path === "scripts/check-monitoring-delivery.py") {
+      assert.equal(check.name, "test_delivery");
+      assert(
+        read(check.path).includes(`def ${check.name}(`),
+        `Stale delivery scenario: ${item.id}`,
+      );
+      continue;
+    }
+    assert(/^(?:internal\/[a-z_]+|cmd\/outpost)\/[a-z][a-z0-9_]*_test\.go$/.test(check.path));
+    assert(/^Test[A-Za-z0-9]+$/.test(check.name));
+    assert(
+      read(check.path).includes(`func ${check.name}(t *testing.T)`),
+      `Stale product check: ${item.id} ${check.name}`,
+    );
+  }
+}
+for (const item of product.acceptance) {
+  assert.equal(item.state, "NOT_VERIFIED");
+  assert.deepEqual(
+    [...item.requirements].sort(),
+    catalog.requirements
+      .filter((r) => r.acceptance.includes(item.id))
+      .map((r) => r.id)
+      .sort(),
+  );
+}
 // Keep the G1 trace attached to existing checks. Existence is not execution.
 const g1Trace = JSON.parse(read("docs/g1-trace.json"));
+assert.equal(catalog.gates.G1.scaleEvidence, "docs/g1-scale-evidence.json");
+validateG1Evidence(
+  JSON.parse(read(catalog.gates.G1.scaleEvidence)),
+  JSON.parse(read(catalog.gates.G1.limits)),
+  catalog.gates.G1,
+);
+execFileSync(process.execPath, [path.join(root, "scripts/g1-evidence.test.mjs")]);
 assert.equal(g1Trace.schemaVersion, 1);
 assert.equal(g1Trace.gate, "G1");
 assert.deepEqual(
@@ -75,7 +168,11 @@ for (const item of generationTrace.requirements) {
   for (const id of item.acceptanceSubset)
     assert(requirement.acceptance.includes(id), `Invalid G2 subset ${item.id} -> ${id}`);
   for (const test of item.tests) {
-    assert(/^internal\/(?:generation|filekit)\/[a-z_]+_test\.go$/.test(test.path));
+    assert(
+      /^internal\/(?:generation|filekit|peer|worker|sourceagent)\/[a-z_]+_test\.go$/.test(
+        test.path,
+      ),
+    );
     assert(/^Test[A-Za-z0-9]+$/.test(test.name));
     assert(
       read(test.path).includes(`func ${test.name}(t *testing.T)`),

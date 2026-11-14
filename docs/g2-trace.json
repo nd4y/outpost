@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "gate": "G2",
-  "scope": "Bounded local generation/replica candidate only; full G2 and release scenarios remain NOT_VERIFIED",
+  "scope": "Bounded local maintenance, actual180-update peer catch-up and holder epoch-transition evidence; full-scale G2 and release scenarios remain NOT_VERIFIED",
   "requirements": [
     {
       "id": "REQ-20",
       "acceptanceSubset": ["AT-17", "AT-20"],
-      "scope": "Canonical signed complete closures and direct checkpoint catch-up",
-      "remaining": "Large catalog/history cost and independently provisioned checkpoints",
+      "scope": "Canonical signed complete closures and direct catch-up after180actual small-file updates, policy changes and maintenance",
+      "remaining": "Large catalog/history cost, independent physical failure domains and full-scale checkpoints",
       "tests": [
         {
           "path": "internal/generation/generation_linux_test.go",
@@ -16,14 +16,18 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestReceiveRestartConflictAndPendingPin"
+        },
+        {
+          "path": "internal/peer/offline_history_linux_test.go",
+          "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
         }
       ]
     },
     {
       "id": "REQ-21",
       "acceptanceSubset": ["AT-18", "AT-21"],
-      "scope": "Epoch/domain binding, highest sequence and conflicting author rejection",
-      "remaining": "Owner epoch transitions, revoked branch isolation and transport authority expiry",
+      "scope": "Epoch/domain binding, owner epoch preparation, actual holder TLS transition and persistent old-branch/epoch rollback rejection; both retained epochs restore independently",
+      "remaining": "Superseded key-material retirement, full-scale lifecycle and independently admitted transport credentials",
       "tests": [
         {
           "path": "internal/generation/generation_linux_test.go",
@@ -32,14 +36,22 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestReceiveRestartConflictAndPendingPin"
+        },
+        {
+          "path": "internal/sourceagent/epoch_recovery_cli_linux_test.go",
+          "name": "TestOwnerEpochCLIProducesIndependentOldAndNewRecovery"
+        },
+        {
+          "path": "internal/worker/epoch_history_linux_test.go",
+          "name": "TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory"
         }
       ]
     },
     {
       "id": "REQ-22",
-      "acceptanceSubset": ["AT-09", "AT-11", "AT-12"],
-      "scope": "Locked consistent source closure and atomic complete local replica",
-      "remaining": "Real network/cloud publication and source application consistency",
+      "acceptanceSubset": ["AT-09", "AT-10", "AT-11", "AT-12"],
+      "scope": "Locked consistent source closure, atomic complete local replica and bounded TLS holder publication",
+      "remaining": "Full-scale network/cloud publication and source application consistency",
       "tests": [
         {
           "path": "internal/filekit/view_linux_test.go",
@@ -52,6 +64,10 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        },
+        {
+          "path": "internal/worker/epoch_history_linux_test.go",
+          "name": "TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory"
         }
       ]
     },
@@ -90,8 +106,8 @@
     {
       "id": "REQ-33",
       "acceptanceSubset": ["AT-09", "AT-10", "AT-11", "AT-12"],
-      "scope": "Complete/pending/kit/restore protection, fail-closed inventory and physical garbage deletion",
-      "remaining": "Distributed and external-target pins, large history and hardware power loss",
+      "scope": "Complete/pending/kit/restore protection, fail-closed inventory, physical garbage deletion and180actual maintained small-file updates while a holder is offline",
+      "remaining": "Distributed/external-target pin scale, large catalogs and hardware power loss",
       "tests": [
         {
           "path": "internal/generation/generation_linux_test.go",
@@ -108,6 +124,10 @@
         {
           "path": "internal/generation/generation_linux_test.go",
           "name": "TestSealedReplicaSurvivesSourceRepackAndAbsence"
+        },
+        {
+          "path": "internal/peer/offline_history_linux_test.go",
+          "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
         }
       ]
     }

@@ -25,15 +25,20 @@ def main():
     p.add_argument("--bytes", type=int, default=100 << 30)
     p.add_argument("--container-image", default="")
     p.add_argument("--filesystem-uuid", default="")
+    p.add_argument("--phase-timeout-seconds", type=int, default=7200)
     a = p.parse_args()
     limits = json.loads(a.limits.read_text())
     root = a.root
     assert root.is_absolute() and not root.exists(), "new isolated root required"
     assert 128 << 20 <= a.bytes <= 100 << 30
+    assert 60 <= a.phase_timeout_seconds <= 43200, "phase timeout must be between 60 and 43200 seconds"
     for binary in (a.kit_binary, a.fixture_binary):
         assert binary.is_absolute() and binary.is_file()
     if a.container_image:
-        assert a.container_image.startswith("sha256:"), "pin the container image"
+        digest = a.container_image.removeprefix("sha256:")
+        assert a.container_image.startswith("sha256:") and len(digest) == 64 and all(c in "0123456789abcdef" for c in digest), "pin the container image"
+    if a.bytes == limits["sourceBytes"]:
+        assert a.container_image and a.filesystem_uuid, "full-scale acceptance requires container and filesystem pins"
     # Admission happens before mkdir so a missing mount cannot write to root.
     if a.filesystem_uuid:
         actual = subprocess.check_output(["findmnt", "-n", "-o", "UUID", "--target", str(root.parent)], text=True).strip()
@@ -41,13 +46,16 @@ def main():
     initial = shutil.disk_usage(root.parent)
     assert initial.free - a.bytes >= initial.total * limits["minimumFilesystemFreeRatio"], "insufficient test capacity"
     root.mkdir(mode=0o700)
-    for directory in ("source", "keys", "outputs", "results"):
+    for directory in ("source", "keys", "recovery", "outputs", "results"):
         (root / directory).mkdir(mode=0o700)
     receipts = []
     started = datetime.datetime.now(datetime.timezone.utc).isoformat()
     peak_used = 0
     min_free = 1.0
     calls = 0
+    overall_status = "RUNNING"
+    failure = None
+    active_label = None
 
     def capacity(additional=0):
         nonlocal peak_used, min_free
@@ -62,9 +70,12 @@ def main():
 
     def save():
         report = {"started": started, "observedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  "status": overall_status, "failure": failure,
                   "baselineBytes": a.bytes, "fullScale": a.bytes == limits["sourceBytes"],
                   "isolation": "networkless-container" if a.container_image else "native-fixture",
-                  "image": a.container_image, "peakObservedFilesystemUsed": peak_used,
+                  "image": a.container_image, "filesystemUUID": a.filesystem_uuid,
+                  "phaseTimeoutSeconds": a.phase_timeout_seconds,
+                  "filesystemBytes": initial.total, "peakObservedFilesystemUsed": peak_used,
                   "minimumObservedFilesystemFreeRatio": min_free, "operations": receipts,
                   "binarySha256": {"kit": hashlib.sha256(a.kit_binary.read_bytes()).hexdigest(),
                                    "fixture": hashlib.sha256(a.fixture_binary.read_bytes()).hexdigest()},
@@ -74,7 +85,8 @@ def main():
         temp.replace(root / "results/report.json")
 
     def call(label, binary, args, mounts, additional=0):
-        nonlocal calls
+        nonlocal calls, active_label
+        active_label = label
         before = capacity(additional)
         calls += 1
         print(json.dumps({"event": "start", "label": label, "time": time.time(), "capacity": before}), flush=True)
@@ -102,7 +114,7 @@ def main():
         stderr_path = root / ("results/" + label + ".stderr")
         with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr:
             process = subprocess.Popen(cmd, stdout=stdout, stderr=stderr, text=True)
-            deadline = time.monotonic() + 7200
+            deadline = time.monotonic() + a.phase_timeout_seconds
             try:
                 while process.poll() is None:
                     capacity()
@@ -169,8 +181,8 @@ def main():
 
     def restore(label, version, phase, selected=None, name="file.bin"):
         if selected:
-            mounts = [(selected, "/kit", "ro"), (root / "keys/recovery.json", "/recovery.json", "ro"), output_mount]
-            args = ["restore", "-owner", "/recovery.json", "-store", "/kit"]
+            mounts = [(selected, "/kit", "ro"), (root / "recovery", "/recovery", "ro"), output_mount]
+            args = ["restore", "-owner", "/recovery/owner.json", "-store", "/kit"]
         else:
             mounts = [key_mount, store_mount, output_mount]
             args = ["restore-store"] + common
@@ -195,39 +207,50 @@ def main():
             elif target.exists(): target.unlink()
         return data
 
-    kit("keygen", ["keygen"] + key, [(root / "keys", "/keys", "rw")])
-    kit("recovery-key", ["recovery-key"] + key + ["-dest", "/keys/recovery.json"], [(root / "keys", "/keys", "rw")])
-    fixture("generate", "generate", "base", "/source/source.bin", [(root / "source", "/source", "rw")], additional=a.bytes)
-    base = backup("backup-base")
-    inventory = kit("inspect-base", ["inspect"] + common + ["-version", base["version"]], [key_mount, (root / "store", "/store", "ro")])["result"]
-    assert inventory["storedBytes"] <= a.bytes * limits["maximumInitialKitRatio"]
-    assert inventory["objects"] <= limits["maximumSelectedKitObjects"]
-    fixture("patch", "mutate", "patched", "/source/source.bin", [(root / "source", "/source", "rw")])
-    changed = backup("backup-patched", base)
-    assert changed["newPayloadBytes"] + changed["newMetadataBytes"] <= limits["maximumIncrementalBytes"]
-    unchanged = backup("backup-unchanged", changed)
-    assert unchanged["version"] == changed["version"] and unchanged["newPayloadBytes"] == 0 and unchanged["newMetadataBytes"] == 0
-    (root / "source/source.bin").rename(root / "source/renamed.bin")
-    renamed = backup("backup-renamed", changed, "renamed.bin", "renamed.bin")
-    assert renamed["newPayloadBytes"] == 0 and renamed["version"] != changed["version"]
-    fixture("scatter", "mutate", "scattered", "/source/renamed.bin", [(root / "source", "/source", "rw")])
-    scattered = backup("backup-scattered", renamed, "renamed.bin", "renamed.bin")
-    fixture("insert", "mutate", "inserted", "/source/renamed.bin", [(root / "source", "/source", "rw")], additional=1 << 20)
-    inserted = backup("backup-inserted", scattered, "renamed.bin", "renamed.bin")
-    restore("restore-inserted", inserted["version"], "inserted", name="renamed.bin")
-    remove_owned(root / "source/renamed.bin")
-    export("export-before-maintenance", base["version"], "kit-old")
-    repack = kit("repack", ["repack"] + common, [key_mount, store_mount], int(a.bytes * 1.08))["result"]
-    assert repack["payloadObjectsReplaced"] > 0 and repack["garbageObjectsRemoved"] > 0
-    kit("retire", ["retire"] + common + ["-version", ",".join([base["version"], renamed["version"], scattered["version"]])], [key_mount, store_mount])
-    restore("independent-old-after-maintenance", base["version"], "base", root / "kit-old")
-    remove_owned(root / "kit-old")
-    export("export-retained-new", changed["version"], "kit-new")
-    restore("independent-new-after-maintenance", changed["version"], "patched", root / "kit-new")
-    capacity()
-    save()
-    (root / "results/PASS").write_text("Full scale G1 fixture PASS\n" if a.bytes == limits["sourceBytes"] else "Bounded fixture PASS; not full-scale acceptance\n")
-    print("PASS: synthetic file-kit acceptance", flush=True)
+    try:
+        kit("keygen", ["keygen"] + key, [(root / "keys", "/keys", "rw")])
+        kit("recovery-key", ["recovery-key"] + key + ["-dest", "/keys/recovery.json"], [(root / "keys", "/keys", "rw")])
+        # A file bind is a separate mount beneath its parent. ReadOwner refuses
+        # that crossing. Admit a directory containing only the recovery key,
+        # keeping the source's signing-capable owner file out of the reader.
+        shutil.copy2(root / "keys/recovery.json", root / "recovery/owner.json")
+        fixture("generate", "generate", "base", "/source/source.bin", [(root / "source", "/source", "rw")], additional=a.bytes)
+        base = backup("backup-base")
+        inventory = kit("inspect-base", ["inspect"] + common + ["-version", base["version"]], [key_mount, (root / "store", "/store", "ro")])["result"]
+        assert inventory["storedBytes"] <= a.bytes * limits["maximumInitialKitRatio"]
+        assert inventory["objects"] <= limits["maximumSelectedKitObjects"]
+        fixture("patch", "mutate", "patched", "/source/source.bin", [(root / "source", "/source", "rw")])
+        changed = backup("backup-patched", base)
+        assert changed["newPayloadBytes"] + changed["newMetadataBytes"] <= limits["maximumIncrementalBytes"]
+        unchanged = backup("backup-unchanged", changed)
+        assert unchanged["version"] == changed["version"] and unchanged["newPayloadBytes"] == 0 and unchanged["newMetadataBytes"] == 0
+        (root / "source/source.bin").rename(root / "source/renamed.bin")
+        renamed = backup("backup-renamed", changed, "renamed.bin", "renamed.bin")
+        assert renamed["newPayloadBytes"] == 0 and renamed["version"] != changed["version"]
+        fixture("scatter", "mutate", "scattered", "/source/renamed.bin", [(root / "source", "/source", "rw")])
+        scattered = backup("backup-scattered", renamed, "renamed.bin", "renamed.bin")
+        fixture("insert", "mutate", "inserted", "/source/renamed.bin", [(root / "source", "/source", "rw")], additional=1 << 20)
+        inserted = backup("backup-inserted", scattered, "renamed.bin", "renamed.bin")
+        restore("restore-inserted", inserted["version"], "inserted", name="renamed.bin")
+        remove_owned(root / "source/renamed.bin")
+        export("export-before-maintenance", base["version"], "kit-old")
+        repack = kit("repack", ["repack"] + common, [key_mount, store_mount], int(a.bytes * 1.08))["result"]
+        assert repack["payloadObjectsReplaced"] > 0 and repack["garbageObjectsRemoved"] > 0
+        kit("retire", ["retire"] + common + ["-version", ",".join([base["version"], renamed["version"], scattered["version"]])], [key_mount, store_mount])
+        restore("independent-old-after-maintenance", base["version"], "base", root / "kit-old")
+        remove_owned(root / "kit-old")
+        export("export-retained-new", changed["version"], "kit-new")
+        restore("independent-new-after-maintenance", changed["version"], "patched", root / "kit-new")
+        capacity()
+        overall_status = "PASS"
+        save()
+        (root / "results/PASS").write_text("Full scale G1 fixture PASS\n" if a.bytes == limits["sourceBytes"] else "Bounded fixture PASS; not full-scale acceptance\n")
+        print("PASS: synthetic file-kit acceptance", flush=True)
+    except BaseException as error:
+        overall_status = "FAIL"
+        failure = {"afterLabel": active_label, "errorType": type(error).__name__}
+        save()
+        raise
 
 
 if __name__ == "__main__":

@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "status": "IDLE_POLLING_AND_RECOVERY_PASS_SLOT_REGRESSION_UNACCEPTED",
+  "sourceTree": "c53235b17204f408ccd108a2ffdaecfb604ac3f9",
+  "originalProductionCommit": "a15289bf2eb8a21684f351aaddb2ae94c5143ae0",
+  "scope": "Actual isolated HDD process tests with a concurrent separately bounded full-size source job. Results do not admit absence of a shared bottleneck or accept the150ms throughput profile.",
+  "polling": {
+    "windowSeconds": 2.1,
+    "maximumMarkerGETs": 12,
+    "originalGETs": {
+      "s3": 38,
+      "webdav": 39
+    },
+    "candidateGETs": {
+      "s3": 5,
+      "webdav": 5
+    },
+    "protocols": ["s3", "webdav"],
+    "workerSIGKILLAndSameJournalRestart": true,
+    "immutableWritesOnce": true,
+    "restoredBytesAndAttributes": true,
+    "cancellationRetainsPinAndRetryableState": true,
+    "backgroundPollingAfterJoin": false
+  },
+  "raceProfiles": [
+    {
+      "cpuMax": "50000 100000",
+      "memoryMaxBytes": 805306368,
+      "candidateSlotRotation12s": "FAIL_BOTH_VARIANTS",
+      "originalControlSlotRotation12s": "FAIL_BOTH_VARIANTS",
+      "newIdleChecks": "PASS",
+      "firstRunPeak": "NOT_RECORDED"
+    },
+    {
+      "cpuMax": "100000 100000",
+      "memoryMaxBytes": 805306368,
+      "originalSlotRotation12s": "FAIL_BOTH_VARIANTS",
+      "candidateSlotRotation12s": "FAIL_BOTH_VARIANTS",
+      "candidateDefault40ms": {
+        "s3": "FAIL_REQUIRED_PEAK3_OBSERVED2",
+        "s3DistinctActors": 3,
+        "s3LaterRecovery": "NOT_RUN_AFTER_REQUIRED_ASSERTION",
+        "webdav": "PASS_OLD_NEW_RECOVERY_FALSE_MARKER_CONFIDENTIALITY",
+        "webdavSpeedupNotA150msSample": 1.182345
+      },
+      "memoryPeakBytes": 392081408,
+      "swapOOM": 0,
+      "vet": "PASS"
+    }
+  ],
+  "attribution": "NOT_VERIFIED. Both original and candidate fail the unchanged12s rotation with the known full-size job at0.5/1CPU and with/without race. Both ordinary sources independently pass default40ms three-process recovery. The controls do not prove one CPU, HDD or instrumentation cause.",
+  "pending": [
+    "Slot-rotation/lost-part HDD deadline acceptance on a quiet admitted test profile",
+    "Exact new committed source and required CI including race",
+    "150ms throughput after heavy work ends",
+    "Whole-product acceptance"
+  ],
+  "ordinaryProfile": {
+    "sourceTree": "c53235b17204f408ccd108a2ffdaecfb604ac3f9",
+    "raceEnabled": false,
+    "CGOEnabled": false,
+    "cpuMax": "100000 100000",
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 341102592,
+    "swapOOM": 0,
+    "samples": {
+      "old": {
+        "slotRotation12s": "FAIL_BOTH_VARIANTS",
+        "default40msBothProtocols": "PASS",
+        "protocols": {
+          "s3": {
+            "singleNs": 38211129812,
+            "threeNs": 23252982958,
+            "speedup": 1.643279,
+            "physicalParts": 52
+          },
+          "webdav": {
+            "singleNs": 41968999246,
+            "threeNs": 19756707798,
+            "speedup": 2.124291,
+            "physicalParts": 52
+          }
+        },
+        "threeDistinctConcurrentActors": true,
+        "immutableWritesOnce": true,
+        "oldNewIndependentRestores": true,
+        "falseMarkerRefused": true,
+        "confidentialityChecks": true
+      },
+      "current": {
+        "slotRotation12s": "FAIL_BOTH_VARIANTS",
+        "default40msBothProtocols": "PASS",
+        "protocols": {
+          "s3": {
+            "singleNs": 36810639785,
+            "threeNs": 24551322992,
+            "speedup": 1.499334,
+            "physicalParts": 52
+          },
+          "webdav": {
+            "singleNs": 34908132238,
+            "threeNs": 20211434100,
+            "speedup": 1.727148,
+            "physicalParts": 52
+          }
+        },
+        "threeDistinctConcurrentActors": true,
+        "immutableWritesOnce": true,
+        "oldNewIndependentRestores": true,
+        "falseMarkerRefused": true,
+        "confidentialityChecks": true
+      }
+    },
+    "limits": "Single predeclared ordinary-build comparison; same12s/500ms/40ms assertions, all previous race and ordinary failures retained. Required exact-head CI race checks remain mandatory. These40ms ratios do not accept the150ms throughput profile."
+  },
+  "repeatPolicy": "No further identical deadline/profile retries. Revisit the slot/throughput acceptance after the known full-size job ends or a demonstrated relevant defect is fixed; preserve all samples and original thresholds."
+}

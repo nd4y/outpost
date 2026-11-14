@@ -26,7 +26,7 @@ node scripts/check-format.mjs
 node scripts/check-standard-adoption.mjs
 ```
 
-Tools: Node.js 22+ locally, CI Node.js 24.18.0, Prettier 3.9.10 and checksum-verified Gitleaks 8.30.1. Git, npm, tar and a POSIX hook shell are required. The M0 prototype uses Go 1.27.3: native gofmt, go test and go vet run in the prototype workflow. Its synthetic integration fixture runs without network or private credentials; see the [G1 commands and limits](g1-prototype.md). The production worker is not implemented.
+Tools: Node.js 22+ locally, CI Node.js 24.18.0, Prettier 3.9.10 and checksum-verified Gitleaks 8.30.1. Git, npm, tar and a POSIX hook shell are required. The M0 prototype uses Go 1.27.3: native gofmt, go test and go vet run in the prototype workflow. Its synthetic integration fixture runs without network or private credentials; see the [G1 commands and limits](g1-prototype.md). Worker and management runtime source now have isolated checks; packaged installation and full product acceptance remain open.
 
 Format with `node scripts/check-format.mjs --write`, review the diff and stage only intended files. The pre-commit hook runs `node .standards/check.mjs staged` on index content; it preserves partial staging and chains any prior hook. Do not edit vendored toolkit files to reformat the project.
 
@@ -51,3 +51,5 @@ After initial bootstrap, use branches/PRs; the owner merges. Do not bypass prote
 Record commit/digest, environment, commands, time, results and unverified paths. [requirements.json](../requirements.json) retains 53 requirements and 35 planned scenarios. The [G1 trace](g1-acceptance.md) binds REQ-09/10/11 to actual file-kit checks and measured resource limits. The checker verifies structure; human review verifies bilingual meaning. Runtime tests belong to G1-G3 and M1-M5.
 
 Update the toolkit with a versioned reviewed PR after checking checksums and rejection behavior. To undo local hook installation, restore the previous hooksPath recorded in the local Git directory's repository-standard-hook.json; a previous hook is preserved. Removing public adoption files requires a reviewed PR preserving product checks. Owner infrastructure and build policies remain private.
+
+CI on Linux x64 obtains the same Gitleaks 8.30.1 archive through its official release asset API using [install-ci-scanner.sh](../../scripts/install-ci-scanner.sh). The browser download route can fail independently. The archive length and the checksum pinned by the unchanged toolkit are verified before extracting or executing the scanner. A mismatching archive or existing output fails closed; the workflow never skips scanning. Only the job's read-only built-in token is used for the public API. Local cross-platform installation continues to use the toolkit command above.

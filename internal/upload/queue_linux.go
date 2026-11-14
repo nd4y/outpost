@@ -7,18 +7,23 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
 const QueueFormat = "outpost-upload-queue-1"
+
+// Command retries add a durable effect ledger. Older binaries must reject it;
+// source pin identities deliberately retain the original QueueFormat namespace.
+const CommandQueueFormat = "outpost-upload-queue-2"
 const maxQueueBytes = 32 << 20
 
 var ErrBlocked = errors.New("upload queue contains blocked or expired jobs")
@@ -36,20 +41,26 @@ func (l QueueLimits) valid() bool {
 }
 
 type QueueJob struct {
-	Plan           json.RawMessage `json:"plan"`
-	Phase          string          `json:"phase"`
-	Attempts       uint64          `json:"attempts"`
-	NextMillis     int64           `json:"nextMillis"`
-	ErrorCode      string          `json:"errorCode,omitempty"`
-	Receipt        *Receipt        `json:"receipt,omitempty"`
-	CleanupPending bool            `json:"cleanupPending"`
+	Plan           json.RawMessage   `json:"plan"`
+	Phase          string            `json:"phase"`
+	Attempts       uint64            `json:"attempts"`
+	NextMillis     int64             `json:"nextMillis"`
+	ErrorCode      string            `json:"errorCode,omitempty"`
+	Receipt        *Receipt          `json:"receipt,omitempty"`
+	CleanupPending bool              `json:"cleanupPending"`
+	Abandonment    *queueAbandonment `json:"abandonment,omitempty"`
 }
 type QueueState struct {
-	Format   string              `json:"format"`
-	Identity string              `json:"identity"`
-	Instance string              `json:"instance"`
-	Revision uint64              `json:"revision"`
-	Jobs     map[string]QueueJob `json:"jobs"`
+	Format   string                `json:"format"`
+	Identity string                `json:"identity"`
+	Instance string                `json:"instance"`
+	Revision uint64                `json:"revision"`
+	Jobs     map[string]QueueJob   `json:"jobs"`
+	Retries  map[string]QueueRetry `json:"commandRetries,omitempty"`
+}
+type QueueRetry struct {
+	Operation string `json:"operation"`
+	Plan      string `json:"plan"`
 }
 type Queue struct {
 	root             *os.Root
@@ -58,13 +69,23 @@ type Queue struct {
 	authority        Authority
 	limits           QueueLimits
 	// Fault is a development-test hook; production callers leave it nil.
-	Fault func(string) error
+	Fault              func(string) error
+	Admit              statefile.Admission
+	Readback           ReadbackOptions
+	Guard              func(context.Context) error
+	ObserveHTTPAttempt func(context.Context, HTTPAttempt)
 }
 
 // OpenQueue requires a caller-admitted persistent Linux directory. No credentials
 // or worker private keys are serialized. Authority and resource bounds are pinned.
 func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize bool) (*Queue, error) {
-	if !filepath.IsAbs(dir) || !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
+	return OpenQueueAdmitted(dir, worker, a, limits, initialize, nil)
+}
+func OpenQueueAdmitted(dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
+	return OpenQueueAt(nil, dir, worker, a, limits, initialize, admit)
+}
+func OpenQueueAt(parent *os.Root, dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
+	if !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
 		return nil, ErrDenied
 	}
 	raw, _ := json.Marshal(struct {
@@ -75,11 +96,11 @@ func OpenQueue(dir, worker string, a Authority, limits QueueLimits, initialize b
 	a.Planner = append([]byte(nil), a.Planner...)
 	a.Generation.Writer = append([]byte(nil), a.Generation.Writer...)
 	a.Generation.Maintenance = append([]byte(nil), a.Generation.Maintenance...)
-	r, e := os.OpenRoot(dir)
+	r, e := localfs.Directory(parent, dir, false)
 	if e != nil {
 		return nil, e
 	}
-	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits}
+	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits, Admit: admit}
 	if initialize {
 		f, e := r.Open(".")
 		if e != nil {
@@ -124,8 +145,17 @@ func (q *Queue) load() (QueueState, error) {
 	if e != nil {
 		return s, e
 	}
-	if storage.Decode(raw, &s, maxQueueBytes) != nil || s.Format != QueueFormat || s.Identity != q.identity || !storage.ID(s.Instance) || q.instance != "" && s.Instance != q.instance || s.Jobs == nil || len(s.Jobs) > q.limits.MaxJobs {
+	if storage.Decode(raw, &s, maxQueueBytes) != nil || (s.Format != QueueFormat && s.Format != CommandQueueFormat) || s.Identity != q.identity || !storage.ID(s.Instance) || q.instance != "" && s.Instance != q.instance || s.Jobs == nil || len(s.Jobs) > q.limits.MaxJobs {
 		return s, ErrConflict
+	}
+	if len(s.Retries) > 2048 || (s.Format == CommandQueueFormat) != (len(s.Retries) > 0) {
+		return s, ErrConflict
+	}
+	for token, retry := range s.Retries {
+		j, ok := s.Jobs[retry.Operation]
+		if !storage.ID(token) || !ok || retry.Plan != storage.Hash(j.Plan) {
+			return s, ErrConflict
+		}
 	}
 	for op, j := range s.Jobs {
 		p, e := Verify(j.Plan, q.authority)
@@ -148,9 +178,12 @@ func (q *Queue) load() (QueueState, error) {
 		if j.NextMillis < 0 || j.NextMillis > p.ExpiresUnix*1000 || (j.Phase == "COMPLETE") != (j.Receipt != nil) || j.CleanupPending && j.Phase != "COMPLETE" {
 			return s, ErrDenied
 		}
+		if !q.validAbandonment(s, p, j) {
+			return s, ErrDenied
+		}
 		if j.Receipt != nil {
 			r := j.Receipt
-			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || r.Verification != "full-target-readback" || r.ObservedUnix < 1 {
+			if r.Target != p.Profile.ID() || r.Generation != p.Generation || r.Operation != op || r.Executor != q.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
 				return s, ErrDenied
 			}
 		}
@@ -165,7 +198,7 @@ func (q *Queue) save(s QueueState) error {
 	if len(raw) > maxQueueBytes {
 		return storage.ErrCapacity
 	}
-	return atomicFile(q.root, "queue.json", raw)
+	return statefile.Guard(q.Admit, "queue.json", len(raw), func() error { return atomicFile(q.root, "queue.json", raw) })
 }
 func (q *Queue) edit(ctx context.Context, fn func(*QueueState) error) error {
 	unlock, e := lock(ctx, q.root, "queue.lock")
@@ -268,30 +301,15 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 	if e != nil {
 		return nil, e
 	}
-	// Root-relative opens keep journal access inside the originally opened queue.
-	if e = q.root.Mkdir("jobs", 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return nil, e
-	}
-	info, e := q.root.Lstat("jobs")
-	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, ErrDenied
-	}
 	name := "jobs/" + p.Operation
-	if e = q.root.Mkdir(name, 0700); e != nil && !errors.Is(e, os.ErrExist) {
-		return nil, e
-	}
-	info, e = q.root.Lstat(name)
-	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, ErrDenied
-	}
-	r, e := q.root.OpenRoot(name)
+	r, e := localfs.OpenAt(q.root, name, resumeAdmission)
 	if e != nil {
 		return nil, e
 	}
 	if _, e = regular(r, "state.json", maxJournal); errors.Is(e, os.ErrNotExist) && resumeAdmission && job.Phase == "ADMITTING" {
 		saved, e := regular(r, "plan.json", MaxPlan)
 		if errors.Is(e, os.ErrNotExist) {
-			e = atomicFile(r, "plan.json", job.Plan)
+			e = statefile.Guard(q.Admit, name+"/plan.json", len(job.Plan), func() error { return atomicFile(r, "plan.json", job.Plan) })
 		} else if e == nil && !bytes.Equal(saved, job.Plan) {
 			e = ErrConflict
 		}
@@ -299,19 +317,48 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 			r.Close()
 			return nil, e
 		}
-		initial, _ := json.Marshal(State{Format: Format, Plan: storage.Hash(job.Plan), Worker: q.worker, Phase: "PENDING", Parts: map[string]Progress{}})
-		if e = atomicFile(r, "state.json", initial); e != nil {
+		initial, _ := json.Marshal(State{Format: journalFormat(p), Plan: storage.Hash(job.Plan), Worker: q.worker, Phase: "PENDING", Parts: map[string]Progress{}})
+		if e = statefile.Guard(q.Admit, name+"/state.json", len(initial), func() error { return atomicFile(r, "state.json", initial) }); e != nil {
 			r.Close()
 			return nil, e
 		}
 	}
-	return openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	j, e := openJournalRoot(r, job.Plan, q.worker, q.authority, false)
+	if e == nil {
+		j.Readback = q.Readback
+		j.Guard = q.Guard
+		j.Fault = q.Fault
+	}
+	if e == nil && q.Admit != nil {
+		j.Admit = func(child string, size int) (func(bool) error, error) { return q.Admit(name+"/"+child, size) }
+	}
+	return j, e
 }
 
 // Retry is an explicit local operator action after correcting a blocked cause.
 // It cannot revive expired authority, replace a plan, or release a source pin.
 func (q *Queue) Retry(ctx context.Context, op string) error {
-	return q.edit(ctx, func(s *QueueState) error {
+	return q.retry(ctx, op, "")
+}
+
+// RetryCommand atomically records a one-time retry token with the queued effect.
+// An exact replay only observes the previous effect, even if the job has since
+// run, blocked again, completed or its plan expired. It never requeues that job.
+func (q *Queue) RetryCommand(ctx context.Context, op, token string) error {
+	if !storage.ID(token) {
+		return ErrDenied
+	}
+	return q.retry(ctx, op, token)
+}
+func (q *Queue) retry(ctx context.Context, op, token string) error {
+	replayed := errors.New("retry already recorded")
+	e := q.edit(ctx, func(s *QueueState) error {
+		if old, ok := s.Retries[token]; token != "" && ok {
+			if old.Operation != op {
+				return ErrConflict
+			}
+			return replayed
+		}
 		j, ok := s.Jobs[op]
 		if !ok || j.Phase != "BLOCKED" {
 			return ErrDenied
@@ -324,8 +371,25 @@ func (q *Queue) Retry(ctx context.Context, op string) error {
 		j.NextMillis = max(time.Now().UnixMilli(), p.StartMillis)
 		j.ErrorCode = ""
 		s.Jobs[op] = j
+		if token != "" {
+			if len(s.Retries) >= 2048 {
+				return storage.ErrCapacity
+			}
+			if s.Retries == nil {
+				s.Retries = map[string]QueueRetry{}
+			}
+			s.Retries[token] = QueueRetry{Operation: op, Plan: storage.Hash(j.Plan)}
+			s.Format = CommandQueueFormat
+		}
 		return nil
 	})
+	if errors.Is(e, replayed) {
+		return nil
+	}
+	if e == nil && token != "" {
+		return q.checkpoint("command-retry-durable")
+	}
+	return e
 }
 func (q *Queue) backoff(op string, attempt uint64) time.Duration {
 	delay := int64(q.limits.RetryBaseMillis)
@@ -410,7 +474,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 			p, _ := Verify(j.Plan, q.authority)
 			if r.err == nil {
 				receipt := r.result.Receipt
-				if receipt.Target != p.Profile.ID() || receipt.Generation != p.Generation || receipt.Operation != p.Operation || receipt.Executor != q.worker || receipt.Verification != "full-target-readback" || receipt.ObservedUnix < 1 {
+				if receipt.Target != p.Profile.ID() || receipt.Generation != p.Generation || receipt.Operation != p.Operation || receipt.Executor != q.worker || !validVerification(receipt.Verification) || receipt.ObservedUnix < 1 {
 					return ErrDenied
 				}
 				j.Phase = "COMPLETE"
@@ -528,6 +592,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 			go func(op string, job QueueJob, profile storage.Profile, attempt context.Context, stop context.CancelFunc) {
 				defer stop()
 				r := queueResult{op: op}
+				attempt, observe := q.startHTTPAttempt(attempt, op, job, profile)
 				backendMu.Lock()
 				b := backends[profile.ID()]
 				backendMu.Unlock()
@@ -541,6 +606,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 							fresh.Close()
 						}
 						r.err = err
+						observe(err)
 						results <- r
 						return
 					}
@@ -561,6 +627,7 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 				}
 				r.err = err
 				r.retryAt = b.NextRequest()
+				observe(err)
 				results <- r
 			}(op, j, p.Profile, attempt, stop)
 		}
@@ -586,8 +653,7 @@ func (q *Queue) release(ctx context.Context, source *generation.Replica, op stri
 	if e := source.ReleasePin(ctx, q.pin(op)); e != nil {
 		return e
 	}
-	workerPin := storage.Hash([]byte(Format + "/pin/" + storage.Hash(j.Plan) + "/" + q.worker))
-	if e := source.ReleasePin(ctx, workerPin); e != nil {
+	if e := source.ReleasePin(ctx, workerPin(storage.Hash(j.Plan), q.worker)); e != nil {
 		return e
 	}
 	return q.edit(ctx, func(s *QueueState) error { v := s.Jobs[op]; v.CleanupPending = false; s.Jobs[op] = v; return nil })

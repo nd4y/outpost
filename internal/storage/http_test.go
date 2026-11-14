@@ -35,6 +35,72 @@ func backend(t *testing.T, s *teststore.Server) *Backend {
 	t.Cleanup(b.Close)
 	return b
 }
+
+func TestRequestGateSharesPacingAndCooldownAcrossBackends(t *testing.T) {
+	s := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: Hash([]byte("shared-gate")), Before: func(w http.ResponseWriter, r *http.Request, actor, key string, body []byte) bool {
+		if key != "throttle" {
+			return false
+		}
+		w.Header().Set("Retry-After", "5")
+		w.WriteHeader(http.StatusTooManyRequests)
+		return true
+	}})
+	p := profile(s)
+	p.Attempts = 1
+	p.RequestsPerSecond = 2
+	gate, err := NewRequestGate(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := func(p Profile, s *teststore.Server) *Backend {
+		t.Helper()
+		b, err := New(p, Credentials{Access: "test-worker", Secret: "ephemeral-test-secret", ExpiresUnix: time.Now().Add(time.Minute).Unix()}, s.Roots)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(b.Close)
+		return b
+	}
+	first, err := client(p, s).WithRequestGate(gate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := client(p, s).WithRequestGate(gate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertWait := func() {
+		t.Helper()
+		before := s.Snapshot().Requests
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+		defer cancel()
+		if _, err := second.Get(ctx, "missing"); !errors.Is(err, context.DeadlineExceeded) || s.Snapshot().Requests != before {
+			t.Fatal("waiting client used the target", err)
+		}
+	}
+	ctx := context.Background()
+	if _, err = first.Get(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	assertWait()
+	if _, err = first.Get(ctx, "throttle"); !errors.Is(err, ErrUnavailable) {
+		t.Fatal(err)
+	}
+	if until := second.NextRequest(); until != first.NextRequest() || time.Until(until) < 3*time.Second {
+		t.Fatal("backend lost shared cooldown", until)
+	}
+	assertWait()
+
+	other := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: Hash([]byte("other-gate"))})
+	independent := client(profile(other), other)
+	if _, err = independent.WithRequestGate(gate); !errors.Is(err, ErrDenied) {
+		t.Fatal("gate bound a different profile", err)
+	}
+	if _, err = independent.Get(ctx, "missing"); !errors.Is(err, ErrNotFound) || other.Snapshot().Requests != 1 {
+		t.Fatal("independent target stalled", err)
+	}
+}
+
 func TestProtocolMultipartAndImmutableReadback(t *testing.T) {
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
@@ -90,6 +156,74 @@ func TestProtocolMultipartAndImmutableReadback(t *testing.T) {
 			requests := s.Snapshot().Requests
 			if e = b.Put(ctx, "too-large", make([]byte, b.profile.MaxObjectBytes+1)); !errors.Is(e, ErrCapacity) || s.Snapshot().Requests != requests {
 				t.Fatal("local size admission failed", e)
+			}
+		})
+	}
+}
+
+func TestProtocolProbeStaysBoundedAcrossRestartsConcurrentWorkersAndLostReply(t *testing.T) {
+	for _, kind := range []string{"s3", "webdav"} {
+		t.Run(kind, func(t *testing.T) {
+			var lost atomic.Bool
+			s := teststore.New(t, teststore.Options{
+				Kind: kind, Namespace: Hash([]byte("bounded-probe-" + kind)),
+				AfterWrite: func(w http.ResponseWriter, r *http.Request, actor, key string, body []byte) bool {
+					if strings.HasPrefix(key, "probe-") && lost.CompareAndSwap(false, true) {
+						conn, _, e := w.(http.Hijacker).Hijack()
+						if e == nil {
+							conn.Close()
+						}
+						return true
+					}
+					return false
+				},
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			for range 4 {
+				b := backend(t, s)
+				if e := b.Probe(ctx); e != nil {
+					t.Fatal(e)
+				}
+				b.Close()
+			}
+			result := make(chan error, 3)
+			for range 3 {
+				b := backend(t, s)
+				go func() { result <- b.Probe(ctx) }()
+			}
+			for range 3 {
+				if e := <-result; e != nil {
+					t.Fatal(e)
+				}
+			}
+			snapshot := s.Snapshot()
+			if !lost.Load() || len(snapshot.Writes) != 2 {
+				t.Fatal("probe retry accumulated objects", snapshot.Writes)
+			}
+			probe := ""
+			for key, count := range snapshot.Writes {
+				if count != 1 {
+					t.Fatal("diagnostic object overwritten", key, count)
+				}
+				if strings.HasPrefix(key, "probe-") {
+					probe = key
+				}
+			}
+			if probe == "" || snapshot.Writes["layout"] != 1 {
+				t.Fatal(snapshot.Writes)
+			}
+			// Corruption is preserved and refused; the probe is not silently reset.
+			bad := bytes.Repeat([]byte{0x7f}, 32)
+			if e := os.WriteFile(s.Path(probe), bad, 0600); e != nil {
+				t.Fatal(e)
+			}
+			if e := backend(t, s).Probe(ctx); !errors.Is(e, ErrConflict) {
+				t.Fatal("changed probe accepted", e)
+			}
+			got, e := os.ReadFile(s.Path(probe))
+			if e != nil || !bytes.Equal(got, bad) || len(s.Snapshot().Writes) != 2 {
+				t.Fatal("probe corruption overwritten", e)
 			}
 		})
 	}

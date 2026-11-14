@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "status": "BOUNDED_CATALOG_PUBLICATION_FIXED_48_ORDINARY_RACE_AND_128MIB_CLEAN_CONSUMERS_PASS_FULL100GIB_PENDING",
+  "observedAt": "2026-11-14T19:00:22.398607+00:00",
+  "sourceBaseCommit": "271a3133ae4c06836602e4c089d63b2fb3791edf",
+  "rehearsalTestTree": "216408366493caa4080209c87a066c2f53975169",
+  "testTreeIsUncommittedSnapshot": true,
+  "productionBinding": "All committed candidate non-test Go inputs under cmd/internal equal the frozen successful rehearsal tree. The public scale harness subsequently reuses the existing retryablePublication classifier instead of direct errors.Is checks, preserving fail-closed handling of joined errors; the successful no-error transfer path is unchanged. No heavy result is attributed to a different test binary.",
+  "changedProductionFile": "internal/ingress/http_linux.go",
+  "changedProductionFileSHA256": "2b0512f7b1e90e7754b23dedc79ac4cffae24403935be7d1eaace755ebc875ed",
+  "limit": {
+    "priorBatchBytes": 268435456,
+    "batchBytes": 8388608,
+    "maximumObjects": 256,
+    "stagingWorkerObjectLimit": 1,
+    "productionSourceRPCSeconds": 30,
+    "finalClosureReadback": "unchanged"
+  },
+  "originalFullFailure": {
+    "runtimeTree": "e121dac2e0c4bb1795508299f678080faa243c4c",
+    "sourceBytes": 107374182400,
+    "initialObjectBodyBytes": 107395477507,
+    "otherPutBodyBytes": 1310862,
+    "catalogBytes": 1309916,
+    "durationSeconds": 36078.6,
+    "error": "catalog PUT: context deadline exceeded while awaiting headers",
+    "batchMetadata": {
+      "catalogBytes": 1309916,
+      "referenceCount": 14548,
+      "oldBatchSelectedObjects": 35,
+      "oldBatchSelectedBytes": 263980668,
+      "durableObjects": 35,
+      "durableBytes": 263980668,
+      "allDurableWithinSelected": true,
+      "selectedNotYetDurable": 0,
+      "verificationCheckpointCount": 0
+    },
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 807374848,
+    "memoryMaxEvents": 553011,
+    "swapBytes": 0,
+    "oom": 0,
+    "complete": false
+  },
+  "ordinaryCausalControl": {
+    "redSourceTree": "4ed90f1721e151bb1ce031db0fe5183049e7adf0",
+    "redStatus": "FAIL_WITH_PREVIOUS_DEFAULT",
+    "fixedSourceTree": "5e674e8c871c411dc63e51a0be6e2d8a72d10977",
+    "fixedStatus": "PASS",
+    "sourceBytesPerCase": 25165824,
+    "requestSeconds": 5,
+    "controlledDurabilityMiBPerSecond": 3,
+    "fixedSeconds": 35.1,
+    "regressionTopLevelPass": 48,
+    "regressionMemoryPeakBytes": 270450688,
+    "regressionMemoryMaxBytes": 805306368,
+    "swapBytes": 0,
+    "oom": 0
+  },
+  "raceControl": {
+    "sourceTree": "216408366493caa4080209c87a066c2f53975169",
+    "testFile": "internal/ingress/catalog_deadline_linux_test.go",
+    "testFileSHA256": "70f24b7f341ecf1d7b01f2546fa15ea199ccf969d14f79bae07cc6202409bb4e",
+    "status": "PASS",
+    "seconds": 143.79,
+    "requestSeconds": 5,
+    "injection": "Actual HTTP request stalls after materializing more than one8MiB upload, until actual request cancellation; both old/default arms then reopen and restore the exact original24MiB signed closure. No sleep or fault added to production."
+  },
+  "preservedFailedRaceControl": {
+    "sourceTree": "bcad364fb743542ea80128b61ef6abf8ddf9db34",
+    "status": "FAIL",
+    "seconds": 117.63,
+    "scope": "Proportional-delay old control passed; new default also exceeded the test-only5s deadline under race. Replaced the throughput-sensitive artificial delay with an explicit cancellation-bound stall. No production deadline or payload bound changed."
+  },
+  "rehearsal": {
+    "sourceBytes": 134217728,
+    "seconds": 184.99,
+    "captures": {
+      "base": {
+        "generation": "27f5446037530a02c6a5c0714b0a50bac116743f7e3a784184efe94d2b30374b",
+        "PayloadBytes": 134245379,
+        "MetadataBytes": 3790,
+        "SourceAllocatedBytes": 53248,
+        "FilePayloadBytes": 134220640,
+        "DescriptorBytes": 24739,
+        "Seconds": 75.359819787,
+        "milestones": {
+          "snapshotUnix": 1794682059,
+          "providerReleaseUnix": 1794682132,
+          "firstReplicaVerifiedUnix": 1794682129,
+          "replicas": [
+            {
+              "target": "7222b05c22086626efead41ec27fd725b30abe2640934a086546bb6e27e11f23",
+              "verifiedUnix": 1794682129
+            }
+          ]
+        }
+      },
+      "patched": {
+        "generation": "686a71a6c733f857708a21b867dafadcfcfa82a13c45f45dc157fa327f2041f5",
+        "PayloadBytes": 12885739,
+        "MetadataBytes": 4006,
+        "SourceAllocatedBytes": 90112,
+        "FilePayloadBytes": 12860086,
+        "DescriptorBytes": 25653,
+        "Seconds": 34.854008494,
+        "milestones": {
+          "snapshotUnix": 1794682135,
+          "providerReleaseUnix": 1794682165,
+          "firstReplicaVerifiedUnix": 1794682161,
+          "replicas": [
+            {
+              "target": "7222b05c22086626efead41ec27fd725b30abe2640934a086546bb6e27e11f23",
+              "verifiedUnix": 1794682161
+            }
+          ]
+        }
+      },
+      "unchanged": {
+        "generation": "d37eaeff4148a365ffcd88b68decfc63c58e36d4e8bed56036b2ddd61f9a6c8d",
+        "PayloadBytes": 458,
+        "MetadataBytes": 3999,
+        "SourceAllocatedBytes": 122880,
+        "FilePayloadBytes": 0,
+        "DescriptorBytes": 458,
+        "Seconds": 28.517015512,
+        "milestones": {
+          "snapshotUnix": 1794682170,
+          "providerReleaseUnix": 1794682195,
+          "firstReplicaVerifiedUnix": 1794682191,
+          "replicas": [
+            {
+              "target": "7222b05c22086626efead41ec27fd725b30abe2640934a086546bb6e27e11f23",
+              "verifiedUnix": 1794682191
+            }
+          ]
+        }
+      }
+    },
+    "sourceBudgetBytes": 2147483648,
+    "replacementBytes": 8388608,
+    "changedBodyLimitBytes": 134217728,
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 552681472,
+    "swapBytes": 0,
+    "oom": 0,
+    "originalPlaintextRuntimeOperationalKeysAndPrivateFixtureContextRemoved": true,
+    "readerRevision": "dev-56ac8edf10f8dc176c34d61088db5e935798a1227bac5093b63ec73b02dce801"
+  },
+  "cleanConsumers": {
+    "status": "PASS_128MIB_MOUNT_REHEARSAL_ONLY",
+    "producerSourceTree": "216408366493caa4080209c87a066c2f53975169",
+    "readerCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "readerSHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+    "generations": {
+      "base": "27f5446037530a02c6a5c0714b0a50bac116743f7e3a784184efe94d2b30374b",
+      "patched": "686a71a6c733f857708a21b867dafadcfcfa82a13c45f45dc157fa327f2041f5"
+    },
+    "sourceBytes": 134217728,
+    "immutableFiles": 27,
+    "immutableBytes": 147138608,
+    "immutableAllocatedBytes": 147193856,
+    "storageScope": "Two fresh networkless consumer processes restore full materialized versions. A new read-only directory contains hardlinks only to the immutable ciphertext catalogs/objects and has no mutable holder index/runtime. A separate read-only owner directory holds only the recovery owner file and public trust. Hardlinks share physical ciphertext inodes; this proves independent process recovery, not another physical copy/failure domain or three stored replicas.",
+    "checks": {
+      "base": {
+        "restore": {
+          "seconds": 16.926330893998966,
+          "logSHA256": "fcc6baaa8eb351c09298046f82a7b1642011573a11e0b172ac03657e43e462c4",
+          "memoryPeakBytes": 174231552,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0
+        },
+        "oracle": {
+          "seconds": 7.413165791949723,
+          "logSHA256": "710f756e74a24d8f2e7d01bd040dd6ca291840dcf3a7a46b565e8bf223a993b4",
+          "memoryPeakBytes": 14528512,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "oracle": {
+            "allocatedBytes": 134221824,
+            "attributesVerified": true,
+            "bytesProcessed": 134217728,
+            "compressionRatio": 0,
+            "elapsedSeconds": 3.9701883220000003,
+            "fileBytes": 134217728,
+            "maxRSSKiB": 15472,
+            "operation": "verify",
+            "phase": "base",
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025"
+          }
+        }
+      },
+      "patched": {
+        "restore": {
+          "seconds": 17.188024334958754,
+          "logSHA256": "c58bc6f6dddf9e35dde32423c6195faf0e9b3f464a656db787f520d3efcfe298",
+          "memoryPeakBytes": 173604864,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0
+        },
+        "oracle": {
+          "seconds": 6.740142866969109,
+          "logSHA256": "81a464c7ec9cc7c6c6bd2fb768d325948440b8a303d3cce8fcb9af5147fc231d",
+          "memoryPeakBytes": 15314944,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "oracle": {
+            "allocatedBytes": 134221824,
+            "attributesVerified": true,
+            "bytesProcessed": 134217728,
+            "compressionRatio": 0,
+            "elapsedSeconds": 4.032782376,
+            "fileBytes": 134217728,
+            "maxRSSKiB": 13396,
+            "operation": "verify",
+            "phase": "patched",
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c"
+          }
+        }
+      }
+    },
+    "observedAt": "2026-11-14T18:58:36.698055+00:00"
+  },
+  "pending": [
+    "physical100GiB corrected source and fresh independent consumers",
+    "asymmetric multi-holder timing",
+    "consistent1.5x external upload speedup and12s slot regression",
+    "physical host/controller power loss and actual target unlock",
+    "owner infrastructure admission"
+  ],
+  "fullProductAcceptance": "NOT_VERIFIED"
+}

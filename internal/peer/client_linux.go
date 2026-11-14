@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,8 +27,10 @@ type Client struct {
 	trust       generation.Trust
 	limits      Limits
 	certificate *x509.Certificate
+	repair      string
 }
 type Result struct {
+	CachedObjects  int      `json:"cachedObjects,omitempty"`
 	Receipt        Receipt  `json:"receipt"`
 	TargetReceipt  *Receipt `json:"targetReceipt,omitempty"`
 	Counters       Counters `json:"counters"`
@@ -51,13 +54,16 @@ func NewClient(endpoint, target string, cert tls.Certificate, roots *x509.CertPo
 	}
 	trust.Writer = append([]byte(nil), trust.Writer...)
 	trust.Maintenance = append([]byte(nil), trust.Maintenance...)
-	return &Client{client, u, target, clonePolicy(policy), journal, trust, limits, leaf}, nil
+	return &Client{http: client, endpoint: u, peer: target, policy: clonePolicy(policy), journal: journal, trust: trust, limits: limits, certificate: leaf}, nil
 }
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) binding(op, id, kind string) Binding {
-	return Binding{op, kind, c.policy.Domain, c.policy.Repository, c.policy.Epoch, id, c.peer, c.policy.Self, id}
+	return Binding{op, kind, c.policy.Domain, c.policy.Repository, c.policy.Epoch, id, c.peer, c.policy.Self, id, c.repair}
 }
 func (c *Client) authorized(push bool) error {
+	if c.repair != "" && (!validID(c.repair) || !c.policy.Peers[c.peer].Repair) {
+		return ErrDenied
+	}
 	if !certCurrent(c.certificate, time.Now()) {
 		return ErrDenied
 	}
@@ -73,6 +79,7 @@ func (c *Client) authorized(push bool) error {
 type response struct {
 	data   []byte
 	header http.Header
+	status int
 }
 
 func (c *Client) request(ctx context.Context, op, id, mode, method, resource string, payload []byte, max int, submitted *atomic.Int64) (response, error) {
@@ -96,7 +103,20 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			return result, ErrProtocol
 		}
 		req.Header.Set("Outpost-Operation", op)
+		if c.policy.RequiredRevision != 0 {
+			req.Header.Set("Outpost-Required-Revision", strconv.FormatUint(c.policy.RequiredRevision, 10))
+		}
 		req.Header.Set("Outpost-Mode", mode)
+		if c.repair != "" {
+			req.Header.Set("Outpost-Repair", c.repair)
+		}
+		window := mode == "push" && method == http.MethodPost && (resource == "missing" || resource == "complete")
+		if window {
+			req.Header.Set(windowHeader, "1")
+		}
+		if mode == "push" && method == http.MethodPut && resource == "catalog" && c.policy.Peers[c.peer].History {
+			req.Header.Set("Outpost-History", "1")
+		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Accept-Encoding", "identity")
 		if submitted != nil {
@@ -110,7 +130,7 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 				cancel()
 				return result, ErrDenied
 			}
-			if res.StatusCode == http.StatusOK {
+			if res.StatusCode == http.StatusOK || window && resource == "complete" && res.StatusCode == http.StatusAccepted {
 				if res.ContentLength > int64(max) || res.Header.Get("Content-Encoding") != "" {
 					res.Body.Close()
 					cancel()
@@ -120,7 +140,7 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 				res.Body.Close()
 				cancel()
 				if readErr == nil && len(b) <= max {
-					return response{b, res.Header.Clone()}, nil
+					return response{b, res.Header.Clone(), res.StatusCode}, nil
 				}
 				if len(b) > max {
 					return result, ErrProtocol
@@ -136,6 +156,10 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 					return result, ErrDenied
 				case http.StatusConflict:
 					return result, ErrConflict
+				case http.StatusPreconditionFailed:
+					return result, generation.ErrIncomplete
+				case http.StatusInsufficientStorage:
+					return result, ErrCapacity
 				default:
 					return result, ErrProtocol
 				}
@@ -209,6 +233,28 @@ func (c *Client) Pull(ctx context.Context, operation, id string, target *generat
 	return c.transfer(ctx, operation, id, target, false)
 }
 
+func (c *Client) RepairPush(ctx context.Context, operation, id, token string, source *generation.Replica) (Result, error) {
+	if !validID(token) {
+		return Result{}, ErrDenied
+	}
+	copy := *c
+	copy.repair = token
+	copy.policy = clonePolicy(c.policy)
+	copy.policy.ReadbackMaxAgeSeconds = 0
+	return copy.transfer(ctx, operation, id, source, true)
+}
+func (c *Client) RepairPull(ctx context.Context, operation, id, token string, target *generation.Replica) (Result, error) {
+	if !validID(token) || target == nil {
+		return Result{}, ErrDenied
+	}
+	if e := target.CheckRepair(ctx, id, token); e != nil {
+		return Result{}, e
+	}
+	copy := *c
+	copy.repair = token
+	return copy.transfer(ctx, operation, id, target, false)
+}
+
 func (c *Client) transfer(ctx context.Context, operation, id string, local *generation.Replica, push bool) (result Result, err error) {
 	if !validID(operation) || !validID(id) || local == nil {
 		return result, ErrDenied
@@ -275,7 +321,15 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if _, err = generation.VerifyCatalog(raw, c.trust); err != nil {
 			return result, err
 		}
-		if _, err = local.Begin(ctx, raw); err != nil {
+		if c.repair != "" {
+			err = local.RepairCatalogFor(ctx, id, c.repair, raw)
+		} else {
+			_, err = local.Begin(ctx, raw)
+			if errors.Is(err, generation.ErrRollback) && c.policy.Peers[c.peer].History {
+				_, err = local.BeginHistorical(ctx, raw)
+			}
+		}
+		if err != nil {
 			return result, err
 		}
 	}
@@ -331,13 +385,19 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if err = c.journal.Update(ctx, binding, "VERIFYING", nil, counters()); err != nil {
 			return result, err
 		}
-		r, e = c.request(ctx, operation, id, kind, http.MethodPost, "complete", nil, 4096, nil)
+		receipt, e := c.completeRemote(ctx, binding, len(refs))
+		for repaired := 0; c.repair != "" && errors.Is(e, generation.ErrIncomplete) && repaired < len(refs); repaired++ {
+			count, err := c.sendRepairMissing(ctx, binding, local, refs, &submitted)
+			if err != nil {
+				return result, err
+			}
+			if count == 0 {
+				return result, e
+			}
+			receipt, e = c.completeRemote(ctx, binding, len(refs))
+		}
 		if e != nil {
 			return result, e
-		}
-		var receipt Receipt
-		if e = decode(r.data, &receipt, 4096); e != nil || !validReceipt(receipt, binding) || receipt.Verification != "target-full-read" || receipt.ObservedUnix > time.Now().Add(5*time.Minute).Unix() {
-			return result, ErrProtocol
 		}
 		result.TargetReceipt = &receipt
 		// A successful status/receipt alone is insufficient. Read back the signed
@@ -350,19 +410,22 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			return result, ErrProtocol
 		}
 		readback.Add(int64(len(r.data)))
-		err = parallel(ctx, refs, c.limits.Concurrency, func(ctx context.Context, ref generation.Object) error {
-			b, e := c.getObject(ctx, operation, id, kind, ref)
-			if e == nil {
-				readback.Add(int64(len(b)))
-			}
-			return e
-		})
+		var oldest int64
+		result.CachedObjects, oldest, err = c.auditObjects(ctx, operation, id, refs, &readback)
 		if err != nil {
 			return result, err
 		}
 		result.Receipt = Receipt{Format, c.peer, id, id, operation, "client-full-readback", time.Now().Unix()}
+		if result.CachedObjects > 0 {
+			result.Receipt.Format = CachedReceiptFormat
+			result.Receipt.Verification = "client-cached-readback"
+			result.Receipt.ObservedUnix = oldest
+		}
 	} else {
-		missing, e := local.Missing(ctx, id)
+		missing, e := local.MissingMetadata(ctx, id)
+		if c.repair != "" {
+			missing, e = local.RepairMissing(ctx, id)
+		}
 		if e != nil {
 			return result, e
 		}
@@ -372,6 +435,9 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 				return e
 			}
 			received.Add(int64(len(b)))
+			if c.repair != "" {
+				return local.RepairPutFor(ctx, id, ref.ID, c.repair, b)
+			}
 			return local.Put(ctx, id, ref.ID, b)
 		})
 		if err != nil {
@@ -380,10 +446,10 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		if err = c.journal.Update(ctx, binding, "VERIFYING", nil, counters()); err != nil {
 			return result, err
 		}
-		if err = local.Complete(ctx, id); err != nil {
+		result.Receipt, err = c.completeLocal(ctx, binding, local, len(refs), &received)
+		if err != nil {
 			return result, err
 		}
-		result.Receipt = Receipt{Format, c.policy.Self, id, id, operation, "local-full-read", time.Now().Unix()}
 	}
 	if err = c.journal.Update(ctx, binding, "COMPLETE", &result.Receipt, counters()); err != nil {
 		return result, err

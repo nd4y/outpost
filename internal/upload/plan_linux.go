@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -18,6 +20,7 @@ import (
 const Format = "outpost-external-plan-1"
 const MaxPlan = 16 << 20
 const MaxTasks = 32768
+const MaxWorkerWeight = 4
 
 var ErrDenied = errors.New("upload plan or worker denied")
 var ErrConflict = errors.New("upload journal binding conflict")
@@ -26,6 +29,7 @@ type Worker struct {
 	ID        string            `json:"id"`
 	Class     string            `json:"class"`
 	PublicKey ed25519.PublicKey `json:"publicKey"`
+	Weight    int               `json:"weight,omitempty"`
 }
 
 func Identity(key ed25519.PublicKey) string {
@@ -52,6 +56,8 @@ type Plan struct {
 	SlotMillis     int64           `json:"slotMillis"`
 	Catalog        json.RawMessage `json:"catalog"`
 	Blobs          []storage.Blob  `json:"blobs"`
+	Delegation     json.RawMessage `json:"delegation,omitempty"`
+	MissingRepair  *MissingRepair  `json:"missingRepair,omitempty"`
 	Signature      []byte          `json:"signature,omitempty"`
 }
 type Authority struct {
@@ -68,7 +74,10 @@ func (p Plan) policy() error {
 	if p.ExpiresUnix > (int64(^uint64(0)>>1)-300000)/1000 {
 		return ErrDenied
 	}
-	if p.Format != Format || !storage.ID(p.Operation) || !p.AllowExternal || p.Profile.Validate() != nil || len(p.Workers) < 1 || len(p.Workers) > 32 || len(p.AllowedClasses) < 1 || len(p.AllowedClasses) > 2 || p.StartMillis < 1 || p.ExpiresUnix <= p.StartMillis/1000 || p.SlotMillis < 500 || p.SlotMillis > 300000 {
+	if (p.Format != Format && p.Format != DerivedFormat) || p.Format == Format && len(p.Delegation) > 0 || p.Format == DerivedFormat && (len(p.Delegation) == 0 || len(p.Signature) > 0) || !storage.ID(p.Operation) || !p.AllowExternal || p.Profile.Validate() != nil || len(p.Workers) < 1 || len(p.Workers) > 32 || len(p.AllowedClasses) < 1 || len(p.AllowedClasses) > 2 || p.StartMillis < 1 || p.ExpiresUnix <= p.StartMillis/1000 || p.SlotMillis < 500 || p.SlotMillis > 300000 {
+		return ErrDenied
+	}
+	if p.MissingRepair != nil && (p.Format != DerivedFormat || !p.MissingRepair.Valid(p.StartMillis/1000, p.ExpiresUnix)) {
 		return ErrDenied
 	}
 	allowed := map[string]bool{}
@@ -80,7 +89,8 @@ func (p Plan) policy() error {
 	}
 	seen := map[string]bool{}
 	for _, w := range p.Workers {
-		if !storage.ID(w.ID) || Identity(w.PublicKey) != w.ID || seen[w.ID] || !allowed[w.Class] || w.Class == "untrusted" && p.Profile.CredentialScope != "namespace" {
+		if !storage.ID(w.ID) || Identity(w.PublicKey) != w.ID || seen[w.ID] || !allowed[w.Class] ||
+			w.Weight < 0 || w.Weight > MaxWorkerWeight || w.Class == "untrusted" && p.Profile.CredentialScope != "namespace" {
 			return ErrDenied
 		}
 		seen[w.ID] = true
@@ -128,41 +138,68 @@ func (p Plan) validate(a Authority) error {
 			return ErrDenied
 		}
 	}
-	_, e = p.Tasks()
-	return e
+	tasks, e := p.Tasks()
+	if e != nil || p.MissingRepair == nil {
+		return e
+	}
+	for _, task := range tasks {
+		if task.Part.ID == p.MissingRepair.Part {
+			return nil
+		}
+	}
+	return ErrDenied
 }
 func Build(ctx context.Context, source *generation.Replica, id string, p Plan, planner ed25519.PrivateKey) ([]byte, error) {
 	// Policy is checked before reading or describing source payloads.
-	if source == nil || p.policy() != nil || len(planner) != ed25519.PrivateKeySize {
+	if source == nil || !buildAllowed(source.Trust(), p, planner) {
 		return nil, ErrDenied
 	}
-	if p.Profile.Namespace != storage.Hash([]byte(source.Trust().Domain+"/"+source.Trust().Repository)) {
-		return nil, ErrDenied
-	}
-	p.Generation = id
-	p.Signature = nil
 	raw, e := source.Catalog(ctx, id)
 	if e != nil {
 		return nil, e
 	}
+	return buildCatalogPlan(ctx, source.Trust(), id, raw, p, planner, func(ctx context.Context, ref generation.Object) ([]byte, error) {
+		return source.ReadObject(ctx, id, ref)
+	})
+}
+
+// BuildFromCatalog signs a selected materialized catalog without opening a
+// mutable replica index. A plan is not evidence that a worker holds its closure.
+func BuildFromCatalog(ctx context.Context, trust generation.Trust, id string, raw []byte, p Plan, planner ed25519.PrivateKey, fetch func(context.Context, generation.Object) ([]byte, error)) ([]byte, error) {
+	if !buildAllowed(trust, p, planner) || fetch == nil {
+		return nil, ErrDenied
+	}
+	return buildCatalogPlan(ctx, trust, id, raw, p, planner, fetch)
+}
+
+func buildAllowed(trust generation.Trust, p Plan, planner ed25519.PrivateKey) bool {
+	return p.Format == Format && p.policy() == nil && len(planner) == ed25519.PrivateKeySize &&
+		p.Profile.Namespace == storage.Hash([]byte(trust.Domain+"/"+trust.Repository))
+}
+
+func buildCatalogPlan(ctx context.Context, trust generation.Trust, id string, raw []byte, p Plan, planner ed25519.PrivateKey, fetch func(context.Context, generation.Object) ([]byte, error)) ([]byte, error) {
+	if !storage.ID(id) || storage.Hash(raw) != id {
+		return nil, ErrDenied
+	}
+	p.Generation = id
+	p.Signature = nil
 	p.Catalog = raw
-	refs, e := generation.Dependencies(raw, source.Trust())
+	refs, e := generation.Dependencies(raw, trust)
 	if e != nil {
+		return nil, e
+	}
+	if e = preflightPlan(p, refs); e != nil {
 		return nil, e
 	}
 	p.Blobs = make([]storage.Blob, 0, len(refs))
 	for _, ref := range refs {
-		data, e := source.ReadObject(ctx, id, ref)
-		if e != nil {
-			return nil, e
-		}
-		blob, e := storage.Describe(ref, data, p.Profile.MaxObjectBytes)
+		blob, e := describeObject(ctx, ref, p.Profile.MaxObjectBytes, fetch)
 		if e != nil {
 			return nil, e
 		}
 		p.Blobs = append(p.Blobs, blob)
 	}
-	a := Authority{source.Trust(), planner.Public().(ed25519.PublicKey)}
+	a := Authority{trust, planner.Public().(ed25519.PublicKey)}
 	if e = p.validate(a); e != nil {
 		return nil, e
 	}
@@ -173,9 +210,38 @@ func Build(ctx context.Context, source *generation.Replica, id string, p Plan, p
 	p.Signature = ed25519.Sign(planner, append([]byte(Format+"\x00"), unsigned...))
 	return json.Marshal(p)
 }
+
+// An unsplit immutable object already has its exact digest and length in the
+// authenticated catalog. Planning is not a fresh source integrity observation.
+// Multipart maps still require actual bytes to determine each part digest.
+func describeReference(ctx context.Context, source *generation.Replica, id string, ref generation.Object, limit int) (storage.Blob, error) {
+	return describeObject(ctx, ref, limit, func(ctx context.Context, ref generation.Object) ([]byte, error) {
+		return source.ReadObject(ctx, id, ref)
+	})
+}
+
+func describeObject(ctx context.Context, ref generation.Object, limit int, fetch func(context.Context, generation.Object) ([]byte, error)) (storage.Blob, error) {
+	if e := ctx.Err(); e != nil {
+		return storage.Blob{}, e
+	}
+	if ref.Bytes <= limit {
+		return storage.Blob{Format: storage.BlobFormat, Object: ref, Parts: []generation.Object{ref}}, nil
+	}
+	data, e := fetch(ctx, ref)
+	if e != nil {
+		return storage.Blob{}, e
+	}
+	return storage.Describe(ref, data, limit)
+}
 func Verify(raw []byte, a Authority) (Plan, error) {
 	var p Plan
-	if storage.Decode(raw, &p, MaxPlan) != nil || len(a.Planner) != ed25519.PublicKeySize || len(p.Signature) != ed25519.SignatureSize {
+	if storage.Decode(raw, &p, MaxPlan) != nil || len(a.Planner) != ed25519.PublicKeySize {
+		return p, ErrDenied
+	}
+	if p.Format == DerivedFormat {
+		return p, verifyDerived(raw, p, a)
+	}
+	if len(p.Signature) != ed25519.SignatureSize {
 		return p, ErrDenied
 	}
 	signature := append([]byte(nil), p.Signature...)
@@ -206,11 +272,40 @@ func (p Plan) round(now time.Time) (int64, time.Time) {
 	return round, time.UnixMilli(p.StartMillis + (round+1)*p.SlotMillis)
 }
 func (p Plan) owner(object string, round int64) string {
-	workers := append([]Worker(nil), p.Workers...)
+	type rankedWorker struct {
+		id, rank string
+		weight   int
+	}
+	workers := make([]rankedWorker, 0, len(p.Workers))
+	maxWeight, total := 1, 0
+	for _, w := range p.Workers {
+		weight := max(1, w.Weight)
+		workers = append(workers, rankedWorker{w.ID, storage.Hash([]byte(p.Operation + "/" + object + "/" + w.ID)), weight})
+		maxWeight = max(maxWeight, weight)
+		total += weight
+	}
 	sort.Slice(workers, func(i, j int) bool {
-		return storage.Hash([]byte(p.Operation+"/"+object+"/"+workers[i].ID)) > storage.Hash([]byte(p.Operation+"/"+object+"/"+workers[j].ID))
+		return workers[i].rank > workers[j].rank
 	})
-	return workers[int(round%int64(len(workers)))].ID
+	if maxWeight == 1 || object == "publication" {
+		return workers[int(round%int64(len(workers)))].id
+	}
+	// Each part enters the same bounded weighted cycle at its own offset.
+	// Interleaving tiers gives all workers a slot even when a heavier worker fails.
+	digest := sha256.Sum256([]byte(p.Operation + "/weight/" + object))
+	period := uint64(total)
+	slot := (binary.BigEndian.Uint64(digest[:8])%period + uint64(round)%period) % period
+	for tier := 1; tier <= maxWeight; tier++ {
+		for _, w := range workers {
+			if w.weight >= tier {
+				if slot == 0 {
+					return w.id
+				}
+				slot--
+			}
+		}
+	}
+	return "" // unreachable for a valid, nonempty worker set
 }
 func sameTrust(a, b generation.Trust) bool {
 	left, _ := json.Marshal(a)

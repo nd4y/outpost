@@ -2,7 +2,7 @@
 
 [Русский](../ru/generation-replicas.md)
 
-The G2 candidate in `internal/generation` adds signed generation catalogs, keyless local receivers, durable reception progress and protected cleanup to the [file-kit format](file-kit-format.md). This is a library and executable test fixture, not a peer service. Full G1/G2/G3 acceptance and heavy scale/endurance tests remain deferred. The implementation does not start or migrate a working service.
+The G2 candidate in `internal/generation` adds signed generation catalogs, keyless local receivers, durable reception progress and protected cleanup to the [file-kit format](file-kit-format.md). This is a library and executable test fixture, not a peer service. The recorded standalone G1 scale and bounded G2 history/epoch checks have separate receipts; full distributed G2/G3, endurance and product acceptance remain open. The implementation does not start or migrate a working service.
 
 ## Authority and data flow
 
@@ -10,11 +10,13 @@ The G2 candidate in `internal/generation` adds signed generation catalogs, keyle
 
 `outpost-generation-1` binds domain, repository, writer epoch, sequence, parent checkpoint, snapshot time, policy version, file-kit format and each selected kit's root and complete physical object list. IDs are SHA-256; names and attributes remain inside encrypted file descriptors. Ordered kit/object lists and exact Go JSON serialization are canonical. Duplicate/unknown fields, alternative encodings, inconsistent lengths and unsafe IDs are rejected. Ed25519 signatures have distinct catalog and maintenance purpose prefixes.
 
-The receiver stores only public author and maintenance verification keys. Neither data-decryption keys nor signing keys belong in its persistent state. Trust/domain/repository/epoch are provisioned separately and immutable for this candidate; a writer cannot grant itself a new epoch or deletion authority. Epoch transition, transport authority expiry/revocation and placement/route enforcement need the later configuration/transport layer. Direct library access assumes an authorized local process, not an exposed remote administration API.
+The receiver stores only public author and maintenance verification keys. Neither data-decryption keys nor signing keys belong in its persistent state. Trust/domain/repository/epoch are provisioned separately and immutable for this candidate; a writer cannot grant itself a new epoch or deletion authority. Epoch transition, transport authority expiry/revocation and placement/route enforcement belong to the configuration/transport layer; the bounded holder workflow below exercises that integration. Direct library access assumes an authorized local process, not an exposed remote administration API.
 
 ## Reception and recovery
 
 `Begin` persists a verified complete dependency manifest and highest accepted sequence before accepting objects. An unfinished reception protects every listed dependency until an explicit maintenance cancellation. `Put` checks membership, length and content hash, then fsyncs and atomically publishes the object. `Complete` reads and verifies every dependency before atomically publishing the state containing COMPLETE. The previous latest known complete generation remains usable when reception is interrupted.
+
+Batched reception syncs the replica root before the first verification checkpoint, including after an interrupted creation that left the directory behind. Once an existing checkpoint has been validated, each update still writes atomically and syncs the checkpoint directory. Previously verified object stamps are checked again before publishing the generation. If a crash leaves complete verification evidence before publication, retry can finish the index update without rewriting the unchanged checkpoint or refreshing its time.
 
 Repeated delivery reuses present verified objects. Conflicting signed catalogs at the same current epoch/sequence fail; a new older checkpoint cannot roll the receiver back. A full signed checkpoint can advance directly from sequence 1 to 181 without intermediate catalogs. This checks sequence-gap behavior, not 180 days of operation or a 180-generation storage benchmark. Wall-clock timestamps do not select the newest generation.
 
@@ -30,7 +32,11 @@ Retirement is committed before whole unreferenced objects are removed. An interr
 
 ## Bounds and commands
 
-The development format accepts at most 64 kits and 32768 unique objects per catalog, 8 MiB per object/catalog, 128 KiB per file-kit root, 256 retained or receiving catalogs, 1024 explicit pins and 1024 maintenance receipts. Serialized local state is capped at 32 MiB; cleanup inventory at 131072 objects. Reaching a bound rejects admission instead of silently dropping protected history. These are parser/admission caps, not measured production capacity. Large-history metadata cost, receipt compaction and automatic retention scheduling remain unaccepted.
+The development format accepts at most 4096 kits and 32768 unique objects per catalog, 8 MiB per object/catalog, 128 KiB per file-kit root, 256 retained or receiving catalogs, 1024 explicit pins and 1024 maintenance receipts. All bounds apply together. Serialized local state is capped at 32 MiB; cleanup inventory at 131072 objects. Reaching a bound rejects admission instead of silently dropping protected history. These are parser/admission caps, not measured production capacity. Receipt compaction, automatic retention scheduling and full-scale history costs remain unaccepted.
+
+Local state format `outpost-replica-state-2` keeps a compact sequence/size/completion index. Signed catalogs are immutable separate files, published before the index refers to them. Object writes no longer parse every historical catalog. A process-wide 64 MiB estimated cache checks file identity, size and modification/change times; it does not prove disk integrity. Opening a replica, completing a generation, exporting a kit, maintenance and explicit verification reread the relevant catalogs. Maintenance protects referenced catalogs and removes retired catalog files only after the root transition is durable.
+
+Existing state requires explicit `outpost replica-migrate --bootstrap FILE --domain ID`. Stop that worker first; the command refuses a busy worker lease and uses its existing quota. Migration verifies complete payloads, preserves exact old state in `state.v1.json`, durably writes catalogs and atomically switches the index. Cancellation or a process crash before that switch retains the old state and permits retry. Wire catalogs, encrypted objects and independent file kits keep their formats. `outpost replica-rollback --bootstrap FILE --domain ID` restores the old state only before any new state mutation and after rechecking payloads. The migration backup is not a perpetual retention root or permission to discard subsequent generations, pins or maintenance receipts. Keep it on private admitted storage and account for its space.
 
 On an authorized Linux test filesystem, with Go pinned by `go.mod`:
 
@@ -44,4 +50,78 @@ Set `TMPDIR` and `OUTPOST_TEST_ROOT` to the admitted test volume. If the build u
 
 The [machine trace](../g2-trace.json) connects the scoped G2 requirements to checks. Five additional child-process tests confirm actual SIGKILL at object durability, pre-COMPLETE, completed-state durability, retirement durability and object deletion, followed by reopen/retry and verified complete closure. These are process-failure tests, not hardware power-loss certification. A bounded external DeepSeek review identified malformed maintenance-key validation; a negative regression now covers it. Revision-zero permits are valid only for the initial empty state, and replay protection is enforced against persisted state.
 
-Remaining acceptance includes full-scale G1, large catalogs/history, multi-node scheduling and policy, epoch transitions, real network cuts and cloud semantics, volume loss during I/O, cold boot and production installation. The [roadmap](roadmap.md) and whole-product acceptance scenarios remain NOT_VERIFIED.
+## Retained history admission
+
+Ordinary `Begin` keeps its rollback guard. Explicit `BeginHistorical`, reserved for owner-authorized retained-history acquisition, can admit an older signed catalog without lowering the highest accepted sequence or latest complete generation. It rejects an already known conflicting sequence and locally retired catalog IDs. Catch-up validates independent catalogs without requiring every intervening catalog to remain available. Inventory exposes recorded complete publications in sequence order; it is not a fresh integrity check.
+
+The separate `outpost-retention-ledger-1` sidecar preserves exact signed maintenance permits before retirement changes the replica index. A process crash may retain extra data, but must not lose the authority that prohibits reacquisition. Pending retirement authority is conservative: existing copies remain readable, while re-admission may remain blocked. The state2 reader contract and immutable file kits are unchanged. A missing or incomplete ledger with existing maintenance receipts blocks historical admission; it never means that nothing was retired. Explicit reconstruction requires every retained signed permit to match the committed receipt digest and cannot overwrite a present ledger. Maintenance performed by an older binary without corresponding ledger records is detectable by that coverage check.
+
+A sixth real SIGKILL boundary now checks the interval between durable retirement authority and index mutation. Reopen/retry preserves the latest complete closure and refuses retired historical reacquisition. HTTPS history admission also requires an explicit local grant; ordinary peer access does not expand it. Full autonomous discovery, queue and operator workflow acceptance is tracked separately.
+
+Remaining acceptance includes integrated distributed scale, large catalogs/history, full epoch lifecycle, real network cuts and cloud semantics, volume loss during I/O, cold boot and production installation. The [roadmap](roadmap.md) and whole-product acceptance scenarios remain NOT_VERIFIED.
+
+## Measured history and holder epochs
+
+The [scoped receipt](../g2-history-evidence.json) records an actual `OUTPOST_OFFLINE_180=1` execution of `TestOfflineHistoryAcrossMaintenanceAndPolicyChange`: 180 updates of a 64 KiB file, through sequence 181, with 187-day test grants. The third holder stays closed while the other holders change policy and maintain only the final generation. An interrupted final receive preserves the old complete generation and pending work; direct catch-up restores both old and new versions after the source and bridge stop. The race-enabled HDD run took 1598.41 s and peaked at 160845824 bytes, with swap and OOM counters zero. Catalog dates simulate daily updates; this is not 180 days of elapsed operation or a 100 GiB distributed test.
+
+`TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory` exercises real worker mTLS transfer into separately keyed epochs. Current policy denies the old configuration and operation; the new replica rejects an old catalog before fetching payloads. Reopening the worker preserves the epoch floor even against a higher configuration revision. Both retained epochs restore independently with their matching read-only owner material after source access is removed. This race-enabled HDD check took 24.59 s and peaked at 119443456 bytes. Superseded key destruction, full-scale lifecycle, complete volume loss and independently admitted credentials remain open.
+
+## Frozen maintenance replay
+
+Detected object corruption advances local metadata to `outpost-replica-state-4`, preserving state3 maintenance history. The [integrity contract](integrity-repair.md) defines shared-generation fencing, admitted quarantine and separately authorized repair. Older writers reject state4; immutable catalogs, objects and independent recovery retain their formats.
+
+The first explicit new maintenance operation upgrades local metadata to `outpost-replica-state-3`. State2 remains readable; wire catalogs, encryption and independent file-kit recovery do not change. Older state writers reject v3. This feature transition has no automatic downgrade: retain the current reader and recover from the unchanged catalogs/kits; binary rollback cannot discard maintenance history.
+
+Before retiring a generation, maintenance writes a sorted immutable GC candidate set and binds its hash to the accepted permit in local state. Retried work uses this original set, never a new orphan scan. Newly created orphan objects are outside the old permit; candidates that gained complete/receiving references are preserved. Missing or altered plan data blocks replay. A legacy receipt without a frozen set requires a newly signed revision-bound permit, not reconstruction of an old deletion scope.
+
+Pending cleanup also requires the signed retention ledger and coverage of every committed receipt. To retain a checkpoint, stop the worker and run `outpost replica-retention-export --bootstrap FILE --domain ID --output NEW_PRIVATE_FILE`. Keep the output and its reported SHA-256 on independent storage. If the ledger is lost and the replica index still exists, run `outpost replica-retention-restore --bootstrap FILE --domain ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256` while the worker is stopped. The command checks the independent digest, each permit and the current receipt coverage. It restores the missing ledger under the existing quota. A present ledger, stale checkpoint with incomplete receipt coverage or missing replica index blocks recovery. The normal maintenance path rechecks the frozen candidates and current protected references before resuming deletion. A completed operation still returns its original result without deleting bytes.
+
+## Recovering a missing replica index
+
+On a stopped worker, enable the optional index copy with `outpost replica-index-mirror-enable --bootstrap FILE --domain ID`. It advances the local revision, so earlier uncommitted maintenance permits must be reviewed. Every later update writes the node-signed index copy, its separate exact digest anchor and then the primary index. The three files use the existing admitted volume and quota. Update every worker executable before enabling this option. Keep the enrolled node key available. Earlier binaries cannot read the new index field, and an independent data recovery still uses only the owner kit and immutable data.
+
+If the primary index is missing or an update was interrupted, stop the worker and run `outpost replica-index-recover --bootstrap FILE --domain ID`. The command verifies the enrolled node, replica trust, original index bytes, protected catalog closures, ciphertext of complete healthy generations, the retention ledger and pending cleanup plans. An interrupted anchor update can continue only from its exact live predecessor. A stale signed copy, a divergent primary or unknown dependencies block recovery. The command keeps the original revision, pins, receiving state and maintenance receipts. If the verified primary is already present, it leaves the index unchanged. Retained peer or ingress journals also prevent a missing replica directory from being enrolled again as empty. The copy and anchor share the replica volume. Retain an independent backup for loss of the volume or all index files.
+
+The final historical result records candidate, absent and protected object/catalog counts and original completion time. Absent counts include candidates already removed before a retry; they are not a claim of physical erasure. Completed replay has no new deletion effect, even if an old object later reappears. Current references, ciphertext checks and per-step caller admission protect interrupted work. Synthetic tests include cancellation/revocation after one deletion and actual SIGKILL at plan, authority, retirement, object deletion and final-result boundaries. Hardware power loss and final scale acceptance remain separate.
+
+## Recover an exact frozen maintenance plan
+
+Keep the frozen candidate set separately from the retention ledger. On a stopped worker, export it with:
+
+```sh
+outpost replica-maintenance-plan-export --bootstrap FILE --domain DOMAIN_ID \
+  --operation OPERATION_ID --output NEW_PRIVATE_FILE
+```
+
+Retain that file and the reported SHA-256 on independent storage. The command authenticates the original plan against the current replica index and its signed retention permit. It returns the original canonical bytes; it cannot reconstruct a missing plan. The existing `outpost-gc-plan-1` format is unchanged.
+
+If only that plan is lost, restore it on the stopped worker:
+
+```sh
+outpost replica-maintenance-plan-restore --bootstrap FILE --domain DOMAIN_ID \
+  --operation OPERATION_ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256
+```
+
+The current index and verified retention ledger must still exist. The independently retained digest must match both the file and the original pending GC record. Restoration uses the enrolled volume and quota and publishes only an absent plan without overwriting an intervening file or symlink. It changes no index revision, pins, permit or maintenance receipt and performs no deletion. Replaying an identical saved plan reports `restored: false`. A completed operation's missing plan is not recreated.
+
+Normal maintenance still checks its original execution window, frozen candidates and current protected references. A later orphan is outside the restored candidate set. Missing authority, altered bytes, wrong operation, conflicting files, an active worker or unavailable quota block recovery. Loss of the index or retention ledger together with the plan remains a separate recovery case; this command does not certify whole-volume recovery.
+
+## Combined replica metadata loss
+
+Enable the signed index mirror before exporting this checkpoint. Run `replica-metadata-export --bootstrap FILE --domain ID --output NEW_PRIVATE_FILE` while the worker is stopped, and retain the checkpoint and its SHA-256 separately. The bounded `outpost-replica-metadata-checkpoint-1` document contains the verified retention ledger and exact pending GC plans, bound to the current signed index. It grants no new deletion authority.
+
+After simultaneous loss of the primary index, retention ledger and pending plans, use `replica-metadata-restore --bootstrap FILE --domain ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256`. The current signed index copy, its exact anchor, enrolled node key, catalogs and required ciphertext must survive. A stale checkpoint, missing anchor, conflicting existing file or symlink, missing dependency, foreign domain, exhausted quota or active worker blocks recovery. This procedure does not reconstruct a lost volume or accept an older archive as the current anchor.
+
+All target paths and immutable dependencies are checked before writing. Supporting files are published without replacing existing paths, then the original primary index is published last. If interrupted, inspect the result and repeat the same exact checkpoint; matching durable files are preserved. Original pins, tombstones, receipts and frozen candidates remain unchanged. Ordinary maintenance still checks its signed window and current protected references. Refresh the independent checkpoint after index changes; an older checkpoint cannot recover the newer anchored state.
+
+Named regression coverage: `TestReplicaMetadataCheckpointRecoversCombinedLossAndFrozenScope`, `TestReplicaMetadataCheckpointRejectsUnprovenRecovery`, `TestReplicaMetadataCheckpointSIGKILLPartialReplay` and `TestWorkerReplicaMetadataCheckpointActualCLI`. Source and component tests alone do not establish complete-volume or whole-product acceptance.
+
+The [bounded HDD receipt](../replica-metadata-evidence.json) records actual combined-loss recovery, fifteen denial controls, real SIGKILL, supporting-file inode preservation, partial quota/cancellation and the selected CLI. Required native CI also exercises the actual CLI on both architectures; inspect the exact commit result before publication acceptance.
+
+## A replacement after complete logical dataset loss
+
+A lost dataset is not an empty admitted replica. Preserve the unavailable root and keep its identity fenced. A replacement uses a separately owner-enrolled identity and dataset sentinel, current signed placement/replication rules and the explicit surviving holder. Cached autonomous inventory can then discover retained complete generations without individual generation jobs or a live controller. This requires the surviving holder to retain every dependency; enrollment cannot recreate missing ciphertext.
+
+The opt-in `TestReplacementDatasetRebuildActualCLI` combines this path using a hash/revision-selected actual CLI: establish two retained generations, make the whole old dataset/runtime unavailable, remove the source cache/plaintext, withdraw the old identity, enroll a new empty dataset, refuse completeness during a controlled503 and resume from cached policy after the holder returns. After SIGTERM it restores both versions using only the replacement immutable catalogs/objects and separately supplied recovery material, without the new runtime/index. The native workflow explicitly selects its built CLI and runs the same scenario on both architectures. This is a bounded candidate check until exact execution evidence is recorded. It models logical dataset loss on one admitted filesystem; physical filesystem replacement, cold-host ordering and large-history/100GiB timing remain separate.
+
+The [dataset-rebuild receipt](../dataset-rebuild-evidence.json) records the actual downloaded-CLI HDD execution: two 256 KiB versions, eight immutable recovery files and every-byte comparison, including unavailable-holder and withdrawn-identity controls. It passed in 145.49 s with a combined 386494464-byte cgroup peak under the 768 MiB cap, without swap or OOM. The uncommitted test tree remains distinct from the selected 0ad4d17 executable. The committed scenario also passed with independently selected 2078249 binaries in both native amd64 and arm64 jobs; all six required checks passed on that commit. Physical-volume replacement, cold-host boot and full-scale acceptance remain separate.

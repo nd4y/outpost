@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/restic/chunker"
+	"golang.org/x/sys/unix"
 )
 
 type countedReader struct {
@@ -28,12 +29,32 @@ func (r countedReader) Read(p []byte) (int, error) {
 // store. No plaintext temporary file or second source repository is created.
 // Previous is an authenticated per-file descriptor, never a global index.
 func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (Stats, error) {
+	fd, err := syscall.Open(source, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		return Stats{}, err
+	}
+	f := os.NewFile(uintptr(fd), source)
+	defer f.Close()
+	return s.BackupFile(ctx, f, opt)
+}
+
+// BackupFile reads a caller-owned regular file descriptor from offset zero.
+// Source scanners must open it through a root-confined, no-symlink path and
+// establish complete hardlink aliases before passing the approved names.
+func (s *Store) BackupFile(ctx context.Context, f *os.File, opt BackupOptions) (Stats, error) {
+	if f == nil {
+		return Stats{}, ErrInvalid
+	}
 	unlock, err := s.lock(ctx, true)
 	if err != nil {
 		return Stats{}, err
 	}
 	defer unlock()
 	s.Stats = Stats{}
+	if opt.Progress != "" && (!validID(opt.Progress) || !validID(opt.File) || s.backend == nil) ||
+		opt.PreviousProgress != "" && (opt.Progress == "" || !validID(opt.PreviousProgress) || opt.PreviousProgress == opt.Progress) {
+		return s.Stats, ErrInvalid
+	}
 	if opt.File == "" {
 		opt.File = randomID()
 	}
@@ -56,7 +77,7 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	}
 	reuse := map[string]Block{}
 	if opt.Previous != "" {
-		_, prev, e := s.LoadVersion(opt.Previous)
+		_, prev, e := s.LoadVersionContext(ctx, opt.Previous)
 		if e != nil {
 			return s.Stats, e
 		}
@@ -67,12 +88,6 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 			reuse[b.Hash] = b
 		}
 	}
-	fd, err := syscall.Open(source, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
-	if err != nil {
-		return s.Stats, err
-	}
-	f := os.NewFile(uintptr(fd), source)
-	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
 		return s.Stats, err
@@ -80,9 +95,42 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	if !st.Mode().IsRegular() || st.Size() > MaxFileBytes {
 		return s.Stats, ErrInvalid
 	}
+	if opt.Expected != nil {
+		var observed unix.Stat_t
+		if err := unix.Fstat(int(f.Fd()), &observed); err != nil {
+			return s.Stats, err
+		}
+		if identity(observed) != *opt.Expected {
+			return s.Stats, ErrInvalid
+		}
+	}
+	if _, err = f.Seek(0, io.SeekStart); err != nil {
+		return s.Stats, err
+	}
 	meta, err := captureMetadata(f)
 	if err != nil {
 		return s.Stats, err
+	}
+	var progress *captureProgress
+	if opt.Progress != "" {
+		var observed unix.Stat_t
+		if err = unix.Fstat(int(f.Fd()), &observed); err != nil {
+			return s.Stats, err
+		}
+		var accepted map[string]Block
+		progress, accepted, err = s.openProgress(ctx, opt, identity(observed), meta)
+		if err != nil {
+			return s.Stats, err
+		}
+		defer progress.file.Close()
+		if opt.PreviousProgress != "" {
+			if err = s.reusePreviousProgress(ctx, opt, identity(observed), meta, reuse, accepted); err != nil {
+				return s.Stats, err
+			}
+		}
+		for hash, block := range accepted {
+			reuse[hash] = block
+		}
 	}
 	d := Descriptor{Format: Format, Domain: s.Owner.Domain, File: opt.File, Names: append([]string(nil), opt.Names...), Metadata: meta}
 	h := sha256.New()
@@ -93,22 +141,97 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	pending := map[string]Block{}
 	positions := map[string][]int{}
 	existing := map[string]bool{}
+	width := 1
+	if backend, ok := s.backend.(ConcurrentObjectBackend); ok {
+		width = backend.ParallelWrites()
+		if width < 1 || width > 4 {
+			return s.Stats, ErrInvalid
+		}
+	}
+	type acceptance struct {
+		ref        Object
+		checkpoint []Block
+		created    bool
+		err        error
+	}
+	var completed chan acceptance
+	inFlight := 0
+	writeCtx := ctx
+	if width > 1 {
+		completed = make(chan acceptance, width)
+		var cancel context.CancelFunc
+		writeCtx, cancel = context.WithCancel(ctx)
+		defer func() {
+			cancel()
+			for inFlight > 0 {
+				<-completed
+				inFlight--
+			}
+		}()
+	}
+	commitCompleted := func() error {
+		result := <-completed
+		inFlight--
+		if result.err != nil {
+			return result.err
+		}
+		if e := s.recordRemoteWrite(result.ref, false, result.created); e != nil {
+			return e
+		}
+		if progress != nil {
+			// Progress is a set of accepted blocks, not a source cursor.
+			// Its serial hash chain may follow durable completion order.
+			return progress.append(ctx, result.checkpoint)
+		}
+		return nil
+	}
 	flush := func() error {
 		if len(pack) == 0 {
 			return nil
 		}
-		ref, e := s.putObject(pack, false)
-		if e != nil {
-			return e
+		var ref Object
+		if width == 1 {
+			var e error
+			ref, e = s.putObjectContext(ctx, pack, false)
+			if e != nil {
+				return e
+			}
+		} else {
+			if inFlight == width {
+				if e := commitCompleted(); e != nil {
+					return e
+				}
+			}
+			ref = Object{ID: digest(pack), Bytes: len(pack)}
+			// The producer owns this reference until acceptance. Later
+			// chunks may refer to it, but no descriptor or progress record
+			// is committed until its actual durable write returns.
+			existing[ref.ID] = true
 		}
+		checkpoint := make([]Block, 0, len(pending))
 		for hash, b := range pending {
 			b.Object = ref
 			reuse[hash] = b
+			checkpoint = append(checkpoint, b)
 			for _, i := range positions[hash] {
 				d.Blocks[i] = b
 			}
 		}
-		pack = pack[:0]
+		if width > 1 {
+			inFlight++
+			go func(payload []byte) {
+				created, e := s.backend.Write(writeCtx, ref, payload)
+				completed <- acceptance{ref: ref, checkpoint: checkpoint, created: created, err: e}
+			}(pack)
+			pack = make([]byte, 0, MaxObject)
+		} else {
+			if progress != nil {
+				if e := progress.append(ctx, checkpoint); e != nil {
+					return e
+				}
+			}
+			pack = pack[:0]
+		}
 		clear(pending)
 		clear(positions)
 		return nil
@@ -132,12 +255,8 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 				return s.Stats, ErrInvalid
 			}
 			if !existing[b.Object.ID] {
-				st, e := s.root.Stat(objectPath(b.Object.ID))
-				if e != nil {
+				if e := s.checkObjectContext(ctx, b.Object); e != nil {
 					return s.Stats, e
-				}
-				if !st.Mode().IsRegular() || st.Size() != int64(b.Object.Bytes) {
-					return s.Stats, ErrInvalid
 				}
 				existing[b.Object.ID] = true
 			}
@@ -167,6 +286,11 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	if err = flush(); err != nil {
 		return s.Stats, err
 	}
+	for inFlight != 0 {
+		if err = commitCompleted(); err != nil {
+			return s.Stats, err
+		}
+	}
 	d.SHA256 = hex.EncodeToString(h.Sum(nil))
 	after, err := f.Stat()
 	if err != nil {
@@ -176,7 +300,7 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	if err != nil {
 		return s.Stats, err
 	}
-	if after.Size() != st.Size() || after.Size() != d.Size || !sameMetadata(meta, afterMeta) {
+	if !sameInodeSnapshot(st, after) || after.Size() != d.Size || !sameMetadata(meta, afterMeta) {
 		return s.Stats, errors.New("source changed during capture")
 	}
 	version, err := s.Owner.version(d)
@@ -187,12 +311,15 @@ func (s *Store) Backup(ctx context.Context, source string, opt BackupOptions) (S
 	s.Stats.File = opt.File
 	s.Stats.Blocks = len(d.Blocks)
 	s.Stats.PeakBufferBytes = MaxChunk + MaxObject + 2*MaxDescriptor
-	if _, _, e := s.LoadVersion(version); e == nil {
+	if width > 1 {
+		s.Stats.PeakBufferBytes += int64(width * MaxObject)
+	}
+	if _, _, e := s.LoadVersionContext(ctx, version); e == nil {
 		return s.Stats, nil
 	} else if !errors.Is(e, os.ErrNotExist) {
 		return s.Stats, e
 	}
-	e, err := s.sealDescriptor(d)
+	e, err := s.sealDescriptorContext(ctx, d)
 	if err != nil {
 		return s.Stats, err
 	}

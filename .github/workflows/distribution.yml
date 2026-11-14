@@ -1,0 +1,249 @@
+name: Native distribution checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      CGO_ENABLED: "0"
+      GOMAXPROCS: "2"
+      GOFLAGS: -p=1
+      PYTHONDONTWRITEBYTECODE: "1"
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build selected artifacts and native synthetic fixture
+        run: |
+          python3 scripts/build-release.py --revision "$SOURCE_COMMIT" --output "$RUNNER_TEMP/current" > "$RUNNER_TEMP/current-receipt.json"
+          go test -c -trimpath -o "$RUNNER_TEMP/container-fixture.test" ./cmd/outpost
+      - name: Build the documented previous implementation with the current packager
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/previous-source"
+          git archive 7747e0b7fd53b4cb4f78911eeb78053e2c58dad1 | tar -xf - -C "$RUNNER_TEMP/previous-source"
+          cp scripts/build-release.py scripts/verify-release.py scripts/check-release.py "$RUNNER_TEMP/previous-source/scripts/"
+          cp -R packaging "$RUNNER_TEMP/previous-source/packaging"
+          python3 "$RUNNER_TEMP/previous-source/scripts/build-release.py" \
+            --output "$RUNNER_TEMP/previous" --architecture "$ARCHITECTURE" > "$RUNNER_TEMP/previous-receipt.json"
+      - name: Reject changed artifacts and execute native installation and recovery
+        run: |
+          current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
+          previous_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/previous-receipt.json"))["manifestSHA256"])')
+          python3 scripts/check-release.py --root "$RUNNER_TEMP/current" \
+            --manifest-sha256 "$current_hash" --work "$RUNNER_TEMP/artifact-checks"
+          python3 scripts/check-container.py --root "$RUNNER_TEMP/current" \
+            --manifest-sha256 "$current_hash" --previous-root "$RUNNER_TEMP/previous" \
+            --previous-manifest-sha256 "$previous_hash" --fixture-binary "$RUNNER_TEMP/container-fixture.test" \
+            --work "$RUNNER_TEMP/container-checks"
+      - name: Rebuild a lost node dataset with the selected native CLI
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/dataset-rebuild-tests"
+          export TMPDIR="$RUNNER_TEMP/dataset-rebuild-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_DATASET_REBUILD_CLI="$RUNNER_TEMP/current/linux_$NATIVE_ARCHITECTURE/outpost"
+          export OUTPOST_DATASET_REBUILD_REVISION="$SOURCE_COMMIT"
+          export OUTPOST_DATASET_REBUILD_SHA256="$(python3 -c 'import json,os; m=json.load(open(os.environ["RUNNER_TEMP"]+"/current/manifest.json")); print(m["files"]["linux_"+os.environ["NATIVE_ARCHITECTURE"]+"/outpost"]["sha256"])')"
+          go test -count=1 -timeout=300s -run '^TestReplacementDatasetRebuildActualCLI$' -v ./internal/worker
+      - name: Generate binary-bound CycloneDX inventories
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$ARCHITECTURE" in
+            amd64) asset=524971569 ;;
+            arm64) asset=524971566 ;;
+            *) exit 1 ;;
+          esac
+          timeout 45s gh api "repos/CycloneDX/cyclonedx-gomod/releases/assets/$asset" \
+            --header 'Accept: application/octet-stream' > "$RUNNER_TEMP/sbom-generator.tar.gz"
+          current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
+          python3 scripts/build-sbom.py --root "$RUNNER_TEMP/current" --manifest-sha256 "$current_hash" \
+            --generator-archive "$RUNNER_TEMP/sbom-generator.tar.gz" --output "$RUNNER_TEMP/sbom"
+      - name: Restore frozen plans and replica metadata with the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/maintenance-checkpoint-tests"
+          export TMPDIR="$RUNNER_TEMP/maintenance-checkpoint-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_MAINTENANCE_PLAN_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_MAINTENANCE_PLAN_CLI_SHA256="$(python3 -c 'import json,os; m=json.load(open(os.environ["RUNNER_TEMP"]+"/current/manifest.json")); print(m["files"]["linux_"+os.environ["ARCHITECTURE"]+"/outpost"]["sha256"])')"
+            export OUTPOST_METADATA_CHECKPOINT_CLI="$OUTPOST_MAINTENANCE_PLAN_CLI"
+            export OUTPOST_METADATA_CHECKPOINT_CLI_SHA256="$OUTPOST_MAINTENANCE_PLAN_CLI_SHA256"
+            go test -count=1 -timeout=120s -run '^TestWorker(MaintenancePlan|ReplicaMetadata)CheckpointActualCLI$' -v ./internal/worker
+      - name: Restore owner packages with the selected native CLI
+        run: |
+          current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
+          mkdir -m 700 "$RUNNER_TEMP/owner-package-tests"
+          export TMPDIR="$RUNNER_TEMP/owner-package-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_RECOVERY_DISTRIBUTION="$RUNNER_TEMP/current"
+          export OUTPOST_RECOVERY_MANIFEST_SHA256="$current_hash"
+          export OUTPOST_RECOVERY_REQUIRE_CLI=1
+          go test -count=1 -timeout=150s \
+            -run 'RecoveryPackage|SourceRecoveryExport|SourceRecoveryPackage|CLIOwnerRecoveryPackage|OwnerEpochCLI|WriterFence' \
+            -v ./internal/recoverybundle ./internal/sourceagent ./cmd/outpost
+      - name: Settle an expired source through the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/settlement-previous-source"
+          git archive 4d5618405578a7958265446e42a675d3920cca2a | tar -xf - -C "$RUNNER_TEMP/settlement-previous-source"
+          go -C "$RUNNER_TEMP/settlement-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/settlement-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/settlement-tests"
+          export TMPDIR="$RUNNER_TEMP/settlement-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_SETTLEMENT_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_SETTLEMENT_PREVIOUS_CLI="$RUNNER_TEMP/settlement-previous"
+          export OUTPOST_SETTLEMENT_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_SETTLEMENT_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_SETTLEMENT_CURRENT_CLI" version
+          go test -count=1 -timeout=180s -run '^TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations$' \
+            -v ./internal/sourceagent
+          go test -count=1 -timeout=180s -skip '^TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations$' \
+            -run 'Settlement|SourceUnstartedRetirement|SourceAgentSIGKILLChild|SourceStandbySelection|SourceActiveReceiverReplacement|SourceSealedReceiverReplacement|ActiveInspectionDistinguishes|RegistryReadinessLeavesNoFence|PublicationGrantResumesFrozenLocalCatalog' \
+            -v ./internal/sourceagent ./internal/worker ./internal/control ./internal/ingress
+      - name: Renew the existing receiver through the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/receiver-previous-source"
+          git archive 3632526d7a623cfba7cc7394475c923d32bfcedb | tar -xf - -C "$RUNNER_TEMP/receiver-previous-source"
+          go -C "$RUNNER_TEMP/receiver-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/receiver-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/receiver-tests"
+          export TMPDIR="$RUNNER_TEMP/receiver-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_RECEIVER_RENEWAL_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_RECEIVER_RENEWAL_PREVIOUS_CLI="$RUNNER_TEMP/receiver-previous"
+          export OUTPOST_RECEIVER_RENEWAL_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_RECEIVER_RENEWAL_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_RECEIVER_RENEWAL_CURRENT_CLI" version
+          go test -count=1 -timeout=120s -run 'ReceiverRenewal|WorkerIngressRenewal|RegistryRenewal' \
+            -v ./internal/sourceagent ./internal/worker ./internal/ingress
+      - name: Recover a published generation's missing receipt through the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/receipt-previous-source"
+          git archive 504b63411ee015b127630c53911863ede6b3858f | tar -xf - -C "$RUNNER_TEMP/receipt-previous-source"
+          go -C "$RUNNER_TEMP/receipt-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/receipt-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/receipt-tests"
+          export TMPDIR="$RUNNER_TEMP/receipt-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_RECEIPT_RECOVERY_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_RECEIPT_RECOVERY_PREVIOUS_CLI="$RUNNER_TEMP/receipt-previous"
+          export OUTPOST_RECEIPT_RECOVERY_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_RECEIPT_RECOVERY_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_RECEIPT_RECOVERY_CURRENT_CLI" version
+          go test -count=1 -timeout=120s -run 'ReceiptRecovery|PublishedEvidence|RegistryRenewal' \
+            -v ./internal/sourceagent ./internal/worker ./internal/ingress ./internal/generation
+      - name: Capture and recover prepared application exports with the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/prepared-previous-source"
+          git archive fbf72424a48c6c52f832906ab0cbeef314e0c536 | tar -xf - -C "$RUNNER_TEMP/prepared-previous-source"
+          go -C "$RUNNER_TEMP/prepared-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/prepared-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/prepared-tests"
+          export TMPDIR="$RUNNER_TEMP/prepared-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_PREPARED_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_PREPARED_PREVIOUS_CLI="$RUNNER_TEMP/prepared-previous"
+          export OUTPOST_PREPARED_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_PREPARED_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_PREPARED_CURRENT_CLI" version
+          go test -count=1 -timeout=150s -run 'Prepared|SourceAgentSIGKILLChild' \
+            -v ./internal/sourceagent ./internal/capture ./cmd/outpost
+      - name: Verify paired source ingress and outbound-only catch-up
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/parallel-capture-tests"
+          export TMPDIR="$RUNNER_TEMP/parallel-capture-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          go test -count=1 -timeout=120s \
+            -run '^(TestPairedIngressAdaptsInitialCiphertextBytes|TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth|TestParallelIngressRenewsBothAuthoritiesAtomically|TestSourceCoverageReleasesBeforePublicationAndWorkersResume|TestSourcePartitionCoverageAssemblesFromPeersAfterRelease|TestStagedCoverageRejectsMissingDependencyAndNeverPublishes)$' \
+            -v ./internal/sourceagent ./internal/ingress
+      - name: Verify WebDAV MOVE on native workers and previous CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir "$RUNNER_TEMP/move-previous-source"
+          git archive b09af9d5facb4911701d49359bcbbb2ee8d3913e | tar -xf - -C "$RUNNER_TEMP/move-previous-source"
+          go -C "$RUNNER_TEMP/move-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/move-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/move-tests"
+          export TMPDIR="$RUNNER_TEMP/move-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_MOVE_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_MOVE_PREVIOUS_CLI="$RUNNER_TEMP/move-previous"
+          export OUTPOST_MOVE_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_MOVE_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          "$OUTPOST_MOVE_CURRENT_CLI" version
+          go test -count=1 -timeout=130s -run 'WebDAVMove|MoveBook|CLIMoveProfile' \
+            -v ./internal/storage ./internal/upload ./internal/worker ./cmd/outpost
+      - name: Audit, restore and plan external repair with the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/external-restore-tests"
+          export TMPDIR="$RUNNER_TEMP/external-restore-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_EXTERNAL_RECOVERY_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          "$OUTPOST_EXTERNAL_RECOVERY_CLI" version
+          go test -count=1 -timeout=110s -run 'CLIExternalRestore|CLIUploadPlan|WorkerOwnerAdmitsMissingRepair|TargetAuditWindowResumesAfterSIGKILL|WorkerScheduledExternalAudit|WorkerScheduledExternalRepair|SignedWeightedAssignments|WeightedWorkerSIGKILL' \
+            -v ./cmd/outpost ./internal/worker ./internal/upload
+      - name: Package allowlisted source-bound development candidate
+        run: |
+          current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
+          python3 scripts/package-release.py --root "$RUNNER_TEMP/current" --manifest-sha256 "$current_hash" \
+            --sbom "$RUNNER_TEMP/sbom" --output "$RUNNER_TEMP/candidate" \
+            --archive "$RUNNER_TEMP/outpost-candidate-$NATIVE_ARCHITECTURE.tar.gz" \
+            --repository "$GITHUB_REPOSITORY" --commit "$SOURCE_COMMIT" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --native-architecture "$NATIVE_ARCHITECTURE" > "$RUNNER_TEMP/candidate-receipt.json"
+          selected_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/candidate-receipt.json"))["manifestSHA256"])')
+          python3 scripts/check-candidate-release.py --root "$RUNNER_TEMP/candidate" \
+            --sha256 "$selected_hash" --work "$RUNNER_TEMP/candidate-checks"
+      - name: Preserve the verified development candidate
+        id: candidate_upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: outpost-candidate-${{ env.SOURCE_COMMIT }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/outpost-candidate-${{ matrix.architecture }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+      - name: Record independent download selection
+        env:
+          ARTIFACT_ID: ${{ steps.candidate_upload.outputs.artifact-id }}
+          ARTIFACT_SHA256: ${{ steps.candidate_upload.outputs.artifact-digest }}
+        run: |
+          python3 scripts/record-candidate-release.py --input "$RUNNER_TEMP/candidate-receipt.json" \
+            --artifact-id "$ARTIFACT_ID" --artifact-sha256 "$ARTIFACT_SHA256" --summary "$GITHUB_STEP_SUMMARY"
