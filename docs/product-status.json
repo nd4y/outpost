@@ -41,7 +41,7 @@
         }
       ],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs. Pinned SDK request signing and HTTP URI encoding now have independent frozen vectors and actual signed-framing/explicit-credential checks; distribution, native CI and publication acceptance remain separate."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs. Pinned SDK request signing and HTTP URI encoding now have independent frozen vectors and actual signed-framing/explicit-credential checks; both native architectures, actual downloaded binary-bound SBOM and bounded storage checks pass on executable0ad4d17; real endpoint/full-product admission remains separate."
     },
     {
       "id": "REQ-02",
@@ -8486,7 +8486,7 @@
         }
       ],
       "acceptance": ["AT-34"],
-      "remaining": "The bounded CI candidate stage is accepted on executable source f2f3321 and receipt-only publication a15289b: actual native/browser downloads, independent digest/source verification, two-version128MiB downloaded-reader recovery, scoped static visual review and six required CI checks passed. Official release, admitted host installation/cold boot, manual keyboard/assistive technology and whole-product acceptance remain separate."
+      "remaining": "Actual CI candidate downloads and seven amd64 installation/upgrade/rollback/source-absent recovery checks are verified on executable0ad4d17 with previousf2f3321, alongside six exact-head CI checks and both native architectures. The19KiB installation fixture, independent128MiB downloaded-reader recovery and full100GiB acceptance are separate. Official release, admitted host cold boot, manual accessibility and whole-product acceptance remain open; see docs/downloaded-install-evidence.json."
     },
     {
       "id": "REQ-52",
