@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "BOUNDED_PACKAGE_CHECKS_PASS_CI_UPLOAD_PENDING",
+  "status": "ACTUAL_CI_DOWNLOAD_AND_BOUNDED_OFFLINE_RECOVERY_PASS",
   "scope": "Real native build/SBOM/package and adversarial verification using synthetic CI-selection metadata. This is not an authenticated published Actions candidate or downloaded-runtime acceptance.",
   "sourceBaseCommit": "42f70880df4616efc58fdb4ea134bbfda0aa6eda",
   "buildAndProductionToolsTree": "476c85451974b920ab18f74fb7ee3fd7094f68bb",
@@ -87,11 +87,9 @@
   "earlierFailure": "The first build, SBOM, package and first two checks passed. Test cloning assumed hardlinks across separate bind mounts and failed with EXDEV. Test copies are now independent ordinary files. The original failure is retained; no binaries/SBOM were rebuilt for the corrected test run.",
   "independentSelection": "Candidate digest plus repository/commit/run/attempt/native architecture must be selected outside the download. The workflow records manifest/archive/artifact digests in authenticated job summaries/logs. Provenance is a CI declaration, not a release signature.",
   "pending": [
-    "Actual new workflow execution and uploads",
-    "Authenticated artifact download and independent digest verification",
-    "Downloaded native-byte offline restore",
-    "Current visual-artifact inspection",
-    "Exact-head required CI and publication acceptance",
+    "Manual keyboard/assistive-technology and admitted host installation acceptance",
+    "Physical cold boot and real endpoint profile admission",
+    "Final source-ingress100GiB and independent full-size consumers",
     "Official release and whole-product acceptance"
   ],
   "logSHA256": {
@@ -101,5 +99,122 @@
     "ci-candidate-short-20261114-094406-results-candidate-receipt.json": "036b7e1f9d945559c5069f645c3b1be51d5b18431dec1b2fc40b61638b13c9b9",
     "ci-candidate-checks-20261114-095111-results-checks.log": "6168f049672188f89e82d0c8ecb4421ad6c9d0ec8cfc77c6f452a2712369abe8",
     "ci-candidate-checks-20261114-095111-results-native-version.json": "7f602ca91cbbc107ef6c038eb4b880f7028a61a32111742664e3c0cca3ca182a"
-  }
+  },
+  "actualCI": {
+    "repository": "nd4y/outpost",
+    "commit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+    "nativeRunId": 43584314070,
+    "browserRunId": 43584314148,
+    "allSixRequiredJobs": "SUCCESS",
+    "observedAt": "2026-11-14T10:48:01.593742+00:00",
+    "nativeSelections": {
+      "amd64": {
+        "archiveSHA256": "f5bd67f34de9fcd75fd80bbc7e7af43c9588e98db6e83c3e178f77d93f2151ed",
+        "artifactId": 14110515525,
+        "artifactSHA256": "18837a5f81d787c21a2aa002258c759d1b11a8adae567b880051255b93abd2be",
+        "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43584314070/artifacts/14110515525",
+        "commit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+        "format": "outpost-ci-artifact-selection-1",
+        "kind": "outpost-ci-candidate-1",
+        "manifestSHA256": "6be7729fa9bf59fcf0f1c982d3007c43fce85ba84e2f13871ae614e8c1c87d5c",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43584314070
+      },
+      "arm64": {
+        "archiveSHA256": "2888293777081fb0a00328d408aa6a6e7db7d5d665fcd0f84876caca7f73aeae",
+        "artifactId": 14110710097,
+        "artifactSHA256": "2e7ab9cae63c91029fa553ee2f88142ecbdd5461db2282fb6ad417c04d281db1",
+        "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43584314070/artifacts/14110710097",
+        "commit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+        "format": "outpost-ci-artifact-selection-1",
+        "kind": "outpost-ci-candidate-1",
+        "manifestSHA256": "4a1d3ea76006e9fe18b218ab3459624d5823fd4e404666deefcd68a48bc71588",
+        "nativeArchitecture": "arm64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43584314070
+      }
+    },
+    "bothNativeArtifactsVerifiedOnHDD": true,
+    "sourceRebuiltForDownloadedRuntime": false
+  },
+  "downloadedRuntime": {
+    "platform": "Linux amd64",
+    "readerSHA256": "8067ea5d0d4f0013e408b8fbe46894227f57b0323bf56838f3bc458ab7839fb4",
+    "originalOwnerManifestSHA256": "6eade616b3cb9abc1619ada0e98684653527bdf25b2c8e372e4e9b7d33bc2504",
+    "originalToolRevision": "dev-d21aa95938ef5a466fac7829653eb1cfb4907311ae4655f7d49b47b57c5da109",
+    "selectionRelationship": "The old recovery kit retains its original independently selected manifest and tool archive. The newer reader is selected independently from actual CI; the old manifest is never rebound.",
+    "sourceBytesPerVersion": 134217728,
+    "immutableFiles": 27,
+    "immutableBytes": 147138608,
+    "replicaStateIndexPresent": false,
+    "originalSourceRuntimeAndKeysAbsent": true,
+    "network": "none",
+    "cpuMax": "50000 100000",
+    "memoryMaxBytes": 536870912,
+    "restoreMemoryPeakBytes": 158367744,
+    "swapOOM": 0,
+    "oldAndNewFullRestoreAndAttributes": true,
+    "restores": {
+      "base": {
+        "allocatedBytes": 134221824,
+        "attributesVerified": true,
+        "bytesProcessed": 134217728,
+        "compressionRatio": 0,
+        "elapsedSeconds": 8.425853518,
+        "fileBytes": 134217728,
+        "maxRSSKiB": 11832,
+        "operation": "verify",
+        "phase": "base",
+        "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025"
+      },
+      "patched": {
+        "allocatedBytes": 134225920,
+        "attributesVerified": true,
+        "bytesProcessed": 134217728,
+        "compressionRatio": 0,
+        "elapsedSeconds": 9.168266446,
+        "fileBytes": 134217728,
+        "maxRSSKiB": 11832,
+        "operation": "verify",
+        "phase": "patched",
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c"
+      }
+    },
+    "productAcceptance": false
+  },
+  "actualBrowserDownload": {
+    "selection": {
+      "archiveSHA256": "bb1b66d565fd9772d39a4a3c52d15b0937b7bdf233159315cb15644036209d28",
+      "artifactId": 14109741195,
+      "artifactSHA256": "fcc6488c3c810f873cf6c86b683296670df7266a1128b753e6b0089f1841f8cf",
+      "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43584314148/artifacts/14109741195",
+      "commit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+      "format": "outpost-ci-artifact-selection-1",
+      "kind": "outpost-browser-visual-evidence-1",
+      "manifestSHA256": "cd0642c6964ec288ad031a0a8222cfa61f3c99d7fbf768d9b5c79bd2435b4e2c",
+      "nativeArchitecture": "amd64",
+      "repository": "nd4y/outpost",
+      "runAttempt": 1,
+      "runId": 43584314148
+    },
+    "status": "ACTUAL_CI_VISUAL_BYTES_VERIFIED",
+    "sourceHashesChecked": 8,
+    "automatedCases": 31,
+    "axeViolationsENRU": 0,
+    "screenshotsHashAndDimensionsChecked": 5,
+    "visualReview": [
+      "English desktop viewport",
+      "Russian 375px viewport and full page",
+      "English 200percent text full page"
+    ],
+    "observations": "Reviewed controls, focus indication, wrapped help and action layout remain readable without overlap. Wide tables use bounded horizontal scrolling on narrow viewports; screenshots alone do not verify interaction.",
+    "manualKeyboardAcceptance": false,
+    "manual320pxAcceptance": false,
+    "screenReaderAcceptance": false,
+    "productAcceptance": false
+  },
+  "earlierDownloadedRuntimeFailure": "Both native archives passed. Before any restore, the private harness expected expanded full-distribution files in an old kit that correctly contains selected tool archives. Corrected checks verify those original archive references and kit inventory. Original exit1/logs/outputs remain; successful extraction reused read-only, verifier rerun before execution. No product code or trust rule changed."
 }
