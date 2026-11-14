@@ -36,8 +36,11 @@ type QueueLimits struct {
 	RetryMaxMillis  int `json:"retryMaxMillis"`
 }
 
+const DefaultAttemptMillis = 5 * 60 * 1000
+const MaxAttemptMillis = 24 * 60 * 60 * 1000
+
 func (l QueueLimits) valid() bool {
-	return l.MaxJobs >= 1 && l.MaxJobs <= 64 && l.Parallel >= 1 && l.Parallel <= 4 && l.AttemptMillis >= 100 && l.AttemptMillis <= 300000 && l.RetryBaseMillis >= 50 && l.RetryBaseMillis <= 60000 && l.RetryMaxMillis >= l.RetryBaseMillis && l.RetryMaxMillis <= 3600000
+	return l.MaxJobs >= 1 && l.MaxJobs <= 64 && l.Parallel >= 1 && l.Parallel <= 4 && l.AttemptMillis >= 100 && l.AttemptMillis <= MaxAttemptMillis && l.RetryBaseMillis >= 50 && l.RetryBaseMillis <= 60000 && l.RetryMaxMillis >= l.RetryBaseMillis && l.RetryMaxMillis <= 3600000
 }
 
 type QueueJob struct {
@@ -587,7 +590,13 @@ func (q *Queue) Run(ctx context.Context, source *generation.Replica, resolve Bac
 			}); e != nil {
 				return e
 			}
-			attempt, stop := context.WithTimeout(work, time.Duration(q.limits.AttemptMillis)*time.Millisecond)
+			deadline := time.Now().Add(time.Duration(q.limits.AttemptMillis) * time.Millisecond)
+			if expires := time.Unix(p.ExpiresUnix, 0); expires.Before(deadline) {
+				deadline = expires
+			}
+			// A local credential resolver is part of this signed plan's attempt.
+			// It cannot outlive the plan while a larger operation budget is active.
+			attempt, stop := context.WithDeadline(work, deadline)
 			active[op] = true
 			go func(op string, job QueueJob, profile storage.Profile, attempt context.Context, stop context.CancelFunc) {
 				defer stop()

@@ -38,7 +38,7 @@ func (w *Worker) jobs(v *view) error {
 			running[key] = true
 			started++
 			go func() {
-				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
+				ctx, cancel := context.WithTimeout(v.ctx, v.cfg.Limits.OperationTimeout())
 				defer cancel()
 				paused := func(op string) bool { return v.paused(domain, op) }
 				advanced, err := local.ingress.AdvanceRelayedIntent(ctx, paused)
@@ -191,7 +191,7 @@ func (w *Worker) jobs(v *view) error {
 			running[j.Operation] = true
 			preferCapture = true
 			go func(job control.Job) {
-				ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
+				ctx, cancel := context.WithTimeout(v.ctx, v.cfg.Limits.OperationTimeout())
 				defer cancel()
 				receipt, e := w.attempt(ctx, v, job)
 				results <- result{job: job, receipt: receipt, err: e}

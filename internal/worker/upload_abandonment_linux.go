@@ -31,7 +31,7 @@ func (w *Worker) withLocalUploadQueue(ctx context.Context, domain, operation str
 		if write {
 			admit = w.admission(filepath.ToSlash(path))
 		}
-		q, e := upload.OpenQueueAt(w.root, path, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, externalQueueLimits, false, admit)
+		q, e := openExternalQueue(w.root, path, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, false, cfg.Limits.OperationMillis, admit)
 		if e != nil {
 			return e
 		}

@@ -915,7 +915,7 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		if err != nil || w.budget == nil {
 			return ErrDenied
 		}
-		queue, e = upload.OpenQueueAt(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, externalQueueLimits, init, w.admission(filepath.ToSlash(relative)))
+		queue, e = openExternalQueue(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, init, v.cfg.Limits.OperationMillis, w.admission(filepath.ToSlash(relative)))
 		return e
 	})
 	if e != nil {

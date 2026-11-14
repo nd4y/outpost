@@ -320,7 +320,7 @@ func (w *Worker) runScheduledExternalAudit(v *view, store *statefile.Store, sele
 	}
 	_, directoryError := w.root.Stat(relative)
 	initialize := !record.Ready && errors.Is(directoryError, os.ErrNotExist)
-	ctx, cancel := context.WithTimeout(v.ctx, time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(v.ctx, v.cfg.Limits.OperationTimeout())
 	defer cancel()
 	proof, err := w.auditRetainedUpload(ctx, record.Operation, window, initialize, v.requestGates[record.Target], v.cfg.Revision)
 	if _, e := w.root.Stat(relative + "/scope.json"); e == nil {

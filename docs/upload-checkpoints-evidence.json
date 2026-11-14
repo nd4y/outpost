@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "BOUNDED_RUNTIME_NUMERIC_RACE_PASS_PUBLICATION_PENDING",
+  "status": "BOUNDED_COMPONENT_ACCEPTED_AT_597fb53",
   "runtimeTree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
   "runtimeFiles": {
     "internal/upload/claim_batch_linux.go": "d3cd16da30751bf98fe2aa2587301fae0d130fdee87f6af3ddd6f52e3157787b",
@@ -99,7 +99,7 @@
     "Full short-deadline HDD suite remains unaccepted; hosted CI cannot relabel its failed sample",
     "No future claims, extended network lease, cached evidence without owner policy, decrypt-key or generation-format changes",
     "No real account, physical failure-domain, full100GiB distributed or full-product acceptance",
-    "Exact published-source required CI/readback still pending"
+    "Historical accepted commit597fb53 remains distinct from later source changes and whole-product/real-profile acceptance"
   ],
   "race": {
     "tree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
@@ -111,5 +111,13 @@
     "capBytes": 805306368,
     "swapOOM": 0,
     "scope": "Preparedguard/quota,atomic/reopen,actualSIGKILL,oldreaderbothversions/protocols,idle/cancel,originaltargetreadback and controlledACK; no claim entire short-deadlineHDD suite passed"
+  },
+  "publication": {
+    "commit": "597fb533d7007d96ce1b5f7e9e84da3638cb0a31",
+    "requiredChecks": 6,
+    "conclusion": "SUCCESS",
+    "PR": "https://github.com/nd4y/outpost/pull/10",
+    "state": "draft/open/unmerged",
+    "scope": "Historical exact-source acceptance; new operation-window changes have their own evidence."
   }
 }

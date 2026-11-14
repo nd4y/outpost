@@ -145,7 +145,7 @@ func (w *Worker) scheduleActions(v *view, s Status, running map[string]bool, res
 		go func(raw []byte, env command.Envelope, policyErr error) {
 			out := &actionResult{raw: raw, envelope: env, err: policyErr}
 			if policyErr == nil {
-				deadline := min(time.Now().Add(time.Duration(v.cfg.Limits.AttemptMillis)*time.Millisecond).UnixMilli(), env.Request.ExpiresUnix*1000)
+				deadline := min(time.Now().Add(v.cfg.Limits.OperationTimeout()).UnixMilli(), env.Request.ExpiresUnix*1000)
 				ctx, cancel := context.WithDeadline(v.ctx, time.UnixMilli(deadline))
 				out.result, out.err = w.executeAction(ctx, v, env, raw)
 				cancel()

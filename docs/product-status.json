@@ -1220,6 +1220,10 @@
         {
           "path": "internal/worker/discovery_linux_test.go",
           "name": "TestDiscoveryRetriesPolicyLagWithoutExpandingAuthority"
+        },
+        {
+          "path": "internal/control/operation_limits_linux_test.go",
+          "name": "TestSignedOperationWindowKeepsRequestBudgetAndLegacyCanonicalBytes"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
@@ -1254,6 +1258,18 @@
         {
           "path": "internal/worker/planning_linux_test.go",
           "name": "TestAutonomousExternalPlanningPublishesNewGenerationsOnBothProtocols"
+        },
+        {
+          "path": "internal/upload/queue_window_linux_test.go",
+          "name": "TestLongQueueAttemptKeepsPlanExpiryAndParentCancellation"
+        },
+        {
+          "path": "internal/worker/operation_window_linux_test.go",
+          "name": "TestWorkerLongOperationKeepsShortRequestsAndConfigurationExpiry"
+        },
+        {
+          "path": "internal/upload/claim_slot_linux_test.go",
+          "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
@@ -2124,6 +2140,18 @@
         {
           "path": "internal/upload/progress_linux_test.go",
           "name": "TestVerifiedPartProgressSurvivesLocalLockAcrossSlot"
+        },
+        {
+          "path": "internal/worker/external_queue_linux_test.go",
+          "name": "TestExternalQueueWindowPreservesLegacyAndKnownLongIdentity"
+        },
+        {
+          "path": "internal/worker/retry_linux_test.go",
+          "name": "TestWorkerLongWindowRetryRecoversQueueCommitAndDoesNotRepeat"
+        },
+        {
+          "path": "internal/worker/external_repair_linux_test.go",
+          "name": "TestWorkerLongWindowRetainedAuditAndRepair"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -8739,6 +8767,18 @@
         {
           "path": "internal/worker/vm_powerloss_linux_test.go",
           "name": "TestVMKernelFixture"
+        },
+        {
+          "path": "internal/control/operation_limits_linux_test.go",
+          "name": "TestSignedOperationWindowKeepsRequestBudgetAndLegacyCanonicalBytes"
+        },
+        {
+          "path": "internal/upload/queue_window_linux_test.go",
+          "name": "TestLongQueueAttemptKeepsPlanExpiryAndParentCancellation"
+        },
+        {
+          "path": "internal/upload/claim_slot_linux_test.go",
+          "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

@@ -44,7 +44,7 @@ func (w *Worker) retryUpload(ctx context.Context, cfg control.Config, j JobState
 	}
 	dir := filepath.Join(DomainDirectory(w.dir, d.Trust), "uploads", j.Job.Operation)
 	relative := w.relative(dir)
-	q, e := upload.OpenQueueAt(w.root, relative, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, upload.QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 300000, RetryBaseMillis: 1000, RetryMaxMillis: 60000}, false, w.admission(filepath.ToSlash(relative)))
+	q, e := openExternalQueue(w.root, relative, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, false, cfg.Limits.OperationMillis, w.admission(filepath.ToSlash(relative)))
 	if e != nil {
 		return e
 	}

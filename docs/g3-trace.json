@@ -108,6 +108,14 @@
         {
           "path": "internal/upload/progress_linux_test.go",
           "name": "TestVerifiedPartProgressSurvivesLocalLockAcrossSlot"
+        },
+        {
+          "path": "internal/upload/queue_window_linux_test.go",
+          "name": "TestLongQueueAttemptKeepsPlanExpiryAndParentCancellation"
+        },
+        {
+          "path": "internal/upload/claim_slot_linux_test.go",
+          "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
         }
       ]
     },

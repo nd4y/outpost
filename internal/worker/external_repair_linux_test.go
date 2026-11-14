@@ -21,7 +21,16 @@ import (
 )
 
 func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *testing.T) {
+	testWorkerRetainedAuditWindow(t, 0)
+}
+
+func TestWorkerLongWindowRetainedAuditAndRepair(t *testing.T) {
+	testWorkerRetainedAuditWindow(t, upload.MaxAttemptMillis)
+}
+
+func testWorkerRetainedAuditWindow(t *testing.T, operationMillis int64) {
 	f := newFixture(t)
+	f.cfg.Limits.OperationMillis = operationMillis
 	ctx := context.Background()
 	w := f.nodes[0]
 	bindFixture(t, f, w)
@@ -75,14 +84,19 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 		t.Helper()
 		op := storage.Hash([]byte(name))
 		now := time.Now()
-		plan, err := upload.Build(ctx, replica, f.generation, upload.Plan{Format: upload.Format, Operation: op, Profile: p, AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{executor}, StartMillis: now.UnixMilli(), ExpiresUnix: now.Add(time.Minute).Unix(), SlotMillis: 1000}, planner)
+		slotMillis := int64(1000)
+		if operationMillis != 0 {
+			slotMillis = 5000
+			t.Logf("new functional profile: signed slot=%dms, completion poll=60s; original default slot=1000ms unchanged", slotMillis)
+		}
+		plan, err := upload.Build(ctx, replica, f.generation, upload.Plan{Format: upload.Format, Operation: op, Profile: p, AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{executor}, StartMillis: now.UnixMilli(), ExpiresUnix: now.Add(time.Minute).Unix(), SlotMillis: slotMillis}, planner)
 		must(t, err)
 		return control.Job{Operation: op, Executor: w.node, Kind: "upload", Domain: f.domain.Trust.Domain, Generation: f.generation, Target: p.ID(), Plan: plan}
 	}
 	first := job("external-initial", old)
 	f.config(t, 0, []control.Job{first})
 	stop := start(t, w)
-	wait(t, func() bool { return complete(w, first.Operation) })
+	waitOperationWindow(t, operationMillis, func() bool { return complete(w, first.Operation) })
 	window := ExternalAuditProfile{Format: ExternalAuditProfileFormat, Window: storage.Hash([]byte("retained-external-window")), MaxAgeSeconds: 3600}
 	requests := targets[old.ID()].Snapshot().Requests
 	if _, err := w.AuditExternal(ctx, first.Operation, window, true); !errors.Is(err, storage.ErrConflict) || targets[old.ID()].Snapshot().Requests != requests {
@@ -107,7 +121,7 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 	repair := job("external-missing-repair", old)
 	f.cfg.Revision++
 	f.config(t, 0, []control.Job{repair})
-	wait(t, func() bool { return complete(w, repair.Operation) })
+	waitOperationWindow(t, operationMillis, func() bool { return complete(w, repair.Operation) })
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, healthy) {
 		t.Fatal("owner-authorized repair did not restore exact part", err)
 	}
@@ -122,7 +136,7 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 	conflict := job("external-corrupt-refusal", old)
 	f.cfg.Revision++
 	f.config(t, 0, []control.Job{conflict})
-	wait(t, func() bool {
+	waitOperationWindow(t, operationMillis, func() bool {
 		s, err := w.Status(ctx)
 		return err == nil && s.Jobs[conflict.Operation].Phase == "BLOCKED"
 	})
@@ -138,7 +152,7 @@ func TestWorkerOwnerAdmitsMissingRepairAndSeparateCorruptCopyReplacement(t *test
 	admitTarget(replacement)
 	f.cfg.Revision++
 	f.config(t, 0, []control.Job{next})
-	wait(t, func() bool { return complete(w, next.Operation) })
+	waitOperationWindow(t, operationMillis, func() bool { return complete(w, next.Operation) })
 	stop()
 	status, err = w.Status(ctx)
 	must(t, err)

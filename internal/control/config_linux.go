@@ -28,20 +28,33 @@ var ErrRollback = errors.New("configuration rollback or conflict")
 var ErrInactive = errors.New("configuration is not active")
 
 type Limits struct {
-	Parallel       int   `json:"parallel"`
-	AttemptMillis  int64 `json:"attemptMillis"`
-	PollSeconds    int64 `json:"pollSeconds"`
-	CapacityBytes  int64 `json:"capacityBytes"`
-	ReserveBytes   int64 `json:"reserveBytes"`
-	SpoolBytes     int64 `json:"spoolBytes"`
-	TelemetryBytes int64 `json:"telemetryBytes"`
+	Parallel        int   `json:"parallel"`
+	AttemptMillis   int64 `json:"attemptMillis"`
+	OperationMillis int64 `json:"operationMillis,omitempty"`
+	PollSeconds     int64 `json:"pollSeconds"`
+	CapacityBytes   int64 `json:"capacityBytes"`
+	ReserveBytes    int64 `json:"reserveBytes"`
+	SpoolBytes      int64 `json:"spoolBytes"`
+	TelemetryBytes  int64 `json:"telemetryBytes"`
 }
 
 func (l Limits) Validate() error {
+	if l.OperationMillis != 0 && (l.OperationMillis < l.AttemptMillis || l.OperationMillis > upload.MaxAttemptMillis) {
+		return ErrDenied
+	}
 	if l.Parallel < 1 || l.Parallel > 4 || l.AttemptMillis < 100 || l.AttemptMillis > 300000 || l.PollSeconds < 1 || l.PollSeconds > 3600 || l.CapacityBytes < 16<<20 || l.CapacityBytes > 1<<60 || l.ReserveBytes < 1<<20 || l.ReserveBytes >= l.CapacityBytes || l.SpoolBytes < 4<<20 || l.SpoolBytes >= l.CapacityBytes-l.ReserveBytes || l.TelemetryBytes < 65536 || l.TelemetryBytes > 64<<20 || l.TelemetryBytes >= l.CapacityBytes-l.ReserveBytes-l.SpoolBytes {
 		return ErrDenied
 	}
 	return nil
+}
+
+// OperationTimeout is an owner-signed whole-operation budget. Omission retains
+// the original attempt budget; individual RPC and assignment limits are separate.
+func (l Limits) OperationTimeout() time.Duration {
+	if l.OperationMillis != 0 {
+		return time.Duration(l.OperationMillis) * time.Millisecond
+	}
+	return time.Duration(l.AttemptMillis) * time.Millisecond
 }
 
 type Domain struct {

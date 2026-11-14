@@ -52,6 +52,8 @@ The [bounded source-ingress receipt](docs/source-ingress-evidence.json) records 
 
 The [bounded maintenance-plan receipt](docs/maintenance-plan-evidence.json) covers export and exact restoration of a lost frozen deletion plan, including real process termination, stopped-worker admission and the selected CLI. The current index and signed retention ledger must survive; combined metadata loss remains open.
 
+[Whole-operation windows](docs/en/operation-windows.md) let the owner explicitly admit long generation work while keeping short request, claim and authority deadlines. Omitted settings preserve the prior effective budget and default queue identity.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.

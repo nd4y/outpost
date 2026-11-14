@@ -97,7 +97,7 @@ func (w *Worker) auditRetainedUpload(ctx context.Context, operation string, p Ex
 	}
 	authority := upload.Authority{Generation: d.Trust, Planner: d.Planner}
 	queuePath := w.relative(filepath.Join(DomainDirectory(w.dir, d.Trust), "uploads", operation))
-	queue, err := upload.OpenQueueAt(w.root, queuePath, w.node, authority, externalQueueLimits, false, nil)
+	queue, err := openExternalQueue(w.root, queuePath, w.node, authority, false, c.Limits.OperationMillis, nil)
 	if err != nil {
 		return result, err
 	}

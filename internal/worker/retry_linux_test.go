@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -24,8 +26,13 @@ import (
 )
 
 func blockedUploadCommand(t *testing.T) (*fixture, control.Config, control.Job, func(string, string, uint64) []byte, *atomic.Bool) {
+	return blockedUploadCommandWindow(t, 0)
+}
+
+func blockedUploadCommandWindow(t *testing.T, operationMillis int64) (*fixture, control.Config, control.Job, func(string, string, uint64) []byte, *atomic.Bool) {
 	t.Helper()
 	f := newFixture(t)
+	f.cfg.Limits.OperationMillis = operationMillis
 	ctx := context.Background()
 	pub, planner := key(t)
 	f.domain.Planner = pub
@@ -34,13 +41,25 @@ func blockedUploadCommand(t *testing.T) (*fixture, control.Config, control.Job, 
 	w := f.nodes[0]
 	var full atomic.Bool
 	full.Store(true)
+	var requestsMu sync.Mutex
+	requests := map[string]int{}
 	server := teststore.New(t, teststore.Options{Kind: "webdav", Namespace: storage.Hash([]byte(f.domain.Trust.Domain + "/" + f.domain.Trust.Repository)), Logins: map[string]teststore.Login{w.node: {Secret: "isolated-retry-secret"}}, Before: func(rw http.ResponseWriter, r *http.Request, actor, key string, body []byte) bool {
+		requestsMu.Lock()
+		requests[r.Method+"/"+strings.SplitN(key, "-", 2)[0]]++
+		requestsMu.Unlock()
 		if full.Load() {
 			rw.WriteHeader(507)
 			return true
 		}
 		return false
 	}})
+	t.Cleanup(func() {
+		if t.Failed() {
+			requestsMu.Lock()
+			defer requestsMu.Unlock()
+			t.Logf("retry target request types: %v", requests)
+		}
+	})
 	p := storage.Profile{Kind: "webdav", Endpoint: server.Endpoint(), Namespace: server.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 2000, CredentialScope: "namespace", NoDelete: true}
 	f.cfg.Targets = []control.Target{{ID: p.ID(), Profile: p}}
 	f.domain.Placement.Targets = []string{p.ID()}
@@ -49,7 +68,12 @@ func blockedUploadCommand(t *testing.T) (*fixture, control.Config, control.Job, 
 	must(t, e)
 	defer replica.Close()
 	op := storage.Hash([]byte("retry upload"))
-	plan, e := upload.Build(ctx, replica, f.generation, upload.Plan{Format: upload.Format, Operation: op, Profile: p, AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{{ID: w.node, Class: "trusted", PublicKey: w.cert.PrivateKey.(ed25519.PrivateKey).Public().(ed25519.PublicKey)}}, StartMillis: time.Now().UnixMilli(), ExpiresUnix: time.Now().Add(3 * time.Minute).Unix(), SlotMillis: 500}, planner)
+	slotMillis := int64(500)
+	if operationMillis != 0 {
+		slotMillis = 5000
+		t.Logf("new functional profile: signed slot=%dms, completion poll=60s; original default slot=500ms unchanged", slotMillis)
+	}
+	plan, e := upload.Build(ctx, replica, f.generation, upload.Plan{Format: upload.Format, Operation: op, Profile: p, AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: []upload.Worker{{ID: w.node, Class: "trusted", PublicKey: w.cert.PrivateKey.(ed25519.PrivateKey).Public().(ed25519.PublicKey)}}, StartMillis: time.Now().UnixMilli(), ExpiresUnix: time.Now().Add(3 * time.Minute).Unix(), SlotMillis: slotMillis}, planner)
 	must(t, e)
 	job := control.Job{Operation: op, Executor: w.node, Kind: "upload", Domain: f.domain.Trust.Domain, Generation: f.generation, Target: p.ID(), Plan: plan}
 	w.resolve = func(ctx context.Context, p storage.Profile) (*storage.Backend, error) {
@@ -158,7 +182,15 @@ func TestWorkerCommandRetryRechecksPolicyAndPreservesHolds(t *testing.T) {
 }
 
 func TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat(t *testing.T) {
-	f, _, job, _, full := blockedUploadCommand(t)
+	testWorkerLocalRetryWindow(t, 0)
+}
+
+func TestWorkerLongWindowRetryRecoversQueueCommitAndDoesNotRepeat(t *testing.T) {
+	testWorkerLocalRetryWindow(t, upload.MaxAttemptMillis)
+}
+
+func testWorkerLocalRetryWindow(t *testing.T, operationMillis int64) {
+	f, _, job, _, full := blockedUploadCommandWindow(t, operationMillis)
 	w := f.nodes[0]
 	ctx := context.Background()
 	cut := errors.New("interrupted")
@@ -174,11 +206,15 @@ func TestWorkerLocalRetryRecoversQueueCommitAndDoesNotRepeat(t *testing.T) {
 	w.Fault = nil
 	other, e := Open(Options{Directory: w.dir, Node: w.node, Owner: w.owner, Certificate: w.cert, Roots: w.roots, Resolve: w.resolve})
 	must(t, e)
-	defer other.Close()
+	t.Cleanup(func() { other.Close() })
 	must(t, other.Retry(ctx, job.Operation))
 	full.Store(false)
 	stop := start(t, other)
-	wait(t, func() bool { return complete(other, job.Operation) })
+	defer func() {
+		stop()
+		logWindowQueueProgress(t, other, f.domain, job)
+	}()
+	waitOperationWindow(t, operationMillis, func() bool { return complete(other, job.Operation) })
 	stop()
 	if e = other.Retry(ctx, job.Operation); !errors.Is(e, ErrDenied) {
 		t.Fatal("local completed job retried", e)
