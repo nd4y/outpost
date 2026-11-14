@@ -83,3 +83,25 @@ On a stopped worker, enable the optional index copy with `outpost replica-index-
 If the primary index is missing or an update was interrupted, stop the worker and run `outpost replica-index-recover --bootstrap FILE --domain ID`. The command verifies the enrolled node, replica trust, original index bytes, protected catalog closures, ciphertext of complete healthy generations, the retention ledger and pending cleanup plans. An interrupted anchor update can continue only from its exact live predecessor. A stale signed copy, a divergent primary or unknown dependencies block recovery. The command keeps the original revision, pins, receiving state and maintenance receipts. If the verified primary is already present, it leaves the index unchanged. Retained peer or ingress journals also prevent a missing replica directory from being enrolled again as empty. The copy and anchor share the replica volume. Retain an independent backup for loss of the volume or all index files.
 
 The final historical result records candidate, absent and protected object/catalog counts and original completion time. Absent counts include candidates already removed before a retry; they are not a claim of physical erasure. Completed replay has no new deletion effect, even if an old object later reappears. Current references, ciphertext checks and per-step caller admission protect interrupted work. Synthetic tests include cancellation/revocation after one deletion and actual SIGKILL at plan, authority, retirement, object deletion and final-result boundaries. Hardware power loss and final scale acceptance remain separate.
+
+## Recover an exact frozen maintenance plan
+
+Keep the frozen candidate set separately from the retention ledger. On a stopped worker, export it with:
+
+```sh
+outpost replica-maintenance-plan-export --bootstrap FILE --domain DOMAIN_ID \
+  --operation OPERATION_ID --output NEW_PRIVATE_FILE
+```
+
+Retain that file and the reported SHA-256 on independent storage. The command authenticates the original plan against the current replica index and its signed retention permit. It returns the original canonical bytes; it cannot reconstruct a missing plan. The existing `outpost-gc-plan-1` format is unchanged.
+
+If only that plan is lost, restore it on the stopped worker:
+
+```sh
+outpost replica-maintenance-plan-restore --bootstrap FILE --domain DOMAIN_ID \
+  --operation OPERATION_ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256
+```
+
+The current index and verified retention ledger must still exist. The independently retained digest must match both the file and the original pending GC record. Restoration uses the enrolled volume and quota and publishes only an absent plan without overwriting an intervening file or symlink. It changes no index revision, pins, permit or maintenance receipt and performs no deletion. Replaying an identical saved plan reports `restored: false`. A completed operation's missing plan is not recreated.
+
+Normal maintenance still checks its original execution window, frozen candidates and current protected references. A later orphan is outside the restored candidate set. Missing authority, altered bytes, wrong operation, conflicting files, an active worker or unavailable quota block recovery. Loss of the index or retention ledger together with the plan remains a separate recovery case; this command does not certify whole-volume recovery.

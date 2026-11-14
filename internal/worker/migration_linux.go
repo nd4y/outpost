@@ -79,6 +79,26 @@ func (w *Worker) RestoreRetentionCheckpoint(ctx context.Context, domain string, 
 	})
 }
 
+func (w *Worker) MaintenancePlanCheckpoint(ctx context.Context, domain, operation string) ([]byte, error) {
+	var raw []byte
+	err := w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
+		var err error
+		raw, err = replica.MaintenancePlanCheckpoint(ctx, operation)
+		return err
+	})
+	return raw, err
+}
+
+func (w *Worker) RestoreMaintenancePlanCheckpoint(ctx context.Context, domain, operation string, raw []byte, expected string) (bool, error) {
+	var restored bool
+	err := w.withExistingReplica(ctx, domain, func(replica *generation.Replica) error {
+		var err error
+		restored, err = replica.RestoreMaintenancePlanCheckpoint(ctx, operation, raw, expected)
+		return err
+	})
+	return restored, err
+}
+
 func (w *Worker) withExistingReplica(ctx context.Context, domain string, action func(*generation.Replica) error) error {
 	return w.withStoppedReplica(ctx, domain, func(_ *os.Root, path string, trust generation.Trust, admit statefile.Admission) error {
 		replica, e := w.openReplicaAt(path, trust, false)

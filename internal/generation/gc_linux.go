@@ -13,6 +13,7 @@ import (
 // Older writers must refuse this state rather than recalculate a frozen GC set.
 // Wire catalogs, file kits and independent recovery payloads remain unchanged.
 const MaintenanceStateFormat = "outpost-replica-state-3"
+const MaintenancePlanFormat = "outpost-gc-plan-1"
 
 type gcRecord struct {
 	Plan   string              `json:"plan"`
@@ -70,26 +71,36 @@ func (r *Replica) MaintenanceResult(ctx context.Context, operation string) (Main
 	return out, e
 }
 func gcName(op string) string { return "gc-" + op + ".json" }
+
+func decodeGCPlan(raw []byte, permit, expected string) (gcPlan, error) {
+	var plan gcPlan
+	if expected != "" && Hash(raw) != expected || canonical(raw, &plan, MaxState) != nil || plan.Format != MaintenancePlanFormat || plan.Permit != permit || len(plan.Objects) > MaxObjects*4 || len(plan.Catalogs) > MaxGenerations*4 {
+		return plan, ErrInvalid
+	}
+	last := ""
+	for _, ref := range plan.Objects {
+		if !validID(ref.ID) || ref.ID <= last || ref.Bytes < 1 || ref.Bytes > MaxObject {
+			return plan, ErrInvalid
+		}
+		last = ref.ID
+	}
+	last = ""
+	for _, id := range plan.Catalogs {
+		if !validID(id) || id <= last {
+			return plan, ErrInvalid
+		}
+		last = id
+	}
+	return plan, nil
+}
+
 func (r *Replica) gcPlan(ctx context.Context, p Permit, digest, expected string, keep map[string]Object, retiring map[string]bool, s *state) (gcPlan, string, error) {
 	var plan gcPlan
 	b, e := read(r.root, gcName(p.Operation), MaxState)
 	if e == nil {
-		if expected != "" && Hash(b) != expected || canonical(b, &plan, MaxState) != nil || plan.Format != "outpost-gc-plan-1" || plan.Permit != digest || len(plan.Objects) > MaxObjects*4 || len(plan.Catalogs) > MaxGenerations*4 {
-			return plan, "", ErrInvalid
-		}
-		last := ""
-		for _, ref := range plan.Objects {
-			if !validID(ref.ID) || ref.ID <= last || ref.Bytes < 1 || ref.Bytes > MaxObject {
-				return plan, "", ErrInvalid
-			}
-			last = ref.ID
-		}
-		last = ""
-		for _, id := range plan.Catalogs {
-			if !validID(id) || id <= last {
-				return plan, "", ErrInvalid
-			}
-			last = id
+		plan, e = decodeGCPlan(b, digest, expected)
+		if e != nil {
+			return plan, "", e
 		}
 		return plan, Hash(b), nil
 	}
@@ -99,7 +110,7 @@ func (r *Replica) gcPlan(ctx context.Context, p Permit, digest, expected string,
 	if expected != "" {
 		return plan, "", ErrMigrationRequired
 	}
-	plan = gcPlan{Format: "outpost-gc-plan-1", Permit: digest, Objects: []Object{}, Catalogs: []string{}}
+	plan = gcPlan{Format: MaintenancePlanFormat, Permit: digest, Objects: []Object{}, Catalogs: []string{}}
 	for _, directory := range []string{"objects", "catalogs"} {
 		limit := MaxObjects * 4
 		if directory == "catalogs" {

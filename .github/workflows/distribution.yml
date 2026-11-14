@@ -74,6 +74,16 @@ jobs:
           current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
           python3 scripts/build-sbom.py --root "$RUNNER_TEMP/current" --manifest-sha256 "$current_hash" \
             --generator-archive "$RUNNER_TEMP/sbom-generator.tar.gz" --output "$RUNNER_TEMP/sbom"
+      - name: Restore frozen maintenance plans with the selected native CLI
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/maintenance-checkpoint-tests"
+          export TMPDIR="$RUNNER_TEMP/maintenance-checkpoint-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_MAINTENANCE_PLAN_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_MAINTENANCE_PLAN_CLI_SHA256="$(python3 -c 'import json,os; m=json.load(open(os.environ["RUNNER_TEMP"]+"/current/manifest.json")); print(m["files"]["linux_"+os.environ["ARCHITECTURE"]+"/outpost"]["sha256"])')"
+          go test -count=1 -timeout=120s -run '^TestWorkerMaintenancePlanCheckpointActualCLI$' -v ./internal/worker
       - name: Restore owner packages with the selected native CLI
         run: |
           current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')

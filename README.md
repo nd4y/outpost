@@ -46,6 +46,8 @@ Worker bootstrap now requires [runtime volume admission](docs/en/runtime-volume.
 
 The [bounded source-ingress receipt](docs/source-ingress-evidence.json) records one full-catalog upload across multiple verification batches, legacy compatibility and actual expiry refusals. A physical 128 MiB source rehearsal and two clean-consumer complete-replica restores prepare the separate 100 GiB stage; they do not establish full-scale acceptance.
 
+The [bounded maintenance-plan receipt](docs/maintenance-plan-evidence.json) covers export and exact restoration of a lost frozen deletion plan, including real process termination, stopped-worker admission and the selected CLI. The current index and signed retention ledger must survive; combined metadata loss remains open.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.
