@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "ACTUAL_CLI_LOGICAL_DATASET_REBUILD_HDD_PASS_NATIVE_PENDING",
+  "status": "ACTUAL_CLI_LOGICAL_DATASET_REBUILD_HDD_AND_BOTH_NATIVE_ARCHITECTURES_PASS",
   "observedAt": "2026-11-14T14:59:07.398012+00:00",
   "testSourceBaseCommit": "94942f127dca72e0e67621271d624a287964cc2a",
   "testSourceTree": "b9247b43682a2fda4d1533bc749b18277de90704",
@@ -24,7 +24,7 @@
     "runAttempt": 1,
     "runId": 43597711032
   },
-  "productionBinding": "Committed cmd/internal/go.mod/go.sum inputs at 94942f1 equal the actual downloaded 0ad4d17 runtime inputs. The new opt-in test is not a replacement product binary. Native CI will select its own exact-head distribution binary independently.",
+  "productionBinding": "Committed cmd/internal/go.mod/go.sum inputs at 94942f1 equal the actual downloaded 0ad4d17 runtime inputs. The new opt-in test is not a replacement product binary. Native CI will select its own exact-head distribution binary independently. Commit 2078249 adds the test and its native workflow hook; both native jobs execute their own independently selected 2078249 CLI.",
   "fixture": {
     "retainedGenerations": 2,
     "sourceBytesPerVersion": 262144,
@@ -78,10 +78,38 @@
     "scope": "Cgroup totals cover the bounded parent fixture and its CLI children; they are not a standalone worker heap budget or admitted-scale RTO."
   },
   "pending": [
-    "Same combined scenario on both selected native CI architectures",
-    "Exact committed publication and required CI",
     "Physical filesystem migration/cold-host ordering and real infrastructure admission",
     "Large retained-history/100GiB and separate G3 performance acceptance"
   ],
-  "fullProductAcceptance": false
+  "fullProductAcceptance": false,
+  "nativeAcceptance": {
+    "commit": "2078249d2fff4ebf64397651592350f481da2851",
+    "runId": 43608105054,
+    "observedAt": "2026-11-14T15:22:47.392Z",
+    "jobs": [
+      {
+        "jobId": 132487002630,
+        "architecture": "amd64",
+        "url": "https://github.com/nd4y/outpost/actions/runs/43608105054/job/132487002630",
+        "lines": [
+          "2026-11-14T15:06:19.0218435Z     dataset_rebuild_cli_linux_test.go:348: DATASET_REBUILD_RESTORE version=old bytes=262144 sha256=860d18a3527c1e328583c6bc9b9920b303c210010e56383a32f2a5b5d2b579c4",
+          "2026-11-14T15:06:19.0286194Z     dataset_rebuild_cli_linux_test.go:348: DATASET_REBUILD_RESTORE version=new bytes=262144 sha256=e244c0f74a749a9cb149a7bdf61e09e2e43337a217630247aaed14206b654538",
+          "2026-11-14T15:06:19.0288844Z     dataset_rebuild_cli_linux_test.go:359: DATASET_REBUILD_PASS revision=2078249d2fff4ebf64397651592350f481da2851 retainedGenerations=2 immutableFiles=8 sourceAbsent=true oldDatasetFenced=true oldIdentityHTTP=403 unavailableNoComplete=true cachedDiscovery=true gracefulJoin=true offlineIndexAbsent=true",
+          "2026-11-14T15:06:19.0380473Z --- PASS: TestReplacementDatasetRebuildActualCLI (4.21s)"
+        ]
+      },
+      {
+        "jobId": 132487002876,
+        "architecture": "arm64",
+        "url": "https://github.com/nd4y/outpost/actions/runs/43608105054/job/132487002876",
+        "lines": [
+          "2026-11-14T15:06:05.4188212Z     dataset_rebuild_cli_linux_test.go:348: DATASET_REBUILD_RESTORE version=old bytes=262144 sha256=6d4791e0947589e862200b9f29d714225366f63c4c0c8a792d4579f89c49ed6c",
+          "2026-11-14T15:06:05.4258097Z     dataset_rebuild_cli_linux_test.go:348: DATASET_REBUILD_RESTORE version=new bytes=262144 sha256=13a074677e818755954f3076608e7e41d945079965624f672a04bd0838e5b62f",
+          "2026-11-14T15:06:05.4260120Z     dataset_rebuild_cli_linux_test.go:359: DATASET_REBUILD_PASS revision=2078249d2fff4ebf64397651592350f481da2851 retainedGenerations=2 immutableFiles=8 sourceAbsent=true oldDatasetFenced=true oldIdentityHTTP=403 unavailableNoComplete=true cachedDiscovery=true gracefulJoin=true offlineIndexAbsent=true",
+          "2026-11-14T15:06:05.4458981Z --- PASS: TestReplacementDatasetRebuildActualCLI (4.24s)"
+        ]
+      }
+    ],
+    "requiredChecks": "All six required checks passed on the exact commit; the two native jobs executed the scenario without skipping it."
+  }
 }
