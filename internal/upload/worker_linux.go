@@ -38,14 +38,34 @@ func sleep(ctx context.Context, d time.Duration) error {
 	}
 }
 func claim(ctx context.Context, b *storage.Backend, j *Journal, part generation.Object, round int64, end time.Time, key ed25519.PrivateKey) error {
-	c := Claim{Format: Format, Plan: j.planID, Object: part.ID, Worker: j.worker, Round: round, ExpiresMillis: end.UnixMilli()}
-	unsigned, _ := json.Marshal(c)
-	c.Signature = ed25519.Sign(key, append([]byte(Format+"/claim\x00"), unsigned...))
-	raw, _ := json.Marshal(c)
+	c, err := signedPartClaim(j, part, round, end, key)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
 	id := storage.Hash([]byte(j.planID + "/" + part.ID + "/" + strconv.FormatInt(round, 10)))
 	return b.Put(ctx, "claim-"+id, raw)
 }
 func VerifyClaim(raw []byte, p Plan, planID string) error {
+	if len(raw) > maxClaimBatchBytes {
+		return ErrDenied
+	}
+	var marker struct {
+		Format string `json:"format"`
+	}
+	if json.Unmarshal(raw, &marker) != nil {
+		return ErrDenied
+	}
+	if marker.Format == claimBatchFormat {
+		return verifyClaimBatch(raw, p, planID)
+	}
+	return verifyPartClaim(raw, p, planID)
+}
+
+func verifyPartClaim(raw []byte, p Plan, planID string) error {
 	if p.policy() != nil || !storage.ID(planID) {
 		return ErrDenied
 	}
@@ -235,6 +255,22 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		return result, e
 	}
 	var cache sourceObjectCache
+	var claims partClaimCache
+	prepared := map[string]bool{}
+	pending := make([]partAcknowledgement, 0, maxProgressBatch)
+	pendingComplete := map[string]bool{}
+	flushProgress := func() error {
+		if len(pending) == 0 {
+			return nil
+		}
+		if err := j.doneParts(ctx, pending); err != nil {
+			return err
+		}
+		pending = pending[:0]
+		clear(pendingComplete)
+		return nil
+	}
+	var wireWindow time.Duration
 	idleDelay := 50 * time.Millisecond
 	previousRound := int64(-1)
 	for {
@@ -243,6 +279,9 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		}
 		// A target marker is only a hint until the whole generation is read back.
 		if e = j.verifyComplete(ctx, b, audit); e == nil {
+			if e = flushProgress(); e != nil {
+				return result, e
+			}
 			return j.completeTarget(ctx, source, b, pin, audit)
 		} else if !storage.Missing(e) && !errors.Is(e, storage.ErrUnavailable) {
 			return result, e
@@ -251,11 +290,19 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		if e != nil {
 			return result, e
 		}
+		// This bounded overlay belongs only to the current invocation. Status
+		// callers still see durable intents until the acknowledgement flush.
+		for id := range pendingComplete {
+			p := state.Parts[id]
+			p.Complete = true
+			state.Parts[id] = p
+		}
 		round, end := j.plan.round(time.Now())
 		if round != previousRound {
 			idleDelay, previousRound = 50*time.Millisecond, round
 		}
 		madeProgress := false
+		var waitUntil, lastLeaseEnd time.Time
 		for _, task := range tasks {
 			progress := state.Parts[task.Part.ID]
 			if progress.Complete || j.plan.owner(task.Part.ID, round) != j.worker {
@@ -279,14 +326,52 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			if !time.Now().Before(end) {
 				break
 			}
+			// Local durable preparation may outlive this assignment slot. It
+			// authorizes no remote IO: select and check the actual owner again
+			// after the journal is durable, before starting its network lease.
+			if prepared[task.Part.ID] {
+				e = j.checkPreparedPart(ctx, task.Part.ID, round)
+			} else {
+				ids := []string{task.Part.ID}
+				for _, next := range tasks {
+					if len(ids) == maxProgressBatch {
+						break
+					}
+					if next.Part.ID != task.Part.ID && !prepared[next.Part.ID] && !state.Parts[next.Part.ID].Complete && j.plan.owner(next.Part.ID, round) == j.worker {
+						ids = append(ids, next.Part.ID)
+					}
+				}
+				e = j.beginParts(ctx, ids, round)
+				if e == nil {
+					for _, id := range ids {
+						prepared[id] = true
+					}
+				}
+			}
+			if e == nil {
+				round, end = j.plan.round(time.Now())
+				if j.plan.owner(task.Part.ID, round) != j.worker {
+					continue
+				}
+			}
 			bounded, stop := context.WithDeadline(ctx, end)
-			e = j.beginPart(bounded, task.Part.ID, round)
+			lastLeaseEnd = end
+			wireStart := time.Now()
 			sent := int64(0)
 			if e == nil {
 				_, e = b.ReadPart(bounded, task.Part)
 			}
 			if storage.Missing(e) {
-				e = claim(bounded, b, j, task.Part, round, end, key)
+				// A late start can repeatedly spend a whole short slot on claims
+				// without finishing a payload request. Learn only from this Run's
+				// actual wire time and wait for a fresh original slot. Readback of
+				// an already durable part remains available even in a short tail.
+				if wireWindow > 0 && time.Until(end) < wireWindow {
+					waitUntil = end
+					stop()
+					break
+				}
+				e = claims.ensure(bounded, b, j, tasks, state, task.Part, round, end, key)
 				if e == nil {
 					var data []byte
 					data, e = cache.read(bounded, source, j.plan.Generation, task.Object)
@@ -306,9 +391,24 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 					}
 				}
 			}
+			if e == nil && sent > 0 || errors.Is(bounded.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+				observed := time.Since(wireStart)
+				wireWindow = max(wireWindow, min(observed+observed/4, time.Duration(j.plan.SlotMillis)*time.Millisecond*9/10))
+			}
 			if e == nil {
-				e = j.donePart(bounded, task.Part.ID, sent)
+				// A verified immutable acknowledgement remains valid after its
+				// network slot. Saving it performs no new remote IO. Cancellation
+				// and the signed plan deadline still bound the local write.
+				pending = append(pending, partAcknowledgement{id: task.Part.ID, round: round, submitted: sent})
+				pendingComplete[task.Part.ID] = true
+				if len(pending) == maxProgressBatch {
+					e = flushProgress()
+				}
 				madeProgress = madeProgress || e == nil
+				if e == nil {
+					progress.Complete = true
+					state.Parts[task.Part.ID] = progress
+				}
 			}
 			stop()
 			if e != nil && !errors.Is(e, context.DeadlineExceeded) && !errors.Is(e, context.Canceled) && !errors.Is(e, storage.ErrUnavailable) {
@@ -319,7 +419,30 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		if round != previousRound {
 			idleDelay, previousRound = 50*time.Millisecond, round
 		}
-		if j.plan.owner("publication", round) == j.worker {
+		readyToPublish := true
+		if audit == nil {
+			// A short assignment slot may end before our own parts finish.
+			// Auditing their already completed prefix cannot publish this
+			// generation yet, and repeated audits consume the next slot too.
+			// Remote completion is still checked above; final publication and
+			// readback remain mandatory after the assigned work is done.
+			for _, task := range tasks {
+				if !state.Parts[task.Part.ID].Complete && j.plan.owner(task.Part.ID, round) == j.worker {
+					readyToPublish = false
+					break
+				}
+			}
+		}
+		if readyToPublish {
+			// A part slot's end does not invalidate verified immutable bytes.
+			// Expose our completed assignment durably even while another worker
+			// owns publication. No publication or COMPLETE precedes this flush.
+			if e = flushProgress(); e != nil {
+				return result, e
+			}
+			round, end = j.plan.round(time.Now())
+		}
+		if readyToPublish && j.plan.owner("publication", round) == j.worker {
 			// Full-generation audit may outlive a part slot. A successor can
 			// audit concurrently; immutable publication makes the duplicate safe.
 			if audit != nil {
@@ -344,6 +467,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 				}); e != nil {
 					return result, e
 				}
+				delete(prepared, absent.Part.ID)
 			}
 		}
 		// Workers waiting for peers must not poll the target at the active-work
@@ -357,6 +481,17 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		// Wake at the next assignment boundary even after a long idle period.
 		// Cancellation and the plan deadline interrupt the bounded wait.
 		pause := min(idleDelay, time.Until(end))
+		if !waitUntil.IsZero() {
+			if remaining := time.Until(waitUntil); remaining > 0 {
+				pause = remaining
+			} else if !readyToPublish {
+				continue
+			}
+		} else if !lastLeaseEnd.IsZero() && !time.Now().Before(lastLeaseEnd) && !readyToPublish {
+			// Active retries do not spend the beginning of the new assignment
+			// on peer-wait backoff. Idle peers retain the bounded backoff below.
+			continue
+		}
 		if pause <= 0 {
 			continue
 		}

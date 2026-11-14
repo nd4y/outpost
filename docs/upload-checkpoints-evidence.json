@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "status": "BOUNDED_RUNTIME_NUMERIC_RACE_PASS_PUBLICATION_PENDING",
+  "runtimeTree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
+  "runtimeFiles": {
+    "internal/upload/claim_batch_linux.go": "d3cd16da30751bf98fe2aa2587301fae0d130fdee87f6af3ddd6f52e3157787b",
+    "internal/upload/claim_batch_linux_test.go": "1a14aa72e5724573e24ecf442dd863cd02486e35f9cda1b81ab8ffd1b7e0ad24",
+    "internal/upload/journal_batch_linux.go": "4abc86213a5b3f03fa5f8cc77392588df39134320fbcd8e271d7154cffd88668",
+    "internal/upload/journal_batch_linux_test.go": "34460b7ce6cf57a09abe545510bc39cb8aa7fce008f094555ce7ea0efcdaf720",
+    "internal/upload/journal_linux.go": "37513b8e7724d2a4204641dec2ca64593bbd908435c9fcf307efb695515f1b61",
+    "internal/upload/missing_repair_linux.go": "aa33f64cb36ef634872ecac9131fc541a4efeeaa6ec880098c8ce7df6756961a",
+    "internal/upload/previous_reader_linux_test.go": "a5d53e184661a1e8bdf2c2112e09050553b957867b2b256af70fba491dbd5b80",
+    "internal/upload/progress_linux_test.go": "50555afda3d83e4defdee27f8d0e3e8b3839c4a0f9876de4b7fef05c6fc24cb6",
+    "internal/upload/worker_linux.go": "63c4b98d7d73f1e10a4df658f46b89866151cadd037ee55d767c9d95549972f9"
+  },
+  "claimBounds": {
+    "members": 32,
+    "bytes": 32768,
+    "rounds": 1,
+    "expiry": "unchanged each original claim slot",
+    "signature": "unchanged individually signed V1 plus purpose-bound signed canonical container"
+  },
+  "journalBounds": {
+    "intentsPerTransaction": 32,
+    "pendingACKs": 32,
+    "formatMigration": false,
+    "asyncWriter": false,
+    "flush": "at bound, own work completion and before publication or peer-marker COMPLETE"
+  },
+  "currentNumeric": {
+    "slotMillis": 500,
+    "deadlineSeconds": 12,
+    "rotationSeconds": 9.167289199,
+    "lostPartSeconds": 9.401889524,
+    "s3Speedup": 1.625057,
+    "webdavSpeedup": 1.602296,
+    "minimumSpeedup": 1.5,
+    "latencyMillis": 150,
+    "inputBytes": 3145728,
+    "physicalParts": 52,
+    "workers": [1, 3],
+    "peakBytes": 172613632,
+    "memoryCapBytes": 805306368,
+    "swapOOM": 0,
+    "logSHA256": "332031c30c81b3dd0c75f2a69c5815b235f285c1540e9bf4f9e2c4e4154eb05c"
+  },
+  "focused": {
+    "logSHA256": "6a682602961a1b879ce965398b000e5fbca05cefc730f39301772232a47ddf79",
+    "passed": [
+      "prepared guard/quota cancellation",
+      "bounded atomic progress/reopen/overflow",
+      "actual SIGKILL with pendingACK and target recheck",
+      "idle polling same journal process restart",
+      "idle cancellation preserves pins",
+      "original targetreadback12s",
+      "controlled ACK beyond original slot",
+      "actual previous packaged reader both versions and protocols"
+    ],
+    "failed": [
+      "unchanged short3MiB queue12s on this HDD; baseline and earlier candidates also fail"
+    ]
+  },
+  "previousReader": {
+    "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "kitSHA256": "43de298c3d4832d487e31f4869d85225b3328dacf37983f099bd5243fadd4aea",
+    "protocols": ["s3", "webdav"],
+    "versionsPerProtocol": 2,
+    "bytesPerVersion": 131072,
+    "sourceRuntimeRemoved": true,
+    "checks": ["bytes", "0640 mode", "hardlinks"],
+    "scope": "Fresh previous executable processes restore exported kits. Shared HDD/container; not separate physical domains or mixed-version workers."
+  },
+  "preservedFailures": [
+    {
+      "tree": "0824be7a4029226010d2c0534adbecc0f4356114",
+      "scope": "original production plus ACK control",
+      "targetReadback12s": "FAIL",
+      "queueAdmissionIntentDeadline": "FAIL"
+    },
+    {
+      "tree": "d79fb3be9978ef84aafca7ed7571d0b7e3e98443",
+      "numeric": "PASS",
+      "fullHDDRegression": "FAIL including MOVE/queue/readback deadlines and600s suite timeout"
+    },
+    {
+      "tree": "162165afb65e4c6af05e6638fc17309ba403a94f",
+      "boundedNewControls": "PASS",
+      "rotation12s": "FAIL12.070039486s despite11durableparts",
+      "lostPart12s": "PASS11.279740684s",
+      "latency": "NOT_RUN after slot failure"
+    },
+    {
+      "tree": "9bcb2a73e79b68d9f1a289f33a4a68cbb8a8a69b",
+      "stage": "test compile",
+      "result": "FAIL: Close with no return used as value; corrected only new test, later exact source tested"
+    }
+  ],
+  "limits": [
+    "Full short-deadline HDD suite remains unaccepted; hosted CI cannot relabel its failed sample",
+    "No future claims, extended network lease, cached evidence without owner policy, decrypt-key or generation-format changes",
+    "No real account, physical failure-domain, full100GiB distributed or full-product acceptance",
+    "Exact published-source required CI/readback still pending"
+  ],
+  "race": {
+    "tree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
+    "topLevelTests": 8,
+    "status": "PASS",
+    "logSHA256": "f1362f10aaa618206c6389e8efb9dd01866c5e895466068409986021265906d6",
+    "binarySHA256": "cb415d106af967bb9c807ce30f6ffafe9928432fbfa0adf567722e1c40f8a3c5",
+    "memoryPeakBytes": 369864704,
+    "capBytes": 805306368,
+    "swapOOM": 0,
+    "scope": "Preparedguard/quota,atomic/reopen,actualSIGKILL,oldreaderbothversions/protocols,idle/cancel,originaltargetreadback and controlledACK; no claim entire short-deadlineHDD suite passed"
+  }
+}

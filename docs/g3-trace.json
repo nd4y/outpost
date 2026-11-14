@@ -96,6 +96,18 @@
         {
           "path": "internal/upload/move_linux_test.go",
           "name": "TestWebDAVMoveQueueReopensWithDurableAttemptBook"
+        },
+        {
+          "path": "internal/upload/journal_batch_linux_test.go",
+          "name": "TestJournalBatchesAreBoundedAtomicAndAdmitted"
+        },
+        {
+          "path": "internal/upload/journal_batch_linux_test.go",
+          "name": "TestJournalBatchSIGKILLRechecksUncommittedAcknowledgement"
+        },
+        {
+          "path": "internal/upload/progress_linux_test.go",
+          "name": "TestVerifiedPartProgressSurvivesLocalLockAcrossSlot"
         }
       ]
     },
@@ -128,6 +140,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueActualSIGKILLAndRestart"
+        },
+        {
+          "path": "internal/upload/journal_batch_linux_test.go",
+          "name": "TestJournalBatchSIGKILLRechecksUncommittedAcknowledgement"
         }
       ]
     },
@@ -164,6 +180,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueInstancesKeepIndependentPins"
+        },
+        {
+          "path": "internal/upload/previous_reader_linux_test.go",
+          "name": "TestPreviousKitRestoresBothBatchUploadedGenerations"
         }
       ]
     },
@@ -224,6 +244,14 @@
         {
           "path": "internal/upload/move_linux_test.go",
           "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
+          "path": "internal/upload/claim_batch_linux_test.go",
+          "name": "TestClaimBatchCacheRequiresActualReadbackAndCurrentLease"
+        },
+        {
+          "path": "internal/upload/progress_linux_test.go",
+          "name": "TestSlotRotationKeepsCompletedPartsAndRequeuesOnlyLostPart"
         }
       ]
     }
@@ -262,6 +290,10 @@
         {
           "path": "internal/upload/queue_linux_test.go",
           "name": "TestQueueInterruptedAdmissionExpiryAndCompletionCleanup"
+        },
+        {
+          "path": "internal/upload/claim_batch_linux_test.go",
+          "name": "TestSignedClaimBatchesKeepLegacyAuthorityAndBounds"
         }
       ]
     },

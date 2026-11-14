@@ -328,13 +328,58 @@ func (j *Journal) beginPart(ctx context.Context, id string, round int64) error {
 		return nil
 	})
 }
-func (j *Journal) donePart(ctx context.Context, id string, submitted int64) error {
+
+// checkPreparedPart re-admits a retry of an intent already durable in this Run.
+// Admission is cancelled rather than committed: no state file is rewritten and
+// the earlier pending intent still protects crash recovery. Completed progress
+// is always saved separately. Attempts counts durable preparations, not RPCs.
+func (j *Journal) checkPreparedPart(ctx context.Context, id string, round int64) error {
+	if j.Guard != nil {
+		if err := j.Guard(ctx); err != nil {
+			return err
+		}
+	}
+	unlock, err := lock(ctx, j.root, "state.lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	s, err := j.load()
+	if err != nil {
+		return err
+	}
+	p, ok := s.Parts[id]
+	if !ok || !j.tasks[id] || p.Complete || round < 0 || p.Attempts == ^uint64(0) || s.Revision == ^uint64(0) {
+		return ErrDenied
+	}
+	p.Round, p.Attempts = round, p.Attempts+1
+	s.Parts[id] = p
+	s.Revision++
+	raw, err := json.Marshal(s)
+	if err != nil || len(raw) > maxJournal {
+		return ErrDenied
+	}
+	if j.Admit == nil {
+		return ctx.Err()
+	}
+	finish, err := j.Admit("state.json", len(raw))
+	if err != nil {
+		return err
+	}
+	if finish == nil {
+		return ErrDenied
+	}
+	return finish(false)
+}
+
+func (j *Journal) donePart(ctx context.Context, id string, round, submitted int64) error {
 	return j.edit(ctx, func(s *State) error {
 		p, ok := s.Parts[id]
-		if !ok || submitted < 0 || p.SubmittedBytes > int64(^uint64(0)>>1)-submitted {
+		if !ok || round < 0 || submitted < 0 || p.SubmittedBytes > int64(^uint64(0)>>1)-submitted {
 			return ErrDenied
 		}
 		p.Complete = true
+		p.Round = round
 		p.SubmittedBytes += submitted
 		s.Parts[id] = p
 		return nil

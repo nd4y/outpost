@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "status": "FAIL_THROUGHPUT",
-  "scope": "Controlled small-data delayed HTTPS fixture. Both protocols retain exactly3 concurrent upload actors and immutable writes once; all recorded throughput samples are retained, not selected for success.",
+  "status": "PASS_BOUNDED_CURRENT_PROFILE",
+  "scope": "Controlled small-data delayed HTTPS fixture; all prior failed samples retained. Current bounded claim/journal batching passes both protocols on its frozen source tree. This is not real topology/full G3 or full-HDD-regression acceptance.",
   "environment": {
     "os": "Linux amd64",
     "go": "1.27.3",
@@ -80,34 +80,95 @@
       },
       "logSHA256": "b4a980acfbeac7ec76270ffda0afcfe484c0f213eb130a27809967707ed2f43a",
       "correctnessContinuedAfterRatioFailure": true
+    },
+    {
+      "tree": "30f170b0975a4c404ef837edd1a839b0f997250d",
+      "raceEnabled": false,
+      "status": "FAIL",
+      "protocols": {
+        "s3": {
+          "singleNs": 42093840740,
+          "threeNs": 29879452111,
+          "speedup": 1.408789
+        },
+        "webdav": {
+          "singleNs": 40303671227,
+          "threeNs": 26226000386,
+          "speedup": 1.536783
+        }
+      },
+      "logSHA256": "aa43dd2316fb7c950c7516ddc250eb8388e223dddc0cf7bacd95636ea83878f7",
+      "correctnessContinuedAfterRatioFailure": true
+    },
+    {
+      "tree": "d79fb3be9978ef84aafca7ed7571d0b7e3e98443",
+      "raceEnabled": false,
+      "status": "PASS",
+      "protocols": {
+        "s3": {
+          "singleNs": 33108908428,
+          "threeNs": 21875321579,
+          "speedup": 1.513528
+        },
+        "webdav": {
+          "singleNs": 31644529422,
+          "threeNs": 20960514428,
+          "speedup": 1.509721
+        }
+      },
+      "logSHA256": "8eb2f7773b90f39a0384500a639fa59a3d9146fdd5491baa715f43a3bc49859a",
+      "correctnessContinuedAfterRatioFailure": true
+    },
+    {
+      "tree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
+      "raceEnabled": false,
+      "status": "PASS",
+      "protocols": {
+        "s3": {
+          "singleNs": 16525044561,
+          "threeNs": 10168898550,
+          "speedup": 1.625057
+        },
+        "webdav": {
+          "singleNs": 17312931897,
+          "threeNs": 10805077209,
+          "speedup": 1.602296
+        }
+      },
+      "logSHA256": "3f94b177b956a589bd4b2fc22f023800154ac1d0dad3c34abc87d9e65d40f554",
+      "correctnessContinuedAfterRatioFailure": true
     }
   ],
   "correctness": {
-    "tree": "67a529e62758531a3053f1d1e83b4becb1c69c68",
+    "tree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
     "bothProtocolsCompleted": true,
     "oldAndNewIndependentRestoreAfterSourceRemoval": true,
     "falseCompleteMarkerRejected": true,
     "signedClaimsAndCiphertextConfidentiality": true,
-    "failureStillReturnsNonzero": true
+    "failureStillReturnsNonzero": true,
+    "logSHA256": "3f94b177b956a589bd4b2fc22f023800154ac1d0dad3c34abc87d9e65d40f554"
   },
   "defaultRegression": {
-    "tree": "97bfc2f5d2940a13d80f4d911800e287d40bc1a4",
+    "tree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
     "partDelayMillis": 40,
     "bothProtocols": "PASS",
-    "logSHA256": "b701ef8af94129dfbb55a4b9eca1df6909d5dd16bc314a973d30afa8ed8b5962"
+    "logSHA256": "89b73621321e931be2e34827c6a992cc39716c68ca4e35990f8666b0ba664918"
   },
   "diagnostics": {
-    "latestMemoryPeakBytes": 155602944,
     "swapBytes": 0,
     "oom": 0,
     "s3RequestsSingleThree": [439, 1204],
     "webdavRequestsSingleThree": [439, 1197],
     "cgroupCPUAndIOAndPressureCountersRecorded": true,
-    "attribution": "NOT_VERIFIED. Shared HDD, repeated requests/readback and instrumentation are not proven as a single root cause.",
-    "repeatPolicy": "No identical retries to select a successful ratio. A new resource/profile comparison needs a declared material change."
+    "attribution": "Controlled ACK lock reproduces lost progress in original code; journal flush cost and repeated prefix audits are observed. Bounded claims/progress avoid repeated metadata writes. No claim that one cause explains every historical sample or eliminates shared HDD/CPU limits.",
+    "repeatPolicy": "No identical retries to select a successful ratio. A new resource/profile comparison needs a declared material change.",
+    "previousMemoryPeakBytes": 155602944,
+    "latestMemoryPeakBytes": 172613632,
+    "latestTree": "dee1677773e6cc811bf3f8fd45814ba05edaf8a2",
+    "previousAttribution": "NOT_VERIFIED. Shared HDD, repeated requests/readback and instrumentation are not proven as a single root cause."
   },
   "limits": [
-    "Does not accept1.5speedup across both protocols",
+    "Accepts only the unchanged bounded current150ms1.5profile, not full AT-14 infrastructure throughput",
     "Not the four-holder topology or a100GiB distributed run",
     "SharedCPU/HDD testbed does not establish absence of a shared bottleneck",
     "No real endpoint ACL/credential admission, physical wire/cost or production guarantee"

@@ -70,16 +70,23 @@ func (j *Journal) restorePart(ctx context.Context, source *generation.Replica, b
 		if err = b.Probe(ctx); err != nil {
 			return err
 		}
-		bounded, stop := context.WithDeadline(ctx, end)
-		err = j.beginPart(bounded, task.Part.ID, round)
-		if err == nil {
-			err = claim(bounded, b, j, task.Part, round, end, key)
+		err = j.beginPart(ctx, task.Part.ID, round)
+		if err != nil {
+			return err
 		}
+		// Probe, source validation and local fsync spend no remote lease.
+		// A changed assignment must be checked before the first claim/write.
+		round, end = j.plan.round(time.Now())
+		if j.plan.owner(task.Part.ID, round) != j.worker {
+			continue
+		}
+		bounded, stop := context.WithDeadline(ctx, end)
+		err = claim(bounded, b, j, task.Part, round, end, key)
 		if err == nil {
 			err = b.PutPart(bounded, task.Part, data[task.Offset:last])
 		}
 		if err == nil {
-			err = j.donePart(bounded, task.Part.ID, int64(task.Part.Bytes))
+			err = j.donePart(ctx, task.Part.ID, round, int64(task.Part.Bytes))
 		}
 		stop()
 		if !errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {

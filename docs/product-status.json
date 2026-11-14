@@ -2112,6 +2112,18 @@
         {
           "path": "internal/worker/vm_powerloss_linux_test.go",
           "name": "TestVMKernelFixture"
+        },
+        {
+          "path": "internal/upload/journal_batch_linux_test.go",
+          "name": "TestJournalBatchesAreBoundedAtomicAndAdmitted"
+        },
+        {
+          "path": "internal/upload/journal_batch_linux_test.go",
+          "name": "TestJournalBatchSIGKILLRechecksUncommittedAcknowledgement"
+        },
+        {
+          "path": "internal/upload/progress_linux_test.go",
+          "name": "TestVerifiedPartProgressSurvivesLocalLockAcrossSlot"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2460,6 +2472,10 @@
         {
           "path": "internal/generation/metadata_checkpoint_linux_test.go",
           "name": "TestReplicaMetadataCheckpointPartialQuotaAndCancellation"
+        },
+        {
+          "path": "internal/upload/journal_batch_linux_test.go",
+          "name": "TestJournalBatchSIGKILLRechecksUncommittedAcknowledgement"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -2843,6 +2859,10 @@
         {
           "path": "internal/ingress/catalog_deadline_linux_test.go",
           "name": "TestCatalogDeadlineBoundsAndReopenedVerificationProgress"
+        },
+        {
+          "path": "internal/upload/previous_reader_linux_test.go",
+          "name": "TestPreviousKitRestoresBothBatchUploadedGenerations"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -3241,6 +3261,10 @@
         {
           "path": "internal/upload/idle_poll_linux_test.go",
           "name": "TestWaitingUploadBackoffCancellationKeepsPin"
+        },
+        {
+          "path": "internal/upload/claim_batch_linux_test.go",
+          "name": "TestClaimBatchCacheRequiresActualReadbackAndCurrentLease"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -5542,6 +5566,10 @@
         {
           "path": "internal/managementservice/shutdown_linux_test.go",
           "name": "TestManagementServiceStopClosesSilentTLSWithoutReportingGraceDeadline"
+        },
+        {
+          "path": "internal/upload/claim_batch_linux_test.go",
+          "name": "TestSignedClaimBatchesKeepLegacyAuthorityAndBounds"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
