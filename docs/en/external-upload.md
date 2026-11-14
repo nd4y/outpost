@@ -71,7 +71,11 @@ The result is an observation at read time. Another worker or a delayed request c
 
 ## Complete generations and recovery
 
+The [polling receipt](../upload-idle-evidence.json) records38/39 original versus5/5 candidate marker GETs per2.1s, real idle-process restart and cancellation, and ordinary old/new cloud restoration on both protocols. The unchanged12s rotation/lost-part test fails on both original and candidate binaries while sharing the HDD with a full-size job, including without race instrumentation. That regression and the150ms throughput profile remain unaccepted; no identical retry or relaxed assertion is used.
+
 Completed immutable parts remain completed when assignment slots rotate. If a publication read discovers an absent part, only that part loses its local completion mark. Other verified progress survives. This prevents a slow executor from repeatedly restarting its completed prefix while preserving full publication checks. A delayed-slot test also physically removes an acknowledged fixture part and requires its independent reupload before recovery.
+
+When an iteration makes no local progress, the worker increases its polling interval from the active 50ms cadence up to one second. Persisted part progress, successful publication and a new assignment round reset that interval. The wait ends by the next slot boundary and is interrupted by cancellation or the plan deadline. The source pin remains held while peers or publication are missing. Every completion still requires the same full target readback; this polling bound does not accept the separate throughput profile.
 
 A part can become durable as its slot expires before the local acknowledgment is saved. Final verification requires the exact planned blob descriptors, then reconciles recorded part completion in the same transaction as the receipt. This resolves uncertain local acknowledgments without inventing submitted-byte counts. A valid target object cannot certify a different planned part map.
 

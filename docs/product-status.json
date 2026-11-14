@@ -2790,6 +2790,14 @@
         {
           "path": "internal/ingress/catalog_continuation_linux_test.go",
           "name": "TestCatalogContinuationRejectsExpiredIntent"
+        },
+        {
+          "path": "internal/upload/idle_poll_linux_test.go",
+          "name": "TestWaitingUploadWorkerBoundsTargetPolling"
+        },
+        {
+          "path": "internal/upload/idle_poll_linux_test.go",
+          "name": "TestWaitingUploadBackoffCancellationKeepsPin"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -3176,6 +3184,14 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/idle_poll_linux_test.go",
+          "name": "TestWaitingUploadWorkerBoundsTargetPolling"
+        },
+        {
+          "path": "internal/upload/idle_poll_linux_test.go",
+          "name": "TestWaitingUploadBackoffCancellationKeepsPin"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -3344,6 +3360,14 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/idle_poll_linux_test.go",
+          "name": "TestWaitingUploadWorkerBoundsTargetPolling"
+        },
+        {
+          "path": "internal/upload/idle_poll_linux_test.go",
+          "name": "TestWaitingUploadBackoffCancellationKeepsPin"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -8421,7 +8445,7 @@
         }
       ],
       "acceptance": ["AT-34"],
-      "remaining": "Bounded CI candidate packaging and strict independent download verification are implemented; HDD adversarial checks, actual uploaded artifact download, downloaded-byte runtime/visual evidence and exact CI remain pending. Official release and whole-product acceptance are separate."
+      "remaining": "The bounded CI candidate stage is accepted on executable source f2f3321 and receipt-only publication a15289b: actual native/browser downloads, independent digest/source verification, two-version128MiB downloaded-reader recovery, scoped static visual review and six required CI checks passed. Official release, admitted host installation/cold boot, manual keyboard/assistive technology and whole-product acceptance remain separate."
     },
     {
       "id": "REQ-52",

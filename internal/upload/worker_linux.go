@@ -235,6 +235,8 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 		return result, e
 	}
 	var cache sourceObjectCache
+	idleDelay := 50 * time.Millisecond
+	previousRound := int64(-1)
 	for {
 		if e = ctx.Err(); e != nil {
 			return result, e
@@ -250,6 +252,10 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			return result, e
 		}
 		round, end := j.plan.round(time.Now())
+		if round != previousRound {
+			idleDelay, previousRound = 50*time.Millisecond, round
+		}
+		madeProgress := false
 		for _, task := range tasks {
 			progress := state.Parts[task.Part.ID]
 			if progress.Complete || j.plan.owner(task.Part.ID, round) != j.worker {
@@ -302,6 +308,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			}
 			if e == nil {
 				e = j.donePart(bounded, task.Part.ID, sent)
+				madeProgress = madeProgress || e == nil
 			}
 			stop()
 			if e != nil && !errors.Is(e, context.DeadlineExceeded) && !errors.Is(e, context.Canceled) && !errors.Is(e, storage.ErrUnavailable) {
@@ -309,6 +316,9 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			}
 		}
 		round, end = j.plan.round(time.Now())
+		if round != previousRound {
+			idleDelay, previousRound = 50*time.Millisecond, round
+		}
 		if j.plan.owner("publication", round) == j.worker {
 			// Full-generation audit may outlive a part slot. A successor can
 			// audit concurrently; immutable publication makes the duplicate safe.
@@ -317,6 +327,7 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 			} else {
 				e = j.publish(ctx, b)
 			}
+			madeProgress = madeProgress || e == nil
 			if e != nil && !storage.Missing(e) && !errors.Is(e, storage.ErrUnavailable) && !errors.Is(e, context.DeadlineExceeded) && !errors.Is(e, context.Canceled) {
 				return result, e
 			}
@@ -335,7 +346,21 @@ func (j *Journal) Run(ctx context.Context, source *generation.Replica, b *storag
 				}
 			}
 		}
-		if e = sleep(ctx, 50*time.Millisecond); e != nil {
+		// Workers waiting for peers must not poll the target at the active-work
+		// cadence indefinitely. No completion evidence is cached or weakened:
+		// the next iteration still verifies the full closure before COMPLETE.
+		if madeProgress {
+			idleDelay = 50 * time.Millisecond
+		} else {
+			idleDelay = min(2*idleDelay, time.Second)
+		}
+		// Wake at the next assignment boundary even after a long idle period.
+		// Cancellation and the plan deadline interrupt the bounded wait.
+		pause := min(idleDelay, time.Until(end))
+		if pause <= 0 {
+			continue
+		}
+		if e = sleep(ctx, pause); e != nil {
 			return result, e
 		}
 	}
