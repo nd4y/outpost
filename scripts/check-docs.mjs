@@ -162,7 +162,11 @@ for (const item of generationTrace.requirements) {
   for (const id of item.acceptanceSubset)
     assert(requirement.acceptance.includes(id), `Invalid G2 subset ${item.id} -> ${id}`);
   for (const test of item.tests) {
-    assert(/^internal\/(?:generation|filekit)\/[a-z_]+_test\.go$/.test(test.path));
+    assert(
+      /^internal\/(?:generation|filekit|peer|worker|sourceagent)\/[a-z_]+_test\.go$/.test(
+        test.path,
+      ),
+    );
     assert(/^Test[A-Za-z0-9]+$/.test(test.name));
     assert(
       read(test.path).includes(`func ${test.name}(t *testing.T)`),

@@ -180,3 +180,11 @@ Unsplit planning uses signed references; multipart planning reads uncached objec
 Journal `SubmittedBytes` counts part payloads passed to upload attempts. The worker also measures HTTP body traffic for each attempt, including retries and verification reads. [Telemetry](telemetry.md#external-upload-attempts) explains the counters and their coverage.
 
 Full network and cost accounting, real endpoint limits and ACLs, low-memory and large-history profiles, long partitions, power loss and heavy G1-G3 tests remain open. [Deployment holds](roadmap.md) require their own acceptance evidence.
+
+## Controlled latency profile
+
+The opt-in `OUTPOST_UPLOAD_LATENCY_PROFILE=1` profile requires the admitted `OUTPOST_TEST_ROOT`, uses the same 3 MiB input and three independent worker processes, and fixes the part delay at150ms before execution. It checks a speedup of at least1.5 without changing the120s child timeout or180000ms assignment slot. The default40ms regression remains separate.
+
+The [full measurement receipt](../g3-latency-evidence.json) retains all three samples, including failures. The first race-enabled sample measured1.08x on S3-compatible storage and1.31x on WebDAV. Ordinary binaries also failed to achieve1.5x consistently across both protocols. Worker journals, source replicas and the synthetic target share one HDD and one CPU quota, so this fixture does not establish the absence of a shared bottleneck required by section20. No single root cause has been proven.
+
+The gated check now records request counts, part-write span, child CPU and cgroup CPU/I/O/pressure observations. A failed speedup assertion keeps the test failing while allowing the false-marker and independent old/new restoration checks to execute. Both protocols completed those correctness checks in the final sample. The ordinary default40ms recovery regression passed separately. Throughput acceptance remains open; do not select a successful single-protocol sample as a full PASS.

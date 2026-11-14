@@ -2,7 +2,7 @@
 
 [Русский](../ru/generation-replicas.md)
 
-The G2 candidate in `internal/generation` adds signed generation catalogs, keyless local receivers, durable reception progress and protected cleanup to the [file-kit format](file-kit-format.md). This is a library and executable test fixture, not a peer service. Full G1/G2/G3 acceptance and heavy scale/endurance tests remain deferred. The implementation does not start or migrate a working service.
+The G2 candidate in `internal/generation` adds signed generation catalogs, keyless local receivers, durable reception progress and protected cleanup to the [file-kit format](file-kit-format.md). This is a library and executable test fixture, not a peer service. The recorded standalone G1 scale and bounded G2 history/epoch checks have separate receipts; full distributed G2/G3, endurance and product acceptance remain open. The implementation does not start or migrate a working service.
 
 ## Authority and data flow
 
@@ -10,7 +10,7 @@ The G2 candidate in `internal/generation` adds signed generation catalogs, keyle
 
 `outpost-generation-1` binds domain, repository, writer epoch, sequence, parent checkpoint, snapshot time, policy version, file-kit format and each selected kit's root and complete physical object list. IDs are SHA-256; names and attributes remain inside encrypted file descriptors. Ordered kit/object lists and exact Go JSON serialization are canonical. Duplicate/unknown fields, alternative encodings, inconsistent lengths and unsafe IDs are rejected. Ed25519 signatures have distinct catalog and maintenance purpose prefixes.
 
-The receiver stores only public author and maintenance verification keys. Neither data-decryption keys nor signing keys belong in its persistent state. Trust/domain/repository/epoch are provisioned separately and immutable for this candidate; a writer cannot grant itself a new epoch or deletion authority. Epoch transition, transport authority expiry/revocation and placement/route enforcement need the later configuration/transport layer. Direct library access assumes an authorized local process, not an exposed remote administration API.
+The receiver stores only public author and maintenance verification keys. Neither data-decryption keys nor signing keys belong in its persistent state. Trust/domain/repository/epoch are provisioned separately and immutable for this candidate; a writer cannot grant itself a new epoch or deletion authority. Epoch transition, transport authority expiry/revocation and placement/route enforcement belong to the configuration/transport layer; the bounded holder workflow below exercises that integration. Direct library access assumes an authorized local process, not an exposed remote administration API.
 
 ## Reception and recovery
 
@@ -58,7 +58,13 @@ The separate `outpost-retention-ledger-1` sidecar preserves exact signed mainten
 
 A sixth real SIGKILL boundary now checks the interval between durable retirement authority and index mutation. Reopen/retry preserves the latest complete closure and refuses retired historical reacquisition. HTTPS history admission also requires an explicit local grant; ordinary peer access does not expand it. Full autonomous discovery, queue and operator workflow acceptance is tracked separately.
 
-Remaining acceptance includes full-scale G1, large catalogs/history, multi-node scheduling and policy, epoch transitions, real network cuts and cloud semantics, volume loss during I/O, cold boot and production installation. The [roadmap](roadmap.md) and whole-product acceptance scenarios remain NOT_VERIFIED.
+Remaining acceptance includes integrated distributed scale, large catalogs/history, full epoch lifecycle, real network cuts and cloud semantics, volume loss during I/O, cold boot and production installation. The [roadmap](roadmap.md) and whole-product acceptance scenarios remain NOT_VERIFIED.
+
+## Measured history and holder epochs
+
+The [scoped receipt](../g2-history-evidence.json) records an actual `OUTPOST_OFFLINE_180=1` execution of `TestOfflineHistoryAcrossMaintenanceAndPolicyChange`: 180 updates of a 64 KiB file, through sequence 181, with 187-day test grants. The third holder stays closed while the other holders change policy and maintain only the final generation. An interrupted final receive preserves the old complete generation and pending work; direct catch-up restores both old and new versions after the source and bridge stop. The race-enabled HDD run took 1598.41 s and peaked at 160845824 bytes, with swap and OOM counters zero. Catalog dates simulate daily updates; this is not 180 days of elapsed operation or a 100 GiB distributed test.
+
+`TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory` exercises real worker mTLS transfer into separately keyed epochs. Current policy denies the old configuration and operation; the new replica rejects an old catalog before fetching payloads. Reopening the worker preserves the epoch floor even against a higher configuration revision. Both retained epochs restore independently with their matching read-only owner material after source access is removed. This race-enabled HDD check took 24.59 s and peaked at 119443456 bytes. Superseded key destruction, full-scale lifecycle, complete volume loss and independently admitted credentials remain open.
 
 ## Frozen maintenance replay
 

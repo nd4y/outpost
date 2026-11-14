@@ -280,20 +280,63 @@ func recoverBytes(t *testing.T, f *fixture, s *teststore.Server, id, version str
 		t.Fatal("restored attributes differ")
 	}
 }
+
+// Profile observations cover the whole process group: workers and the synthetic
+// endpoint share the admitted CPU and HDD. They do not attribute a bottleneck.
+func logUploadProfile(t *testing.T, phase string, s *teststore.Server, children []*child) {
+	t.Helper()
+	snapshot := s.Snapshot()
+	var first, last time.Time
+	var childCPU time.Duration
+	for _, event := range snapshot.Events {
+		if first.IsZero() || event.Start.Before(first) {
+			first = event.Start
+		}
+		if event.End.After(last) {
+			last = event.End
+		}
+	}
+	for _, child := range children {
+		if state := child.cmd.ProcessState; state != nil {
+			childCPU += state.UserTime() + state.SystemTime()
+		}
+	}
+	t.Logf("upload profile phase=%s requests=%d part-write-span=%s child-cpu=%s", phase, snapshot.Requests, last.Sub(first), childCPU)
+	for _, name := range []string{"cpu.stat", "io.stat", "cpu.pressure", "io.pressure"} {
+		if raw, err := os.ReadFile("/sys/fs/cgroup/" + name); err == nil {
+			t.Logf("upload profile phase=%s cgroup-%s=%s", phase, name, strings.Join(strings.Fields(string(raw)), " "))
+		}
+	}
+}
+
 func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
+	latency := 40 * time.Millisecond
+	profiled := os.Getenv("OUTPOST_UPLOAD_LATENCY_PROFILE") == "1"
+	if profiled {
+		if os.Getenv("OUTPOST_TEST_ROOT") == "" {
+			t.Fatal("OUTPOST_UPLOAD_LATENCY_PROFILE=1 requires nonempty OUTPOST_TEST_ROOT")
+		}
+		latency = 150 * time.Millisecond
+	}
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
-			// Keep the three-process fixture independent of HDD fsync latency.
+			// Bound child execution and assignment independently of per-part delay.
 			f.childTimeout = 120 * time.Second
 			const slotMillis = 180000
-			baseline := f.server(t, kind, 40*time.Millisecond, nil)
+			baseline := f.server(t, kind, latency, nil)
 			single := f.prepare(t, baseline, f.plan(t, baseline, 1, slotMillis), 0)
+			if profiled {
+				logUploadProfile(t, kind+"-before-single", baseline, nil)
+			}
 			start := time.Now()
 			single.start(t)
 			single.wait(t, true)
 			singleTime := time.Since(start)
-			target := f.server(t, kind, 40*time.Millisecond, nil)
+			if profiled {
+				logUploadProfile(t, kind+"-after-single", baseline, []*child{single})
+			}
+			target := f.server(t, kind, latency, nil)
 			raw := f.plan(t, target, 3, slotMillis)
 			children := []*child{}
 			for i := 0; i < 3; i++ {
@@ -307,6 +350,10 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 				c.wait(t, true)
 			}
 			parallelTime := time.Since(start)
+			if profiled {
+				logUploadProfile(t, kind+"-after-three", target, children)
+			}
+			speedup := float64(singleTime) / float64(parallelTime)
 			snapshot := target.Snapshot()
 			actors := map[string]int{}
 			for _, event := range snapshot.Events {
@@ -320,7 +367,10 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 					t.Fatal("physical object rewritten", key)
 				}
 			}
-			t.Logf("bounded delayed-endpoint fixture: single=%s three=%s ratio=%.2f physical-parts=%d", singleTime, parallelTime, float64(singleTime)/float64(parallelTime), len(snapshot.Events))
+			t.Logf("bounded delayed-endpoint fixture: input-bytes=%d single=%s three=%s single-ns=%d three-ns=%d speedup=%.6f latency=%s workers=%d/%d physical-parts=%d", len(f.data), singleTime, parallelTime, singleTime.Nanoseconds(), parallelTime.Nanoseconds(), speedup, latency, 1, 3, len(snapshot.Events))
+			if profiled && speedup < 1.5 {
+				t.Errorf("latency profile speedup below 1.5: single=%s three=%s speedup=%.2f input-bytes=%d latency=%s workers=%d/%d events=%d", singleTime, parallelTime, speedup, len(f.data), latency, 1, 3, len(snapshot.Events))
+			}
 			// A later, incomplete generation cannot replace the retained complete one.
 			oldID, oldVersion, oldBytes := f.id, f.version, append([]byte(nil), f.data...)
 			changed := append([]byte(nil), f.data...)
@@ -410,6 +460,9 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 			}
 			if claims == 0 {
 				t.Fatal("no signed assignment claims observed")
+			}
+			if profiled {
+				t.Log("latency profile correctness: false marker rejected; old and new versions restored independently after source replicas removed; signed claims and ciphertext confidentiality checked")
 			}
 		})
 	}

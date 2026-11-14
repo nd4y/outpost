@@ -61,6 +61,7 @@ func TestOfflineHistoryAcrossMaintenanceAndPolicyChange(t *testing.T) {
 	bridge = f.endpoint(t, f.a, policy(f.a, f.b), nil)
 	push = f.client(t, f.b, f.a, bridge.URL, policy(f.b, f.a))
 	current, version, body := first, firstVersion, firstBody
+	progressStarted := time.Now()
 	for seq := uint64(2); seq <= updates+1; seq++ {
 		previous := current
 		current, version, body = seal(seq, previous, 2)
@@ -74,6 +75,9 @@ func TestOfflineHistoryAcrossMaintenanceAndPolicyChange(t *testing.T) {
 			must(t, e)
 			_, e = n.replica.Maintain(testContext, permit)
 			must(t, e)
+		}
+		if updates == 180 && (seq-1)%30 == 0 {
+			t.Logf("offline catch-up fixture: sealed and maintained %d/%d updates while the third node remains closed; elapsed=%s", seq-1, updates, time.Since(progressStarted).Round(time.Millisecond))
 		}
 	}
 	for _, n := range []*node{f.a, f.b} {

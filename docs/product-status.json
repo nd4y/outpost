@@ -20,7 +20,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-02",
@@ -166,7 +166,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-23"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-04",
@@ -273,7 +273,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-05",
@@ -454,7 +454,7 @@
       ],
       "checks": [],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-07",
@@ -632,10 +632,14 @@
         {
           "path": "cmd/outpost/external_recovery_linux_test.go",
           "name": "TestCLIExternalRestoreReadsOnlySelectedCloudDependencies"
+        },
+        {
+          "path": "internal/worker/epoch_history_linux_test.go",
+          "name": "TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory"
         }
       ],
       "acceptance": ["AT-01", "AT-18", "AT-24"],
-      "remaining": "The bounded owner procedure authenticates the preceding recovery package, prepares distinct keys through the selected CLI, restores the successor and durably fences the old writer with the actual successor checkpoint. Reopen preserves the old checkpoint and rejects another capture; both retained epochs remain independently restorable after sources and receivers shut down. Holder credential revocation, retirement of superseded key material and admitted-scale lifecycle acceptance remain open."
+      "remaining": "Bounded holder credential/operation/catalog revocation and persistent epoch rollback rejection now pass alongside independent old/new epoch restoration. Retirement of superseded key material and admitted-scale lifecycle acceptance remain open."
     },
     {
       "id": "REQ-09",
@@ -844,7 +848,7 @@
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, lost active-journal recovery and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
     },
     {
       "id": "REQ-15",
@@ -2089,10 +2093,14 @@
         {
           "path": "internal/generation/catalog_integrity_linux_test.go",
           "name": "TestCatalogRepairMissingEmptyAndUnsafeEntryPreservation"
+        },
+        {
+          "path": "internal/peer/offline_history_linux_test.go",
+          "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
-      "remaining": "Maintenance scheduling/epoch workflow, recovery after journal loss and full product target-readiness reporting."
+      "remaining": "Actual180-update catch-up with policy changes, maintenance and interrupted final receive has bounded evidence; large catalog/history cost, recovery after complete journal loss and full product target-readiness reporting remain open."
     },
     {
       "id": "REQ-21",
@@ -2157,10 +2165,14 @@
         {
           "path": "internal/sourceagent/epoch_recovery_cli_linux_test.go",
           "name": "TestOwnerEpochCLIProducesIndependentOldAndNewRecovery"
+        },
+        {
+          "path": "internal/worker/epoch_history_linux_test.go",
+          "name": "TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18", "AT-20", "AT-21"],
-      "remaining": "Maintenance scheduling and holder-side epoch policy/revocation, recovery after journal loss and full product target-readiness reporting. The bounded owner procedure now connects a real prepared successor, independent restoration and a persistent old-writer fence across reopen; it preserves both retained epochs."
+      "remaining": "Owner epoch preparation, old-writer fencing, actual holder TLS transition and old-branch rejection across reopen have bounded evidence; both retained epochs restore independently. Superseded key-material retirement, full-scale lifecycle, complete journal-loss recovery and product readiness remain open."
     },
     {
       "id": "REQ-22",
@@ -3514,6 +3526,10 @@
         {
           "path": "internal/worker/maintenance_linux_test.go",
           "name": "TestWorkerCommandMaintenanceSeparateAuthorityAndActualOutcome"
+        },
+        {
+          "path": "internal/peer/offline_history_linux_test.go",
+          "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
