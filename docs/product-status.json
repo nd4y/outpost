@@ -883,10 +883,14 @@
         {
           "path": "internal/worker/dataset_rebuild_cli_linux_test.go",
           "name": "TestReplacementDatasetRebuildActualCLI"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
-      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json. The opt-in replacement-dataset CLI scenario now combines full old local runtime/replica loss, new owner-enrolled identity, unavailable-holder refusal, cached history discovery and independent immutable-only two-version recovery; it passed on the HDD through the actual selected CLI and on both native architectures at commit 2078249, with all six required checks successful. Physical-volume replacement, cold boot and full-scale acceptance remain separate."
+      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json. The opt-in replacement-dataset CLI scenario now combines full old local runtime/replica loss, new owner-enrolled identity, unavailable-holder refusal, cached history discovery and independent immutable-only two-version recovery; it passed on the HDD through the actual selected CLI and on both native architectures at commit 2078249, with all six required checks successful. Physical-volume replacement, cold boot and full-scale acceptance remain separate. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-14",
@@ -2104,10 +2108,14 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "never-admitted configuration requires the exact reselected signed file"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
-      "remaining": "Installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-20",
@@ -3605,10 +3613,14 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalAuditChecksOptedInHistory"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-18"],
-      "remaining": "Local selection produces a bounded unsigned draft. Complete cross-node retention policy, live epoch workflow, volume-loss recovery and product target-readiness acceptance."
+      "remaining": "Local selection produces a bounded unsigned draft. Complete cross-node retention policy, live epoch workflow, volume-loss recovery and product target-readiness acceptance. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-32",
@@ -3683,10 +3695,14 @@
         {
           "path": "internal/worker/dataset_rebuild_cli_linux_test.go",
           "name": "TestReplacementDatasetRebuildActualCLI"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json. The opt-in replacement-dataset CLI scenario now combines full old local runtime/replica loss, new owner-enrolled identity, unavailable-holder refusal, cached history discovery and independent immutable-only two-version recovery; it passed on the HDD through the actual selected CLI and on both native architectures at commit 2078249, with all six required checks successful. Physical-volume replacement, cold boot and full-scale acceptance remain separate."
+      "remaining": "Maintenance scheduling/epoch workflow, loss of the signed index copy/anchor or entire volume, independently retained checkpoint lifecycle and full product target-readiness reporting remain open. Bounded combined primary-index/retention/pending-plan loss now has exact-source HDD race, actual CLI, SIGKILL and partial-quota/cancellation evidence while the current signed index copy and exact anchor survive; see docs/replica-metadata-evidence.json. The opt-in replacement-dataset CLI scenario now combines full old local runtime/replica loss, new owner-enrolled identity, unavailable-holder refusal, cached history discovery and independent immutable-only two-version recovery; it passed on the HDD through the actual selected CLI and on both native architectures at commit 2078249, with all six required checks successful. Physical-volume replacement, cold boot and full-scale acceptance remain separate. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-33",
@@ -3811,10 +3827,14 @@
         {
           "path": "internal/peer/offline_history_linux_test.go",
           "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12", "AT-20", "AT-21"],
-      "remaining": "Automatic retirement selection and epoch workflow, recovery after complete replica volume loss, and full product target-readiness reporting."
+      "remaining": "Automatic retirement selection and epoch workflow, recovery after complete replica volume loss, and full product target-readiness reporting. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-34",
@@ -8058,10 +8078,14 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "never-admitted configuration requires the exact reselected signed file"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
-      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements."
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-49",
@@ -8503,10 +8527,14 @@
         {
           "path": "scripts/check-candidate-release.py",
           "name": "test_browser_publication_refuses_failed_stale_and_linked_inputs"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-34"],
-      "remaining": "Actual CI candidate downloads and seven amd64 installation/upgrade/rollback/source-absent recovery checks are verified on executable0ad4d17 with previousf2f3321, alongside six exact-head CI checks and both native architectures. The19KiB installation fixture, independent128MiB downloaded-reader recovery and full100GiB acceptance are separate. Official release, admitted host cold boot, manual accessibility and whole-product acceptance remain open; see docs/downloaded-install-evidence.json."
+      "remaining": "Actual CI candidate downloads and seven amd64 installation/upgrade/rollback/source-absent recovery checks are verified on executable0ad4d17 with previousf2f3321, alongside six exact-head CI checks and both native architectures. The19KiB installation fixture, independent128MiB downloaded-reader recovery and full100GiB acceptance are separate. Official release, admitted host cold boot, manual accessibility and whole-product acceptance remain open; see docs/downloaded-install-evidence.json. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     },
     {
       "id": "REQ-52",
@@ -8667,10 +8695,14 @@
         {
           "path": "internal/storage/sdk_signing_test.go",
           "name": "TestSDKIntegrationDoesNotDiscoverCredentials"
+        },
+        {
+          "path": "internal/worker/vm_powerloss_linux_test.go",
+          "name": "TestVMKernelFixture"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],
-      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements."
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
     }
   ],
   "acceptance": [

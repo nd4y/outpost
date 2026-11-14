@@ -1,0 +1,326 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_BOUNDED_GUEST_KERNEL_POWERLOSS_AND_BOOT_ORDERING",
+  "observedAt": "2026-11-14T18:07:50.343968+00:00",
+  "testSourceBaseCommit": "12b10c758537803cb3fc40d7dee093e7849394f1",
+  "testSourceTree": "606782e716ca5a774d1400d66a20f6ea4b4043b2",
+  "testTreeIsUncommittedSnapshot": true,
+  "testFile": "internal/worker/vm_powerloss_linux_test.go",
+  "testFileSHA256": "3148dc95d738b8469a0b34a6236760f129144f025f0f94ab3b4d9f7eb14e471b",
+  "helperSHA256": "92442539991532b8cdfd8fc39b891d63ee178c35c00442c63d7922bacbf968ea",
+  "controllerFile": "scripts/check-vm-powerloss.py",
+  "controllerSHA256": "3d5215cf70d09efdaf76f466e0ca160f62f870740186da0a38fda309f9b5a283",
+  "actualSelectedCLICommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+  "actualSelectedCLIs": {
+    "outpost": {
+      "sha256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+      "bytes": 13394044,
+      "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6"
+    },
+    "outpost-kit": {
+      "sha256": "43de298c3d4832d487e31f4869d85225b3328dacf37983f099bd5243fadd4aea",
+      "bytes": 3498108,
+      "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6"
+    }
+  },
+  "productionBinding": "No production source was changed. The helper is built from the recorded tree; the two recovery CLIs were independently downloaded and selected from actual CI artifacts at the recorded revision. Ordinary Go tests skip this opt-in VM fixture.",
+  "kernel": {
+    "kernelRelease": "6.12.116+deb13-amd64",
+    "kernelSHA256": "a21f79197954256e75fd352692e63263face31601f671c14c9c9d8803785a6c3",
+    "kernelBytes": 12167104,
+    "modules": [
+      {
+        "source": "kernel/drivers/block/virtio_blk.ko.xz",
+        "sourceSHA256": "2bffcfe94376ea4007d4f2249aa945d32aa04f87b873cdbae9c592cdfed4f20e",
+        "file": "virtio_blk.ko",
+        "sha256": "79569825fe2e61649ec448a65302ad6df93f6eabdc8c8f28d362f167dca90476",
+        "bytes": 75015
+      },
+      {
+        "source": "kernel/drivers/char/hw_random/virtio-rng.ko.xz",
+        "sourceSHA256": "18b85f4fa37bf3b943143e01d4e1cb79989ab4d74b3c0b6aafb5ec43acef516b",
+        "file": "virtio_rng.ko",
+        "sha256": "802d3dc2c63213a9e4e0d271056fd89535f7e4095a60e426d4fa5ff4ea5eb2da",
+        "bytes": 20319
+      },
+      {
+        "source": "kernel/lib/crc16.ko.xz",
+        "sourceSHA256": "bdeecf7ce53c2a33dc2752efa7163908f7ee44ff5e68627bc7f4b804a8d838fc",
+        "file": "crc16.ko",
+        "sha256": "5d618c4a9ac7e41a87b7969bd2f6dacabd1f1ae99511bee7ae883aa26afff248",
+        "bytes": 6591
+      },
+      {
+        "source": "kernel/fs/mbcache.ko.xz",
+        "sourceSHA256": "0802af7c7366982de50a29b0e40064b71c68d020cf8d627aca7afa89c54e61bd",
+        "file": "mbcache.ko",
+        "sha256": "74d8539d50cbc9e52350cb138f3408c3f2b21dab5afbbca263a42c7cb0999235",
+        "bytes": 30151
+      },
+      {
+        "source": "kernel/fs/jbd2/jbd2.ko.xz",
+        "sourceSHA256": "6de68db5c8f29b995c66c8b936b9bc9577289ca8180cc8a887cc0b4ec36ef804",
+        "file": "jbd2.ko",
+        "sha256": "47517df1097b5c4e67a16ecf468183c4cf039918b9f36cef997bc5bb2b58e2f9",
+        "bytes": 433896
+      },
+      {
+        "source": "kernel/fs/ext4/ext4.ko.xz",
+        "sourceSHA256": "22e60750cff34b2e64278b9cbd6dec86856d2c52835ae5b99db345c46c33daec",
+        "file": "ext4.ko",
+        "sha256": "cf899b35b305ee3a47ebf7bf7ba6d2b0776c1f76ac89537ea9bdf7431e3f069b",
+        "bytes": 2475639
+      },
+      {
+        "source": "kernel/crypto/crc32c_generic.ko.xz",
+        "sourceSHA256": "16c50e5a494854fd11f95502a6f8ece8b7ab39f4a81b94d7b7741d8d3f403f8c",
+        "file": "crc32c_generic.ko",
+        "sha256": "ac40c6208c29a64e0d7cf6ae51fb1fd6e0a5a335e236b1bcc9ca1d359efd9a22",
+        "bytes": 11559
+      }
+    ],
+    "moduleLoadOrder": [
+      "virtio_blk.ko",
+      "virtio_rng.ko",
+      "crc16.ko",
+      "mbcache.ko",
+      "jbd2.ko",
+      "ext4.ko",
+      "crc32c_generic.ko"
+    ]
+  },
+  "tools": {
+    "QEMU": "7.2.22",
+    "BusyBox": "1.35.0",
+    "publicSignedPackageCount": 53,
+    "qemuSHA256": "1493008ba0036014c727bb23bbe2f399135867e9b5c4fe288ef2b4b816f46b0c",
+    "busyboxSHA256": "3d9f2889d6782537624a4e1a10e68a2ddd53e0ee8bac02676f27308f42ec6bf6",
+    "packageDownloadMemoryPeak": "NOT_RECORDED",
+    "networklessPostcheckMemoryPeakBytes": 13963264
+  },
+  "fixture": {
+    "diskBytes": 2147483648,
+    "sourceBytesPerVersion": 2097152,
+    "retainedVersionsPerCase": 2,
+    "filesystem": "ext4, commit=60",
+    "virtualDisk": "new regular raw file, cache=directsync",
+    "outerIsolation": "non-root, no capabilities, no-new-privileges, seccomp, read-only root, loopback only, no KVM or host devices",
+    "guestRAMMiB": 384,
+    "guestCPU": 1
+  },
+  "resources": {
+    "memoryMaxBytes": 805306368,
+    "swapMaxBytes": 0,
+    "cpuMax": [100000, 100000],
+    "pidsMax": 128,
+    "memoryPeakBytes": 609734656,
+    "memoryEvents": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    },
+    "swapCurrentBytes": 0
+  },
+  "phases": {
+    "setup": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 116.6655693409848,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=setup",
+        "OUTPOST_VM_SETUP_PASS retained-cases=4 source-plaintext-and-cache-removed=true",
+        "OUTPOST_VM_PHASE_DONE phase=setup code=0"
+      ],
+      "logSHA256": "a44790784ceadb3122585e48cc2595b8c958ba2a4ae855ffdd92f08d214c7f9c",
+      "initrdSHA256": "723e3360427a9c0f09a0396231ba24610906f8898073f03cd2f0b30f69ececba"
+    },
+    "cut:object-durable": {
+      "status": "EXPECTED_GUEST_KERNEL_POWER_CUT",
+      "exitCode": -9,
+      "seconds": 20.090452082979027,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=cut:object-durable",
+        "OUTPOST_VM_CUT_READY point=object-durable"
+      ],
+      "logSHA256": "f8eb0ffb7b0e4642bf7785855bb6a8c3ff73c9218bd23c002d1b4dd4f0ec59ee",
+      "initrdSHA256": "5741b7ebf3f49a177f65d8184b0188e6719b0cb0a46356c1f83394cfa9e0ff5c"
+    },
+    "verify:object-durable": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 26.555650802038144,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=verify:object-durable",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=8979f86316834aa320e3ee6a8137b72b3af64d7e8aed55328f72d17418683413 hardlink=true mode=0640",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=6896e26d4fef4aa6171bc599a4eb82ae74d879a61e1f12887da50e80cbc1ca5f hardlink=true mode=0640",
+        "OUTPOST_VM_KERNEL_RECOVERY_PASS point=object-durable unflushed-control-lost=true source-absent=true retained-old-new-restored=true",
+        "OUTPOST_VM_PHASE_DONE phase=verify:object-durable code=0"
+      ],
+      "logSHA256": "7d05a7eb3d248c0a251682f058805487b16a3e1b26f43342f08d3b419af7a48c",
+      "initrdSHA256": "2cec5c6f8337b5fca5f08fb623fde67abb57753e2b60f9e326875a2abcf37209"
+    },
+    "cut:before-complete": {
+      "status": "EXPECTED_GUEST_KERNEL_POWER_CUT",
+      "exitCode": -9,
+      "seconds": 16.66467988397926,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=cut:before-complete",
+        "OUTPOST_VM_CUT_READY point=before-complete"
+      ],
+      "logSHA256": "b5736119bf75e3ff6609de8ff4dda919d79e26243979c04b37da86e59c3410e3",
+      "initrdSHA256": "fd8fed02a18431f6119030716e0134fadc05a9885b7fb2fff4a4833a6f5769f0"
+    },
+    "verify:before-complete": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 27.272635749017354,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=verify:before-complete",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=1a2d2d219e32f08f2f0b8a44ee49d983c8cd0ed1d6360227ae75f3d96626792a hardlink=true mode=0640",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=bc642e4ac058a4557ed845dd7dc05d5347921a0d41f0f94463794d6ce3a5c816 hardlink=true mode=0640",
+        "OUTPOST_VM_KERNEL_RECOVERY_PASS point=before-complete unflushed-control-lost=true source-absent=true retained-old-new-restored=true",
+        "OUTPOST_VM_PHASE_DONE phase=verify:before-complete code=0"
+      ],
+      "logSHA256": "b90cff6e716ba9d26c126ffa33a1a26acfe9b399f5774cc60db930d8f9724c69",
+      "initrdSHA256": "9b17ec7a207058f14d90d2b6b598c8cdd35c0daf64086057a1ab6f912f710b22"
+    },
+    "cut:state-durable": {
+      "status": "EXPECTED_GUEST_KERNEL_POWER_CUT",
+      "exitCode": -9,
+      "seconds": 19.546378574043047,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=cut:state-durable",
+        "OUTPOST_VM_CUT_READY point=state-durable"
+      ],
+      "logSHA256": "19a996dbaffa6a334e0a93ddcd9f88bc4fe334168a1e80d39b5c29c98787af01",
+      "initrdSHA256": "46ae7bea4fdc90b40c87f6bc5c506d3bee2d2655ba463230c3cabb0c7cb73fd6"
+    },
+    "verify:state-durable": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 26.008016728970688,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=verify:state-durable",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=f815939ada7ccbd57715a2dde3968093ceba40cf8169f9151973a470dc569a96 hardlink=true mode=0640",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=efe3d83b863869ec31036a497718b718ed2072b5cbebfa17c574827268e6de66 hardlink=true mode=0640",
+        "OUTPOST_VM_KERNEL_RECOVERY_PASS point=state-durable unflushed-control-lost=true source-absent=true retained-old-new-restored=true",
+        "OUTPOST_VM_PHASE_DONE phase=verify:state-durable code=0"
+      ],
+      "logSHA256": "e7a3bed3fd8061aa90d4acbdbd6ef8aef8cca284b4755a4ebf5a4fc1daa4b2da",
+      "initrdSHA256": "c897a96d5fd632c14d9765cf875ef8cb320bbb0672ff16a0e82b4368ec6732ab"
+    },
+    "cut:retirement-durable": {
+      "status": "EXPECTED_GUEST_KERNEL_POWER_CUT",
+      "exitCode": -9,
+      "seconds": 20.218619843013585,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=cut:retirement-durable",
+        "OUTPOST_VM_CUT_READY point=retirement-durable"
+      ],
+      "logSHA256": "ecfa4620da387ee11a5b45fb692c4561f752c7a851cb49374b4230cac799c7c3",
+      "initrdSHA256": "42c51eb4c6872a862ba8d801f834c764e3bd5f9a7ac764fd89045ea8d99859fe"
+    },
+    "verify:retirement-durable": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 26.666429677978158,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=verify:retirement-durable",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=4968511ba7d61fd47292429c7d91855c16defcce0a1a51913a1cd7c4803ddf2b hardlink=true mode=0640",
+        "OUTPOST_VM_RESTORED bytes=2097152 sha256=986f031dce38dfaf0d6282ab11b887c5b101475e2b1f0eca7e4d9d5d580eab46 hardlink=true mode=0640",
+        "OUTPOST_VM_KERNEL_RECOVERY_PASS point=retirement-durable unflushed-control-lost=true source-absent=true retained-old-new-restored=true",
+        "OUTPOST_VM_PHASE_DONE phase=verify:retirement-durable code=0"
+      ],
+      "logSHA256": "a1a9e97d0b2a5ba9b6f70b6b6caefb2ba33912df39b95645ea570a82d95b75a5",
+      "initrdSHA256": "77effa35371b2e91a2be1c826c108ee7024629699f46c2862f06f82bb2eb4e9d"
+    },
+    "volume-absent": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 16.350321824022103,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=volume-absent",
+        "OUTPOST_VM_VOLUME_REFUSED actual-cli=true fallback-state=false",
+        "OUTPOST_VM_PHASE_DONE phase=volume-absent code=0"
+      ],
+      "logSHA256": "50a61e321a3807cac3115fc1206063b2c9f18b4915e2a8b7303eb9960795293a",
+      "initrdSHA256": "33edc020ee7175d2cc176beec8d1445354009437b002e598a1e60115b4edb527"
+    },
+    "volume-wrong": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 16.32206104398938,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=volume-wrong",
+        "OUTPOST_VM_VOLUME_REFUSED actual-cli=true fallback-state=false",
+        "OUTPOST_VM_PHASE_DONE phase=volume-wrong code=0"
+      ],
+      "logSHA256": "2c664da909d512608476ae69a539517171a520476b7c7daf2319aed0be8d966c",
+      "initrdSHA256": "e1eba052640cee18de51ab8edfb4c8d3c79dd73e935c1a46b52fcff107f90b5f"
+    },
+    "volume-readonly": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 17.264657913998235,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=volume-readonly",
+        "OUTPOST_VM_VOLUME_REFUSED actual-cli=true fallback-state=false",
+        "OUTPOST_VM_PHASE_DONE phase=volume-readonly code=0"
+      ],
+      "logSHA256": "f57c9a04b01cfbe15463bb1a68652358542986ac5fac0bb109bed06cb91c1311",
+      "initrdSHA256": "ac114ba664485080c578a9d9a2d888c954feb36aaa6d2068feaf706db580fd7b"
+    },
+    "volume-delayed": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 19.97497271699831,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=volume-delayed",
+        "OUTPOST_VM_VOLUME_REFUSED actual-cli=true fallback-state=false",
+        "OUTPOST_VM_VOLUME_ACCEPTED phase=volume-initialize identity-stable=true",
+        "OUTPOST_VM_PHASE_DONE phase=volume-delayed code=0"
+      ],
+      "logSHA256": "dbb1031dba440eae0a38a4a3eb2df43c317545e2d71e1903a0bd69a74e069ccf",
+      "initrdSHA256": "794fa26beef2b236639c42401af3c291e869b5456eca9bacdbf912dbb6aa72fe"
+    },
+    "volume-status": {
+      "status": "PASS",
+      "exitCode": 0,
+      "seconds": 17.057270621997304,
+      "markers": [
+        "OUTPOST_VM_BOOT phase=volume-status",
+        "OUTPOST_VM_VOLUME_ACCEPTED phase=volume-status identity-stable=true",
+        "OUTPOST_VM_PHASE_DONE phase=volume-status code=0"
+      ],
+      "logSHA256": "0d5b2946bdb2dd87b03965838b8130f0c40e3c696c6c899ad123236b3d215fee",
+      "initrdSHA256": "21ec24c7c0ed94c2745f691fad8ea528ea15d6135c8f8624e0630c52abfc419e"
+    }
+  },
+  "failedControls": [
+    {
+      "result": "REFUSED_BEFORE_PAYLOAD",
+      "cause": "Exact marked kernel argument was present but the first helper compared a newline-padded /proc/cmdline incorrectly. The helper now matches an exact strings.Fields element."
+    },
+    {
+      "result": "FOUR_POWER_CUTS_PASS_COLD_OBSERVER_FAIL",
+      "cause": "The actual CLI correctly returned VOLUME_UNAVAILABLE/5; the observer expected generic UNAVAILABLE/7. The static BusyBox lacked mountpoint; clean phases now explicitly unmount their known guest mount."
+    },
+    {
+      "result": "FOUR_POWER_CUTS_AND_THREE_COLD_CASES_PASS_STATUS_OBSERVER_FAIL",
+      "cause": "The delayed-mount CLI succeeded; the observer decoded the versioned status response at the wrong envelope level. It now checks result.node and the exact response format."
+    }
+  ],
+  "scope": "TCG guest kernel and its volatile state, ext4 commit=60 and a regular raw file with QEMU directsync; only QEMU is SIGKILLed at the cut marker. Negative unflushed-write loss and independently selected actual CLI restores are required. This is not physical host/storage-controller power loss, real unlock ordering or 100GiB acceptance.",
+  "pending": [
+    "physical host/controller power loss",
+    "actual target disk unlocking and cold boot",
+    "physical volume replacement",
+    "100 GiB source/independent-consumer acceptance",
+    "asymmetric ingress and cloud throughput",
+    "owner infrastructure admission"
+  ],
+  "fullProductAcceptance": "NOT_VERIFIED"
+}

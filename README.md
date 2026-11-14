@@ -155,3 +155,5 @@ The [downloaded installation evidence](docs/downloaded-install-evidence.json) re
 The [interactive keyboard receipt](docs/manual-keyboard-evidence.json) records a scoped English/Russian review and visible focus at 320px alongside the automated accessibility checks.
 
 The [replacement dataset check](docs/dataset-rebuild-evidence.json) exercises a fresh owner-enrolled node through an actual selected CLI after loss of all old local runtime/replica data, with independent two-version recovery. Its bounded HDD result remains separate from native/physical/full-scale acceptance.
+
+The [guest-kernel evidence](docs/vm-powerloss-evidence.json) records four actual virtual power cuts and five cold volume-ordering cases using independently selected recovery CLIs. All 14 phases passed in a bounded networkless guest; physical host power loss, real disk unlocking and full-scale acceptance remain separate.
