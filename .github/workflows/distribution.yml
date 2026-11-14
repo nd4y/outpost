@@ -20,24 +20,27 @@ jobs:
           - runner: ubuntu-24.04-arm
             architecture: arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 12
+    timeout-minutes: 15
     env:
       CGO_ENABLED: "0"
       GOMAXPROCS: "2"
       GOFLAGS: -p=1
       PYTHONDONTWRITEBYTECODE: "1"
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      NATIVE_ARCHITECTURE: ${{ matrix.architecture }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           fetch-depth: 0
+          ref: ${{ env.SOURCE_COMMIT }}
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
           cache: false
       - name: Build selected artifacts and native synthetic fixture
         run: |
-          python3 scripts/build-release.py --output "$RUNNER_TEMP/current" > "$RUNNER_TEMP/current-receipt.json"
+          python3 scripts/build-release.py --revision "$SOURCE_COMMIT" --output "$RUNNER_TEMP/current" > "$RUNNER_TEMP/current-receipt.json"
           go test -c -trimpath -o "$RUNNER_TEMP/container-fixture.test" ./cmd/outpost
       - name: Build the documented previous implementation with the current packager
         env:
@@ -205,3 +208,33 @@ jobs:
           "$OUTPOST_EXTERNAL_RECOVERY_CLI" version
           go test -count=1 -timeout=110s -run 'CLIExternalRestore|CLIUploadPlan|WorkerOwnerAdmitsMissingRepair|TargetAuditWindowResumesAfterSIGKILL|WorkerScheduledExternalAudit|WorkerScheduledExternalRepair|SignedWeightedAssignments|WeightedWorkerSIGKILL' \
             -v ./cmd/outpost ./internal/worker ./internal/upload
+      - name: Package allowlisted source-bound development candidate
+        run: |
+          current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
+          python3 scripts/package-release.py --root "$RUNNER_TEMP/current" --manifest-sha256 "$current_hash" \
+            --sbom "$RUNNER_TEMP/sbom" --output "$RUNNER_TEMP/candidate" \
+            --archive "$RUNNER_TEMP/outpost-candidate-$NATIVE_ARCHITECTURE.tar.gz" \
+            --repository "$GITHUB_REPOSITORY" --commit "$SOURCE_COMMIT" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --native-architecture "$NATIVE_ARCHITECTURE" > "$RUNNER_TEMP/candidate-receipt.json"
+          selected_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/candidate-receipt.json"))["manifestSHA256"])')
+          python3 scripts/check-candidate-release.py --root "$RUNNER_TEMP/candidate" \
+            --sha256 "$selected_hash" --work "$RUNNER_TEMP/candidate-checks"
+      - name: Preserve the verified development candidate
+        id: candidate_upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: outpost-candidate-${{ env.SOURCE_COMMIT }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/outpost-candidate-${{ matrix.architecture }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+      - name: Record independent download selection
+        env:
+          ARTIFACT_ID: ${{ steps.candidate_upload.outputs.artifact-id }}
+          ARTIFACT_SHA256: ${{ steps.candidate_upload.outputs.artifact-digest }}
+        run: |
+          python3 scripts/record-candidate-release.py --input "$RUNNER_TEMP/candidate-receipt.json" \
+            --artifact-id "$ARTIFACT_ID" --artifact-sha256 "$ARTIFACT_SHA256" --summary "$GITHUB_STEP_SUMMARY"

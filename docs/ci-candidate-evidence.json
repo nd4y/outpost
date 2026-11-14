@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "status": "BOUNDED_PACKAGE_CHECKS_PASS_CI_UPLOAD_PENDING",
+  "scope": "Real native build/SBOM/package and adversarial verification using synthetic CI-selection metadata. This is not an authenticated published Actions candidate or downloaded-runtime acceptance.",
+  "sourceBaseCommit": "42f70880df4616efc58fdb4ea134bbfda0aa6eda",
+  "buildAndProductionToolsTree": "476c85451974b920ab18f74fb7ee3fd7094f68bb",
+  "testCopyCorrectionTree": "be90441c8d28406cbdfa1deb42d4f07eea95bca5",
+  "fixtureSelectionOnly": {
+    "repository": "example/fixture",
+    "commitIsUncommittedTree": true,
+    "runId": 1,
+    "runAttempt": 1
+  },
+  "fixtureCandidate": {
+    "archiveBytes": 13401215,
+    "archiveSHA256": "338cc9837565543cc45be37b4b7a865c8fa8c37150e2d4e7fde889ec535da566",
+    "commit": "476c85451974b920ab18f74fb7ee3fd7094f68bb",
+    "distributionManifestSHA256": "5182d4c628817e06d1e5f02493cbf38e1c0b2949ab4bd3e3962d0cc2de026c94",
+    "format": "outpost-ci-candidate-1",
+    "manifestSHA256": "c7a9588fdcb416ef9d899a1dc768095f591faa276f79b999c1d88f9a429973da",
+    "nativeArchitecture": "amd64",
+    "repository": "example/fixture",
+    "runAttempt": 1,
+    "runId": 1,
+    "runtimeAcceptance": false,
+    "state": "VERIFIED_CANDIDATE_BYTES"
+  },
+  "checks": [
+    {
+      "name": "test_selected_candidate_and_archive_roundtrip",
+      "state": "PASS"
+    },
+    {
+      "name": "test_independent_commit_run_architecture_and_digest_selection",
+      "state": "PASS"
+    },
+    {
+      "name": "test_changed_unlisted_and_symlinked_candidate_files",
+      "state": "PASS"
+    },
+    {
+      "name": "test_sbom_and_binary_binding_cannot_be_relabelled",
+      "state": "PASS"
+    },
+    {
+      "name": "test_duplicate_json_and_invalid_inventory_are_rejected",
+      "state": "PASS"
+    },
+    {
+      "name": "test_tar_paths_links_and_duplicate_members_are_rejected",
+      "state": "PASS"
+    },
+    {
+      "name": "test_special_tar_headers_are_refused_before_reading_bodies",
+      "state": "PASS"
+    },
+    {
+      "name": "test_tar_member_count_and_aggregate_size_are_bounded",
+      "state": "PASS"
+    },
+    {
+      "name": "test_actual_verifier_cli_uses_independent_selection",
+      "state": "PASS"
+    },
+    {
+      "name": "test_browser_publication_allowlist_excludes_private_fixture_files",
+      "state": "PASS"
+    },
+    {
+      "name": "test_browser_publication_refuses_failed_stale_and_linked_inputs",
+      "state": "PASS"
+    }
+  ],
+  "originalPreserved": true,
+  "runtimeProfile": {
+    "platform": "Linux amd64",
+    "go": "1.27.3",
+    "python": "3.11",
+    "storage": "Isolated HDD",
+    "cpuMax": "50000 100000",
+    "memoryMaxBytes": 536870912,
+    "checksMemoryPeakBytes": 214208512,
+    "checksSwapOOM": 0,
+    "firstBuildPeak": "NOT_RECORDED",
+    "network": "none"
+  },
+  "earlierFailure": "The first build, SBOM, package and first two checks passed. Test cloning assumed hardlinks across separate bind mounts and failed with EXDEV. Test copies are now independent ordinary files. The original failure is retained; no binaries/SBOM were rebuilt for the corrected test run.",
+  "independentSelection": "Candidate digest plus repository/commit/run/attempt/native architecture must be selected outside the download. The workflow records manifest/archive/artifact digests in authenticated job summaries/logs. Provenance is a CI declaration, not a release signature.",
+  "pending": [
+    "Actual new workflow execution and uploads",
+    "Authenticated artifact download and independent digest verification",
+    "Downloaded native-byte offline restore",
+    "Current visual-artifact inspection",
+    "Exact-head required CI and publication acceptance",
+    "Official release and whole-product acceptance"
+  ],
+  "logSHA256": {
+    "ci-candidate-short-20261114-094406-results-checks.log": "872e23fa83c81b60c57cdf4140e5812aa9c450d52d3553ffcf4a7a031e392e22",
+    "ci-candidate-short-20261114-094406-results-build-receipt.json": "f72c70a87ffafea3fac56f2810769ce29a78f5be6d2f12ca47bb59a94f82ab46",
+    "ci-candidate-short-20261114-094406-results-sbom-receipt.json": "4f6c6a8d8a6612db546efb2cb3d4acef09cf2f2279c57893591737cdfdf46d07",
+    "ci-candidate-short-20261114-094406-results-candidate-receipt.json": "036b7e1f9d945559c5069f645c3b1be51d5b18431dec1b2fc40b61638b13c9b9",
+    "ci-candidate-checks-20261114-095111-results-checks.log": "6168f049672188f89e82d0c8ecb4421ad6c9d0ec8cfc77c6f452a2712369abe8",
+    "ci-candidate-checks-20261114-095111-results-native-version.json": "7f602ca91cbbc107ef6c038eb4b880f7028a61a32111742664e3c0cca3ca182a"
+  }
+}

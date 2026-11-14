@@ -8355,7 +8355,12 @@
         "packaging",
         "scripts/build-release.py",
         "scripts/verify-release.py",
-        "scripts/build-sbom.py"
+        "scripts/build-sbom.py",
+        "scripts/package-release.py",
+        "scripts/verify-candidate-release.py",
+        "scripts/check-candidate-release.py",
+        "scripts/record-candidate-release.py",
+        "scripts/package-browser-evidence.py"
       ],
       "checks": [
         {
@@ -8369,10 +8374,54 @@
         {
           "path": "scripts/check-container.py",
           "name": "test_independent_recovery_after_source_removal"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_selected_candidate_and_archive_roundtrip"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_independent_commit_run_architecture_and_digest_selection"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_changed_unlisted_and_symlinked_candidate_files"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_sbom_and_binary_binding_cannot_be_relabelled"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_duplicate_json_and_invalid_inventory_are_rejected"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_tar_paths_links_and_duplicate_members_are_rejected"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_special_tar_headers_are_refused_before_reading_bodies"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_tar_member_count_and_aggregate_size_are_bounded"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_actual_verifier_cli_uses_independent_selection"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_browser_publication_allowlist_excludes_private_fixture_files"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_browser_publication_refuses_failed_stale_and_linked_inputs"
         }
       ],
       "acceptance": ["AT-34"],
-      "remaining": "Publish selected version and commit, checksums, provenance, binary-bound SBOM and bilingual release notes together. Download the published artifacts and verify clean installation, supported upgrade and independent restore from those exact bytes."
+      "remaining": "Bounded CI candidate packaging and strict independent download verification are implemented; HDD adversarial checks, actual uploaded artifact download, downloaded-byte runtime/visual evidence and exact CI remain pending. Official release and whole-product acceptance are separate."
     },
     {
       "id": "REQ-52",

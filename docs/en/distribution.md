@@ -73,3 +73,25 @@ Cgroup-v1 hosts require an explicitly private cgroup namespace and readable memo
 The [owner recovery package](owner-recovery-package.md) keeps read-only decryption material, original checkpoint age and selected offline tools in private owner storage. Export, digest-anchored inspection and atomic extraction leave signing authority out of the package. Selected-file and complete-replica recovery have separate small process checks; key lifecycle and full-scale acceptance remain open.
 
 Native CI also runs the selected distribution's `restore-external` against isolated read-only S3-compatible and WebDAV fixtures. It verifies complete and selected recovery after the source paths become unavailable. [Independent external recovery](external-upload.md#independent-external-recovery).
+
+## Downloadable CI candidates
+
+A successful native distribution job preserves one allowlisted candidate for seven days. Its artifact name binds the source commit, native architecture, Actions run and attempt. Both architectures have separate native execution evidence. The candidate contains the exact distribution, checksums/licenses, binary-bound CycloneDX files, both language versions of the candidate release notes and `candidate.json`. It includes no fixture data, recovery keys or owner journals. A candidate is not a GitHub Release or an accepted production deployment.
+
+Select the commit and successful job independently. Retain its `CANDIDATE_SELECTION` log record or job-summary receipt outside the download: repository, run/attempt, architecture, candidate-manifest SHA-256, inner archive SHA-256, artifact ID and the Actions artifact SHA-256. Match the authenticated Actions API metadata and download digest. Checksums taken only from the downloaded archive do not establish that selection. CI checks out the exact source head and embeds that commit in the candidate binaries.
+
+Using the verifier from an independently trusted checkout of that source, run on an isolated Linux host:
+
+```sh
+python3 scripts/verify-candidate-release.py \
+  --archive /downloads/outpost-candidate-amd64.tar.gz --output /verification/new-candidate \
+  --sha256 INDEPENDENT_CANDIDATE_MANIFEST_SHA256 --repository OWNER/REPOSITORY \
+  --commit SELECTED_COMMIT --run-id SELECTED_RUN --run-attempt SELECTED_ATTEMPT \
+  --native-architecture amd64
+```
+
+The bounded extractor accepts USTAR regular files only. It rejects links, traversal, duplicate/special headers, excess members/bytes, wrong provenance, missing files, changed binaries and a mismatching SBOM. Existing output paths are never overwritten. A failed attempt may leave its new private output directory for inspection; repeat into a different new directory. `VERIFIED_CANDIDATE_BYTES` certifies the selected bytes, not installation or backup health. Run the installation/upgrade and independent recovery procedures using those exact verified bytes before accepting that stage.
+
+The browser job separately preserves five synthetic screenshots and a sanitized source-bound report. Fixture certificates, `ready.json`, raw logs, local browser storage and raw axe DOM/URL data are excluded. Automated PASS and manual visual/keyboard acceptance remain distinct. See the [candidate notes](release-notes.md).
+
+The [bounded candidate receipt](../ci-candidate-evidence.json) records the real build/SBOM/package and eleven adversarial checks. Its synthetic fixture selection is explicitly separate from authenticated Actions upload/download evidence, which must be read from the selected commit run.

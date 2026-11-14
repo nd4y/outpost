@@ -52,7 +52,13 @@ for (const item of product.requirements) {
     assert(fs.existsSync(path.join(root, file)), `Missing implementation: ${item.id} ${file}`);
   }
   for (const check of item.checks) {
-    if (["scripts/check-release.py", "scripts/check-container.py"].includes(check.path)) {
+    if (
+      [
+        "scripts/check-release.py",
+        "scripts/check-container.py",
+        "scripts/check-candidate-release.py",
+      ].includes(check.path)
+    ) {
       assert(/^test_[a-z0-9_]{5,160}$/.test(check.name));
       const source = read(check.path);
       const registration = source.match(/^TESTS\s*=\s*\[([\s\S]*?)\]/m);
