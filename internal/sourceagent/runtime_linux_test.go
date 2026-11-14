@@ -156,10 +156,69 @@ type fixtureEpoch struct {
 	writer ed25519.PrivateKey
 }
 
+// fixtureOptions overrides fixture defaults. Zero values select the original
+// bounded defaults, so newFixtureWithKeys keeps its existing behaviour.
+type fixtureOptions struct {
+	Directory           string
+	MaxSourceBytes      int64
+	MaxBytes            int64
+	MaxObjects          int
+	Limits              diskbudget.Limits
+	CertificateLifetime time.Duration
+	InitialSource       func(*testing.T, string)
+}
+
 func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epoch *fixtureEpoch) *fixture {
 	t.Helper()
+	return newFixtureWithOptions(t, seconds, extra, epoch, fixtureOptions{})
+}
+
+func newFixtureWithOptions(t *testing.T, seconds int64, extra *tls.Certificate, epoch *fixtureEpoch, opts fixtureOptions) *fixture {
+	t.Helper()
+	maxSourceBytes := opts.MaxSourceBytes
+	if maxSourceBytes == 0 {
+		maxSourceBytes = 32 << 20
+	}
+	maxBytes := opts.MaxBytes
+	if maxBytes == 0 {
+		maxBytes = 32 << 20
+	}
+	maxObjects := opts.MaxObjects
+	if maxObjects == 0 {
+		maxObjects = 128
+	}
+	limits := opts.Limits
+	if limits.Capacity == 0 {
+		limits.Capacity = 128 << 20
+	}
+	if limits.Reserve == 0 {
+		limits.Reserve = 8 << 20
+	}
+	if limits.Spool == 0 {
+		limits.Spool = 64 << 20
+	}
+	if limits.Telemetry == 0 {
+		limits.Telemetry = 1 << 20
+	}
+	certificateLifetime := opts.CertificateLifetime
+	if certificateLifetime == 0 {
+		certificateLifetime = time.Hour
+	}
 	ctx := context.Background()
-	f := &fixture{base: teststore.Root(t)}
+	base := opts.Directory
+	if base == "" {
+		base = teststore.Root(t)
+	} else {
+		// Scale fixtures survive a failed assertion. The caller owns this new
+		// direct child of the admitted volume; existing directories are refused.
+		admitted := os.Getenv("OUTPOST_TEST_ROOT")
+		resolved, err := filepath.EvalSymlinks(admitted)
+		if err != nil || !filepath.IsAbs(admitted) || resolved != admitted || filepath.Dir(base) != admitted {
+			t.Fatal("retained fixture must be a new direct child of the admitted volume")
+		}
+		must(t, os.Mkdir(base, 0700))
+	}
+	f := &fixture{base: base}
 	write := func(name string, raw []byte) string {
 		p := filepath.Join(f.base, name)
 		must(t, os.WriteFile(p, raw, 0600))
@@ -169,7 +228,7 @@ func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epo
 	pub, caKey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	now := time.Now()
-	ca := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	ca := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: now.Add(-time.Hour), NotAfter: now.Add(certificateLifetime), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	der, e := x509.CreateCertificate(rand.Reader, ca, ca, pub, caKey)
 	must(t, e)
 	roots := x509.NewCertPool()
@@ -178,7 +237,7 @@ func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epo
 	newCert := func(serial int64) (tls.Certificate, []byte, []byte) {
 		pub, key, e := ed25519.GenerateKey(rand.Reader)
 		must(t, e)
-		leaf := &x509.Certificate{SerialNumber: big.NewInt(serial), NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), DNSNames: []string{"localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}}
+		leaf := &x509.Certificate{SerialNumber: big.NewInt(serial), NotBefore: now.Add(-time.Minute), NotAfter: now.Add(certificateLifetime), DNSNames: []string{"localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}}
 		der, e := x509.CreateCertificate(rand.Reader, leaf, ca, pub, caKey)
 		must(t, e)
 		private, e := x509.MarshalPKCS8PrivateKey(key)
@@ -217,7 +276,7 @@ func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epo
 	}
 	f.owner, f.writer = epoch.owner, epoch.writer
 	trust, key := epoch.trust, f.writer
-	f.grant = ingress.Authority{Format: ingress.AuthorityFormat, Tenant: storage.Hash([]byte("tenant")), Profile: storage.Hash([]byte("profile")), Source: id(src), Ingress: id(dst), Revision: 1, NotBefore: now.Unix() - 10, ExpiresUnix: now.Unix() + seconds, Trust: trust, MaxBytes: 32 << 20, MaxObjects: 128}
+	f.grant = ingress.Authority{Format: ingress.AuthorityFormat, Tenant: storage.Hash([]byte("tenant")), Profile: storage.Hash([]byte("profile")), Source: id(src), Ingress: id(dst), Revision: 1, NotBefore: now.Unix() - 10, ExpiresUnix: now.Unix() + seconds, Trust: trust, MaxBytes: maxBytes, MaxObjects: maxObjects}
 	f.authority, e = ingress.SignAuthority(f.grant, ownerKey)
 	must(t, e)
 	f.replicaPath = filepath.Join(f.base, "replica")
@@ -251,11 +310,15 @@ func newFixtureWithKeys(t *testing.T, seconds int64, extra *tls.Certificate, epo
 	must(t, e)
 	f.tree = filepath.Join(f.base, "source")
 	must(t, os.Mkdir(f.tree, 0700))
-	must(t, os.WriteFile(filepath.Join(f.tree, "private.bin"), bytes.Repeat([]byte("source"), 65536), 0640))
+	if opts.InitialSource != nil {
+		opts.InitialSource(t, f.tree)
+	} else {
+		must(t, os.WriteFile(filepath.Join(f.tree, "private.bin"), bytes.Repeat([]byte("source"), 65536), 0640))
+	}
 	origin := storage.Hash([]byte("origin"))
 	tree, e := capture.ProbeTree(ctx, f.tree, origin)
 	must(t, e)
-	f.b = Bootstrap{Format: Format, Local: worker.Bootstrap{Format: worker.BootstrapFormat, Volume: binding, Directory: filepath.Join(vol, "agent"), Node: id(src), Owner: ownerPub, CertificateFile: write("source.pem", cp), PrivateKeyFile: write("source-key.pem", kp), CAFile: caFile}, Profile: capture.Profile{ID: f.grant.Profile, Origin: origin, Consistency: "best-effort", Selection: source.Selection{Rules: []policy.Rule{{Prefix: ".", Domain: f.owner.Domain}}, Domains: map[string]bool{f.owner.Domain: true}, EntryLimit: 128}, MaxSourceBytes: 32 << 20, MinimumCopies: 1, CopyTargets: []string{id(dst)}}, Tree: tree, DataKeyFile: write("data-key.json", marshal(f.owner)), WriterKeyFile: write("writer-key.json", marshal(map[string]any{"privateKey": key})), AuthorityFile: write("authority.json", f.authority), Endpoint: s.URL, Limits: diskbudget.Limits{Capacity: 128 << 20, Reserve: 8 << 20, Spool: 64 << 20, Telemetry: 1 << 20}}
+	f.b = Bootstrap{Format: Format, Local: worker.Bootstrap{Format: worker.BootstrapFormat, Volume: binding, Directory: filepath.Join(vol, "agent"), Node: id(src), Owner: ownerPub, CertificateFile: write("source.pem", cp), PrivateKeyFile: write("source-key.pem", kp), CAFile: caFile}, Profile: capture.Profile{ID: f.grant.Profile, Origin: origin, Consistency: "best-effort", Selection: source.Selection{Rules: []policy.Rule{{Prefix: ".", Domain: f.owner.Domain}}, Domains: map[string]bool{f.owner.Domain: true}, EntryLimit: 128}, MaxSourceBytes: maxSourceBytes, MinimumCopies: 1, CopyTargets: []string{id(dst)}}, Tree: tree, DataKeyFile: write("data-key.json", marshal(f.owner)), WriterKeyFile: write("writer-key.json", marshal(map[string]any{"privateKey": key})), AuthorityFile: write("authority.json", f.authority), Endpoint: s.URL, Limits: limits}
 	f.a, e = Open(ctx, f.b, true)
 	must(t, e)
 	t.Cleanup(func() {

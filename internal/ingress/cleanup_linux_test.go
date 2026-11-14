@@ -9,8 +9,9 @@ import (
 
 func TestExpiredIntentCleanupOverHTTPSAfterRegistryRestart(t *testing.T) {
 	f := registryNetwork(t)
+	shortExpiryPayload(t, f)
 	ctx := context.Background()
-	f.intent.ExpiresUnix = time.Now().Unix() + 5
+	f.intent.ExpiresUnix = time.Now().Unix() + expiryFixtureLifetimeSeconds
 	raw, e := SignIntent(f.intent, f.options.Authority, f.options.Owner, f.writer, time.Now())
 	must(t, e)
 	f.options.Authority = f.fixture.options.Authority

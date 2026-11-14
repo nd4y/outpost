@@ -170,6 +170,17 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 				fail(w, e)
 				return
 			}
+			if values := r.Header.Values(catalogResumeHeader); len(values) != 0 {
+				if len(values) != 1 || len(raw) != 0 {
+					fail(w, ErrProtocol)
+					return
+				}
+				raw, e = s.resumeCatalog(ctx, values[0])
+				if e != nil {
+					fail(w, e)
+					return
+				}
+			}
 			progress, receipt, e := s.FinishBatch(ctx, raw, batchObjects, batchBytes)
 			if e != nil {
 				fail(w, e)
@@ -180,6 +191,8 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 			if progress.Complete {
 				reply.Receipt = &receipt
 				status = http.StatusOK
+			} else {
+				w.Header().Set(catalogResumeHeader, storage.Hash(raw))
 			}
 			jsonReply(w, status, reply)
 			return
@@ -267,6 +280,7 @@ type Client struct {
 	peerPublicationGrant         []byte
 	inspection                   bool
 	settlement                   []byte
+	catalogResume                atomic.Pointer[string]
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
 type countedBody struct {
@@ -330,6 +344,13 @@ func (c *Client) ValidReceipt(r Receipt) bool {
 
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
+	return c.requestCatalog(ctx, method, resource, ref, payload, max, "")
+}
+
+func (c *Client) requestCatalog(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int, catalogID string) (int, http.Header, []byte, error) {
+	if catalogID != "" && (resource != "catalog" || method != http.MethodPut || len(payload) != 0 || !storage.ID(catalogID)) {
+		return 0, nil, nil, ErrDenied
+	}
 	now := time.Now()
 	ack := resource == "ack" && method == http.MethodPut
 	retiring := resource == "retire" && method == http.MethodPut
@@ -393,6 +414,9 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 		r.Body = http.NoBody
 	}
 	r.Header.Set("Outpost-Authority", c.intent.Authority)
+	if catalogID != "" {
+		r.Header.Set(catalogResumeHeader, catalogID)
+	}
 	if len(c.peerPublicationGrant) != 0 {
 		r.Header.Set("Outpost-Publication-Grant", base64.RawStdEncoding.EncodeToString(c.peerPublicationGrant))
 	}
@@ -536,8 +560,7 @@ func (c *Client) Write(ctx context.Context, ref filekit.Object, b []byte) (bool,
 // FinishStep performs one bounded verification batch. The source journal must
 // retain the operation and retry incomplete progress; it must release nothing
 // until the returned receipt matches a published complete catalog.
-func (c *Client) FinishStep(ctx context.Context, raw []byte) (generation.BatchResult, *Receipt, error) {
-	var result generation.BatchResult
+func (c *Client) FinishStep(ctx context.Context, raw []byte) (result generation.BatchResult, receipt *Receipt, err error) {
 	a, e := VerifyAuthority(c.authority, c.owner, time.Now())
 	if e != nil {
 		return result, nil, e
@@ -550,7 +573,20 @@ func (c *Client) FinishStep(ctx context.Context, raw []byte) (generation.BatchRe
 	if e != nil {
 		return result, nil, e
 	}
-	status, _, body, e := c.request(ctx, http.MethodPut, "catalog", nil, raw, 8192)
+	id := storage.Hash(raw)
+	payload, resumeID := raw, ""
+	cue := c.catalogResume.Load()
+	defer func() {
+		if err != nil && cue != nil {
+			// Include malformed progress and failed final readback. Another
+			// concurrent successful request may have installed a newer hint.
+			c.catalogResume.CompareAndSwap(cue, nil)
+		}
+	}()
+	if cue != nil && *cue == id {
+		payload, resumeID = nil, id
+	}
+	status, headers, body, e := c.requestCatalog(ctx, http.MethodPut, "catalog", nil, payload, 8192, resumeID)
 	if e != nil {
 		return result, nil, e
 	}
@@ -561,6 +597,9 @@ func (c *Client) FinishStep(ctx context.Context, raw []byte) (generation.BatchRe
 	if status == http.StatusAccepted {
 		if reply.Progress.Complete || reply.Receipt != nil {
 			return result, nil, ErrProtocol
+		}
+		if hints := headers.Values(catalogResumeHeader); len(hints) == 1 && hints[0] == id {
+			c.catalogResume.Store(&id)
 		}
 		return reply.Progress, nil, nil
 	}

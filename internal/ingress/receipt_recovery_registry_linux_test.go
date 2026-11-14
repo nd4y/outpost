@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,8 +31,10 @@ func interruptedPublication(t *testing.T, expire, published bool) (*registryFixt
 	if !published {
 		point = "capture-catalog-durable"
 	}
+	var interrupted atomic.Bool
 	f.registry.session.Fault = func(p string) error {
 		if p == point {
+			interrupted.Store(true)
 			return errors.New("interrupt before ingress receipt")
 		}
 		return nil
@@ -45,6 +48,9 @@ func interruptedPublication(t *testing.T, expire, published bool) (*registryFixt
 	}
 	if _, _, e = f.client.FinishStep(ctx, raw); e == nil {
 		t.Fatal("publication interruption not reached")
+	}
+	if !interrupted.Load() {
+		t.Fatal("publication failed before the intended durable fault point", point, e)
 	}
 	if f.registry.session.state.Complete || f.registry.session.state.Receipt != nil {
 		t.Fatal("fixture already has receipt")

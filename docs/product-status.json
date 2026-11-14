@@ -2283,6 +2283,22 @@
         {
           "path": "internal/sourceagent/unstarted_linux_test.go",
           "name": "TestSourceUnstartedRetirementRefusesActiveWithoutReceiverReceipt"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestIngressCatalogContinuationUploadsOneCatalogAcrossBatches"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationRejectsMissingChangedAndAmbiguousCandidate"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationLegacyAndWrongHint"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationRejectsExpiredIntent"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -2634,6 +2650,26 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "never-admitted configuration requires the exact reselected signed file"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestIngressCatalogContinuationUploadsOneCatalogAcrossBatches"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationRejectsMissingChangedAndAmbiguousCandidate"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationLegacyAndWrongHint"
+        },
+        {
+          "path": "internal/sourceagent/ingress_scale_linux_test.go",
+          "name": "TestSourceIngressScaleAndOfflineMaterializedReplica"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationRejectsExpiredIntent"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -6269,6 +6305,10 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalRepairReplaysDurableMissingPart"
+        },
+        {
+          "path": "internal/sourceagent/ingress_scale_linux_test.go",
+          "name": "TestSourceIngressScaleAndOfflineMaterializedReplica"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -6674,6 +6714,22 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "never-admitted configuration requires the exact reselected signed file"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestIngressCatalogContinuationUploadsOneCatalogAcrossBatches"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationRejectsMissingChangedAndAmbiguousCandidate"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationLegacyAndWrongHint"
+        },
+        {
+          "path": "internal/ingress/catalog_continuation_linux_test.go",
+          "name": "TestCatalogContinuationRejectsExpiredIntent"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -6772,6 +6828,10 @@
         {
           "path": "internal/generation/typed_linux_test.go",
           "name": "TestTypedGenerationKeepsStandaloneRecoveryAfterSourceLoss"
+        },
+        {
+          "path": "internal/sourceagent/ingress_scale_linux_test.go",
+          "name": "TestSourceIngressScaleAndOfflineMaterializedReplica"
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],

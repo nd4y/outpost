@@ -44,6 +44,8 @@ Worker bootstrap now requires [runtime volume admission](docs/en/runtime-volume.
 
 [Trusted content verification](docs/en/trusted-verification.md) decrypts selected retained versions without plaintext output or a replica index. Private reports preserve per-version outcomes and original check times; partial checks return a failure status. Ordinary workers remain keyless.
 
+The [bounded source-ingress receipt](docs/source-ingress-evidence.json) records one full-catalog upload across multiple verification batches, legacy compatibility and actual expiry refusals. A physical 128 MiB source rehearsal and two clean-consumer complete-replica restores prepare the separate 100 GiB stage; they do not establish full-scale acceptance.
+
 ## Planned workflows
 
 - Back up a dataset once at the source and distribute complete encrypted replicas across permitted nodes.

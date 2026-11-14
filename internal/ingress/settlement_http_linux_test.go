@@ -18,6 +18,7 @@ import (
 func shortSettlementRegistry(t *testing.T) *registryFixture {
 	t.Helper()
 	f := registryNetwork(t)
+	shortExpiryPayload(t, f)
 	must(t, f.source.Close())
 	f.source = nil
 	f.client.Close()
@@ -25,7 +26,7 @@ func shortSettlementRegistry(t *testing.T) *registryFixture {
 	f.registry = nil
 	// Fixture construction, before any operation is admitted. The completed
 	// historical slot below is always reopened at this same directory.
-	f.authority.ExpiresUnix = time.Now().Unix() + 5
+	f.authority.ExpiresUnix = time.Now().Unix() + expiryFixtureLifetimeSeconds
 	authority, e := SignAuthority(f.authority, f.control)
 	must(t, e)
 	f.intent.Authority = storage.Hash(authority)
@@ -44,6 +45,20 @@ func shortSettlementRegistry(t *testing.T) *registryFixture {
 	f.source, e = filekit.OpenStreamingStore(filepath.Join(f.base, "source-cache"), f.owner, false, f.client)
 	must(t, e)
 	return f
+}
+
+// This is preparation headroom for a test grant, not a product TTL or request
+// timeout. Each expiry scenario waits for the actual signed deadline before
+// exercising the historical operation and proving payload access is refused.
+const expiryFixtureLifetimeSeconds = 30
+
+// Expiry tests exercise a real nonempty encrypted file and durable publication
+// without also benchmarking multi-MiB encryption under -race. Prepare it before
+// starting the test grant; large-file behavior has its own acceptance profile.
+func shortExpiryPayload(t *testing.T, f *registryFixture) {
+	t.Helper()
+	f.payload = f.payload[:32<<10]
+	must(t, os.WriteFile(f.input, f.payload, 0600))
 }
 
 func grantFor(t *testing.T, f *registryFixture, generation string) []byte {
