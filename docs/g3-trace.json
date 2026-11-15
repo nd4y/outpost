@@ -116,6 +116,10 @@
         {
           "path": "internal/upload/claim_slot_linux_test.go",
           "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ]
     },
@@ -192,6 +196,10 @@
         {
           "path": "internal/upload/previous_reader_linux_test.go",
           "name": "TestPreviousKitRestoresBothBatchUploadedGenerations"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ]
     },
@@ -260,6 +268,10 @@
         {
           "path": "internal/upload/progress_linux_test.go",
           "name": "TestSlotRotationKeepsCompletedPartsAndRequeuesOnlyLostPart"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ]
     }
@@ -342,6 +354,10 @@
         {
           "path": "internal/storage/move_http_linux_test.go",
           "name": "TestWebDAVMoveRetainsCorruptStagesAndBoundsRetries"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ]
     },
@@ -362,6 +378,10 @@
         {
           "path": "internal/upload/move_linux_test.go",
           "name": "TestWebDAVMoveProcessesResumeAndRestoreBothGenerations"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ]
     },

@@ -208,3 +208,5 @@ The check retains request counts, part-write span, child CPU and cgroup CPU/I/O/
 [Bounded signed claims and journal checkpoints](upload-checkpoints.md) reduce repeated local and remote metadata writes while preserving actual readback, original network leases, crash recovery and full-generation publication.
 
 [Whole-operation windows](operation-windows.md) separate explicitly owner-admitted large-generation execution from unchanged short HTTP/claim limits. Default configuration and retained legacy queues preserve their original bounds.
+
+The opt-in [full-generation external scale harness](full-external-scale.md) separately checks the complete retained source corpus with three physically copied local holders and three actual upload processes. It requires its own bounded rehearsal, terminal full-size execution and fresh standalone consumers; a source file or skipped CI test does not establish acceptance.

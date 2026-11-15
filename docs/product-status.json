@@ -809,6 +809,10 @@
         {
           "path": "internal/upload/readback_linux_test.go",
           "name": "TestCloudReadbackReusePreservesAgeAndReadsOnlyChangedObjects"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
@@ -2152,6 +2156,10 @@
         {
           "path": "internal/worker/external_repair_linux_test.go",
           "name": "TestWorkerLongWindowRetainedAuditAndRepair"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2891,6 +2899,10 @@
         {
           "path": "internal/upload/previous_reader_linux_test.go",
           "name": "TestPreviousKitRestoresBothBatchUploadedGenerations"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -2989,6 +3001,10 @@
         {
           "path": "internal/worker/repair_linux_test.go",
           "name": "TestCatalogRepairAutonomousPushPullAcrossRestartAndOutboundOnlyRoutes"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -3293,6 +3309,10 @@
         {
           "path": "internal/upload/claim_batch_linux_test.go",
           "name": "TestClaimBatchCacheRequiresActualReadbackAndCurrentLease"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -3403,6 +3423,10 @@
         {
           "path": "internal/storage/sdk_signing_test.go",
           "name": "TestSDKIntegrationDoesNotDiscoverCredentials"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-16"],
@@ -3489,6 +3513,10 @@
         {
           "path": "internal/upload/idle_poll_linux_test.go",
           "name": "TestWaitingUploadBackoffCancellationKeepsPin"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-14", "AT-15"],
@@ -4337,6 +4365,10 @@
         {
           "path": "internal/upload/upload_linux_test.go",
           "name": "TestWeightedWorkerSIGKILLReassignmentAndRestart"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-24"],
@@ -7165,6 +7197,10 @@
         {
           "path": "internal/ingress/catalog_deadline_linux_test.go",
           "name": "TestCatalogDeadlineBoundsAndReopenedVerificationProgress"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
@@ -8779,6 +8815,10 @@
         {
           "path": "internal/upload/claim_slot_linux_test.go",
           "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestFullGenerationExternalScale"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

@@ -29,6 +29,7 @@ type Options struct {
 	Logins                             map[string]Login
 	Delay                              time.Duration
 	Before                             Hook
+	BeforePartWrite                    Hook
 	AfterWrite                         Hook
 	MoveOnly                           bool
 	IgnoreMoveOverwrite                bool
@@ -237,6 +238,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 				}
 				s.mu.Unlock()
 			}()
+			if s.Options.BeforePartWrite != nil && s.Options.BeforePartWrite(w, r, actor, key, body) {
+				return
+			}
 			select {
 			case <-r.Context().Done():
 				return
