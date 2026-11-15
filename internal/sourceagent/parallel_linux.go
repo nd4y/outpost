@@ -275,6 +275,7 @@ func (s *parallelSink) Write(ctx context.Context, ref filekit.Object, payload []
 		holders := [2]*ingress.Client{s.Client, s.companion}
 		owner := s.splitOwner(ref)
 		origin, debit := s.distribution.reservePreferred(ref.Bytes, owner)
+		defer s.distribution.completePreferred(origin, ref.Bytes)
 		start := time.Now()
 		created, err := holders[origin].Write(ctx, ref, payload)
 		if origin != owner && errors.Is(err, statefile.ErrCapacity) {

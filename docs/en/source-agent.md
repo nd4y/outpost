@@ -1,6 +1,8 @@
 # Private source agent
 
-[Р СѓСЃСЃРєРёР№](../ru/source-agent.md)
+[Русский](../ru/source-agent.md)
+
+REQ-06 has explicit component checks for ciphertext/name isolation (`TestConfidentialNamesAndFileDomainIsolation`), encrypted capture progress, names absent from the source checkpoint and rejection of private paths in typed telemetry. The [product trace](../product-status.json) identifies the exact test functions. These checks cover different boundaries; they do not certify every real storage endpoint or third-party access log. REQ-47's repository-governance checks are listed separately in `requirements.json.documentChecks`, rather than counted as Go runtime tests.
 
 The Linux agent joins the [source lifecycle](source-jobs.md) to an enrolled [runtime volume](runtime-volume.md), private metadata cache and HTTPS ingress. The installed tree provider declares `best-effort` consistency. It verifies the enrolled filesystem/root inode, rejects links and overlap with runtime storage, and never deletes, unmounts or changes source files when releasing its view.
 
@@ -57,7 +59,7 @@ The `two-holder-coverage` policy requires two holders for every dependency.
 
 Set `profile.releasePolicy` to `paired-split-coverage` to accept one staged copy per dependency before release. New object ownership is stable across retries and derived from its opaque ID and the two holder identities. Both holders retain the final catalog. The source validates the union by recomputing the assigned dependency list for each holder. A required dependency cannot be covered by an unrelated holder or intent.
 
-Small objects and the first samples go to their assigned holders. When successful durable PUTs of at least 256 KiB show unequal rates, the source can send a large object to the other holder, using the same 4:1 cap as full-copy capture. The assigned holder then pulls the exact staged bytes over the signed peer route before that object counts toward coverage. After an interruption between the PUT and the handoff, the source asks the assigned holder to import the peer's staged bytes before sending the object again. If the alternate origin reports a quota refusal and the import confirms the object is absent, the source sends directly to the assigned holder.
+Small objects and sequential equal-rate writes prefer their assigned holders. For a large split write, an occupied assigned holder and an idle peer can use both initial receivers even during equal-rate warm-up. The reservation covers acceptance and the required peer handoff and is released on every return, including cancellation or quota fallback. Successful durable PUTs of at least 256 KiB still supply the smoothed rates; unequal rates use the same 4:1 cap as full-copy capture. The assigned holder pulls the exact staged bytes over the signed peer route before that object counts toward coverage. After an interruption between the PUT and the handoff, the source asks the assigned holder to import the peer's staged bytes before sending the object again. If the alternate origin reports a quota refusal and the import confirms the object is absent, the source sends directly to the assigned holder. The [asymmetric acceptance method](asymmetric-source.md) separates actual initial concurrency, matched capture timing and full-size acceptance.
 
 After seal, each worker pulls missing dependencies only from its configured peer and verifies the entire generation before publication. Protect both holders until assembly completes. Failure of a holder can lose a newly captured object during the interval with only one staged copy. The [publication recovery workflow](source-settlement.md#finish-an-expired-staged-publication) covers accepted staging after expiry. Asymmetric throughput acceptance remains open.
 

@@ -698,6 +698,9 @@ func testSplitDelivery(t *testing.T, ctx context.Context, a *Agent, traffic *cap
 	if _, err = sink.Write(ctx, ref, payload); !errors.Is(err, ingress.ErrUnavailable) {
 		t.Fatal("did not interrupt delivery after durable source PUT", err)
 	}
+	if sink.distribution.pending != [2]int{} {
+		t.Fatal("failed handoff retained initial reservation", sink.distribution.pending)
+	}
 	must(t, sink.Client.Check(ctx, ref))
 	if err = sink.companion.Check(ctx, ref); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("stable owner unexpectedly accepted the object", err)
@@ -745,6 +748,9 @@ func testSplitDelivery(t *testing.T, ctx context.Context, a *Agent, traffic *cap
 	must(t, err)
 	if !created || refuse.Load() {
 		t.Fatal("adaptive staging refusal did not fall back to the owner")
+	}
+	if capped.distribution.pending != [2]int{} {
+		t.Fatal("quota fallback retained initial reservation", capped.distribution.pending)
 	}
 	must(t, capped.companion.Check(ctx, ref))
 	if err = capped.Client.Check(ctx, ref); !errors.Is(err, os.ErrNotExist) {

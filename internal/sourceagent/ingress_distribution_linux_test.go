@@ -64,3 +64,31 @@ func TestSplitIngressKeepsOwnerUntilRatesDiverge(t *testing.T) {
 		t.Fatal("split ingress did not allocate measured throughput", sends)
 	}
 }
+
+func TestSplitIngressColdOwnerUsesIdlePeerAndReleasesReservations(t *testing.T) {
+	const size = 1 << 20
+	var d ingressDistribution
+	first, debit := d.reservePreferred(size, 0)
+	second, otherDebit := d.reservePreferred(size, 0)
+	if first != 0 || second != 1 || debit != 0 || otherDebit != 0 {
+		t.Fatal("concurrent equal-rate writes did not use idle initial receiver", first, second, debit, otherDebit)
+	}
+	d.completePreferred(second, size)
+	d.completePreferred(first, size)
+	if d.pending != [2]int{} {
+		t.Fatal("completed reservations leaked", d.pending)
+	}
+	for range 8 {
+		holder, _ := d.reservePreferred(size, 1)
+		if holder != 1 {
+			t.Fatal("sequential write lost stable-owner preference", holder)
+		}
+		d.completePreferred(holder, size)
+	}
+	before := d.pending
+	holder, _ := d.reservePreferred(minIngressSample-1, 1)
+	d.completePreferred(holder, minIngressSample-1)
+	if d.pending != before {
+		t.Fatal("small metadata changed pending accounting", d.pending)
+	}
+}

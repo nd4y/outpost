@@ -12,6 +12,7 @@ type ingressDistribution struct {
 	mu      sync.Mutex
 	rate    [2]float64
 	balance int64
+	pending [2]int
 }
 
 const minIngressSample = 256 << 10
@@ -20,11 +21,15 @@ func (d *ingressDistribution) reserve(size int) (holder int, debit int64) {
 	return d.reservePreferred(size, -1)
 }
 
-// The stable owner is preferred during split warm-up and for small writes.
-// Only a measured difference warrants an extra pre-seal peer transfer.
+// Prefer the stable owner for small or sequential equal-rate split writes.
+// A concurrent large write can use the idle peer while that owner is occupied;
+// the caller must still deliver the exact object to its required stable owner.
 func (d *ingressDistribution) reservePreferred(size, preferred int) (holder int, debit int64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if preferred >= 0 && size >= minIngressSample {
+		defer func() { d.pending[holder]++ }()
+	}
 
 	weight := [2]int64{1, 1}
 	if d.rate[0] > 0 && d.rate[1] > 0 {
@@ -33,7 +38,11 @@ func (d *ingressDistribution) reservePreferred(size, preferred int) (holder int,
 		}
 	}
 	if preferred >= 0 && (size < minIngressSample || weight[0] == weight[1]) {
-		return preferred, 0
+		holder = preferred
+		if size >= minIngressSample && d.pending[holder] > 0 && d.pending[1-holder] == 0 {
+			holder = 1 - holder
+		}
+		return holder, 0
 	}
 	// Reserving bytes before the HEAD checks keeps concurrent packs from
 	// making the same decision against an unchanged balance.
@@ -43,6 +52,17 @@ func (d *ingressDistribution) reservePreferred(size, preferred int) (holder int,
 	}
 	d.balance += debit
 	return holder, debit
+}
+
+// A split reservation covers the whole accepted write and required handoff.
+// Pair this with reservePreferred on every return, including failed requests.
+func (d *ingressDistribution) completePreferred(holder, size int) {
+	if size < minIngressSample {
+		return
+	}
+	d.mu.Lock()
+	d.pending[holder]--
+	d.mu.Unlock()
 }
 
 func (d *ingressDistribution) refund(debit int64) {
