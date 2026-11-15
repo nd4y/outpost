@@ -1281,6 +1281,14 @@
         {
           "path": "internal/control/operation_limits_linux_test.go",
           "name": "TestSignedOperationWindowKeepsRequestBudgetAndLegacyCanonicalBytes"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
@@ -1327,6 +1335,14 @@
         {
           "path": "internal/upload/claim_slot_linux_test.go",
           "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
@@ -2213,6 +2229,14 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestFullGenerationExternalScale"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -3058,6 +3082,14 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestFullGenerationExternalScale"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
@@ -3154,6 +3186,14 @@
         {
           "path": "internal/worker/dataset_rebuild_cli_linux_test.go",
           "name": "TestReplacementDatasetRebuildActualCLI"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
@@ -3180,6 +3220,14 @@
         {
           "path": "internal/worker/discovery_linux_test.go",
           "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18"],
@@ -4422,6 +4470,14 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestFullGenerationExternalScale"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-24"],
@@ -5683,6 +5739,14 @@
         {
           "path": "internal/upload/claim_batch_linux_test.go",
           "name": "TestSignedClaimBatchesKeepLegacyAuthorityAndBounds"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-07", "AT-08", "AT-16", "AT-22", "AT-25", "AT-26", "AT-30"],
@@ -7144,6 +7208,14 @@
         {
           "path": "internal/ingress/catalog_continuation_linux_test.go",
           "name": "TestCatalogContinuationRejectsExpiredIntent"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
@@ -8239,6 +8311,14 @@
         {
           "path": "internal/worker/vm_powerloss_linux_test.go",
           "name": "TestVMKernelFixture"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],

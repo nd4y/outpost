@@ -189,6 +189,20 @@ jobs:
           go test -count=1 -timeout=120s \
             -run '^(TestPairedIngressAdaptsInitialCiphertextBytes|TestSourceParallelIngressForwardsBeforeSealAndRecoversBoth|TestParallelIngressRenewsBothAuthoritiesAtomically|TestSourceCoverageReleasesBeforePublicationAndWorkersResume|TestSourcePartitionCoverageAssemblesFromPeersAfterRelease|TestStagedCoverageRejectsMissingDependencyAndNeverPublishes)$' \
             -v ./internal/sourceagent ./internal/ingress
+      - name: Verify selected source and autonomous worker processes
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/cli-process-flow"
+          export OUTPOST_TEST_ROOT="$RUNNER_TEMP/cli-process-flow"
+          export TMPDIR="$OUTPOST_TEST_ROOT"
+          export OUTPOST_CLI_PROCESS_FLOW=1
+          export OUTPOST_FLOW_CURRENT_CLI="$RUNNER_TEMP/current/linux_$ARCHITECTURE/outpost"
+          export OUTPOST_FLOW_CURRENT_SHA256="$(python3 -c 'import json,os; m=json.load(open(os.environ["RUNNER_TEMP"]+"/current/manifest.json")); print(m["files"]["linux_"+os.environ["ARCHITECTURE"]+"/outpost"]["sha256"])')"
+          export OUTPOST_FLOW_REVISION="$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current/manifest.json"))["revision"])')"
+          go test -count=1 -timeout=360s \
+            -run '^TestCLIProcess(SourceAndOutboundFollowerKeepIndependentHistory|FlowSelectionRefusesBeforeFixture)$' \
+            -v ./cmd/outpost
       - name: Verify WebDAV MOVE on native workers and previous CLI
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
