@@ -12,12 +12,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/readback"
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/teststore"
 	"golang.org/x/sys/unix"
@@ -41,6 +44,12 @@ type externalScaleChildResult struct {
 	HTTP   storage.HTTPBodyCounts `json:"http"`
 }
 
+type externalScaleChildConfig struct {
+	childConfig
+	ReadbackDirectory     string `json:",omitempty"`
+	ReadbackMaxAgeSeconds int64  `json:",omitempty"`
+}
+
 func TestFullExternalUploadWorkerProcess(t *testing.T) {
 	path := os.Getenv("OUTPOST_FULL_EXTERNAL_CHILD")
 	if path == "" {
@@ -48,13 +57,29 @@ func TestFullExternalUploadWorkerProcess(t *testing.T) {
 	}
 	raw, err := os.ReadFile(path)
 	must(t, err)
-	var cfg childConfig
+	var cfg externalScaleChildConfig
 	must(t, storage.Decode(raw, &cfg, 64<<10))
 	raw, err = os.ReadFile(filepath.Join(cfg.Directory, "plan.json"))
 	must(t, err)
 	journal, err := Open(cfg.Directory, raw, cfg.Worker, cfg.Authority, false)
 	must(t, err)
 	defer journal.Close()
+	if cfg.ReadbackMaxAgeSeconds != 0 {
+		if cfg.ReadbackMaxAgeSeconds != 3600 && cfg.ReadbackMaxAgeSeconds != 86400 {
+			t.Fatal("unsupported separately admitted readback age")
+		}
+		root := os.Getenv("OUTPOST_TEST_ROOT")
+		rel, err := filepath.Rel(root, cfg.ReadbackDirectory)
+		if err != nil || !filepath.IsAbs(root) || !filepath.IsAbs(cfg.ReadbackDirectory) || rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+			t.Fatal("readback state outside the admitted fixture")
+		}
+		cache, err := statefile.Open(cfg.ReadbackDirectory, readback.MaxPage, true)
+		must(t, err)
+		defer func() { must(t, cache.Close()) }()
+		journal.Readback = ReadbackOptions{Store: cache, MaxAgeSeconds: cfg.ReadbackMaxAgeSeconds}
+	} else if cfg.ReadbackDirectory != "" {
+		t.Fatal("readback directory without an explicit age policy")
+	}
 	replica, err := generation.Open(cfg.Replica, cfg.Authority.Generation, false)
 	must(t, err)
 	defer replica.Close()
@@ -115,6 +140,7 @@ type externalScaleTraffic struct {
 	putBytes  int64
 	partBytes int64
 	partPUTs  map[string]int
+	partGETs  map[string]int
 }
 
 type externalScaleRendezvous struct {
@@ -234,6 +260,11 @@ func TestScaleRendezvousRequiresThreeActualPartRequests(t *testing.T) {
 }
 
 func (c *externalScaleTraffic) observe(_ http.ResponseWriter, r *http.Request, _, key string, body []byte) bool {
+	if r.Method == http.MethodGet && strings.HasPrefix(key, "part-") {
+		c.mu.Lock()
+		c.partGETs[strings.TrimPrefix(key, "part-")]++
+		c.mu.Unlock()
+	}
 	if r.Method == http.MethodPut {
 		c.mu.Lock()
 		c.putBytes += int64(len(body))
@@ -251,6 +282,100 @@ func (c *externalScaleTraffic) reset() {
 	defer c.mu.Unlock()
 	c.putBytes, c.partBytes = 0, 0
 	c.partPUTs = map[string]int{}
+	c.partGETs = map[string]int{}
+}
+
+func (c *externalScaleTraffic) retainedReads(refs map[string]int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	count := 0
+	for id, n := range c.partGETs {
+		if _, retained := refs[id]; retained {
+			count += n
+		}
+	}
+	return count
+}
+
+func externalScalePhysicalParts(plan Plan) map[string]int {
+	parts := map[string]int{}
+	for _, blob := range plan.Blobs {
+		for _, part := range blob.Parts {
+			parts[part.ID] = part.Bytes
+		}
+	}
+	return parts
+}
+
+func externalScaleCacheRecords(t *testing.T, cfg childConfig, directory string, age int64, backend *storage.Backend) (map[string]readback.Record, int64) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(cfg.Directory, "plan.json"))
+	must(t, err)
+	journal, err := Open(cfg.Directory, raw, cfg.Worker, cfg.Authority, false)
+	must(t, err)
+	defer journal.Close()
+	cache, err := statefile.Open(directory, readback.MaxPage, false)
+	must(t, err)
+	defer func() { must(t, cache.Close()) }()
+	journal.Readback = ReadbackOptions{Store: cache, MaxAgeSeconds: age}
+	audit, err := journal.newAudit(t.Context(), backend)
+	must(t, err)
+	defer audit.close()
+	// Inspect only persisted local evidence after every worker has exited.
+	// This is not another network audit or a current-persistence claim.
+	records := map[string]readback.Record{}
+	oldest := time.Now().Unix()
+	for id := range audit.blobs {
+		proof, present := audit.proofs[id]
+		if !present || !audit.usable(id) {
+			t.Fatal("completed worker lacks current age-bound local evidence")
+		}
+		records[audit.keys[id].ID] = proof.Record
+		oldest = min(oldest, proof.ObservedUnix)
+	}
+	return records, oldest
+}
+
+func TestScaleRetainedTrafficUsesActualMultipartIDs(t *testing.T) {
+	f := fixtureBytes(t, 128<<10)
+	traffic := &externalScaleTraffic{}
+	traffic.reset()
+	server := f.server(t, "webdav", 0, traffic.observe)
+	backend := f.backend(t, server, 0)
+	plan, err := Verify(f.plan(t, server, 1, 500), f.authority)
+	must(t, err)
+	retained := externalScalePhysicalParts(plan)
+	for _, blob := range plan.Blobs {
+		if len(blob.Parts) < 2 {
+			continue
+		}
+		payload, err := f.replicas[0].ReadObject(t.Context(), f.id, blob.Object)
+		must(t, err)
+		offset := 0
+		for _, part := range blob.Parts {
+			must(t, backend.PutPart(t.Context(), part, payload[offset:offset+part.Bytes]))
+			offset += part.Bytes
+		}
+		must(t, backend.SealBlob(t.Context(), blob))
+		traffic.reset()
+		got, err := backend.ReadBlob(t.Context(), blob.Object)
+		must(t, err)
+		if storage.Hash(got) != blob.Object.ID || traffic.retainedReads(retained) != len(blob.Parts) {
+			t.Fatal("actual multipart reads escaped retained physical-part accounting")
+		}
+		if traffic.retainedReads(map[string]int{blob.Object.ID: blob.Object.Bytes}) != 0 {
+			t.Fatal("fixture did not distinguish logical object IDs from physical parts")
+		}
+		traffic.reset()
+		part := blob.Parts[0]
+		must(t, backend.PutPart(t.Context(), part, payload[:part.Bytes]))
+		_, _, attempts := traffic.snapshot()
+		if attempts[part.ID] != 1 || retained[part.ID] != part.Bytes || server.Snapshot().Writes["part-"+part.ID] != 1 {
+			t.Fatal("retained multipart PUT was missed or immutable data was rewritten")
+		}
+		return
+	}
+	t.Fatal("fixture did not create a real split object")
 }
 
 func (c *externalScaleTraffic) snapshot() (int64, int64, map[string]int) {
@@ -341,6 +466,15 @@ func TestFullGenerationExternalScale(t *testing.T) {
 	if source.Format != "outpost-external-scale-input-1" || source.SourceBytes != 128<<20 && source.SourceBytes != 100<<30 {
 		t.Fatal("only the admitted128MiB or physical100GiB source profile is supported")
 	}
+	var readbackAge int64
+	if value := os.Getenv("OUTPOST_FULL_EXTERNAL_READBACK_MAX_AGE_SECONDS"); value != "" {
+		readbackAge, err = strconv.ParseInt(value, 10, 64)
+		must(t, err)
+		if readbackAge != 0 && readbackAge != 3600 && readbackAge != 86400 {
+			t.Fatal("only fresh, one-hour rehearsal or one-day full readback policies are admitted")
+		}
+	}
+	t.Logf("EXTERNAL_SCALE_READBACK maximum-age-seconds=%d fresh-recovery-required=true", readbackAge)
 	var fs unix.Statfs_t
 	must(t, unix.Statfs(root, &fs))
 	fsid := fmt.Sprintf("%x", uint64(uint32(fs.Fsid.Val[0]))|uint64(uint32(fs.Fsid.Val[1]))<<32)
@@ -370,7 +504,6 @@ func TestFullGenerationExternalScale(t *testing.T) {
 	ctx := t.Context()
 	ids := []string{source.Base, source.Patched, source.Unchanged}
 	catalogs := make([][]byte, len(ids))
-	refs := make([]map[string]int, len(ids))
 	for n, id := range ids {
 		if !storage.ID(id) {
 			t.Fatal("invalid expected generation")
@@ -380,12 +513,8 @@ func TestFullGenerationExternalScale(t *testing.T) {
 		if storage.Hash(catalogs[n]) != id {
 			t.Fatal("input catalog digest differs")
 		}
-		dependencies, err := generation.Dependencies(catalogs[n], source.Trust)
+		_, err = generation.Dependencies(catalogs[n], source.Trust)
 		must(t, err)
-		refs[n] = make(map[string]int, len(dependencies))
-		for _, ref := range dependencies {
-			refs[n][ref.ID] = ref.Bytes
-		}
 	}
 	// Every worker receives its own physically copied full retained history.
 	// These are distinct files, not hardlinked input views or shards. The lab
@@ -437,6 +566,8 @@ func TestFullGenerationExternalScale(t *testing.T) {
 			backend, err := storage.New(p, storage.Credentials{Access: f.workers[0].ID, Secret: logins[f.workers[0].ID].Secret, ExpiresUnix: f.expiresUnix()}, target.Roots)
 			must(t, err)
 			defer backend.Close()
+			priorEvidence := make([]map[string]readback.Record, len(f.workers))
+			retainedParts := map[string]int{}
 			for phase, name := range []string{"base", "patched", "unchanged"} {
 				started := time.Now()
 				traffic.reset()
@@ -452,6 +583,8 @@ func TestFullGenerationExternalScale(t *testing.T) {
 				plan, err := Build(ctx, f.replicas[0], ids[phase], Plan{Format: Format, Operation: storage.Hash([]byte(kind + "/" + name + "/" + ids[phase])),
 					Profile: p, AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: f.workers, StartMillis: time.Now().Add(200 * time.Millisecond).UnixMilli(), ExpiresUnix: f.expiresUnix(), SlotMillis: 30000}, planner)
 				must(t, err)
+				verifiedPlan, err := Verify(plan, f.authority)
+				must(t, err)
 				children := make([]*child, 3)
 				for n := range children {
 					f.serial++
@@ -463,7 +596,15 @@ func TestFullGenerationExternalScale(t *testing.T) {
 					cfg := childConfig{Directory: job, Replica: f.dirs[n], Worker: f.workers[n].ID, Result: job + "/result.json", Access: f.workers[n].ID,
 						Secret: logins[f.workers[n].ID].Secret, Key: f.keys[n], Authority: f.authority, Profile: p, ExpiresUnix: f.expiresUnix(), Timeout: f.childTimeout,
 						CA: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: target.HTTP.Certificate().Raw})}
-					data, err := json.Marshal(cfg)
+					childCfg := externalScaleChildConfig{childConfig: cfg}
+					if readbackAge > 0 {
+						childCfg.ReadbackDirectory = filepath.Join(base, fmt.Sprintf("readback-%s-%d", kind, n))
+						childCfg.ReadbackMaxAgeSeconds = readbackAge
+						if phase == 0 {
+							must(t, os.Mkdir(childCfg.ReadbackDirectory, 0700))
+						}
+					}
+					data, err := json.Marshal(childCfg)
 					must(t, err)
 					path := job + "/child.json"
 					must(t, os.WriteFile(path, data, 0600))
@@ -475,11 +616,14 @@ func TestFullGenerationExternalScale(t *testing.T) {
 					t.Fatalf("8MiB replacement exceeded128MiB received PUT bodies: %d", putBytes)
 				}
 				if phase == 2 {
+					if readbackAge > 0 && traffic.retainedReads(retainedParts) != 0 {
+						t.Fatal("enabled readback reuse fetched retained payload during unchanged capture")
+					}
 					if partBytes > 64<<10 {
 						t.Fatal("unchanged source created unexpected new file-sized payload", partBytes)
 					}
 					for id := range partPUTs {
-						if _, existed := refs[1][id]; existed {
+						if _, existed := retainedParts[id]; existed {
 							t.Fatal("unchanged phase retransmitted a retained payload or descriptor", id)
 						}
 					}
@@ -508,12 +652,31 @@ func TestFullGenerationExternalScale(t *testing.T) {
 					if !proof.HTTP.Valid() || proof.HTTP.Incomplete || proof.Result.CleanupPending {
 						t.Fatal("incomplete scale worker result or HTTP accounting")
 					}
+					if readbackAge > 0 {
+						directory := filepath.Join(base, fmt.Sprintf("readback-%s-%d", kind, n))
+						records, oldest := externalScaleCacheRecords(t, c.config, directory, readbackAge, backend)
+						preserved := 0
+						for id, record := range records {
+							if old, existed := priorEvidence[n][id]; existed {
+								if old != record {
+									t.Fatal("retained object evidence changed its supporting time or length")
+								}
+								preserved++
+							}
+						}
+						if proof.Result.Receipt.ObservedUnix != oldest || phase > 0 && (preserved == 0 || proof.Result.Receipt.Verification != "cached-target-readback") {
+							t.Fatal("receipt age differs from its current dependency evidence or claims fresh verification", proof.Result.Receipt)
+						}
+						priorEvidence[n] = records
+						t.Logf("EXTERNAL_SCALE_CACHE protocol=%s phase=%s worker=%d records=%d preserved=%d oldest=%d", kind, name, n, len(records), preserved, oldest)
+					}
 					t.Logf("EXTERNAL_SCALE_HTTP protocol=%s phase=%s worker=%d counts=%s", kind, name, n, data)
 				}
 				parentCounts, err := json.Marshal(externalScaleMeter(t, phaseMeter))
 				must(t, err)
 				t.Logf("EXTERNAL_SCALE_HTTP protocol=%s phase=%s worker=parent counts=%s", kind, name, parentCounts)
 				t.Logf("EXTERNAL_SCALE_CAPTURE protocol=%s phase=%s source-bytes=%d received-put-body-bytes=%d part-body-bytes=%d parts=%d actors=%d peak=%d seconds=%.6f", kind, name, source.SourceBytes, putBytes, partBytes, len(partPUTs), len(actors), snapshot.PeakWorkers, time.Since(started).Seconds())
+				retainedParts = externalScalePhysicalParts(verifiedPlan)
 			}
 			// A fresh materialized store is downloaded through the actual adapter.
 			// The separate consumer stage will mount only its immutable files,

@@ -20,6 +20,8 @@ The scenario refuses existing fixture roots and requires a 20 percent reserve pl
 
 The recorded small functional rehearsal used a separately admitted exception: 0.5 CPU and 512 MiB alongside one existing source capture. Its consumer stage used 0.5 CPU and 384 MiB. Fresh admission checked both jobs and system reserve. These shared intervals belong in the source timing record and provide no throughput guarantee. The 100 GiB external scenario still requires an idle test runtime and a separate cost review.
 
+Readback reuse is a separate, explicitly selected profile of the existing [owner policy](readback-reuse.md). `OUTPOST_FULL_EXTERNAL_READBACK_MAX_AGE_SECONDS` defaults to zero, preserving fresh-only verification. The harness also admits 3600 seconds for its small rehearsal or 86400 seconds for the large profile. Each worker keeps its own bounded cache across the three generations. Records for retained objects keep their original observation times. A receipt reports the oldest supporting time for its current dependencies and uses `cached-target-readback` when it reuses evidence. Removing the oldest object can change that minimum without refreshing retained records. The unchanged phase must not fetch retained payload parts. This does not make a historical observation a current persistence guarantee. The later adapter downloads and all independent reader/oracle restores always read actual bytes and never use this cache. Record its selected age and costs separately from the accepted fresh-only control.
+
 Each disk-backed HTTPS protocol fixture admits 8 MiB objects and a disclosed 10 ms part-write delay. Three actual subprocesses use separately admitted 30-second assignment slots and bounded 24-hour operation contexts. Existing small default, failover and latency profiles remain unchanged. A failed child causes the remaining children to be stopped and joined before its endpoint closes; the next protocol is not started after failure.
 
 The checks require:
@@ -29,6 +31,8 @@ The checks require:
 - At most 128 MiB of received PUT bodies for the 8 MiB replacement, conservatively including its negative publication check. HTTP responses and TCP/TLS overhead are separate costs.
 - No retransmission of retained parts during the unchanged phase, and at most 64 KiB of new encrypted metadata parts for this fixed source corpus. The producer's separately verified zero file-payload observation remains part of the combined evidence.
 - A fresh complete materialized store downloaded through each actual storage adapter, retaining all three checkpoints.
+
+Retained-traffic checks use physical part IDs from the verified upload plan, including split objects. Logical object IDs cannot identify their smaller parts. `TestScaleRetainedTrafficUsesActualMultipartIDs` reads a real split object over HTTPS and repeats a conditional part PUT: it checks that both operations are counted while the immutable target key is physically written once. Scope this result separately from a corpus whose objects fit the target cap without splitting.
 
 The endpoint holds the first authenticated part request from each identity at a bounded 15-second rendezvous before any of those payloads is written. All three must arrive; cancellation or a missing participant fails the check. The ordinary temporary-file, fsync, immutable creation and readback follow this barrier. This controls request concurrency rather than claiming simultaneous physical disk operations or throughput. A separate real-HTTP check proves that two waiting participants create no part files and that a third releases three actual writes; cancellation keeps them unwritten.
 
@@ -54,3 +58,20 @@ The [source-bound receipt](../full-external-rehearsal-evidence.json) records a s
 Each unchanged phase created 7644 bytes of encrypted metadata parts and retransmitted no retained part. The low PUT count does not describe total traffic: fresh verification reads are substantial. Response counts above sum the three workers; parent checks, subsequent downloads and TCP/TLS framing add separate costs. Review this measured read amplification before admitting the large run or advertising transfer costs.
 
 The uploader's 512 MiB cgroup recorded a 538292224-byte peak and 5468 memory-limit events, with no OOM or swap. This is memory pressure, not evidence of headroom. All seven reader peaks were below their 384 MiB caps. The original delay-only WebDAV profile failed with peak concurrency two; the declared rendezvous profile does not change that result. A rejected noncanonical input and a rejected race invocation outside the admitted temporary root also remain recorded. No verifier or filesystem guard was weakened. Earlier short-deadline HDD failures and the asymmetric ingress, physical failure-domain and production gates remain open.
+
+## Recorded explicit-policy result
+
+The separate [explicit-policy receipt](../external-readback-scale-evidence.json) records the corrected 128 MiB run with a 3600-second age policy and seven new offline older-reader restores. Both generic protocols retain all three generations. Retained object records keep their original times and lengths; each receipt matches the minimum over its current dependencies. The multipart GET/repeated-PUT control, evidence epochs, descriptor loss, concurrency and existing protocol refusal checks pass under the race detector.
+
+| Protocol      | Phase             | Received PUT bodies, bytes | Worker response bodies, bytes | Worker HTTP requests | Seconds |
+| ------------- | ----------------- | -------------------------: | ----------------------------: | -------------------: | ------: |
+| S3-compatible | Base              |                  134281534 |                     745025723 |                  525 |  166.66 |
+| S3-compatible | 8 MiB replacement |                   12900636 |                      51601088 |                  240 |   17.65 |
+| S3-compatible | Unchanged         |                       4459 |                         46025 |                  173 |    1.92 |
+| WebDAV        | Base              |                  134273912 |                     743020419 |                  513 |  145.63 |
+| WebDAV        | 8 MiB replacement |                   12900636 |                      51599443 |                  233 |   19.00 |
+| WebDAV        | Unchanged         |                       4459 |                         46025 |                  172 |    3.90 |
+
+Each unchanged phase had zero retained-part GETs and 2548 bytes of new encrypted metadata parts. Parent checks and later fresh adapter downloads are recorded separately in the receipt; TCP/TLS framing is excluded. The two small profiles have different host/cache conditions, so their times do not establish a throughput guarantee. The 512 MiB group recorded a 537665536-byte peak and 2822 limit events without OOM or swap. This remains memory pressure.
+
+The earlier comparison with the base generation's aggregate minimum was invalid when an old object left the dependency set; that failed control remains recorded. The corrected per-object check and physical-part map are exercised by this exact source. Fresh-only defaults, independent uncached recovery, original failed profiles and all full-size/physical/production gates remain unchanged. The proposed one-day large-data policy still needs its own admitted execution.

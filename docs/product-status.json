@@ -813,6 +813,10 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestFullGenerationExternalScale"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestScaleRetainedTrafficUsesActualMultipartIDs"
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
@@ -8819,6 +8823,10 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestFullGenerationExternalScale"
+        },
+        {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestScaleRetainedTrafficUsesActualMultipartIDs"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

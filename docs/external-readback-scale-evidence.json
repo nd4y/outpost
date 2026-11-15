@@ -1,0 +1,738 @@
+{
+  "format": "outpost-external-readback-scale-rehearsal-1",
+  "status": "PASS_128MIB_ONLY",
+  "observedAt": "2026-11-15T03:33:18.173946+00:00",
+  "baseCommit": "e324b227cdfd0d6b598a0d4d66f51f6531f86020",
+  "sourceTree": "7e9ffcf488cecf3371579a3996334b17662917bb",
+  "sourceInputs": {
+    "internal/upload/scale_linux_test.go": "f74b0f9e2a82a958a378d3df66992343182135c56f64253bedc0f98a040f2ebe",
+    "internal/teststore/server.go": "94fe98d83dfe4f8cf68fad301755c37529374c66a45cdf7cd19a589c182a599b"
+  },
+  "sourceBytes": 134217728,
+  "replacementBytes": 8388608,
+  "readbackMaxAgeSeconds": 3600,
+  "defaultMaxAgeSeconds": 0,
+  "fullProfileAgeSecondsProposed": 86400,
+  "holderCount": 3,
+  "uploaderProcesses": 3,
+  "retainedGenerations": 3,
+  "profile": {
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 537665536,
+    "memoryLimitEvents": 2822,
+    "swapBytes": 0,
+    "oom": 0,
+    "cohosted": true,
+    "cpuUsageMicroseconds": 242781120
+  },
+  "metrics": [
+    {
+      "protocol": "s3",
+      "phase": "base",
+      "receivedPUTBodyBytes": 134281534,
+      "partBodyBytes": 134250167,
+      "newPartCount": 21,
+      "seconds": 166.659767,
+      "workerResponseBodyBytes": 745025723,
+      "workerRequestBodyBytes": 134281534,
+      "parentResponseBodyBytes": 3006,
+      "workers": [
+        {
+          "actor": 0,
+          "responseBytes": 253800229,
+          "requestBytes": 39865561,
+          "http": {
+            "requests": 180,
+            "getRequests": 159,
+            "putRequests": 21,
+            "moveRequests": 0,
+            "requestBytes": 39865561,
+            "objectRequestBytes": 39856659,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 253800229,
+            "objectResponseBytes": 253777121,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "full-target-readback",
+          "observedUnix": 1794712588,
+          "currentEvidenceRecords": 20,
+          "unchangedEvidenceRecords": 0
+        },
+        {
+          "actor": 1,
+          "responseBytes": 243951301,
+          "requestBytes": 42117181,
+          "http": {
+            "requests": 166,
+            "getRequests": 142,
+            "putRequests": 24,
+            "moveRequests": 0,
+            "requestBytes": 42117181,
+            "objectRequestBytes": 42107982,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 243951301,
+            "objectResponseBytes": 243927892,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "full-target-readback",
+          "observedUnix": 1794712629,
+          "currentEvidenceRecords": 20,
+          "unchangedEvidenceRecords": 0
+        },
+        {
+          "actor": 2,
+          "responseBytes": 247274193,
+          "requestBytes": 52298792,
+          "http": {
+            "requests": 179,
+            "getRequests": 152,
+            "putRequests": 27,
+            "moveRequests": 0,
+            "requestBytes": 52298792,
+            "objectRequestBytes": 52285526,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 247274193,
+            "objectResponseBytes": 247253050,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "full-target-readback",
+          "observedUnix": 1794712615,
+          "currentEvidenceRecords": 20,
+          "unchangedEvidenceRecords": 0
+        }
+      ],
+      "unchangedRetainedPartGETs": null,
+      "workerHTTPRequests": 525
+    },
+    {
+      "protocol": "s3",
+      "phase": "patched",
+      "receivedPUTBodyBytes": 12900636,
+      "partBodyBytes": 12888287,
+      "newPartCount": 5,
+      "seconds": 17.645372,
+      "workerResponseBodyBytes": 51601088,
+      "workerRequestBodyBytes": 12900636,
+      "parentResponseBodyBytes": 3160,
+      "workers": [
+        {
+          "actor": 0,
+          "responseBytes": 12943971,
+          "requestBytes": 33748,
+          "http": {
+            "requests": 132,
+            "getRequests": 118,
+            "putRequests": 14,
+            "moveRequests": 0,
+            "requestBytes": 33748,
+            "objectRequestBytes": 28201,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 12943971,
+            "objectResponseBytes": 12919036,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712588,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 17
+        },
+        {
+          "actor": 1,
+          "responseBytes": 20238588,
+          "requestBytes": 7343356,
+          "http": {
+            "requests": 54,
+            "getRequests": 48,
+            "putRequests": 6,
+            "moveRequests": 0,
+            "requestBytes": 7343356,
+            "objectRequestBytes": 7339753,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 20238588,
+            "objectResponseBytes": 20228040,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712629,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 17
+        },
+        {
+          "actor": 2,
+          "responseBytes": 18418529,
+          "requestBytes": 5523532,
+          "http": {
+            "requests": 54,
+            "getRequests": 48,
+            "putRequests": 6,
+            "moveRequests": 0,
+            "requestBytes": 5523532,
+            "objectRequestBytes": 5520333,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 18418529,
+            "objectResponseBytes": 18408620,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712615,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 17
+        }
+      ],
+      "unchangedRetainedPartGETs": null,
+      "workerHTTPRequests": 240
+    },
+    {
+      "protocol": "s3",
+      "phase": "unchanged",
+      "receivedPUTBodyBytes": 4459,
+      "partBodyBytes": 2548,
+      "newPartCount": 1,
+      "seconds": 1.923161,
+      "workerResponseBodyBytes": 46025,
+      "workerRequestBodyBytes": 4459,
+      "parentResponseBodyBytes": 3160,
+      "workers": [
+        {
+          "actor": 0,
+          "responseBytes": 25715,
+          "requestBytes": 3593,
+          "http": {
+            "requests": 89,
+            "getRequests": 82,
+            "putRequests": 7,
+            "moveRequests": 0,
+            "requestBytes": 3593,
+            "objectRequestBytes": 2548,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 25715,
+            "objectResponseBytes": 7644,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712588,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 21
+        },
+        {
+          "actor": 1,
+          "responseBytes": 9691,
+          "requestBytes": 433,
+          "http": {
+            "requests": 40,
+            "getRequests": 36,
+            "putRequests": 4,
+            "moveRequests": 0,
+            "requestBytes": 433,
+            "objectRequestBytes": 0,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 9691,
+            "objectResponseBytes": 2548,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712629,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 21
+        },
+        {
+          "actor": 2,
+          "responseBytes": 10619,
+          "requestBytes": 433,
+          "http": {
+            "requests": 44,
+            "getRequests": 40,
+            "putRequests": 4,
+            "moveRequests": 0,
+            "requestBytes": 433,
+            "objectRequestBytes": 0,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 10619,
+            "objectResponseBytes": 2548,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712615,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 21
+        }
+      ],
+      "unchangedRetainedPartGETs": 0,
+      "workerHTTPRequests": 173
+    },
+    {
+      "protocol": "webdav",
+      "phase": "base",
+      "receivedPUTBodyBytes": 134273912,
+      "partBodyBytes": 134250167,
+      "newPartCount": 21,
+      "seconds": 145.629932,
+      "workerResponseBodyBytes": 743020419,
+      "workerRequestBodyBytes": 134273912,
+      "parentResponseBodyBytes": 3006,
+      "workers": [
+        {
+          "actor": 0,
+          "responseBytes": 268518620,
+          "requestBytes": 36724146,
+          "http": {
+            "requests": 174,
+            "getRequests": 158,
+            "putRequests": 16,
+            "moveRequests": 0,
+            "requestBytes": 36724146,
+            "objectRequestBytes": 36717907,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 268518620,
+            "objectResponseBytes": 268497940,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "full-target-readback",
+          "observedUnix": 1794712807,
+          "currentEvidenceRecords": 20,
+          "unchangedEvidenceRecords": 0
+        },
+        {
+          "actor": 1,
+          "responseBytes": 221085004,
+          "requestBytes": 44254125,
+          "http": {
+            "requests": 168,
+            "getRequests": 145,
+            "putRequests": 23,
+            "moveRequests": 0,
+            "requestBytes": 44254125,
+            "objectRequestBytes": 44244726,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 221085004,
+            "objectResponseBytes": 221068660,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "full-target-readback",
+          "observedUnix": 1794712834,
+          "currentEvidenceRecords": 20,
+          "unchangedEvidenceRecords": 0
+        },
+        {
+          "actor": 2,
+          "responseBytes": 253416795,
+          "requestBytes": 53295641,
+          "http": {
+            "requests": 171,
+            "getRequests": 145,
+            "putRequests": 26,
+            "moveRequests": 0,
+            "requestBytes": 53295641,
+            "objectRequestBytes": 53287534,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 253416795,
+            "objectResponseBytes": 253395422,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "full-target-readback",
+          "observedUnix": 1794712859,
+          "currentEvidenceRecords": 20,
+          "unchangedEvidenceRecords": 0
+        }
+      ],
+      "unchangedRetainedPartGETs": null,
+      "workerHTTPRequests": 513
+    },
+    {
+      "protocol": "webdav",
+      "phase": "patched",
+      "receivedPUTBodyBytes": 12900636,
+      "partBodyBytes": 12888287,
+      "newPartCount": 5,
+      "seconds": 19.004537,
+      "workerResponseBodyBytes": 51599443,
+      "workerRequestBodyBytes": 12900636,
+      "parentResponseBodyBytes": 3160,
+      "workers": [
+        {
+          "actor": 0,
+          "responseBytes": 20239227,
+          "requestBytes": 7343760,
+          "http": {
+            "requests": 56,
+            "getRequests": 50,
+            "putRequests": 6,
+            "moveRequests": 0,
+            "requestBytes": 7343760,
+            "objectRequestBytes": 7339753,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 20239227,
+            "objectResponseBytes": 20228040,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712807,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 17
+        },
+        {
+          "actor": 1,
+          "responseBytes": 12939131,
+          "requestBytes": 31728,
+          "http": {
+            "requests": 117,
+            "getRequests": 103,
+            "putRequests": 14,
+            "moveRequests": 0,
+            "requestBytes": 31728,
+            "objectRequestBytes": 28201,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 12939131,
+            "objectResponseBytes": 12919036,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712834,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 17
+        },
+        {
+          "actor": 2,
+          "responseBytes": 18421085,
+          "requestBytes": 5525148,
+          "http": {
+            "requests": 60,
+            "getRequests": 54,
+            "putRequests": 6,
+            "moveRequests": 0,
+            "requestBytes": 5525148,
+            "objectRequestBytes": 5520333,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 18421085,
+            "objectResponseBytes": 18408620,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712860,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 17
+        }
+      ],
+      "unchangedRetainedPartGETs": null,
+      "workerHTTPRequests": 233
+    },
+    {
+      "protocol": "webdav",
+      "phase": "unchanged",
+      "receivedPUTBodyBytes": 4459,
+      "partBodyBytes": 2548,
+      "newPartCount": 1,
+      "seconds": 3.897285,
+      "workerResponseBodyBytes": 46025,
+      "workerRequestBodyBytes": 4459,
+      "parentResponseBodyBytes": 3160,
+      "workers": [
+        {
+          "actor": 0,
+          "responseBytes": 10157,
+          "requestBytes": 433,
+          "http": {
+            "requests": 42,
+            "getRequests": 38,
+            "putRequests": 4,
+            "moveRequests": 0,
+            "requestBytes": 433,
+            "objectRequestBytes": 0,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 10157,
+            "objectResponseBytes": 2548,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712807,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 21
+        },
+        {
+          "actor": 1,
+          "responseBytes": 11093,
+          "requestBytes": 433,
+          "http": {
+            "requests": 45,
+            "getRequests": 41,
+            "putRequests": 4,
+            "moveRequests": 0,
+            "requestBytes": 433,
+            "objectRequestBytes": 0,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 11093,
+            "objectResponseBytes": 2548,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712834,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 21
+        },
+        {
+          "actor": 2,
+          "responseBytes": 24775,
+          "requestBytes": 3593,
+          "http": {
+            "requests": 85,
+            "getRequests": 78,
+            "putRequests": 7,
+            "moveRequests": 0,
+            "requestBytes": 3593,
+            "objectRequestBytes": 2548,
+            "repeatedRequestBytes": 0,
+            "responseBytes": 24775,
+            "objectResponseBytes": 7644,
+            "stagingResponseBytes": 0,
+            "incomplete": false
+          },
+          "verification": "cached-target-readback",
+          "observedUnix": 1794712860,
+          "currentEvidenceRecords": 21,
+          "unchangedEvidenceRecords": 21
+        }
+      ],
+      "unchangedRetainedPartGETs": 0,
+      "workerHTTPRequests": 172
+    }
+  ],
+  "recoveryDownloadResponseBodyBytes": {
+    "s3": 147146060,
+    "webdav": 147146060
+  },
+  "consumers": {
+    "readerCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "readerSHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+    "cpu": 0.5,
+    "memoryMaxBytes": 402653184,
+    "network": false,
+    "restores": [
+      {
+        "group": "holder-0",
+        "phase": "patched",
+        "restoreSeconds": 41.12484778597718,
+        "oracleSeconds": 14.414991374011151,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 227602432
+      },
+      {
+        "group": "holder-1",
+        "phase": "patched",
+        "restoreSeconds": 41.495982652995735,
+        "oracleSeconds": 13.567840510979295,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 310812672
+      },
+      {
+        "group": "holder-2",
+        "phase": "patched",
+        "restoreSeconds": 38.93437975697452,
+        "oracleSeconds": 15.271106203028467,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 225390592
+      },
+      {
+        "group": "s3",
+        "phase": "base",
+        "restoreSeconds": 46.180407879990526,
+        "oracleSeconds": 12.170764801034238,
+        "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "attributesVerified": true,
+        "memoryPeakBytes": 293629952
+      },
+      {
+        "group": "s3",
+        "phase": "patched",
+        "restoreSeconds": 41.30612528201891,
+        "oracleSeconds": 14.108443500997964,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 224735232
+      },
+      {
+        "group": "webdav",
+        "phase": "base",
+        "restoreSeconds": 41.00813982001273,
+        "oracleSeconds": 13.725045002007391,
+        "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "attributesVerified": true,
+        "memoryPeakBytes": 221368320
+      },
+      {
+        "group": "webdav",
+        "phase": "patched",
+        "restoreSeconds": 37.50294178898912,
+        "oracleSeconds": 13.829186868970282,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 307961856
+      }
+    ]
+  },
+  "freshControl": {
+    "receipt": "full-external-rehearsal-evidence.json",
+    "sourceTree": "4e77a43fcb5e3ba576d7e78f46d577176e754f64",
+    "logSHA256": {
+      "scale": "4dff7fd5b00a719c888c0299d669b3cc53ed666710c3776a3895f4baf5291f43",
+      "consumers": "c4237e0e1e32fbcb3f98f6ea485a94a30d2fa4f9c24bccbb3bb032498eecdc0f",
+      "race": "a5d0f460921342055d570ce37c9cdf0b97f73f06ad28ccf1d01282a692d7bac1"
+    },
+    "metrics": [
+      {
+        "protocol": "s3",
+        "phase": "base",
+        "receivedPUTBodyBytes": 134296923,
+        "partBodyBytes": 134252561,
+        "newPartCount": 21,
+        "cumulativeDistinctActors": 3,
+        "cumulativePeakActors": 3,
+        "seconds": 283.402596,
+        "workerResponseBodyBytes": 1800079483,
+        "workerRequestBodyBytes": 134296923
+      },
+      {
+        "protocol": "s3",
+        "phase": "patched",
+        "receivedPUTBodyBytes": 12916415,
+        "partBodyBytes": 12893383,
+        "newPartCount": 5,
+        "cumulativeDistinctActors": 3,
+        "cumulativePeakActors": 3,
+        "seconds": 212.266389,
+        "workerResponseBodyBytes": 1534701582,
+        "workerRequestBodyBytes": 12916415
+      },
+      {
+        "protocol": "s3",
+        "phase": "unchanged",
+        "receivedPUTBodyBytes": 25548,
+        "partBodyBytes": 7644,
+        "newPartCount": 1,
+        "cumulativeDistinctActors": 3,
+        "cumulativePeakActors": 3,
+        "seconds": 207.177255,
+        "workerResponseBodyBytes": 1537294753,
+        "workerRequestBodyBytes": 25548
+      },
+      {
+        "protocol": "webdav",
+        "phase": "base",
+        "receivedPUTBodyBytes": 134281570,
+        "partBodyBytes": 134252561,
+        "newPartCount": 21,
+        "cumulativeDistinctActors": 3,
+        "cumulativePeakActors": 3,
+        "seconds": 223.4866,
+        "workerResponseBodyBytes": 1551804329,
+        "workerRequestBodyBytes": 134281570
+      },
+      {
+        "protocol": "webdav",
+        "phase": "patched",
+        "receivedPUTBodyBytes": 12916415,
+        "partBodyBytes": 12893383,
+        "newPartCount": 5,
+        "cumulativeDistinctActors": 3,
+        "cumulativePeakActors": 3,
+        "seconds": 196.69867,
+        "workerResponseBodyBytes": 1514988402,
+        "workerRequestBodyBytes": 12916415
+      },
+      {
+        "protocol": "webdav",
+        "phase": "unchanged",
+        "receivedPUTBodyBytes": 25548,
+        "partBodyBytes": 7644,
+        "newPartCount": 1,
+        "cumulativeDistinctActors": 3,
+        "cumulativePeakActors": 3,
+        "seconds": 205.194769,
+        "workerResponseBodyBytes": 1544421911,
+        "workerRequestBodyBytes": 25548
+      }
+    ]
+  },
+  "logSHA256": {
+    "scale": "0f696fcb869914fc88d9ecf5c6c2d51309a9f5fe15b34c71916572186e5c123f",
+    "consumers": "79ea03a7ad117f1a53379cbc9a52af6d4ffe923a1f93eb49fd793e5d64d4d471"
+  },
+  "limits": [
+    "Separate explicit profile of existing local owner policy. Zero-age product and fixture defaults remain fresh-only; no production runtime behavior changed.",
+    "Each worker retains its own bounded private cache across generations. Reused receipts retain supporting observation age and cached-target-readback level; they do not guarantee current persistence.",
+    "New parts and descriptors remain verified. The unchanged phase performed zero GETs of retained parts. Subsequent adapter materialization and all seven independent old-reader/oracle recoveries read actual bytes with no cache mounted.",
+    "The fresh-only control remains accepted on its exact source; the delay-only WebDAV concurrency failure, canonical-input rejection, temporary-root refusal and earlier short-deadline failures are not relabelled.",
+    "These cohosted 128 MiB measurements have different host/cache conditions; timings describe these runs and do not establish a speedup guarantee or a 100 GiB bound.",
+    "Memory-limit events indicate pressure. No RAM headroom, physical failure-domain, full-scale, real-account, asymmetric ingress or overall-product acceptance is claimed.",
+    "Response-body counts exclude TCP/TLS framing. Parent checks and later independent downloads are recorded separately. Full profile admission still requires a terminal accepted physical source, exact committed CI and fresh resource/cost review."
+  ],
+  "testSeconds": 592.31,
+  "cacheEvidenceRule": "Each retained per-object record keeps its original time and length. Receipt time is the minimum over current dependencies; removing an old object may advance that minimum without refreshing any retained record.",
+  "race": {
+    "sourceTree": "7e9ffcf488cecf3371579a3996334b17662917bb",
+    "logSHA256": "fbe1fb4f980961389420d09b8cde9d60bb2bcbd204623af61cb8c8f9cadbafc0",
+    "tests": [
+      "--- PASS: TestCloudEvidenceEpochFencesOtherOperationAndSurvivesPartialInvalidation (6.84s)",
+      "--- PASS: TestCloudHashProgressLosingKnownDescriptorInvalidatesUnsealedPrefix (4.92s)",
+      "--- PASS: TestScaleRendezvousRequiresThreeActualPartRequests (1.04s)",
+      "--- PASS: TestScaleRetainedTrafficUsesActualMultipartIDs (6.64s)",
+      "--- PASS: TestProtocolMultipartAndImmutableReadback (5.72s)",
+      "--- PASS: TestProtocolFaultsNeverBecomeVerified (1.64s)",
+      "--- PASS: TestProtocolAuthorizationRoutesAndCapabilityProbe (1.52s)"
+    ],
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 269516800,
+    "swapBytes": 0,
+    "oom": 0
+  },
+  "retainedFailures": [
+    "An intermediate compile passed raw signed plan bytes to the typed physical-part helper; signature verification corrected the harness type error.",
+    "The earlier aggregate-age comparison rejected a changed dependency set. The corrected harness compares retained records individually and the receipt with the current dependency minimum; no product age policy was changed.",
+    "Earlier fresh-only input/root/concurrency and short-deadline controls retain their original failed results."
+  ],
+  "execution": {
+    "imageDigest": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef",
+    "goVersion": "1.27.3",
+    "uploadTestSHA256": "e1a45cc390bf95070e0028e10d56b7596addcc3536e33babc7559ce531971f35",
+    "compiledSourceTree": "7e9ffcf488cecf3371579a3996334b17662917bb",
+    "profile": {
+      "cpu": 0.5,
+      "memoryBytes": 536870912,
+      "swapBytes": 0,
+      "slotMillis": 30000,
+      "childHours": 24,
+      "testHours": 2,
+      "partDelayMillis": 10,
+      "firstPartRendezvousSeconds": 15,
+      "maximumObjectBytes": 8388608,
+      "initialReserveOverlap": 2952790016,
+      "readbackMaxAgeSeconds": 3600,
+      "GOMEMLIMIT": "384MiB"
+    },
+    "pidsLimit": 128,
+    "GOMAXPROCS": 1,
+    "readOnlyRoot": true,
+    "network": "none",
+    "capabilities": "none"
+  }
+}
