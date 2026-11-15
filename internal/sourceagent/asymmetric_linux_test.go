@@ -335,6 +335,7 @@ type asymmetricFixture struct {
 	split                  bool
 	retained               map[string]asymmetricExpected
 	removeVerifiedRestores bool
+	deferRecoveries        bool
 	beforeSourcePut        func(string, http.ResponseWriter, *http.Request) bool
 }
 
@@ -509,6 +510,11 @@ func (x *asymmetricFixture) capture(t *testing.T, ctx context.Context, single bo
 	info, err := os.Stat(filepath.Join(f.tree, "private.bin"))
 	must(t, err)
 	expected.Mode, expected.MtimeNS = info.Mode().Perm(), info.ModTime().UnixNano()
+	if x.deferRecoveries && expected.SHA256 == "" {
+		// Diagnostic/preparation read, before capture timing and source counters.
+		// Later consumers must verify this exact version independently.
+		expected.SHA256 = expected.verify(t, filepath.Join(f.tree, "private.bin"))
+	}
 	x.traffic.begin()
 	x.proof.Store(false)
 	x.publication.Store(!x.split)
@@ -682,6 +688,9 @@ func (x *asymmetricFixture) capture(t *testing.T, ctx context.Context, single bo
 		t.Fatal("source input unexpectedly available during recovery")
 	}
 	for generationID, original := range x.retained {
+		if x.deferRecoveries {
+			continue // mandatory fresh executable recovery remains pending
+		}
 		for n, dir := range x.dirs {
 			replica := filepath.Join(worker.DomainDirectory(dir, f.grant.Trust), "replica")
 			out := filepath.Join(f.base, "restore-"+r.Generation+"-"+generationID+"-"+string(rune('a'+n)))
@@ -710,6 +719,9 @@ func (x *asymmetricFixture) capture(t *testing.T, ctx context.Context, single bo
 	raw, err := json.Marshal(r)
 	must(t, err)
 	t.Logf("ASYMMETRIC_CAPTURE %s", raw)
+	if x.deferRecoveries {
+		t.Logf("ASYMMETRIC_RECOVERY_PENDING generation=%s bytes=%d retained=%d holders=3 mode=fresh-executable-required", r.Generation, expected.Bytes, len(x.retained))
+	}
 	return r
 }
 

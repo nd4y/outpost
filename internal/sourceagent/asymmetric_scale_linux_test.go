@@ -34,6 +34,10 @@ func TestAsymmetricSourceScale(t *testing.T) {
 	if err != nil || (size != 128<<20 && size != 100<<30) {
 		t.Fatal("scale requires128MiB rehearsal or physical100GiB")
 	}
+	recoveryMode := os.Getenv("OUTPOST_ASYMMETRIC_DEFER_RECOVERY")
+	if recoveryMode != "" && recoveryMode != "1" || size == 100<<30 && recoveryMode != "1" {
+		t.Fatal("full profile requires separately admitted fresh executable consumers;128MiB also supports the original in-process control")
+	}
 	root := os.Getenv("OUTPOST_TEST_ROOT")
 	var disk unix.Statfs_t
 	must(t, unix.Statfs(root, &disk))
@@ -106,6 +110,7 @@ func TestAsymmetricSourceScale(t *testing.T) {
 					},
 				}, control.Limits{Parallel: 2, AttemptMillis: 30000, PollSeconds: 1, CapacityBytes: 512 << 30, ReserveBytes: 16 << 30, SpoolBytes: 256 << 30, TelemetryBytes: 1 << 20})
 				x.removeVerifiedRestores = true
+				x.deferRecoveries = recoveryMode == "1"
 				results := map[string]asymmetricResult{}
 				for _, phase := range []string{"base", "patched"} {
 					if phase == "patched" {
@@ -167,10 +172,11 @@ func TestAsymmetricSourceScale(t *testing.T) {
 					paths = append(paths, filepath.Join(worker.DomainDirectory(dir, x.f.grant.Trust), "replica"))
 				}
 				write("asymmetric-result.json", struct {
-					Bytes    int64
-					Results  map[string]asymmetricResult
-					Replicas []string
-				}{size, results, paths})
+					Bytes                     int64
+					Results                   map[string]asymmetricResult
+					Replicas                  []string
+					InProcessRecoveryDeferred bool
+				}{size, results, paths, x.deferRecoveries})
 				t.Logf("ASYMMETRIC_SCALE_CASE_PASS name=%s bytes=%d retained-generations=2 physical-holders=3 independent-process-consumers=pending", name, size)
 			})
 		}
