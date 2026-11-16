@@ -16,7 +16,12 @@
         "internal/recoverybundle",
         "internal/ingress",
         "internal/observation",
-        "internal/policy"
+        "internal/policy",
+        "go.mod",
+        "go.sum",
+        "internal/storage",
+        "internal/generation",
+        "cmd/outpost"
       ],
       "checks": [
         {
@@ -38,10 +43,34 @@
         {
           "path": "internal/storage/sdk_signing_test.go",
           "name": "TestSDKIntegrationDoesNotDiscoverCredentials"
+        },
+        {
+          "path": "internal/filekit/reference_linux_test.go",
+          "name": "TestFrozenV1KitCreatedByPreviousImplementation"
+        },
+        {
+          "path": "internal/filekit/filekit_linux_test.go",
+          "name": "TestIndependentVersionsAndAttributes"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageActualPackagedReaderAfterSourceLoss"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIRestoresMaterializedReplicaWithoutIndexOrSource"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_sbom_and_binary_binding_cannot_be_relabelled"
+        },
+        {
+          "path": "scripts/check-candidate-release.py",
+          "name": "test_independent_commit_run_architecture_and_digest_selection"
         }
       ],
       "acceptance": ["AT-24", "AT-25"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs. Pinned SDK request signing and HTTP URI encoding now have independent frozen vectors and actual signed-framing/explicit-credential checks; both native architectures, actual downloaded binary-bound SBOM and bounded storage checks pass on executable0ad4d17; real endpoint/full-product admission remains separate."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs. Pinned SDK request signing and HTTP URI encoding now have independent frozen vectors and actual signed-framing/explicit-credential checks; both native architectures, actual downloaded binary-bound SBOM and bounded storage checks pass on executable0ad4d17; real endpoint/full-product admission remains separate. Direct facet links now distinguish component/format and independently selected binary-SBOM binding, frozen previous-format reading and standalone materialized recovery from SDK signing alone. See docs/en/requirement-facets.md; no whole-profile acceptance is inferred."
     },
     {
       "id": "REQ-02",
@@ -530,7 +559,13 @@
       "id": "REQ-07",
       "workstream": "crypto",
       "state": "IN_DEVELOPMENT",
-      "implementation": ["internal/filekit", "internal/generation", "internal/storage"],
+      "implementation": [
+        "internal/filekit",
+        "internal/generation",
+        "internal/storage",
+        "internal/recoverybundle",
+        "internal/worker"
+      ],
       "checks": [
         {
           "path": "internal/observation/authority_test.go",
@@ -539,10 +574,26 @@
         {
           "path": "internal/upload/delegation_linux_test.go",
           "name": "TestDelegationRejectsScopeChangesAndUntrustedPartMapCannotPublish"
+        },
+        {
+          "path": "internal/recoverybundle/epoch_linux_test.go",
+          "name": "TestOwnerEpochInitialPreparationRequiresPrivateVolumeAndSeparateKeys"
+        },
+        {
+          "path": "internal/recoverybundle/recovery_linux_test.go",
+          "name": "TestRecoveryPackageRoundTripHasOnlyReadOnlySecrets"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryKeylessAdmissionTrustedRuntimeAndOriginalReport"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
         }
       ],
       "acceptance": ["AT-01", "AT-06", "AT-20", "AT-21", "AT-27"],
-      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios. Direct facet links now include distinct data/signing/maintenance key preparation, recovery packages with read-only secrets and keyless worker admission/actual process flow. Scope remains the stated synthetic roles and recovery fixtures, not physical host isolation."
     },
     {
       "id": "REQ-08",
@@ -3228,10 +3279,14 @@
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
           "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
+        },
+        {
+          "path": "internal/peer/offline_history_linux_test.go",
+          "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
         }
       ],
       "acceptance": ["AT-09", "AT-11", "AT-18"],
-      "remaining": "Installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance. The existing offline-history test is directly linked. Its ordinary default is three updates; the explicit admitted-HDD OUTPOST_OFFLINE_180 profile selects180. The recorded180-update receipt is not180wallclockdays or100GiB per generation."
     },
     {
       "id": "REQ-27",
