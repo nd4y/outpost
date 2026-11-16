@@ -1,5 +1,7 @@
 # Outpost
 
+The [owner export correction](docs/en/owner-export-mount.md) accepts the same enrolled source after a mount-namespace restart and pins a fresh observation during export. Its bounded HDD controls also cover all configured ingress receivers being unavailable. The prior 100 GiB run completed three captures but failed before recovery export; full offline recovery remains pending.
+
 The [verification work correction](docs/en/verification-batch.md) removes repeated prefix stamp scans while retaining the final publication sweep. Controlled HDD and race checks pass; the failed 36-hour full-size run remains unaccepted.
 
 [Русский](README.ru.md)

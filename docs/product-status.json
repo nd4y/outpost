@@ -332,6 +332,10 @@
         {
           "path": "internal/sourceagent/asymmetric_scale_linux_test.go",
           "name": "TestAsymmetricSourceScale"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_linux_test.go",
+          "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
@@ -515,6 +519,10 @@
         {
           "path": "internal/sourceagent/ingress_distribution_linux_test.go",
           "name": "TestSplitIngressColdOwnerUsesIdlePeerAndReleasesReservations"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_linux_test.go",
+          "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
@@ -761,6 +769,10 @@
         {
           "path": "internal/worker/epoch_history_linux_test.go",
           "name": "TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory"
+        },
+        {
+          "path": "internal/sourceagent/recovery_mount_linux_test.go",
+          "name": "TestSourceRecoveryExportAcrossMountNamespaceIDChange"
         }
       ],
       "acceptance": ["AT-01", "AT-18", "AT-24"],
@@ -6906,6 +6918,10 @@
         {
           "path": "internal/ingress/catalog_deadline_linux_test.go",
           "name": "TestCatalogDeadlineBoundsAndReopenedVerificationProgress"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_linux_test.go",
+          "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -8438,6 +8454,10 @@
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
           "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
+        },
+        {
+          "path": "internal/sourceagent/recovery_mount_linux_test.go",
+          "name": "TestSourceRecoveryExportAcrossMountNamespaceIDChange"
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
@@ -9075,6 +9095,10 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestScaleRetainedTrafficUsesActualMultipartIDs"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_linux_test.go",
+          "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

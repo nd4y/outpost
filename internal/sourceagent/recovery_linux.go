@@ -54,6 +54,19 @@ func (a *Agent) ExportRecovery(ctx context.Context, p RecoveryExportProfile, rev
 		return out, e
 	}
 	defer ownerRoot.Close()
+	// A saved mount ID belongs to the namespace that enrolled the tree. Pin
+	// the current namespace's observation for this export after checking every
+	// durable source identity field; do not rewrite the enrolled bootstrap.
+	initialTree, e := localfs.OpenRoot(a.b.Tree.Path)
+	if e != nil {
+		return out, e
+	}
+	defer initialTree.Close()
+	sourceObservation, e := volume.InspectRoot(ctx, initialTree)
+	enrolled := a.b.Tree.Observed
+	if e != nil || sourceObservation.Filesystem != enrolled.Filesystem || sourceObservation.FSID != enrolled.FSID || sourceObservation.RootInode != enrolled.RootInode || sourceObservation.ReadOnly != enrolled.ReadOnly {
+		return out, recoverybundle.ErrDenied
+	}
 	guard := func(ctx context.Context) error {
 		if e := p.Volume.CheckHandle(ctx, p.Directory, owner); e != nil {
 			return e
@@ -75,7 +88,9 @@ func (a *Agent) ExportRecovery(ctx context.Context, p RecoveryExportProfile, rev
 		}
 		defer tree.Close()
 		observed, e := volume.InspectRoot(ctx, tree)
-		if e != nil || observed != a.b.Tree.Observed {
+		// Include the fresh mount ID here: changing the mount or root during
+		// this export must still fail before publishing recovery material.
+		if e != nil || observed != sourceObservation {
 			return recoverybundle.ErrDenied
 		}
 		if e = localfs.Disjoint(ctx, ownerRoot, tree); e != nil {
