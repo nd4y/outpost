@@ -524,7 +524,7 @@
         }
       ],
       "acceptance": ["AT-01", "AT-05", "AT-06", "AT-26"],
-      "remaining": "File-kit ciphertext/root privacy, encrypted progress, source-checkpoint names and typed-telemetry rejection now have explicit component links. These checks do not establish privacy of every real endpoint, source/application profile or third-party access log. Final integrated scale and owner-profile admission remain separate."
+      "remaining": "File-kit ciphertext/root privacy, encrypted progress, source-checkpoint names and typed-telemetry rejection now have explicit component links. These checks do not establish privacy of every real endpoint, source/application profile or third-party access log. Final integrated scale and owner-profile admission remain separate. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission."
     },
     {
       "id": "REQ-07",
@@ -805,7 +805,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-06", "AT-12", "AT-26"],
-      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission."
     },
     {
       "id": "REQ-11",
@@ -839,7 +839,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12"],
-      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission."
     },
     {
       "id": "REQ-12",
@@ -869,7 +869,7 @@
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
-      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission."
     },
     {
       "id": "REQ-13",
@@ -7329,7 +7329,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission."
     },
     {
       "id": "REQ-47",

@@ -3,6 +3,7 @@ package filekit
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -66,10 +67,18 @@ func TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency(t *testing.T) {
 }
 
 func TestConfidentialNamesAndFileDomainIsolation(t *testing.T) {
-	_, s, source, data := fixture(t, 128<<10)
+	base, s, source, data := fixture(t, 128<<10)
 	marker := "unique-private-name-5c41a128.bin"
+	otherName := "another-private-name-62e59c10.bin"
+	payloadMarker := []byte("private-payload-marker-fb98e145")
+	for _, offset := range []int{0, len(data) / 2, len(data) - len(payloadMarker)} {
+		copy(data[offset:], payloadMarker)
+	}
+	if err := os.WriteFile(source, data, 0640); err != nil {
+		t.Fatal(err)
+	}
 	a := mustBackup(t, s, source, BackupOptions{Names: []string{marker}})
-	b := mustBackup(t, s, source, BackupOptions{Names: []string{"another-name"}})
+	b := mustBackup(t, s, source, BackupOptions{Names: []string{otherName}})
 	ae, ad, err := s.LoadVersion(a.Version)
 	if err != nil {
 		t.Fatal(err)
@@ -86,23 +95,62 @@ func TestConfidentialNamesAndFileDomainIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for id, ref := range ar {
+	for id := range ar {
 		if _, shared := br[id]; shared {
 			t.Fatal("cross-file encrypted objects shared")
 		}
-		ciphertext, err := s.readObject(ref)
+	}
+	for _, version := range []string{a.Version, b.Version} {
+		root, err := s.readFile("versions/"+version+".json", MaxRoot)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Contains(ciphertext, []byte(marker)) || bytes.Contains(ciphertext, data[:64]) {
-			t.Fatal("plaintext disclosed")
+		for _, secret := range [][]byte{[]byte(marker), []byte(otherName), payloadMarker, []byte(ad.Blocks[0].Hash), []byte(bd.Blocks[0].Hash)} {
+			if bytes.Contains(root, secret) {
+				t.Fatal("version root disclosed a private marker")
+			}
 		}
-	}
-	root, err := s.readFile("versions/"+a.Version+".json", MaxRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Contains(root, []byte(marker)) || bytes.Contains(root, []byte(ad.Blocks[0].Hash)) {
-		t.Fatal("root disclosed names or plaintext chunk identity")
+		kit := filepath.Join(base, "export-"+version)
+		if err := s.Export(context.Background(), version, kit); err != nil {
+			t.Fatal(err)
+		}
+		files := 0
+		err = filepath.WalkDir(kit, func(name string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			relative, err := filepath.Rel(kit, name)
+			if err != nil {
+				return err
+			}
+			for _, secret := range []string{marker, otherName, string(payloadMarker), ad.Blocks[0].Hash, bd.Blocks[0].Hash} {
+				if bytes.Contains([]byte(relative), []byte(secret)) {
+					t.Fatal("export filename disclosed a private marker")
+				}
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			if !entry.Type().IsRegular() {
+				t.Fatal("export contains a non-regular entry")
+			}
+			files++
+			raw, err := os.ReadFile(name)
+			if err != nil {
+				return err
+			}
+			for _, secret := range [][]byte{[]byte(marker), []byte(otherName), payloadMarker, []byte(ad.Blocks[0].Hash), []byte(bd.Blocks[0].Hash)} {
+				if bytes.Contains(raw, secret) {
+					t.Fatal("export bytes disclosed a private marker")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if files < 3 {
+			t.Fatal("export must contain the envelope, descriptor and encrypted payload")
+		}
 	}
 }
