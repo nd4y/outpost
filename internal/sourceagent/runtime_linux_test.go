@@ -327,15 +327,10 @@ func newFixtureWithOptions(t *testing.T, seconds int64, extra *tls.Certificate, 
 		// These synthetic keys never leave the private fixture. Keeping only
 		// public certificates would lose the original receiver identity when
 		// the test process exits, preventing authenticated diagnosis/resumption.
-		name := write("fixture-context.json", marshal(struct {
-			Format                                                string
-			Bootstrap                                             Bootstrap
-			Authority                                             []byte
-			DataOwner                                             filekit.Owner
-			ControlOwnerKey, WriterKey                            ed25519.PrivateKey
-			SourceCertificate, SourceKey                          []byte
-			DestinationCertificate, DestinationKey, CertificateCA []byte
-		}{"outpost-private-synthetic-fixture-1", f.b, f.authority, f.owner, ownerKey, key, cp, kp, destinationCertificate, destinationKey, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}))
+		name := write("fixture-context.json", marshal(retainedFixtureContext{
+			"outpost-private-synthetic-fixture-1", f.b, f.authority, f.owner, ownerKey, key, cp, kp,
+			destinationCertificate, destinationKey, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		}))
 		retained, err := os.Open(name)
 		must(t, err)
 		must(t, retained.Sync())

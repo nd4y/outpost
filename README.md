@@ -1,5 +1,7 @@
 # Outpost
 
+The [verification work correction](docs/en/verification-batch.md) removes repeated prefix stamp scans while retaining the final publication sweep. Controlled HDD and race checks pass; the failed 36-hour full-size run remains unaccepted.
+
 [Русский](README.ru.md)
 
 [Real source expiry](docs/en/source-agent.md#real-authority-expiry-on-the-hdd) now has a current, explicitly enabled HDD receipt for expired ACTIVE retirement and offline split-coverage publication. The three bounded native cases preserve authority, receipt-time and release thresholds; physical 100 GiB and product acceptance remain separate.

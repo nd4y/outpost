@@ -39,6 +39,9 @@ type BatchResult struct {
 }
 
 func (r *Replica) objectStamp(ref Object) (catalogStamp, error) {
+	if e := r.point("verification-object-stamp"); e != nil {
+		return catalogStamp{}, e
+	}
 	f, e := localfs.OpenFile(r.root, "objects/"+ref.ID, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return catalogStamp{}, e
@@ -186,10 +189,12 @@ func (r *Replica) publishComplete(s *state, id string, c Catalog) error {
 
 // ReceiveBatch copies and verifies at most maxObjects/maxBytes of payload per
 // call, keeping durable verification progress across request/process restarts.
-// Receiving references protect every object from maintenance. A verified object
-// is reused only while its inode/size/mtime/ctime stamp is unchanged; final
-// publication checks all stamps under the replica lock. As with any multi-object
-// scrub, this records a verification window, not immunity to later bit rot.
+// Receiving references protect every object from maintenance. Intermediate
+// checkpoints retain past content reads and recheck only newly verified stamps.
+// Before publication, and on completed replay, all inode/size/mtime/ctime stamps
+// are checked under the replica lock. An invalidated proof is discarded durably
+// before ErrIncomplete is returned. As with any multi-object scrub, this records
+// a verification window, not immunity to later bit rot.
 // VerifyComplete always performs a new full content scrub.
 func (r *Replica) ReceiveBatch(ctx context.Context, raw []byte, maxObjects int, maxBytes int64, fetch func(Object) ([]byte, error)) (BatchResult, error) {
 	var result BatchResult
@@ -260,6 +265,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		if e != nil {
 			return e
 		}
+		completedCheckpoint := v.CompletedAt > 0 && len(v.Objects) == len(refs)
 		var bytes int64
 		for _, key := range sortedIDs(refs) {
 			if e := ctx.Err(); e != nil {
@@ -268,6 +274,9 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 			ref := refs[key]
 			_, damaged := s.Damage[key]
 			if checked, ok := v.Objects[key]; ok && !damaged {
+				if !completedCheckpoint {
+					continue
+				}
 				stamp, e := r.objectStamp(ref)
 				if e == nil && stamp == checked.Stamp {
 					continue
@@ -361,17 +370,26 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		for key, checked := range verified {
 			v.Objects[key] = checked
 		}
-		for key, ref := range refs {
+		// A full prefix walk per small batch is quadratic in the catalog size.
+		// New reads need a race check before checkpointing; the full sweep is
+		// necessary only when every dependency has supporting content evidence.
+		checks := verified
+		if len(v.Objects) == len(refs) {
+			checks = v.Objects
+		}
+		invalidated := false
+		for key, checked := range checks {
 			if e := ctx.Err(); e != nil {
 				return e
 			}
-			checked, ok := v.Objects[key]
+			ref, ok := refs[key]
 			if !ok {
-				continue
+				return ErrInvalid
 			}
 			stamp, e := r.objectStamp(ref)
 			if e != nil || stamp != checked.Stamp {
 				delete(v.Objects, key)
+				invalidated = true
 			}
 		}
 		if len(v.Objects) == len(refs) {
@@ -389,6 +407,9 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 			}
 		}
 		result.VerifiedObjects = len(v.Objects)
+		if invalidated {
+			return ErrIncomplete
+		}
 		if len(v.Objects) != len(refs) {
 			return nil
 		}

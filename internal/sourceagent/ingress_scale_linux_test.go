@@ -93,24 +93,44 @@ func TestSourceIngressScaleAndOfflineMaterializedReplica(t *testing.T) {
 		return run(tool, args...)
 	}
 	t.Logf("INGRESS_SCALE_ADMITTED bytes=%d projected-overlap-bytes=%d source-budget-bytes=%d", size, 6*size, int64(2<<30))
-	f := newFixtureWithOptions(t, int64((48*time.Hour)/time.Second), nil, nil, fixtureOptions{
-		Directory:      filepath.Join(root, "source-ingress-scale"),
-		MaxSourceBytes: size, MaxBytes: 128 << 30, MaxObjects: generation.MaxObjects,
-		Limits:              diskbudget.Limits{Capacity: 2 << 30, Reserve: 256 << 20, Spool: 1 << 30, Telemetry: 1 << 20},
-		CertificateLifetime: 48 * time.Hour,
-		RetainContext:       true,
-		InitialSource: func(t *testing.T, tree string) {
-			name := filepath.Join(tree, "private.bin")
-			t.Logf("INGRESS_SCALE_GENERATING bytes=%d", size)
-			t.Logf("INGRESS_SCALE_GENERATED %s", oracle("generate", name, "base", ""))
-			must(t, os.Link(name, filepath.Join(tree, "alias.bin")))
-			info, e := os.Stat(name)
-			must(t, e)
-			if info.Size() != size || info.Sys().(*syscall.Stat_t).Blocks*512 < size {
-				t.Fatal("source is not physically allocated at the declared length")
-			}
-		},
-	})
+	var prior *ingressScalePrior
+	if previous := os.Getenv("OUTPOST_INGRESS_RESUME_LOG"); previous != "" {
+		carried, err := readIngressScalePrior(previous, os.Getenv("OUTPOST_INGRESS_RESUME_LOG_SHA256"), size)
+		must(t, err)
+		prior = &carried
+	}
+	f := func() *fixture {
+		if prior != nil {
+			return reopenRetainedFixture(t, filepath.Join(root, "source-ingress-scale"), os.Getenv("OUTPOST_INGRESS_RESUME_CONTEXT_SHA256"))
+		}
+		return newFixtureWithOptions(t, int64((48*time.Hour)/time.Second), nil, nil, fixtureOptions{
+			Directory:      filepath.Join(root, "source-ingress-scale"),
+			MaxSourceBytes: size, MaxBytes: 128 << 30, MaxObjects: generation.MaxObjects,
+			Limits:              diskbudget.Limits{Capacity: 2 << 30, Reserve: 256 << 20, Spool: 1 << 30, Telemetry: 1 << 20},
+			CertificateLifetime: 48 * time.Hour,
+			RetainContext:       true,
+			InitialSource: func(t *testing.T, tree string) {
+				name := filepath.Join(tree, "private.bin")
+				t.Logf("INGRESS_SCALE_GENERATING bytes=%d", size)
+				t.Logf("INGRESS_SCALE_GENERATED %s", oracle("generate", name, "base", ""))
+				must(t, os.Link(name, filepath.Join(tree, "alias.bin")))
+				info, e := os.Stat(name)
+				must(t, e)
+				if info.Size() != size || info.Sys().(*syscall.Stat_t).Blocks*512 < size {
+					t.Fatal("source is not physically allocated at the declared length")
+				}
+			},
+		})
+	}()
+	if prior != nil {
+		original, err := os.Stat(filepath.Join(f.tree, "private.bin"))
+		must(t, err)
+		alias, err := os.Stat(filepath.Join(f.tree, "alias.bin"))
+		must(t, err)
+		if original.Size() != size || original.Sys().(*syscall.Stat_t).Blocks*512 < size || !os.SameFile(original, alias) {
+			t.Fatal("retained physical source or alias changed")
+		}
+	}
 	// Count received HTTP request bodies, separately from TLS/HTTP overhead,
 	// response readback and receiver logical-reference counts.
 	var payload, metadata atomic.Int64
@@ -157,25 +177,56 @@ func TestSourceIngressScaleAndOfflineMaterializedReplica(t *testing.T) {
 		}
 	}()
 	defer func() { close(stopWatch); <-watchDone }()
-	type result struct {
-		Generation                                        string `json:"generation"`
-		PayloadBytes, MetadataBytes, SourceAllocatedBytes int64
-		FilePayloadBytes, DescriptorBytes                 int64
-		Seconds                                           float64
-		Milestones                                        *Milestones `json:"milestones"`
-	}
+	type result = ingressScaleResult
 	results := map[string]result{}
+	var carriedCheckpoint capture.Checkpoint
+	if prior != nil {
+		previous, err := f.replica.Catalog(ctx, prior.Base.Generation)
+		must(t, err)
+		catalog, err := generation.VerifyCatalog(previous, f.grant.Trust)
+		must(t, err)
+		state, err := f.a.load()
+		must(t, err)
+		intent, err := f.a.stateIntent(state)
+		must(t, err)
+		status, err := f.a.Status(ctx)
+		must(t, err)
+		if catalog.Sequence != 1 || intent.Sequence != 2 || intent.Parent != prior.Base.Generation || status.Phase != "ACTIVE" ||
+			status.Job == nil || status.Job.Phase != "SEALED" || !storage.ID(status.Job.Generation) || status.Milestones == nil || status.Milestones.SnapshotUnix < 1 {
+			t.Fatal("retained capture is not the original base-complete patched seal")
+		}
+		carriedBase := prior.Base
+		carriedBase.Carried = true
+		results["base"] = carriedBase
+		carriedCheckpoint = capture.Checkpoint{Generation: prior.Base.Generation, Sequence: catalog.Sequence}
+		encoded, err := json.Marshal(results["base"])
+		must(t, err)
+		t.Logf("INGRESS_SCALE_CARRIED_GENERATED %s", prior.Generated)
+		t.Logf("INGRESS_SCALE_CARRIED_CAPTURE phase=base result=%s", encoded)
+		t.Logf("INGRESS_SCALE_RESUME original-log-sha256=%s authority-and-certificates-unchanged=true", prior.LogSHA256)
+	}
 	captureOne := func(phase string) capture.Checkpoint {
 		t.Helper()
 		currentPhase.Store("capture-" + phase)
 		p, m, started := payload.Load(), metadata.Load(), time.Now()
+		resumed := prior != nil && phase == "patched"
+		if resumed {
+			status, err := f.a.Status(ctx)
+			must(t, err)
+			if status.Milestones == nil {
+				t.Fatal("retained snapshot observation is absent")
+			}
+			started = time.Unix(status.Milestones.SnapshotUnix, 0)
+		}
 		objectsMu.Lock()
 		before := map[string]int64{}
 		for id, n := range objects {
 			before[id] = n
 		}
 		objectsMu.Unlock()
-		must(t, f.a.Next(ctx))
+		if !resumed {
+			must(t, f.a.Next(ctx))
+		}
 		for attempt := 1; ; attempt++ {
 			err := f.a.Run(ctx)
 			if err == nil {
@@ -259,16 +310,34 @@ func TestSourceIngressScaleAndOfflineMaterializedReplica(t *testing.T) {
 			t.Fatal("incomplete object body accounting")
 		}
 		results[phase] = result{Generation: c.Generation, PayloadBytes: payload.Load() - p, MetadataBytes: metadata.Load() - m, SourceAllocatedBytes: allocated, FilePayloadBytes: filePayload, DescriptorBytes: descriptorBytes, Seconds: time.Since(started).Seconds(), Milestones: status.Milestones}
+		if resumed {
+			row := results[phase]
+			row.PriorPayloadBytes = prior.Payload - prior.Base.PayloadBytes
+			row.PriorMetadataBytes = prior.Metadata - prior.Base.MetadataBytes
+			row.PayloadBytes += row.PriorPayloadBytes
+			row.MetadataBytes += row.PriorMetadataBytes
+			// The previous process measured its wire totals, but its per-object
+			// in-memory classifier was lost. Do not manufacture that split.
+			row.FilePayloadBytes, row.DescriptorBytes = -1, -1
+			row.PriorObjectTypeSplitUnknown = true
+			row.TimingBasis = "original persisted snapshotUnix, including stopped interval"
+			results[phase] = row
+		}
 		encoded, e := json.Marshal(results[phase])
 		must(t, e)
 		t.Logf("INGRESS_SCALE_CAPTURE phase=%s result=%s", phase, encoded)
 		return c
 	}
-	one := captureOne("base")
+	one := carriedCheckpoint
+	if prior == nil {
+		one = captureOne("base")
+	}
 	if results["base"].PayloadBytes > size*108/100 {
 		t.Fatal("initial encrypted payload exceeds declared1.08amplification", results["base"])
 	}
-	oracle("mutate", filepath.Join(f.tree, "private.bin"), "patched", "")
+	if prior == nil {
+		oracle("mutate", filepath.Join(f.tree, "private.bin"), "patched", "")
+	}
 	two := captureOne("patched")
 	if r := results["patched"]; r.PayloadBytes+r.MetadataBytes > 128<<20 {
 		t.Fatal("8MiB change exceeded128MiB received body budget", r)

@@ -995,6 +995,14 @@
         {
           "path": "internal/worker/vm_powerloss_linux_test.go",
           "name": "TestVMKernelFixture"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedVerificationStampWorkIsLinear"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedFinalStampInvalidationIsDurableBeforePublication"
         }
       ],
       "acceptance": ["AT-05", "AT-16"],
@@ -1398,6 +1406,10 @@
         {
           "path": "internal/sourceagent/renewal_linux_test.go",
           "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState"
+        },
+        {
+          "path": "internal/sourceagent/retained_fixture_linux_test.go",
+          "name": "TestRetainedFixtureReopensOriginalIdentityAuthorityAndCapture"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
@@ -2292,6 +2304,14 @@
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
           "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
+        },
+        {
+          "path": "internal/sourceagent/retained_fixture_linux_test.go",
+          "name": "TestRetainedFixtureReopensOriginalIdentityAuthorityAndCapture"
+        },
+        {
+          "path": "internal/sourceagent/ingress_scale_resume_linux_test.go",
+          "name": "TestIngressScaleResumeLogBindingsRejectAmbiguousCounters"
         }
       ],
       "acceptance": ["AT-14", "AT-15", "AT-17", "AT-18", "AT-20", "AT-22"],
@@ -2398,6 +2418,14 @@
         {
           "path": "internal/worker/dataset_rebuild_cli_linux_test.go",
           "name": "TestReplacementDatasetRebuildActualCLI"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedVerificationStampWorkIsLinear"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedFinalStampInvalidationIsDurableBeforePublication"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-20"],
@@ -2644,6 +2672,14 @@
         {
           "path": "internal/upload/journal_batch_linux_test.go",
           "name": "TestJournalBatchSIGKILLRechecksUncommittedAcknowledgement"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedVerificationStampWorkIsLinear"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedFinalStampInvalidationIsDurableBeforePublication"
         }
       ],
       "acceptance": ["AT-09", "AT-10", "AT-11", "AT-12"],
@@ -3035,6 +3071,10 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestFullGenerationExternalScale"
+        },
+        {
+          "path": "internal/sourceagent/ingress_scale_resume_linux_test.go",
+          "name": "TestIngressScaleResumeLogBindingsRejectAmbiguousCounters"
         }
       ],
       "acceptance": ["AT-01", "AT-24"],
@@ -3145,6 +3185,14 @@
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
           "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedVerificationStampWorkIsLinear"
+        },
+        {
+          "path": "internal/generation/batch_work_linux_test.go",
+          "name": "TestBatchedFinalStampInvalidationIsDurableBeforePublication"
         }
       ],
       "acceptance": ["AT-01", "AT-07", "AT-24"],
