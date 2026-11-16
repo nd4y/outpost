@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "HDD_COMPONENT_PASS_NATIVE_CI_PENDING",
+  "status": "HDD_COMPONENT_AND_NATIVE_CI_PASS_FULL_PRODUCT_OPEN",
   "observedAt": "2026-11-16T02:34:43.658448185Z",
   "test": {
     "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState",
@@ -69,7 +69,7 @@
   },
   "limitations": [
     "This bounded metadata/CLI compatibility case is separate from100GiB source/cloud/AS and independent file recovery.",
-    "The HDD current executable is the independently downloaded e9 candidate, not a relabelled b26 executable. All258non-testGo/module inputs match b26; nativeCI must run its own newly selected current revision.",
+    "The HDD current executable is the independently downloaded e9 candidate, not a relabelled b26 executable. All258non-testGo/module inputs match b26; nativeCI independently ran its selected c739 revision on both architectures, as recorded separately.",
     "The old comparator is built from exact public source4a4, not downloaded as an official oldest-supported release. Installation/upgrade/rollback acceptance remains separate.",
     "Synthetic keys and fixture paths stay private; no working service, live endpoint or real owner profile was changed."
   ],
@@ -79,5 +79,25 @@
     "historicalExecutionSourceHash": "b492987ecd1fdf4ec10c901f6a97d5deb37a66711891e95f82f5343f6c2efa39",
     "currentSourceHash": "dfb76b48fc9c8eb019c2bfb63434ae00cb63749258a3a3ca3067a3cde5f5f1a7",
     "reason": "Production renewal code changed after historicalCLI runs; native workflow did not execute this opt-in case. Repeat is justified by actual source drift, not mere absence from a named job."
+  },
+  "nativeCI": {
+    "sourceCommit": "c73960e6a78e568593e280d8a866ec5ebca5b549",
+    "executedTree": "18676b7a254e042b52dc813c9d13dc02f1a1e4e1",
+    "runURL": "https://github.com/nd4y/outpost/actions/runs/43796281374",
+    "tests": [
+      {
+        "architecture": "amd64",
+        "jobId": 133065712571,
+        "seconds": 0.18,
+        "legacyComparatorSHA256": "24f5ff16198c03bb5714da0be17c5e48e5369147d4884005c101af2839443ffa"
+      },
+      {
+        "architecture": "arm64",
+        "jobId": 133065712219,
+        "seconds": 0.2,
+        "legacyComparatorSHA256": "13826df97a2b3abd93365bb0a6595b12ed60a625a3130a20aee11cb49978c868"
+      }
+    ],
+    "currentVersionFieldsMatchSourceCommit": true
   }
 }

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "status": "SCOPED_CURRENT_REAL_EXPIRY_HDD_PASS_FULL_PRODUCT_OPEN",
+  "observedAt": "2026-11-16T04:16:48.037176+00:00",
+  "sourceCommit": "c73960e6a78e568593e280d8a866ec5ebca5b549",
+  "executedTree": "18676b7a254e042b52dc813c9d13dc02f1a1e4e1",
+  "binarySHA256": "88b1c3bdf64e78d9f232ed21475825a9147a3e2391ff3d150abe9b85ff415a10",
+  "goAndModuleInputs": 520,
+  "tests": [
+    {
+      "name": "TestExpiredActiveRetirementRequiresAllAdmissionProofs",
+      "seconds": 77.84,
+      "verdict": "PASS"
+    },
+    {
+      "name": "TestExpiredUnsealedSourceRetiresAdmittedCaptureAndReleasesView",
+      "seconds": 80.44,
+      "verdict": "PASS"
+    },
+    {
+      "name": "TestExpiredPairedCoveragePublishesAndSettlesOfflineSource",
+      "seconds": 187.34,
+      "verdict": "PASS"
+    }
+  ],
+  "environment": {
+    "platform": "isolated Linux amd64 ext4 HDD fixture",
+    "network": "none outside the fixture namespace",
+    "cohostedWithSeparateScaleProducer": true,
+    "resourceScope": "One precompiled test process and its synthetic worker roles, not whole-host or per-role limits.",
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 22196224,
+    "memoryMaxEvents": 0,
+    "oom": 0,
+    "swapBytes": 0
+  },
+  "assertions": [
+    "Read-only inspection preserves expired ACTIVE state and cannot authorize retirement. Fresh owner authorization and authenticated receiver admission proof are required.",
+    "Both NOT_ADMITTED and admitted-but-unsealed retirement survive interruption after durable audit and replay after reopening. The generation does not advance and no write route is contacted; the source view is released durably only after the authorized retry.",
+    "Missing second coverage blocks snapshot release. A signed coverage checkpoint survives source restart and release remains distinct from a complete two-copy checkpoint.",
+    "The original source authority really expires; ordinary source Run refuses it. Fresh, separately signed settlement permissions allow both workers to publish with the source offline.",
+    "Both receivers independently restore their complete bounded fixture after original expiry. Late receipts preserve original verification provenance and the two-full-copy threshold; the original release observation remains unchanged."
+  ],
+  "bounds": {
+    "explicitEnvironment": "OUTPOST_EXPIRY_INTEGRATION=1",
+    "retirementAuthorityLifetimeSeconds": 75,
+    "retirementContextSeconds": 190,
+    "pairedAuthorityLifetimeSeconds": 155,
+    "pairedContextSeconds": 425,
+    "productionAuthorityAndRPCDefaultsChanged": false
+  },
+  "logSHA256": "c0b034d21276a5710346d762b977e98387f509e551354128a6fd4ba8c59c2a8d",
+  "limitations": [
+    "Existing opt-in native Go test functions execute bounded synthetic fixtures. This is distinct from the selected-CLI migration/installation checks and physical 100 GiB source/cloud/asymmetric acceptance.",
+    "The HDD shares a host and filesystem with a separate scale producer. Separate physical failure domains, real owner endpoints and whole-host or per-role resource acceptance are not established.",
+    "Historical checks412 remain historical: subsequent parallel-capture code and test changes justify this current run. No skipped ordinary-CI case is relabelled as executed.",
+    "No working service, live endpoint, network policy or storage capacity changed."
+  ],
+  "fullProductAcceptance": false
+}

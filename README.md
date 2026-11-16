@@ -2,6 +2,8 @@
 
 [Русский](README.ru.md)
 
+[Real source expiry](docs/en/source-agent.md#real-authority-expiry-on-the-hdd) now has a current, explicitly enabled HDD receipt for expired ACTIVE retirement and offline split-coverage publication. The three bounded native cases preserve authority, receipt-time and release thresholds; physical 100 GiB and product acceptance remain separate.
+
 The [actual CLI process flow](docs/en/process-flow.md) runs a selected distribution for source capture and two autonomous receiver processes. Its [bounded HDD receipt](docs/cli-process-flow-evidence.json) records outbound-only catch-up after source/center loss, unchanged restart receipts, four independent materialized restores and rejection of wrong artifact selections. The 2 MiB fixture complements the separate full-size and isolation gates.
 
 [Bounded verification windows](docs/en/verification-windows.md) continue peer generation checks across HTTPS requests and cloud object hashing across physical parts. Receipts preserve original read time. Short tests exercise interrupted progress, fresh operations, legacy peers, corruption and independent recovery; this does not close the full product or large-scale gates.
