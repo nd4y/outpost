@@ -30,4 +30,6 @@ Native distribution CI selects `TestCLIArchiveRetrievalRestartsExpiresAndRestore
 
 Without that executable, the ordinary package test calls the status handler in the same process. That result establishes component behavior; the native job's named test result and executable revision are required for the separate-process assertion. Neither mode admits a real archive class or establishes its retrieval time, cost or RTO.
 
+The [native receipt](../archive-cli-evidence.json) records that case on `056661c`: 0.39 seconds on amd64 and 0.40 seconds on arm64, with both selected-CLI revision fields identifying the exact commit and all six required checks successful. The independent process reconciles status; the other request and two 116 KiB restore phases call the handler inside the test process. Real archive-class and complete-generation admission remain separate.
+
 The short HTTPS fixture covers authenticated metadata, a selected multipart file, a lost accepted request, a fresh status read, the cost cap, temporary expiry and a byte-for-byte second restore. A current HEAD response is an availability observation. Use a successful ciphertext audit and restore for integrity evidence. The current client creates no lifecycle rules, lists or deletes no remote objects, and does not extend a temporary window automatically.

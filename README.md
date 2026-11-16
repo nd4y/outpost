@@ -164,6 +164,8 @@ WebDAV targets without conditional `PUT` can use the explicit MOVE profile. Work
 
 The [archive recovery check](docs/en/archive-recovery.md#native-cli-restart-check) is selected in native CI for both amd64 and arm64. It uses a separate current CLI process to reconcile a lost retrieval reply; actual archive-class admission remains separate.
 
+The [independent-domain check](docs/en/requirement-facets.md#identical-input-in-independent-domains) holds file content, name and identity equal across two owners, with separate ciphertext dependencies, independent kit recovery and crossed-key refusals. Tenant roles and placement retain separate acceptance checks.
+
 Stopped workers can export an index-bound metadata checkpoint and explicitly recover simultaneous loss of the primary index, retention ledger and pending frozen plans while the current signed index copy and anchor survive. See [the prerequisites and replay procedure](docs/en/generation-replicas.md#combined-replica-metadata-loss). Complete-volume recovery and whole-product acceptance remain separate.
 
 Native CI now prepares allowlisted downloadable development candidates with commit/run selection, checksums, binary-bound SBOM and [bilingual candidate notes](docs/en/release-notes.md). [Independent download verification](docs/en/distribution.md#downloadable-ci-candidates) remains separate from runtime acceptance and release.

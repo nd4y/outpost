@@ -590,10 +590,14 @@
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
           "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "internal/filekit/domain_isolation_linux_test.go",
+          "name": "TestIndependentOwnerDomainsIdenticalInput"
         }
       ],
       "acceptance": ["AT-01", "AT-06", "AT-20", "AT-21", "AT-27"],
-      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios. Direct facet links now include distinct data/signing/maintenance key preparation, recovery packages with read-only secrets and keyless worker admission/actual process flow. Scope remains the stated synthetic roles and recovery fixtures, not physical host isolation."
+      "remaining": "Standalone G1 regular-file scale is accepted on the recorded source. Integrated distributed recovery, retained-version checks and target admission remain open; G1 does not close the whole requirement or its acceptance scenarios. Direct facet links now include distinct data/signing/maintenance key preparation, recovery packages with read-only secrets and keyless worker admission/actual process flow. Scope remains the stated synthetic roles and recovery fixtures, not physical host isolation. The independent-owner test holds content, path and explicit file identity equal across two storage domains, requiring disjoint encrypted dependencies, source/index-absent kit recovery and crossed-owner/data-key refusals with no plaintext output. This is a domain-data/kit facet; tenant roles, quotas, placement and real profiles retain their separate evidence."
     },
     {
       "id": "REQ-08",
@@ -1030,10 +1034,14 @@
         {
           "path": "internal/source/scan_linux_test.go",
           "name": "TestScanDeniedAliasNeverCapturesAllowedName"
+        },
+        {
+          "path": "internal/filekit/domain_isolation_linux_test.go",
+          "name": "TestIndependentOwnerDomainsIdenticalInput"
         }
       ],
       "acceptance": ["AT-06", "AT-19", "AT-27"],
-      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs."
+      "remaining": "Native Btrfs acquisition/reuse/disposal and two-version offline recovery have bounded kernel evidence; real source/application profile admission, retained-snapshot scale/performance, resolution of expired operations with uncertain evidence, recovery after loss of the whole source runtime or retained capture records and recovery-package lifecycle across key epochs. The independent-owner test holds content, path and explicit file identity equal across two storage domains, requiring disjoint encrypted dependencies, source/index-absent kit recovery and crossed-owner/data-key refusals with no plaintext output. This is a domain-data/kit facet; tenant roles, quotas, placement and real profiles retain their separate evidence."
     },
     {
       "id": "REQ-15",
@@ -5291,10 +5299,14 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "never-admitted configuration requires the exact reselected signed file"
+        },
+        {
+          "path": "internal/filekit/domain_isolation_linux_test.go",
+          "name": "TestIndependentOwnerDomainsIdenticalInput"
         }
       ],
       "acceptance": ["AT-27"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. The independent-owner test holds content, path and explicit file identity equal across two storage domains, requiring disjoint encrypted dependencies, source/index-absent kit recovery and crossed-owner/data-key refusals with no plaintext output. This is a domain-data/kit facet; tenant roles, quotas, placement and real profiles retain their separate evidence."
     },
     {
       "id": "REQ-39",

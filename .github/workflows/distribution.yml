@@ -247,6 +247,12 @@ jobs:
           "$OUTPOST_EXTERNAL_RECOVERY_CLI" version
           go test -count=1 -timeout=110s -run 'CLIExternalRestore|CLIArchiveRetrieval|CLIUploadPlan|WorkerOwnerAdmitsMissingRepair|TargetAuditWindowResumesAfterSIGKILL|WorkerScheduledExternalAudit|WorkerScheduledExternalRepair|SignedWeightedAssignments|WeightedWorkerSIGKILL' \
             -v ./cmd/outpost ./internal/worker ./internal/upload
+      - name: Verify independent owner domains with identical file input
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/domain-isolation-tests"
+          export TMPDIR="$RUNNER_TEMP/domain-isolation-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          go test -count=1 -timeout=60s -run '^TestIndependentOwnerDomainsIdenticalInput$' -v ./internal/filekit
       - name: Package allowlisted source-bound development candidate
         run: |
           current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')
