@@ -91,6 +91,10 @@ Between durable catalog and full-copy checkpoint, a two-copy installation can st
 
 ## Renewing source authority
 
+The [CLI migration receipt](../source-renewal-cli-evidence.json) records a fresh HDD run of the existing compatibility case after later renewal-code changes. The source-built predecessor `4a4afc91` must first read the original state. The actual selected current CLI renews to revision 2 while retaining the generation, sequence and legacy-state digest; all four predecessor commands then refuse without changing `agent.json`. Current status, refusal of an old authority, the unchanged installation anchor and reopening the accepted head are checked separately.
+
+The HDD executable is the independently downloaded `e9e90aca` candidate, with all 258 production Go/module inputs identical to `b26db48`; the test executable comes from frozen tree `c26a223e`. Native CI now supplies its own selected current executable and builds the same exact public predecessor source on amd64 and arm64. The receipt keeps those stages separate. The old comparator is not an official oldest-supported release, and this metadata/CLI check does not replace installation, independent byte recovery or 100 GiB acceptance.
+
 `source-renew` accepts a separately owner-signed grant with a higher revision and current validity. Pause the foreground scheduler first. Renewal accepts `IDLE`, `COMPLETE` and an owner-authorized `ABANDONED` operation. The command holds the same execution lease as capture, preserves the generation head and schedule, and refuses a pending `PREPARING` or `ACTIVE` operation. It does not extend an immutable intent or discard work whose grant has expired.
 
 ```sh

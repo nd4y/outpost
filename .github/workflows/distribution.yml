@@ -130,6 +130,22 @@ jobs:
           go test -count=1 -timeout=180s -skip '^TestSourceSettlementLostReceiptPreservesOriginalAgeAndBothGenerations$' \
             -run 'Settlement|SourceUnstartedRetirement|SourceAgentSIGKILLChild|SourceStandbySelection|SourceActiveReceiverReplacement|SourceSealedReceiverReplacement|ActiveInspectionDistinguishes|RegistryReadinessLeavesNoFence|PublicationGrantResumesFrozenLocalCatalog' \
             -v ./internal/sourceagent ./internal/worker ./internal/control ./internal/ingress
+      - name: Renew source authority and reject the previous source CLI
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/source-renewal-previous-source"
+          git archive 4a4afc91b60e154b0a19010965d9a9c74393b593 | tar -xf - -C "$RUNNER_TEMP/source-renewal-previous-source"
+          go -C "$RUNNER_TEMP/source-renewal-previous-source" build -trimpath \
+            -o "$RUNNER_TEMP/source-renewal-previous" ./cmd/outpost
+          mkdir -m 700 "$RUNNER_TEMP/source-renewal-tests"
+          export TMPDIR="$RUNNER_TEMP/source-renewal-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          export OUTPOST_SOURCE_CURRENT_CLI="$RUNNER_TEMP/current/linux_$NATIVE_ARCHITECTURE/outpost"
+          export OUTPOST_SOURCE_PREVIOUS_CLI="$RUNNER_TEMP/source-renewal-previous"
+          export OUTPOST_SOURCE_PREVIOUS_SHA256="$(sha256sum "$OUTPOST_SOURCE_PREVIOUS_CLI" | cut -d ' ' -f1)"
+          printf 'SOURCE_RENEWAL_COMPARATOR source=4a4afc91b60e154b0a19010965d9a9c74393b593 sha256=%s\n' "$OUTPOST_SOURCE_PREVIOUS_SHA256"
+          "$OUTPOST_SOURCE_CURRENT_CLI" version
+          go test -count=1 -timeout=120s -run '^TestSourceRenewalCLIPreviousReaderRefusesMigratedState$' \
+            -v ./internal/sourceagent
       - name: Renew the existing receiver through the selected native CLI
         env:
           ARCHITECTURE: ${{ matrix.architecture }}

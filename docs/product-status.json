@@ -1394,10 +1394,14 @@
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
           "name": "TestCLIProcessFlowSelectionRefusesBeforeFixture"
+        },
+        {
+          "path": "internal/sourceagent/renewal_linux_test.go",
+          "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState"
         }
       ],
       "acceptance": ["AT-17", "AT-18", "AT-19", "AT-20", "AT-30"],
-      "remaining": "Installation, long-outage and complete process-level acceptance."
+      "remaining": "Installation, long-outage and complete process-level acceptance. The current/previous source-renewal CLI case directly checks a higher signed revision, refusal of old authority and legacy state readers, unchanged installation anchor and retained generation identity; see docs/source-renewal-cli-evidence.json. Its metadata migration scope does not establish data-key rotation or whole-profile expiry recovery."
     },
     {
       "id": "REQ-19",
@@ -6082,7 +6086,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-24", "AT-25", "AT-26"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. The existing source-renewal current/previous CLI case now has a fresh bounded HDD receipt in docs/source-renewal-cli-evidence.json after later renewal changes. Native CI explicitly supplies both executables on each architecture; its execution/publication remains separately attested. This does not close full100GiB, installation or oldest-supported-release admission."
     },
     {
       "id": "REQ-42",
@@ -7274,7 +7278,7 @@
         }
       ],
       "acceptance": ["AT-17", "AT-19", "AT-24", "AT-25", "AT-30"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. The existing source-renewal current/previous CLI case now has a fresh bounded HDD receipt in docs/source-renewal-cli-evidence.json after later renewal changes. Native CI explicitly supplies both executables on each architecture; its execution/publication remains separately attested. This does not close full100GiB, installation or oldest-supported-release admission."
     },
     {
       "id": "REQ-46",
@@ -7384,7 +7388,7 @@
         }
       ],
       "acceptance": ["AT-04", "AT-05", "AT-12", "AT-24", "AT-25"],
-      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission."
+      "remaining": "Recovery-key lifecycle, output profile migration/retention, unavailable-domain cleanup, cloud/media repair and admitted-scale restore acceptance. The original physical100GiB catalog timeout is retained in docs/catalog-publication-evidence.json: its exact35-object/263980668-byte first batch was durable without a verification checkpoint. The default batch is now8MiB with unchanged30s source RPC/closure/authority checks. Ordinary48-test regressions, a deterministic cancellation-bound race control and184.99s physical128MiB old/new recovery pass, including fresh immutable-only independently selected CLI consumers. Full corrected100GiB acceptance remains open. Focused current-source multipart-last-part, equal-size part reorder, descriptor trailing-data and no-output refusals plus both exported-kit marker scans have a separate bounded receipt in docs/filekit-negative-evidence.json. This does not promote the full acceptance scenario or physical placement/full100GiB admission. The existing source-renewal current/previous CLI case now has a fresh bounded HDD receipt in docs/source-renewal-cli-evidence.json after later renewal changes. Native CI explicitly supplies both executables on each architecture; its execution/publication remains separately attested. This does not close full100GiB, installation or oldest-supported-release admission."
     },
     {
       "id": "REQ-47",
@@ -8377,7 +8381,7 @@
         }
       ],
       "acceptance": ["AT-21", "AT-22", "AT-32"],
-      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate. The existing source-renewal current/previous CLI case now has a fresh bounded HDD receipt in docs/source-renewal-cli-evidence.json after later renewal changes. Native CI explicitly supplies both executables on each architecture; its execution/publication remains separately attested. This does not close full100GiB, installation or oldest-supported-release admission."
     },
     {
       "id": "REQ-49",

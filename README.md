@@ -12,6 +12,8 @@ Autonomous encrypted backups with complete assigned replicas, granular placement
 
 **Stage: M0; G1 accepted, G2/G3 implementation candidates.** The [G1 file-kit format](docs/en/file-kit-format.md) streams files into encrypted objects and restores a selected version without a global repository index. Typed kits also preserve directory attributes and symbolic links without following their targets; regular files retain the original format. There is no production backup service yet. Start with the [specification](docs/en/specification.md) and [G1-G3 feasibility gates](docs/en/roadmap.md). The previous receiver remains in [outpost-legacy](https://github.com/nd4y/outpost-legacy).
 
+The [source-authority CLI check](docs/en/source-agent.md#renewing-source-authority) verifies renewal through a real selected executable and refusal of the migrated state by a pinned source-built predecessor. Its [HDD receipt](docs/source-renewal-cli-evidence.json) keeps the downloaded current revision, comparator origin and native CI stages distinct.
+
 The [direct requirement facets](docs/en/requirement-facets.md) distinguish component/reader pinning, key capabilities and the explicit 180-update profile from adjacent SDK, delegation and ordinary catch-up checks. Links preserve the original execution and acceptance boundaries.
 
 [Focused kit rejection](docs/en/filekit-negative.md) checks the missing final multipart descriptor part, authenticated equal-size part reordering, trailing descriptor data and absent output after version/ciphertext substitution. Both exported kits are scanned for synthetic private markers; [the scoped receipt](docs/filekit-negative-evidence.json) keeps placement and full-scale admission separate.
