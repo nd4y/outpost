@@ -82,11 +82,22 @@ func TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore(t *testing.T) 
 	defer observer.Close()
 	cert, target := f.ca.node(t)
 	started, release := make(chan struct{}), make(chan struct{})
+	firstFinished := make(chan struct{})
 	var once sync.Once
-	var captured []byte
+	var capturedMu sync.Mutex
+	var captured [][]byte
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		captured, _ = io.ReadAll(r.Body)
-		once.Do(func() { close(started) })
+		body, _ := io.ReadAll(r.Body)
+		capturedMu.Lock()
+		captured = append(captured, body)
+		capturedMu.Unlock()
+		first := false
+		once.Do(func() { first = true; close(started) })
+		defer func() {
+			if first {
+				close(firstFinished)
+			}
+		}()
 		<-release
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("{}"))
@@ -108,7 +119,11 @@ func TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore(t *testing.T) 
 	client, e := telemetry.NewClient(server.URL, w.cert, f.ca.pool, w.node, target)
 	must(t, e)
 	defer client.Close()
-	bounded, cancel := context.WithTimeout(ctx, 12*time.Second)
+	// The fixture's five-second job and RPC budgets are unchanged. Observe
+	// startup and ordinary durable retries on HDD without treating them as a
+	// disk SLA; the receiver must stay blocked through transfer and restore.
+	// Its HTTP client's existing 15-second transport timeout is unchanged.
+	bounded, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	done := make(chan error, 1)
 	go func() { _, e := observer.TelemetryOnce(bounded, p, q, client); done <- e }()
@@ -121,7 +136,7 @@ func TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore(t *testing.T) 
 	}
 	stopB := start(t, f.nodes[1])
 	stopA := start(t, w)
-	wait(t, func() bool { return complete(w, push.Operation) })
+	waitFor(t, 60*time.Second, func() bool { return complete(w, push.Operation) })
 	stopA()
 	stopB()
 	replica, e := generation.Open(filepath.Join(DomainDirectory(f.nodes[1].dir, f.domain.Trust), "replica"), f.domain.Trust, false)
@@ -140,15 +155,39 @@ func TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore(t *testing.T) 
 	if !bytes.Equal(got, f.content) {
 		t.Fatal("backup restore changed")
 	}
+	select {
+	case <-firstFinished:
+		t.Fatal("telemetry receiver recovered before independent backup and restore")
+	default:
+	}
+	before, e := q.Status(ctx)
+	must(t, e)
+	if before.Cursor != 1 || before.Pending != 1 || before.Accepted != 0 {
+		t.Fatal("unavailable receiver lost or acknowledged queued telemetry", before)
+	}
+	t.Logf("WORKER_TELEMETRY_BLOCKED_BACKUP_PASS bytes=%d rpcMillis=%d operationMillis=%d receiverStillBlocked=true", len(f.content), cfg.Limits.AttemptMillis, cfg.Limits.OperationTimeout().Milliseconds())
 	unblock()
 	must(t, <-done)
-	for _, secret := range [][]byte{[]byte("\u0434\u0430\u043d\u043d\u044b\u0435.bin"), []byte(f.base), f.content[:64]} {
-		if bytes.Contains(captured, secret) {
-			t.Fatal("private data exported")
-		}
-	}
 	s, e := q.Status(ctx)
 	must(t, e)
+	if s.Accepted == 0 {
+		// A normal transport timeout can occur while the receiver is down.
+		// Retry the durably retained request after recovery, without changing
+		// its deadline, acknowledgement or retry policy.
+		_, e = observer.TelemetryOnce(bounded, p, q, client)
+		must(t, e)
+		s, e = q.Status(ctx)
+		must(t, e)
+	}
+	capturedMu.Lock()
+	defer capturedMu.Unlock()
+	for _, body := range captured {
+		for _, secret := range [][]byte{[]byte("\u0434\u0430\u043d\u043d\u044b\u0435.bin"), []byte(f.base), f.content[:64]} {
+			if bytes.Contains(body, secret) {
+				t.Fatal("private data exported")
+			}
+		}
+	}
 	if s.Cursor != 1 || s.Pending != 1 || s.Accepted != 1 {
 		t.Fatal("pending log lost", s)
 	}

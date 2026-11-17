@@ -253,6 +253,14 @@ jobs:
           export TMPDIR="$RUNNER_TEMP/domain-isolation-tests"
           export OUTPOST_TEST_ROOT="$TMPDIR"
           go test -count=1 -timeout=60s -run '^TestIndependentOwnerDomainsIdenticalInput$' -v ./internal/filekit
+      - name: Verify durable telemetry after a real transport outage
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/telemetry-outage-tests"
+          export TMPDIR="$RUNNER_TEMP/telemetry-outage-tests"
+          export OUTPOST_TEST_ROOT="$TMPDIR"
+          go test -count=1 -timeout=90s \
+            -run '^(TestTelemetryTCPOutageReopenAndSameTargetRecovery|TestTelemetrySIGKILLPreservesCursorAndUnknownAck|TestTelemetryTypedPayloadPrivacyAndUnknown)$' \
+            -v ./internal/telemetry
       - name: Package allowlisted source-bound development candidate
         run: |
           current_hash=$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/current-receipt.json"))["manifestSHA256"])')

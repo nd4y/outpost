@@ -146,7 +146,7 @@ The interface now shows [external-copy observations](docs/en/external-copy-repor
 
 The [Linux distribution candidate](docs/en/distribution.md) builds source-bound amd64/arm64 archives and a shellless container input; installation and runtime acceptance remain explicit gates.
 
-The [durable telemetry process](docs/en/telemetry.md) provides a signed bounded OTLP queue, retained source positions, explicit scope renewal and independent delivery. Short checks include a real collector and backup/restore during a slow sink; complete instrumentation and operational acceptance remain open.
+The [durable telemetry process](docs/en/telemetry.md) provides a signed bounded OTLP queue, retained source positions, explicit scope renewal and independent delivery. A transport outage keeps accepted records pending across restart for delivery to the same admitted recipient; arbitrary recipient diagnostics are excluded from the journal and status. Short checks include a real collector and backup/restore during a slow sink; complete instrumentation and operational acceptance remain open.
 
 The [monitoring rules](docs/en/telemetry.md#monitoring-rules-and-independent-watchdog) distinguish missing telemetry from measured failures and provide a separate watchdog for receipt of the monitoring heartbeat.
 

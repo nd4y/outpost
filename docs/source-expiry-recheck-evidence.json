@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_THREE_CURRENT_COMPILED_REAL_EXPIRY_CASES_ONLY",
+  "observedAt": "2026-11-17T08:52:38.467651+00:00",
+  "productionBaseCommit": "8c783708704dbf55cbf05a2472be3436bc4a6d15",
+  "executedTree": "74f1369b61258b8a05c2933f00e563af4d7a919a",
+  "goAndModuleInputs": 527,
+  "sourceInputsDigestSHA256": "d1c83a45e73a028c250a59593fa714b814eaf895945fac8e97856d6c24f511d1",
+  "testBinarySHA256": "896483804c27355b5bf40e7b4f0ea90a7f4f3a79b14ece5c526abe62ea481967",
+  "goToolchain": "go1.27.3 linux/amd64",
+  "runtimeImageDigest": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef",
+  "tests": [
+    {
+      "name": "TestExpiredActiveRetirementRequiresAllAdmissionProofs",
+      "seconds": 78.71,
+      "verdict": "PASS"
+    },
+    {
+      "name": "TestExpiredUnsealedSourceRetiresAdmittedCaptureAndReleasesView",
+      "seconds": 78.14,
+      "verdict": "PASS"
+    },
+    {
+      "name": "TestExpiredPairedCoveragePublishesAndSettlesOfflineSource",
+      "seconds": 172.13,
+      "verdict": "PASS"
+    }
+  ],
+  "resources": {
+    "cpuQuota": 1,
+    "cpuMax": "100000 100000",
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 35119104,
+    "memoryLimitEvents": 0,
+    "cpuUsageMicroseconds": 5705241,
+    "swapBytes": 0,
+    "oom": 0,
+    "pidsMax": 128,
+    "privateRuntimeIdleBeforeStart": true
+  },
+  "bounds": {
+    "retirementAuthoritySeconds": 75,
+    "retirementContextSeconds": 190,
+    "pairedAuthoritySeconds": 155,
+    "pairedContextSeconds": 425,
+    "goSuiteDeadlineSeconds": 900,
+    "productionBoundsChanged": false
+  },
+  "earlierEvidence": {
+    "c739ReceiptPreserved": true,
+    "postBatch9fThreeCasesPreserved": true,
+    "batchProductionBytesIdenticalTo9f": true
+  },
+  "assertions": [
+    "Expired ACTIVE read-only inspection grants no retirement authority; exact fresh owner permission and authenticated receiver evidence remain necessary.",
+    "Never-admitted and unsealed admitted retirement preserve durable audit through interruption/reopen; release follows the authorized retry without advancing the generation.",
+    "Missing paired coverage prevents source release; signed coverage survives restart; release and two complete copies remain separate thresholds.",
+    "Actual original authority expiry blocks ordinary source execution. Separately authorized workers can complete frozen publication while the source is offline.",
+    "Both receivers recover the bounded fixture independently; late receipts retain original verification and release provenance."
+  ],
+  "logSHA256": "c7e214a1588973aa7948df39fd3296a46b9ab4a6f7b393836c2db6f3f1bd9f36",
+  "limitations": [
+    "Native source-agent test binary with synthetic roles; no selected CLI rebuilt or current CLI installation claimed.",
+    "No new physical100GiB source/reader execution, real endpoint, physical failure domain or whole AT18/product acceptance.",
+    "Go/module inputs and full executed tree identify the test snapshot; only test/documentation differences from the stated production base."
+  ],
+  "fullProductAcceptance": false
+}

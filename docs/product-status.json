@@ -6318,6 +6318,10 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalAuditDetectsLossAndResumesAfterRestart"
+        },
+        {
+          "path": "internal/telemetry/outage_linux_test.go",
+          "name": "TestTelemetryTCPOutageReopenAndSameTargetRecovery"
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
@@ -6595,6 +6599,10 @@
         {
           "path": "internal/worker/external_schedule_linux_test.go",
           "name": "TestWorkerScheduledExternalRepairReplaysDurableMissingPart"
+        },
+        {
+          "path": "internal/telemetry/outage_linux_test.go",
+          "name": "TestTelemetryTCPOutageReopenAndSameTargetRecovery"
         }
       ],
       "acceptance": ["AT-05", "AT-06", "AT-22", "AT-25", "AT-26"],
