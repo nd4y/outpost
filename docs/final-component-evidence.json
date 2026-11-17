@@ -2503,5 +2503,66 @@
   "holds": [
     "Physical host boot and real infrastructure/source/storage/monitoring profiles remain separate",
     "No merge, release/tag, deployment, actual endpoint/account/notification enrollment, working-service or network/storage-capacity changes"
-  ]
+  ],
+  "interfaceTrace": {
+    "observedAt": "2026-11-17T21:03:31.926404+00:00",
+    "head": "6571b24b58025b8e46ff71f70f471d2abd21ce4b",
+    "requirement": "REQ-49",
+    "scenario": "AT-31",
+    "missingDirectLinks": [
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIConfigSigningAndNoOverwriteWithUnicodePaths"
+      },
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIStableErrorsDoNotExposeSensitivePaths"
+      },
+      {
+        "path": "cmd/outpost/cli_flow_linux_test.go",
+        "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+      }
+    ],
+    "previousUniqueCount": 636,
+    "existingUnregisteredCases": [
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIConfigSigningAndNoOverwriteWithUnicodePaths"
+      },
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIStableErrorsDoNotExposeSensitivePaths"
+      }
+    ],
+    "codeOrBehaviorGapFound": false,
+    "all527InputsUnchanged": true,
+    "newRuntimeTests": 0,
+    "runtimeEvidenceSourceCommit": "6571b24b58025b8e46ff71f70f471d2abd21ce4b",
+    "prototypeJob": 134336035252,
+    "cliPackageExecution": "2026-11-17T20:15:00.6389663Z ok  \tgithub.com/nd4y/outpost/cmd/outpost\t7.938s",
+    "nativeSelectedFlow": {
+      "amd64": {
+        "namedPass": "2026-11-17T20:24:19.7586309Z --- PASS: TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory (1.21s)",
+        "summary": "2026-11-17T20:24:19.7491372Z     cli_flow_linux_test.go:379: CLI_PROCESS_FLOW_PASS revision=6571b24b58025b8e46ff71f70f471d2abd21ce4b bytes=2097152 versions=2 workers=2 independent-immutable-restores=4 source-and-center-offline=true"
+      },
+      "arm64": {
+        "namedPass": "2026-11-17T20:23:55.6598899Z --- PASS: TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory (1.17s)",
+        "summary": "2026-11-17T20:23:55.6535355Z     cli_flow_linux_test.go:379: CLI_PROCESS_FLOW_PASS revision=6571b24b58025b8e46ff71f70f471d2abd21ce4b bytes=2097152 versions=2 workers=2 independent-immutable-restores=4 source-and-center-offline=true"
+      }
+    },
+    "browserJob": 134336035379,
+    "browserCases": 31,
+    "manualFrontendFilesUnchanged": {
+      "internal/management/ui/app.css": "84b4fb6265c517658c42d6ada436ec21d419c100a5ea3f267f7c16a1805244c8",
+      "internal/management/ui/app.js": "00156210efd31b07464f1cac5270d74b81267736ec6718d09d203914282fb5dc",
+      "internal/management/ui/index.html": "3af8e444fde02c0902e907a8c4c59fee2833fc22831098c1d907e0fb7642306b",
+      "internal/management/ui/journal.js": "2f59e631cdbeef07ff77c64b2c9acfd9f42143574395be37e296d12062969eb7",
+      "internal/management/ui_linux.go": "f44ff342b293c6980534880baf0ec17c63f47194a38c82f4909f0f975c4c3f1c"
+    },
+    "manualObservedAt": "2026-11-14T14:16:26.388549+00:00",
+    "signalBoundary": "Existing actual CLI flow sends SIGTERM and requires graceful child join; canceled-error mapping separately verifies130. No separately executed SIGINT-process result is claimed.",
+    "status": "DIRECT_EXISTING_CLI_TRACE_REPAIRED_NO_EXECUTABLE_CHANGE",
+    "uniqueChecksAfter": 638,
+    "scope": "Direct existing CLI checks for Unicode/spaced key paths, no overwrite, stable error/exit mapping and actual selected SIGTERM daemon stop. Current 31 browser scenarios and byte-identical scoped manual EN/RU keyboard/focus/320px evidence remain distinct. No new test, screen-reader, wider-device, separately executed SIGINT-process or whole AT-31/product assertion."
+  }
 }

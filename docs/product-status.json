@@ -8739,6 +8739,18 @@
         {
           "path": "scripts/browser/check.mjs",
           "name": "never-admitted configuration requires the exact reselected signed file"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIConfigSigningAndNoOverwriteWithUnicodePaths"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIStableErrorsDoNotExposeSensitivePaths"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
         }
       ],
       "acceptance": ["AT-31"],
