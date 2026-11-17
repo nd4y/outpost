@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_COMPOSED_SOURCE100_CAPTURE_AND_FOUR_FRESH_RECOVERIES",
+  "observedAt": "2026-11-17T18:26:49.919433+00:00",
+  "sourceBytes": 107374182400,
+  "changedBytes": 8388608,
+  "captureSource": {
+    "baselineCommit": "7eec7ff9de0e6a9c612288a7854ea26dc695cbea",
+    "resumedCommit": "9f0f71299a83a62768bbea3b20ca6be8952d52cb",
+    "resumedTree": "ffd8543464c5062126496d4bab836295094f9c39",
+    "sourceInputCount": 523,
+    "testBinarySHA256": "b3c1a9c1038c2e02da94292944d13b743db863e4317615a0cf0943c185b8196b"
+  },
+  "recoverySource": {
+    "commit": "8c783708704dbf55cbf05a2472be3436bc4a6d15",
+    "tree": "a497487ed11b4050d59621251bd33f9cb1bd66b3",
+    "sourceInputCount": 526,
+    "readerSHA256": "10ce787bd412bde9e6ff43a34fed04bbc2ca9505d13ae364ead48dbfc7f9f2d6",
+    "packageSHA256": "02d19587911a907e60dd639437ef6acdc6da29111efee7bd9b0f8a5252d908a8",
+    "toolManifestSHA256": "7eab927cffe16f8a2048906077b42f730df4cd26cf0f8e00f6c1653388d3a380",
+    "stableSourceIdentity": true,
+    "namespaceMountIDChanged": true,
+    "authorityAndBootstrapUnchanged": true,
+    "ownerHasNoSigningKey": true
+  },
+  "sourceContinuity": {
+    "reviewedHead": "1855bcaceb06ea20f15f19656da1634f006a4a22",
+    "reviewedTree": "bcc1d5bf5e87a63cb04faf69465f9421032e3ec0",
+    "inputCount": 527,
+    "changedCaptureProductionInputs": ["internal/sourceagent/recovery_linux.go"],
+    "changedExistingTestInputs": ["internal/worker/telemetry_linux_test.go"],
+    "additionalInputs": "Test-only; selected recovery guard bytes unchanged from actual8c reader."
+  },
+  "compiler": "go1.27.3 linux/amd64",
+  "runtimeImageDigest": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef",
+  "generated": {
+    "allocatedBytes": 107374202880,
+    "attributesVerified": false,
+    "bytesProcessed": 107374182400,
+    "compressionRatio": 1.00008225440979,
+    "elapsedSeconds": 3307.347444047,
+    "fileBytes": 107374182400,
+    "maxRSSKiB": 19736,
+    "operation": "generate",
+    "phase": "base",
+    "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1"
+  },
+  "captures": {
+    "base": {
+      "generation": "95775139fca653e2288d19788154d57f82998e3612cd8a0478532b7135e43040",
+      "PayloadBytes": 107395477507,
+      "MetadataBytes": 1336854,
+      "SourceAllocatedBytes": 1359872,
+      "FilePayloadBytes": 107376512308,
+      "DescriptorBytes": 18965199,
+      "Seconds": 84644.238527801,
+      "milestones": {
+        "snapshotUnix": 1794701837,
+        "providerReleaseUnix": 1794786465,
+        "firstReplicaVerifiedUnix": 1794786461,
+        "replicas": [
+          {
+            "target": "3e3fbdcdcee8c1040d50423ffe0f96724fb275063e0199219e0f90175f085b03",
+            "verifiedUnix": 1794786461
+          }
+        ]
+      },
+      "carried": true
+    },
+    "patched": {
+      "generation": "1d9da916168299121a475cdd34bb9e4cf26b70ab22ba5732de013742d691487b",
+      "PayloadBytes": 31103221,
+      "MetadataBytes": 2621598,
+      "SourceAllocatedBytes": 2703360,
+      "FilePayloadBytes": -1,
+      "DescriptorBytes": -1,
+      "Seconds": 49369.981400828,
+      "milestones": {
+        "snapshotUnix": 1794786482,
+        "providerReleaseUnix": 1794835848,
+        "firstReplicaVerifiedUnix": 1794835844,
+        "replicas": [
+          {
+            "target": "3e3fbdcdcee8c1040d50423ffe0f96724fb275063e0199219e0f90175f085b03",
+            "verifiedUnix": 1794835844
+          }
+        ]
+      },
+      "priorPayloadBytes": 31103221,
+      "priorMetadataBytes": 1311080,
+      "priorObjectTypeSplitUnknown": true,
+      "timingBasis": "original persisted snapshotUnix, including stopped interval"
+    },
+    "unchanged": {
+      "generation": "122336107fbe33c6ef303c0268c9356a6b51174ceba35cbaf3ab9dfff7e063b3",
+      "PayloadBytes": 820,
+      "MetadataBytes": 1311521,
+      "SourceAllocatedBytes": 4042752,
+      "FilePayloadBytes": 0,
+      "DescriptorBytes": 820,
+      "Seconds": 27091.210090785,
+      "milestones": {
+        "snapshotUnix": 1794835851,
+        "providerReleaseUnix": 1794862941,
+        "firstReplicaVerifiedUnix": 1794862938,
+        "replicas": [
+          {
+            "target": "3e3fbdcdcee8c1040d50423ffe0f96724fb275063e0199219e0f90175f085b03",
+            "verifiedUnix": 1794862938
+          }
+        ]
+      }
+    }
+  },
+  "bounds": {
+    "sourceStateBudgetBytes": 2147483648,
+    "maximumObservedSourceStateCheckpointBytes": 4042752,
+    "changedHTTPBodyLimitBytes": 134217728,
+    "initialPayloadAmplificationLimit": 1.08,
+    "catalogBatchBytes": 8388608,
+    "requestDeadlineSeconds": 30,
+    "freeReservePercent": 20
+  },
+  "failedDrivers": {
+    "original": {
+      "exitCode": 2,
+      "timeoutHours": 36,
+      "logSHA256": "10ab1c10d8e248ca169f7f3cfecd8213a9a029bae36f634835921b6262216404",
+      "wholeCase": "FAIL_NOT_RELABELLED"
+    },
+    "resumed": {
+      "exitCode": 1,
+      "logSHA256": "b25e31741486655a9944089ac1248a4438163d7344425ef114114b485d04a51d",
+      "wholeCase": "FAIL_NOT_RELABELLED",
+      "failure": "Private recovery export guard rejected after three COMPLETE captures."
+    },
+    "actualExportWrapper": {
+      "exitCode": 1,
+      "effectReadbackExitCode": 0,
+      "reexported": false,
+      "failure": "Wrapper expected a loose ELF, but verified package stores a native tools archive."
+    },
+    "previousReaderController": {
+      "exitCode": 1,
+      "wholeCase": "FAIL_AFTER_TWO_SUCCESSFUL_BASE_PHASES_NOT_RELABELLED",
+      "originalException": "NOT_VERIFIED",
+      "baseRestoreAndOracleTerminalZero": true,
+      "baseReplayed": false,
+      "remainingPatchedPairActuallyPassed": true
+    }
+  },
+  "sourceLoss": {
+    "ownedSyntheticPaths": 9,
+    "sourceRuntimeAndOperationalKeysAbsent": true,
+    "verifiedOwnerKitRetained": true
+  },
+  "freshCurrentReaders": {
+    "readerCommit": "8c783708704dbf55cbf05a2472be3436bc4a6d15",
+    "readerSHA256": "10ce787bd412bde9e6ff43a34fed04bbc2ca9505d13ae364ead48dbfc7f9f2d6",
+    "sourceBytes": 107374182400,
+    "observedAt": "2026-11-17T08:02:47.898904+00:00",
+    "summarySHA256": "719aa05f3ebd13d7fc45c11f6445062dcd6efc2f9b3ca877bbe1412a3e4f4143",
+    "checks": {
+      "base": {
+        "generation": "95775139fca653e2288d19788154d57f82998e3612cd8a0478532b7135e43040",
+        "restore": {
+          "seconds": 13988.943572042976,
+          "logSHA256": "ba69231d7656e5bab531d91c90a885315dabd4053cf8a4c6146b919c23f5e929",
+          "memoryPeakBytes": 805572608,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "memoryLimitEvents": 858839
+        },
+        "oracle": {
+          "seconds": 3365.392741513904,
+          "logSHA256": "42a3b2e28ca7f3c98b8ed2f2b2a9bacc0885145dc9e68e251ca4c38699e630b0",
+          "memoryPeakBytes": 805314560,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "memoryLimitEvents": 406313,
+          "result": {
+            "operation": "verify",
+            "phase": "base",
+            "bytesProcessed": 107374182400,
+            "fileBytes": 107374182400,
+            "allocatedBytes": 107374211072,
+            "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1",
+            "attributesVerified": true,
+            "maxRSSKiB": 15724,
+            "elapsedSeconds": 3362.370774137
+          }
+        }
+      },
+      "patched": {
+        "generation": "1d9da916168299121a475cdd34bb9e4cf26b70ab22ba5732de013742d691487b",
+        "restore": {
+          "seconds": 13654.639717295067,
+          "logSHA256": "b0356fd83cf391a6fc10fcabf8c76bb686c12661ac0e684e5cc9da8d9296f77c",
+          "memoryPeakBytes": 805318656,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "memoryLimitEvents": 817973
+        },
+        "oracle": {
+          "seconds": 3221.1404408869566,
+          "logSHA256": "235568ebe59f5a2d1cd99a2765daca79ae694d25b7650a199b657d132e120055",
+          "memoryPeakBytes": 791207936,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "memoryLimitEvents": 0,
+          "result": {
+            "operation": "verify",
+            "phase": "patched",
+            "bytesProcessed": 107374182400,
+            "fileBytes": 107374182400,
+            "allocatedBytes": 107374198784,
+            "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+            "attributesVerified": true,
+            "maxRSSKiB": 13696,
+            "elapsedSeconds": 3218.991818258
+          }
+        }
+      }
+    }
+  },
+  "freshPreviousReaders": {
+    "readerCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "readerSHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+    "sourceBytes": 107374182400,
+    "observedAt": "2026-11-17T18:26:49.919433+00:00",
+    "summarySHA256": "03fec6de0f5ea0480593ae2f2a43b0991ef413749ccaab9cef7a91f344c2b8d2",
+    "checks": {
+      "base": {
+        "generation": "95775139fca653e2288d19788154d57f82998e3612cd8a0478532b7135e43040",
+        "restore": {
+          "seconds": 13298.75332570076,
+          "logSHA256": "c393b753be50d0c24f3ba5364e93ba3f176f17085b9382937e5c5c9890580c69",
+          "memoryPeakBytes": 544546816,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "timingBasis": "Observed original container-start to final phase-log write wall interval; original monotonic value unavailable",
+          "memoryLimitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3256.050269644,
+          "logSHA256": "a6fce5372a2dcf1f9b6569a3edd637ae03020f3b86807768aa60efffc80516da",
+          "memoryPeakBytes": 462839808,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "timingBasis": "Actual independent oracle self-reported elapsed; original outer monotonic value unavailable",
+          "memoryLimitEvents": 0,
+          "result": {
+            "operation": "verify",
+            "phase": "base",
+            "bytesProcessed": 107374182400,
+            "fileBytes": 107374182400,
+            "allocatedBytes": 107374198784,
+            "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1",
+            "attributesVerified": true,
+            "maxRSSKiB": 15808,
+            "elapsedSeconds": 3256.050269644
+          }
+        }
+      },
+      "patched": {
+        "generation": "1d9da916168299121a475cdd34bb9e4cf26b70ab22ba5732de013742d691487b",
+        "restore": {
+          "seconds": 13534.361941321986,
+          "logSHA256": "022672c089ca5177a36088e5ddb2deb85aaaaec9237345f055e9dbb3db425723",
+          "memoryPeakBytes": 468590592,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "timingBasis": "Actual continuation controller monotonic phase interval",
+          "memoryLimitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3358.6556589559186,
+          "logSHA256": "a1360b9a9d38272d7999752f99aa5b05ae910499f895c6f13eb356bf5109eb1f",
+          "memoryPeakBytes": 416952320,
+          "memoryMaxBytes": 805306368,
+          "swapBytes": 0,
+          "oom": 0,
+          "timingBasis": "Actual continuation controller monotonic phase interval",
+          "memoryLimitEvents": 0,
+          "result": {
+            "operation": "verify",
+            "phase": "patched",
+            "bytesProcessed": 107374182400,
+            "fileBytes": 107374182400,
+            "allocatedBytes": 107374198784,
+            "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+            "attributesVerified": true,
+            "maxRSSKiB": 15672,
+            "elapsedSeconds": 3355.313304815
+          }
+        }
+      }
+    },
+    "workflowComposition": {
+      "kind": "RETAINED_SUCCESSFUL_BASE_PAIR_AND_FRESH_PATCHED_PAIR",
+      "originalControllerExitCode": 1,
+      "originalLocalObserverExitCode": 1,
+      "baseRestoreAndOracleTerminalZero": true,
+      "baseReplayed": false,
+      "originalException": "NOT_VERIFIED: stderr lost with prior local session; success print into a closed channel is a supported hypothesis, not a proven incident exception.",
+      "baseTimingLimit": "Original outer monotonic values were lost. Base restore uses observed wall interval; base oracle uses its own elapsed measurement. No throughput/SLA claim.",
+      "continuation": "Only never-started patched CLI and oracle. Same reader/oracle bytes, image, immutable view, owner-only namespace, 1CPU/768MiB/noSwap/8h per phase/20percent reserve. Controller output and each successful phase receipt are durable local test files."
+    }
+  },
+  "independentMaterializedRestores": 4,
+  "resources": {
+    "sourceCPU": 1,
+    "sourceMemoryMaxBytes": 805306368,
+    "sourceMemoryPeakBytes": 805572608,
+    "sourceMemoryLimitEvents": 99998,
+    "sourceOOM": 0,
+    "sourceSwapBytes": 0,
+    "sourceCohosted": true,
+    "eachReaderCPU": 1,
+    "eachReaderMemoryMaxBytes": 805306368,
+    "eachPhaseDeadlineSeconds": 28800,
+    "readerProcessesSequential": true
+  },
+  "limits": [
+    "New composed recovery workflow, not a fresh successful Go capture test. Original exit2/exit1 and export-wrapper exit1 remain failed.",
+    "Original baseline and stable old aggregate edited counters are carried with their own times; lost old file/descriptor split remains unknown=-1.",
+    "One retained authenticated complete receiver; four fresh standalone reader processes, not three physical failure domains.",
+    "Read-only views share ciphertext inodes. Source/runtime/operational keys/network/mutable holder index are absent from consumers.",
+    "Source state is enforced by its declared2GiB admission budget; reported allocations are measured checkpoints, not an independently sampled all-time peak.",
+    "Source timing includes stopped/cohosted intervals; neither uncontended throughput nor raw channel bandwidth/RPO/RTO is established.",
+    "Fresh initial current-source100GiB, matched asymmetric profiles, full generic cloud upload/readers, actual installation and final applicable scenarios remain separate.",
+    "The previous-reader controller exited1 after successful base CLI/oracle phases. Its exception was not recorded. Only the never-started patched pair was continued with identical binaries, namespace and phase limits; the base pair was not replayed. Original outer monotonic values were lost: base CLI duration is an observed wall interval, while the base oracle reports its own elapsed time; timing bases are explicit in each row."
+  ],
+  "fullProductAcceptance": false
+}
