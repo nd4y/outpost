@@ -28,6 +28,13 @@ func TestBatchedReceptionRestartsWithoutRepeatingVerifiedPayload(t *testing.T) {
 	r, e = Open(filepath.Join(base, "replica"), trust, false)
 	ok(t, e)
 	defer r.Close()
+	checkpointReads := 0
+	r.Fault = func(point string) error {
+		if point == "verification-checkpoint-read" {
+			checkpointReads++
+		}
+		return nil
+	}
 	second, e := r.ReceiveBatch(ctx, raw, 1, MaxObject, fetch(objects))
 	ok(t, e)
 	if !second.Complete || second.VerifiedObjects != 2 {
@@ -40,7 +47,45 @@ func TestBatchedReceptionRestartsWithoutRepeatingVerifiedPayload(t *testing.T) {
 	if first.ReadBytes+second.ReadBytes != total || first.WrittenBytes+second.WrittenBytes != total {
 		t.Fatal("repeated verified payload", first, second, total)
 	}
+	if checkpointReads != 1 {
+		t.Fatal("unchanged checkpoint was decoded again", checkpointReads)
+	}
 	ok(t, r.VerifyComplete(ctx, Hash(raw)))
+}
+
+func TestBatchedReceptionReloadsCheckpointAfterAnotherWriter(t *testing.T) {
+	dir := filepath.Join(temp(t), "replica")
+	trust, key, _ := trust(t)
+	r := openTest(t, dir, trust)
+	other, err := Open(dir, trust, false)
+	ok(t, err)
+	defer other.Close()
+	raw, objects := synthetic(t, trust, key, 1, "two writers")
+	first, err := r.ReceiveBatch(ctx, raw, 1, MaxObject, fetch(objects))
+	ok(t, err)
+	if first.Complete {
+		t.Fatal("fixture unexpectedly complete")
+	}
+	var published BatchResult
+	readCount := 0
+	r.Fault = func(point string) error {
+		if point == "verification-checkpoint-read" {
+			readCount++
+		}
+		return nil
+	}
+	finish, err := r.ReceiveBatch(ctx, raw, 1, MaxObject, func(ref Object) ([]byte, error) {
+		// The first handle is between locks while reading the missing body.
+		// Another handle durably verifies and publishes the same generation.
+		var err error
+		published, err = other.ReceiveBatch(ctx, raw, 1, MaxObject, fetch(objects))
+		return objects[ref.ID], err
+	})
+	ok(t, err)
+	if readCount != 2 || !published.Complete || !finish.Complete || finish.Generation != published.Generation {
+		t.Fatal("replaced checkpoint was not reloaded", readCount, published, finish)
+	}
+	ok(t, r.VerifyComplete(ctx, published.Generation))
 }
 func TestBatchedReceptionInvalidatesChangedObjectAndPreservesPreviousComplete(t *testing.T) {
 	base := temp(t)

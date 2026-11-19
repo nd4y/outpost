@@ -2530,6 +2530,14 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/generation/batch_linux_test.go",
+          "name": "TestBatchedReceptionRestartsWithoutRepeatingVerifiedPayload"
+        },
+        {
+          "path": "internal/generation/batch_linux_test.go",
+          "name": "TestBatchedReceptionReloadsCheckpointAfterAnotherWriter"
+        },
+        {
           "path": "internal/ingress/registry_journal_linux_test.go",
           "name": "TestRegistryJournalRestoresExactIntentAndReceiptAfterLoss"
         },

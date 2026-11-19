@@ -6,6 +6,10 @@ A source sends the signed catalog after the encrypted closure is durably staged.
 
 Each ordinary HTTPS publication step now processes at most 8 MiB of payload, with at most 256 objects. This matches the maximum size of one uploaded object. Staging-enabled workers keep their existing one-object bound. An incomplete response is HTTP 202; the source continues the same signed catalog using its authenticated continuation hint. The 30-second source request limit, signed authority, closure checks and final readback are unchanged.
 
+During a batch, the receiver reads the verification checkpoint to choose the next objects. Before saving progress, it reopens that checkpoint under the replica lock. If its file identity, size and timestamps still match, the receiver reuses the decoded records for this batch. A checkpoint changed by another writer is read and validated again. A missing checkpoint starts without verification records. The receiver still writes the checkpoint durably and checks every object stamp before publication. The checkpoint format and request limits stay the same.
+
+`TestBatchedReceptionRestartsWithoutRepeatingVerifiedPayload` checks one checkpoint decode when the file stays unchanged. `TestBatchedReceptionReloadsCheckpointAfterAnotherWriter` checks that a second handle can publish in between locks and the first handle reads its new checkpoint. These checks cover the read path and interleaving. Full-scale publication timing requires a measured run.
+
 ## Failure and causal check
 
 The previous standalone receiver could process 256 MiB before saving its verification checkpoint. In the failed physical 100 GiB fixture, its first selected batch was exactly 35 objects and 263,980,668 bytes. Those same 35 objects were durable when the catalog request timed out; no verification checkpoint or complete generation existed. All 107,395,477,507 initial object-body bytes had already reached staging. This was a request timeout after roughly ten hours of source transfer, not the 36-hour test deadline. There were no OOM or swap events, but substantial memory reclaim occurred; memory headroom is not established.

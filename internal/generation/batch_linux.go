@@ -28,6 +28,12 @@ type verificationState struct {
 	Objects     map[string]objectVerification `json:"objects"`
 	CompletedAt int64                         `json:"completedAt,omitempty"`
 }
+type verificationSnapshot struct {
+	state    verificationState
+	stamp    catalogStamp
+	newestAt int64
+}
+
 type BatchResult struct {
 	Generation      string `json:"generation"`
 	Complete        bool   `json:"complete"`
@@ -98,29 +104,71 @@ func verificationName(id, window string) string {
 	return "window-" + Hash([]byte(id+"/"+window))
 }
 func (r *Replica) verification(id, window string, refs map[string]Object) (verificationState, bool, error) {
+	var snapshot verificationSnapshot
+	return r.readVerification(id, window, refs, &snapshot)
+}
+
+// One receive batch reads verification when choosing objects and again after
+// reacquiring the replica lock. Reuse the decoded state only if the exact file
+// identity is unchanged. A concurrent writer or removal is read back normally.
+func (r *Replica) readVerification(id, window string, refs map[string]Object, snapshot *verificationSnapshot) (verificationState, bool, error) {
 	t, _ := json.Marshal(r.trust)
 	v := verificationState{Format: VerificationFormat, Generation: id, Trust: Hash(t), Objects: map[string]objectVerification{}}
 	if window != "" {
 		v.Format = WindowVerificationFormat
 		v.Window = window
 	}
-	b, e := read(r.root, "verification/"+verificationName(id, window), MaxState)
+	f, e := localfs.OpenFile(r.root, "verification/"+verificationName(id, window), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if errors.Is(e, os.ErrNotExist) {
 		return v, false, nil
 	}
 	if e != nil {
 		return v, false, e
 	}
-	var old verificationState
-	if canonical(b, &old, MaxState) != nil || old.Format != v.Format || old.Generation != id || old.Trust != v.Trust || old.Window != window || old.Objects == nil || len(old.Objects) > len(refs) || old.CompletedAt < 0 || old.CompletedAt > time.Now().Unix() || old.CompletedAt > 0 && len(old.Objects) != len(refs) {
+	defer f.Close()
+	info, e := f.Stat()
+	if e != nil {
+		return v, false, e
+	}
+	stamp, e := stampOf(info)
+	if e != nil || stamp.Size < 1 || stamp.Size > MaxState {
 		return v, false, ErrInvalid
 	}
-	for key, checked := range old.Objects {
-		ref, ok := refs[key]
-		if !ok || checked.Stamp.Size != int64(ref.Bytes) || checked.CheckedUnix <= 0 || checked.CheckedUnix > time.Now().Unix() || old.CompletedAt > 0 && checked.CheckedUnix > old.CompletedAt {
+	if snapshot.stamp == stamp && snapshot.state.Generation == id && snapshot.state.Window == window {
+		if snapshot.newestAt > time.Now().Unix() {
 			return v, false, ErrInvalid
 		}
+		return snapshot.state, true, nil
 	}
+	if e = r.point("verification-checkpoint-read"); e != nil {
+		return v, false, e
+	}
+	b, e := io.ReadAll(io.LimitReader(f, MaxState+1))
+	if e != nil {
+		return v, false, e
+	}
+	info, e = f.Stat()
+	if e != nil {
+		return v, false, e
+	}
+	after, e := stampOf(info)
+	if e != nil || after != stamp || int64(len(b)) != stamp.Size {
+		return v, false, ErrInvalid
+	}
+	var old verificationState
+	now := time.Now().Unix()
+	if canonical(b, &old, MaxState) != nil || old.Format != v.Format || old.Generation != id || old.Trust != v.Trust || old.Window != window || old.Objects == nil || len(old.Objects) > len(refs) || old.CompletedAt < 0 || old.CompletedAt > now || old.CompletedAt > 0 && len(old.Objects) != len(refs) {
+		return v, false, ErrInvalid
+	}
+	newestAt := old.CompletedAt
+	for key, checked := range old.Objects {
+		ref, ok := refs[key]
+		if !ok || checked.Stamp.Size != int64(ref.Bytes) || checked.CheckedUnix <= 0 || checked.CheckedUnix > now || old.CompletedAt > 0 && checked.CheckedUnix > old.CompletedAt {
+			return v, false, ErrInvalid
+		}
+		newestAt = max(newestAt, checked.CheckedUnix)
+	}
+	*snapshot = verificationSnapshot{state: old, stamp: stamp, newestAt: newestAt}
 	return old, true, nil
 }
 func (r *Replica) saveVerification(v verificationState, hasCheckpoint bool) error {
@@ -250,6 +298,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 	var result BatchResult
 	result.Generation = id
 	var todo []Object
+	var checkpoint verificationSnapshot
 	e := r.locked(ctx, func(s *state) error {
 		if token != "" {
 			if e := checkRepair(s, id, token); e != nil {
@@ -261,7 +310,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 			return e
 		}
 		result.TotalObjects = len(refs)
-		v, _, e := r.verification(id, window, refs)
+		v, _, e := r.readVerification(id, window, refs, &checkpoint)
 		if e != nil {
 			return e
 		}
@@ -362,7 +411,7 @@ func (r *Replica) receiveBatch(ctx context.Context, id, window string, maxObject
 		if e != nil {
 			return e
 		}
-		v, hasCheckpoint, e := r.verification(id, window, refs)
+		v, hasCheckpoint, e := r.readVerification(id, window, refs, &checkpoint)
 		if e != nil {
 			return e
 		}
