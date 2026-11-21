@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "status": "HDD_COMPONENT_AND_NATIVE_CI_PASS_FULL_PRODUCT_OPEN",
+  "observedAt": "2026-11-16T02:34:43.658448185Z",
+  "test": {
+    "name": "TestSourceRenewalCLIPreviousReaderRefusesMigratedState",
+    "sourceTree": "c26a223e5468f986290992f391093a593e2d20fc",
+    "binarySHA256": "88b1c3bdf64e78d9f232ed21475825a9147a3e2391ff3d150abe9b85ff415a10",
+    "goAndModuleInputs": 520,
+    "seconds": 18.43
+  },
+  "currentExecutable": {
+    "revision": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+    "sha256": "507b15c39d757cf8ad9d4063c096fa69c77441bab254612f6d4a77ad58d5494a",
+    "rebuilt": false,
+    "independentSelection": {
+      "archiveSHA256": "097541ed638d6768335e66d4063b62497d4ec2eb17393c6833b9bcef8de26c22",
+      "artifactId": 14154486700,
+      "artifactSHA256": "ec85373386471c7edaa525a2998de269c1c9063060233fb528a41b5b9936afae",
+      "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43696037395/artifacts/14154486700",
+      "commit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+      "format": "outpost-ci-artifact-selection-1",
+      "kind": "outpost-ci-candidate-1",
+      "manifestSHA256": "870655b4766bbfdc838b449d4da90ee65fdcb4f168cd174e376bbe6afb47e0ed",
+      "nativeArchitecture": "amd64",
+      "repository": "nd4y/outpost",
+      "runAttempt": 1,
+      "runId": 43696037395
+    },
+    "productionGoAndModuleInputsIdenticalTo": "b26db48bbb9954b1a547ea69e99c4c22b82fc7e9",
+    "productionInputsCompared": 258
+  },
+  "legacyComparator": {
+    "sourceCommit": "4a4afc91b60e154b0a19010965d9a9c74393b593",
+    "sourceArchiveSHA256": "f0ac73e621304638b447888fd0908fa3535ce3248e4e11254e179fcc54c73133",
+    "binarySHA256": "24f5ff16198c03bb5714da0be17c5e48e5369147d4884005c101af2839443ffa",
+    "kind": "source-built-pinned-public-comparator",
+    "releasedArtifact": false,
+    "goVersion": "1.27.3",
+    "modules": "verified offline"
+  },
+  "environment": {
+    "platform": "isolated Linux amd64 HDD fixture",
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 350736384,
+    "memoryMaxEvents": 0,
+    "oom": 0,
+    "swapBytes": 0,
+    "network": "none",
+    "fixtureOnlyExecutableTmpfsBytes": 67108864
+  },
+  "assertions": [
+    "Legacy source-status reads the original state before migration.",
+    "The actual current CLI renews to revision2 while preserving generation/sequence and the original legacy-state digest.",
+    "Legacy source-status/source-next/source-run/source-init all refuse the migrated state and do not change agent.json.",
+    "Current source-status observes the renewed format/revision and original generation.",
+    "Old authority replay is refused; the installation authority anchor remains byte-identical.",
+    "The current runtime reopens and runs the accepted head."
+  ],
+  "logs": {
+    "results-renewal.log": "210d54821070b8be660cde62b769d83c6320f41730c1866f6de2779fedd75741",
+    "results-resources.log": "530fdc1778e95be7049b0262397a1de8ba05890f7adedc24c88f0e1a7ed960a3",
+    "results-candidate-verification.json": "4635b214d4522b108b54fbcc613c641a79e4a3c554c5c855e93ee816802e5bcb",
+    "results-current-version.json": "73d4721787c81ef552bb38572fefde35fe74ac889812246529e1c2f6bb603301",
+    "results-legacy-modules.log": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+    "results-legacy-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "results-legacy-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "limitations": [
+    "This bounded metadata/CLI compatibility case is separate from100GiB source/cloud/AS and independent file recovery.",
+    "The HDD current executable is the independently downloaded e9 candidate, not a relabelled b26 executable. All258non-testGo/module inputs match b26; nativeCI independently ran its selected c739 revision on both architectures, as recorded separately.",
+    "The old comparator is built from exact public source4a4, not downloaded as an official oldest-supported release. Installation/upgrade/rollback acceptance remains separate.",
+    "Synthetic keys and fixture paths stay private; no working service, live endpoint or real owner profile was changed."
+  ],
+  "fullProductAcceptance": false,
+  "recheckTrigger": {
+    "path": "internal/sourceagent/renewal_linux.go",
+    "historicalExecutionSourceHash": "b492987ecd1fdf4ec10c901f6a97d5deb37a66711891e95f82f5343f6c2efa39",
+    "currentSourceHash": "dfb76b48fc9c8eb019c2bfb63434ae00cb63749258a3a3ca3067a3cde5f5f1a7",
+    "reason": "Production renewal code changed after historicalCLI runs; native workflow did not execute this opt-in case. Repeat is justified by actual source drift, not mere absence from a named job."
+  },
+  "nativeCI": {
+    "sourceCommit": "c73960e6a78e568593e280d8a866ec5ebca5b549",
+    "executedTree": "18676b7a254e042b52dc813c9d13dc02f1a1e4e1",
+    "runURL": "https://github.com/nd4y/outpost/actions/runs/43796281374",
+    "tests": [
+      {
+        "architecture": "amd64",
+        "jobId": 133065712571,
+        "seconds": 0.18,
+        "legacyComparatorSHA256": "24f5ff16198c03bb5714da0be17c5e48e5369147d4884005c101af2839443ffa"
+      },
+      {
+        "architecture": "arm64",
+        "jobId": 133065712219,
+        "seconds": 0.2,
+        "legacyComparatorSHA256": "13826df97a2b3abd93365bb0a6595b12ed60a625a3130a20aee11cb49978c868"
+      }
+    ],
+    "currentVersionFieldsMatchSourceCommit": true
+  }
+}

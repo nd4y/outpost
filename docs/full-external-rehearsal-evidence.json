@@ -1,0 +1,216 @@
+{
+  "format": "outpost-full-external-rehearsal-1",
+  "status": "PASS_128MIB_ONLY",
+  "observedAt": "2026-11-15T02:15:42.479282+00:00",
+  "baseCommit": "7eec7ff9de0e6a9c612288a7854ea26dc695cbea",
+  "sourceTree": "4e77a43fcb5e3ba576d7e78f46d577176e754f64",
+  "sourceInputs": {
+    "internal/upload/scale_linux_test.go": "268a4ae44e87cbd7314a8d0f9567fd272566ce017ef39ec182bfa4652f02ecd6",
+    "internal/teststore/server.go": "94fe98d83dfe4f8cf68fad301755c37529374c66a45cdf7cd19a589c182a599b"
+  },
+  "uploadTestSHA256": "6a00770dbd5f53486dd835c3f73f212ebdcdf61796989f1b30eece3ae33733ee",
+  "sourceBytes": 134217728,
+  "replacementBytes": 8388608,
+  "holderCount": 3,
+  "uploaderProcessCount": 3,
+  "retainedGenerationCount": 3,
+  "profile": {
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 538292224,
+    "memoryMaxEvents": 5468,
+    "swapBytes": 0,
+    "oom": 0,
+    "assignmentSlotMillis": 30000,
+    "operationHours": 24,
+    "maximumObjectBytes": 8388608,
+    "partDelayMillis": 10,
+    "firstPartRendezvousSeconds": 15,
+    "cohosted": true
+  },
+  "metrics": [
+    {
+      "protocol": "s3",
+      "phase": "base",
+      "receivedPUTBodyBytes": 134296923,
+      "partBodyBytes": 134252561,
+      "newPartCount": 21,
+      "cumulativeDistinctActors": 3,
+      "cumulativePeakActors": 3,
+      "seconds": 283.402596,
+      "workerResponseBodyBytes": 1800079483,
+      "workerRequestBodyBytes": 134296923
+    },
+    {
+      "protocol": "s3",
+      "phase": "patched",
+      "receivedPUTBodyBytes": 12916415,
+      "partBodyBytes": 12893383,
+      "newPartCount": 5,
+      "cumulativeDistinctActors": 3,
+      "cumulativePeakActors": 3,
+      "seconds": 212.266389,
+      "workerResponseBodyBytes": 1534701582,
+      "workerRequestBodyBytes": 12916415
+    },
+    {
+      "protocol": "s3",
+      "phase": "unchanged",
+      "receivedPUTBodyBytes": 25548,
+      "partBodyBytes": 7644,
+      "newPartCount": 1,
+      "cumulativeDistinctActors": 3,
+      "cumulativePeakActors": 3,
+      "seconds": 207.177255,
+      "workerResponseBodyBytes": 1537294753,
+      "workerRequestBodyBytes": 25548
+    },
+    {
+      "protocol": "webdav",
+      "phase": "base",
+      "receivedPUTBodyBytes": 134281570,
+      "partBodyBytes": 134252561,
+      "newPartCount": 21,
+      "cumulativeDistinctActors": 3,
+      "cumulativePeakActors": 3,
+      "seconds": 223.4866,
+      "workerResponseBodyBytes": 1551804329,
+      "workerRequestBodyBytes": 134281570
+    },
+    {
+      "protocol": "webdav",
+      "phase": "patched",
+      "receivedPUTBodyBytes": 12916415,
+      "partBodyBytes": 12893383,
+      "newPartCount": 5,
+      "cumulativeDistinctActors": 3,
+      "cumulativePeakActors": 3,
+      "seconds": 196.69867,
+      "workerResponseBodyBytes": 1514988402,
+      "workerRequestBodyBytes": 12916415
+    },
+    {
+      "protocol": "webdav",
+      "phase": "unchanged",
+      "receivedPUTBodyBytes": 25548,
+      "partBodyBytes": 7644,
+      "newPartCount": 1,
+      "cumulativeDistinctActors": 3,
+      "cumulativePeakActors": 3,
+      "seconds": 205.194769,
+      "workerResponseBodyBytes": 1544421911,
+      "workerRequestBodyBytes": 25548
+    }
+  ],
+  "consumers": {
+    "readerCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "readerSHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+    "cpu": 0.5,
+    "memoryMaxBytes": 402653184,
+    "network": false,
+    "restores": [
+      {
+        "group": "holder-0",
+        "phase": "patched",
+        "restoreSeconds": 36.200927402009256,
+        "oracleSeconds": 13.286639784986619,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 268910592
+      },
+      {
+        "group": "holder-1",
+        "phase": "patched",
+        "restoreSeconds": 35.80413519201102,
+        "oracleSeconds": 11.676251976983622,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 221671424
+      },
+      {
+        "group": "holder-2",
+        "phase": "patched",
+        "restoreSeconds": 37.3186064499896,
+        "oracleSeconds": 13.03831817000173,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 218963968
+      },
+      {
+        "group": "s3",
+        "phase": "base",
+        "restoreSeconds": 41.45329478097847,
+        "oracleSeconds": 10.600782926019747,
+        "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "attributesVerified": true,
+        "memoryPeakBytes": 209686528
+      },
+      {
+        "group": "s3",
+        "phase": "patched",
+        "restoreSeconds": 36.89982727402821,
+        "oracleSeconds": 10.891896979010198,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 225857536
+      },
+      {
+        "group": "webdav",
+        "phase": "base",
+        "restoreSeconds": 38.27908262901474,
+        "oracleSeconds": 12.180666479980573,
+        "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "attributesVerified": true,
+        "memoryPeakBytes": 218009600
+      },
+      {
+        "group": "webdav",
+        "phase": "patched",
+        "restoreSeconds": 35.628501786035486,
+        "oracleSeconds": 13.17863588698674,
+        "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "attributesVerified": true,
+        "memoryPeakBytes": 221638656
+      }
+    ]
+  },
+  "race": {
+    "status": "PASS",
+    "rendezvousSeconds": 0.57,
+    "uploadPackageSeconds": 1.741,
+    "storagePackageSeconds": 10.746,
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 120225792,
+    "swapBytes": 0,
+    "oom": 0,
+    "coverage": [
+      "two requests create no parts",
+      "cancellation preserves absence",
+      "third actual request releases three immutable writes",
+      "default-nil multipart and immutable readback",
+      "false ACK, truncation, corruption, quota refusal",
+      "authorization, route and capability refusals"
+    ]
+  },
+  "logSHA256": {
+    "scale": "4dff7fd5b00a719c888c0299d669b3cc53ed666710c3776a3895f4baf5291f43",
+    "consumers": "c4237e0e1e32fbcb3f98f6ea485a94a30d2fa4f9c24bccbb3bb032498eecdc0f",
+    "race": "a5d0f460921342055d570ce37c9cdf0b97f73f06ad28ccf1d01282a692d7bac1"
+  },
+  "retainedFailures": [
+    "Noncanonical private input JSON was correctly refused before fixture work; only the serializer was corrected.",
+    "The initial 10 ms delay-only profile had three WebDAV actors but peak concurrency two and failed. The new bounded first-request barrier is a different declared fixture; the original result remains FAIL.",
+    "The first race invocation propagated compiler GOTMPDIR outside the admitted fixture root and all controls refused before payload writes. Only the invocation was corrected with env -u GOTMPDIR; the filesystem guard remains unchanged.",
+    "Earlier default short-deadline HDD failover profiles remain failed; this scale rehearsal does not replace them."
+  ],
+  "limits": [
+    "Functional cohosted 128 MiB rehearsal only, not 100 GiB or whole-product acceptance.",
+    "The 512 MiB uploader had memory pressure and a recorded peak slightly above its configured cap, with no OOM or swap. No RAM headroom claim.",
+    "The first authenticated part requests rendezvous before real writes; this proves concurrent requests, not simultaneous physical disk operations or a 1.5x throughput guarantee.",
+    "HTTP response bodies expose substantial fresh verification read amplification; PUT-only delta counts are not total network cost. TCP/TLS framing is not included.",
+    "Three holders are separate physical files on one shared host and controller. Consumer views share immutable inodes and do not add failure domains.",
+    "Consumers receive only immutable data, public trust, owner recovery material, pinned reader and empty output. No source, upload journals, mutable indexes, planner or worker keys, endpoints or network.",
+    "Physical 100 GiB source and cloud acceptance, asymmetric ingress timing, real endpoints, production enrollment and physical fault domains remain separate gates."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_BOUNDED_RECOVERY_COMPONENTS",
+  "scope": "Exact frozen maintenance-plan checkpoint export and explicit restoration when the current replica index and signed retention ledger survive. Combined journal or volume loss remains open.",
+  "sourceBaseCommit": "831ab37479a6d08553ad62a323cdc7c96348adef",
+  "generationAndWorkerRuntimeTree": "24bb8e0546ba92bf4dac45aac496445c2d355c45",
+  "actualCLITestTree": "d21d38107eca742c773ba367213984d1d1aeb163",
+  "sourceReuse": "All production Go files are hash-identical between these trees; only the actual CLI test, documentation and native workflow were added.",
+  "environment": {
+    "os": "Linux amd64",
+    "go": "1.27.3",
+    "storage": "Dedicated ext4 HDD",
+    "cpuQuotaPercent": 50,
+    "memoryMaxBytes": 536870912,
+    "swapMaxBytes": 0,
+    "network": "none; loopback-only synthetic fixtures",
+    "concurrentWork": "An independently isolated physical100GiB source generator remained active. This run establishes functional safety, not throughput."
+  },
+  "checks": [
+    "Exact original canonical plan and independently retained digest",
+    "Original index and signed ledger required",
+    "Original permit, operation and plan digest must match",
+    "No candidate rescan, payload deletion, new execution window or index/ledger/receipt update",
+    "Atomic no-replacement publication preserves a foreign file created during quota admission",
+    "Conflicting file or symlink, changed hash or operation, missing index or ledger, cancelled context and exhausted quota refused",
+    "Real SIGKILL after durable plan publication, exact idempotent recovery and safe maintenance replay",
+    "Later orphan and newly referenced candidates protected by original frozen replay checks",
+    "Active worker lease and foreign domain refused",
+    "Selected actual CLI export, private input, no output overwrite, active-worker refusal, wrong digest, recovery and idempotent replay",
+    "Completed operations retain original outcomes; their absent plans are not recreated"
+  ],
+  "actualCLI": {
+    "sha256": "a50b6872ab102368215be4941a16ec345baf75d1d9d7047a88f11af890ccb8f8",
+    "test": "TestWorkerMaintenancePlanCheckpointActualCLI",
+    "elapsedSeconds": 16.87,
+    "existingEnvelope": "outpost-cli-1 with the operation result in result",
+    "earlierTestCorrection": "The first CLI test inspected fields outside the existing result envelope. Its failed log is retained; the product response format was unchanged."
+  },
+  "generationMemoryPeakBytes": 59588608,
+  "generationSwapAndOOM": 0,
+  "logSHA256": {
+    "generation": "75c5c111dd30b2135ed0c232c85d4c321d8ba29c7426abece22bd9f38704a324",
+    "workerLease": "b5628228eb8fa5acc7f87e915f99b2ac025ed55de8eba998dac6bf4b48423481",
+    "actualCLI": "9854cc5fad436d4283ff252bd47fb1ba6ed1d289285469ac49680c24106ca7d2",
+    "build": "1d7d90dfe259c4b29d4b4489d6af77b791ffb01e69b36ad1c07778ce38b4f584",
+    "earlierCLIHarnessFailure": "7db05d57e1ba8eb5604af74969824b1ab680b8a474373b27ac02691ed5490692"
+  },
+  "compatibility": "The existing outpost-gc-plan-1 file, replica state, deletion permit and wire catalog formats are unchanged. Normal maintenance still enforces its original window and current references.",
+  "unverified": [
+    "Combined index/retention/plan loss or complete replica volume loss",
+    "Automatic off-node checkpoint retention and periodic permit lifecycle",
+    "Full product and production acceptance"
+  ]
+}

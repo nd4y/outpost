@@ -13,23 +13,30 @@ import (
 )
 
 const (
-	Format         = "outpost-generation-1"
-	KitFormat      = "outpost-filekit-1"
-	MaxObject      = 8 << 20
-	MaxCatalog     = 8 << 20
-	MaxObjects     = 32768
-	MaxKits        = 64
-	MaxGenerations = 256
-	MaxPins        = 1024
-	MaxState       = 32 << 20
+	Format             = "outpost-generation-1"
+	PermitWindowFormat = "outpost-maintenance-permit-2"
+	MaxPermit          = 64 << 10
+	StateFormat        = "outpost-replica-state-2"
+	KitFormat          = "outpost-filekit-1"
+	TypedKitFormat     = "outpost-filekit-2"
+	MaxObject          = 8 << 20
+	MaxCatalog         = 8 << 20
+	MaxObjects         = 32768
+	MaxKits            = 4096
+	MaxGenerations     = 256
+	MaxPins            = 1024
+	MaxState           = 32 << 20
 )
 
 var (
-	ErrInvalid    = errors.New("invalid generation or replica state")
-	ErrConflict   = errors.New("conflicting signed generation")
-	ErrRollback   = errors.New("stale generation or authority")
-	ErrProtected  = errors.New("generation is locally protected")
-	ErrIncomplete = errors.New("generation dependencies unavailable or corrupt")
+	ErrInvalid           = errors.New("invalid generation or replica state")
+	ErrConflict          = errors.New("conflicting signed generation")
+	ErrRollback          = errors.New("stale generation or authority")
+	ErrProtected         = errors.New("generation is locally protected")
+	ErrIncomplete        = errors.New("generation dependencies unavailable or corrupt")
+	ErrMigrationRequired = errors.New("explicit local replica migration required")
+	ErrMaintenanceWindow = errors.New("maintenance node or window does not permit deletion")
+	ErrRetirementClosed  = errors.New("retirement operation is durably closed")
 )
 
 type Object struct {
@@ -90,7 +97,7 @@ func canonical(raw []byte, v any, maximum int) error {
 	return nil
 }
 func closure(c Catalog) (map[string]Object, error) {
-	if c.Format != Format || c.KitFormat != KitFormat || !validID(c.Domain) || !validID(c.Repository) || c.Epoch == 0 || c.Sequence == 0 || c.SnapshotUnix <= 0 || c.Policy == 0 || (c.Parent != "" && !validID(c.Parent)) || (c.Sequence == 1 && c.Parent != "") || (c.Sequence > 1 && c.Parent == "") || len(c.Kits) == 0 || len(c.Kits) > MaxKits {
+	if c.Format != Format || (c.KitFormat != KitFormat && c.KitFormat != TypedKitFormat) || !validID(c.Domain) || !validID(c.Repository) || c.Epoch == 0 || c.Sequence == 0 || c.SnapshotUnix <= 0 || c.Policy == 0 || (c.Parent != "" && !validID(c.Parent)) || (c.Sequence == 1 && c.Parent != "") || (c.Sequence > 1 && c.Parent == "") || len(c.Kits) == 0 || len(c.Kits) > MaxKits {
 		return nil, ErrInvalid
 	}
 	refs := map[string]Object{}
@@ -177,18 +184,42 @@ func VerifyCatalog(raw []byte, t Trust) (Catalog, error) {
 }
 
 type Permit struct {
-	Format     string   `json:"format"`
-	Domain     string   `json:"domain"`
-	Repository string   `json:"repository"`
-	Epoch      uint64   `json:"epoch"`
-	Revision   uint64   `json:"revision"`
-	Operation  string   `json:"operation"`
-	Retire     []string `json:"retire"`
-	Signature  []byte   `json:"signature,omitempty"`
+	Format     string             `json:"format"`
+	Domain     string             `json:"domain"`
+	Repository string             `json:"repository"`
+	Epoch      uint64             `json:"epoch"`
+	Revision   uint64             `json:"revision"`
+	Operation  string             `json:"operation"`
+	Retire     []string           `json:"retire"`
+	Window     *PermitWindow      `json:"window,omitempty"`
+	Coverage   *RetentionCoverage `json:"coverage,omitempty"`
+	Signature  []byte             `json:"signature,omitempty"`
+}
+
+type PermitWindow struct {
+	Node        string `json:"node"`
+	StartUnix   int64  `json:"startUnix"`
+	ExpiresUnix int64  `json:"expiresUnix"`
 }
 
 func validPermit(p Permit) bool {
-	if p.Format != Format || !validID(p.Domain) || !validID(p.Repository) || p.Epoch == 0 || !validID(p.Operation) || len(p.Retire) > MaxGenerations {
+	if !validID(p.Domain) || !validID(p.Repository) || p.Epoch == 0 || !validID(p.Operation) || len(p.Retire) > MaxGenerations {
+		return false
+	}
+	if p.Format != RetentionPermitFormat && p.Coverage != nil {
+		return false
+	}
+	switch p.Format {
+	case Format:
+		if p.Window != nil {
+			return false
+		}
+	case PermitWindowFormat, RetentionPermitFormat:
+		w := p.Window
+		if w == nil || !validID(w.Node) || w.StartUnix <= 0 || w.ExpiresUnix > 1<<40 || w.ExpiresUnix <= w.StartUnix || w.ExpiresUnix-w.StartUnix > 86400 {
+			return false
+		}
+	default:
 		return false
 	}
 	last := ""
@@ -198,38 +229,60 @@ func validPermit(p Permit) bool {
 		}
 		last = id
 	}
-	return true
+	return p.Format != RetentionPermitFormat || p.validRetentionCoverage()
 }
+
+// ValidatePermitDraft validates the unsigned fields and bounds the signed size.
+func ValidatePermitDraft(p Permit) error {
+	if len(p.Signature) != 0 || !validPermit(p) {
+		return ErrInvalid
+	}
+	p.Signature = make([]byte, ed25519.SignatureSize)
+	raw, e := json.Marshal(p)
+	if e != nil || len(raw) > MaxPermit {
+		return ErrInvalid
+	}
+	return nil
+}
+
 func SignPermit(p Permit, key ed25519.PrivateKey) ([]byte, error) {
 	if !validPermit(p) || len(key) != ed25519.PrivateKeySize {
 		return nil, ErrInvalid
 	}
 	p.Signature = nil
 	b, _ := json.Marshal(p)
-	p.Signature = ed25519.Sign(key, append([]byte(Format+"\x00maintenance\x00"), b...))
-	return json.Marshal(p)
+	p.Signature = ed25519.Sign(key, append([]byte(p.Format+"\x00maintenance\x00"), b...))
+	signed, e := json.Marshal(p)
+	if e != nil || len(signed) > MaxPermit {
+		return nil, ErrInvalid
+	}
+	return signed, nil
 }
+
+// VerifyPermit checks the separate maintenance authority. Execution additionally
+// binds revision, operation, current references, pins and any command admission.
+func VerifyPermit(raw []byte, t Trust) (Permit, error) { return verifyPermit(raw, t) }
 func verifyPermit(raw []byte, t Trust) (Permit, error) {
 	var p Permit
 	if !t.valid() {
 		return p, ErrInvalid
 	}
-	if err := canonical(raw, &p, 64<<10); err != nil {
+	if err := canonical(raw, &p, MaxPermit); err != nil {
 		return p, err
 	}
-	if !validPermit(p) || p.Domain != t.Domain || p.Repository != t.Repository || p.Epoch != t.Epoch {
+	if p.Domain != t.Domain || p.Repository != t.Repository || p.Epoch != t.Epoch {
 		return p, ErrInvalid
 	}
 	sig := p.Signature
 	p.Signature = nil
 	b, _ := json.Marshal(p)
 	p.Signature = sig
-	if !ed25519.Verify(t.Maintenance, append([]byte(Format+"\x00maintenance\x00"), b...), sig) {
+	if !ed25519.Verify(t.Maintenance, append([]byte(p.Format+"\x00maintenance\x00"), b...), sig) || !validPermit(p) {
 		return p, ErrInvalid
 	}
 	return p, nil
 }
-func sortedIDs(refs map[string]Object) []string {
+func sortedIDs[T any](refs map[string]T) []string {
 	ids := make([]string, 0, len(refs))
 	for id := range refs {
 		ids = append(ids, id)

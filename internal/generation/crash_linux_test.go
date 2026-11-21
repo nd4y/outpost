@@ -7,9 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/nd4y/outpost/internal/statefile"
 )
 
 type crashInput struct {
@@ -44,6 +47,10 @@ func TestReplicaCrashChild(t *testing.T) {
 		_, e = r.Receive(ctx, input.Raw, fetch(input.Objects))
 	case "complete":
 		e = r.Complete(ctx, input.ID)
+	case "window":
+		_, e = r.VerifyWindow(ctx, input.ID, Hash([]byte("crash-window")), 2, MaxObject)
+	case "repair":
+		_, e = r.RepairWindow(ctx, input.ID, Hash([]byte("crash-repair-window")), 2, MaxObject, fetch(input.Objects))
 	case "maintain":
 		_, e = r.Maintain(ctx, input.Permit)
 	default:
@@ -53,7 +60,7 @@ func TestReplicaCrashChild(t *testing.T) {
 }
 
 func TestReplicaSIGKILLBoundaries(t *testing.T) {
-	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}} {
+	for _, tc := range []struct{ action, point string }{{"receive", "object-durable"}, {"receive", "before-complete"}, {"complete", "state-durable"}, {"maintain", "gc-plan-durable"}, {"maintain", "retirement-authority-durable"}, {"maintain", "retirement-durable"}, {"maintain", "gc-object-removed"}, {"maintain", "gc-result-durable"}, {"window", "verification-batch-durable"}, {"window", "before-complete"}, {"window", "state-durable"}} {
 		t.Run(tc.action+"/"+tc.point, func(t *testing.T) {
 			base := temp(t)
 			trust, key, maintenance := trust(t)
@@ -103,12 +110,42 @@ func TestReplicaSIGKILLBoundaries(t *testing.T) {
 				}
 				_, e = r.Receive(ctx, b, fetch(newObjects))
 				ok(t, e)
+			} else if tc.action == "window" {
+				if tc.point != "state-durable" && state.LatestComplete != old {
+					t.Fatal("window published before durable boundary")
+				}
+				window := Hash([]byte("crash-window"))
+				catalog, e := VerifyCatalog(b, trust)
+				ok(t, e)
+				dependencies, e := closure(catalog)
+				ok(t, e)
+				checkpoint, found, e := r.verification(id, window, dependencies)
+				ok(t, e)
+				if !found || checkpoint.CompletedAt <= 0 {
+					t.Fatal("verification checkpoint did not survive SIGKILL")
+				}
+				// Disk admission can still allow the index write while
+				// refusing another copy of the unchanged checkpoint.
+				r.Admit = func(name string, _ int) (func(bool) error, error) {
+					if strings.HasPrefix(name, "verification/") {
+						return nil, statefile.ErrCapacity
+					}
+					return func(bool) error { return nil }, nil
+				}
+				result, e := r.VerifyWindow(ctx, id, window, 2, MaxObject)
+				ok(t, e)
+				if !result.Complete || result.ReadBytes != 0 || result.VerifiedAt != verificationTime(checkpoint) {
+					t.Fatal("durable window lost after SIGKILL", result)
+				}
 			} else if state.LatestComplete != id {
 				t.Fatal("durable complete root lost")
 			}
 			if tc.action == "maintain" {
 				_, e = r.Maintain(ctx, input.Permit)
 				ok(t, e)
+				if _, e = r.BeginHistorical(ctx, a); !errors.Is(e, ErrProtected) {
+					t.Fatal("retirement authority lost across SIGKILL", e)
+				}
 			}
 			c, refs, e := getForTest(r, id)
 			ok(t, e)

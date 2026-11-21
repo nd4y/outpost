@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "status": "HDD_COMPONENT_PASS_PUBLICATION_PENDING",
+  "observedAt": "2026-11-15T14:34:53.364322789Z",
+  "sourceBaseCommit": "b0ff95a898070e2384b7f7aa51a53d03937816d1",
+  "executedTree": "c26a223e5468f986290992f391093a593e2d20fc",
+  "testSource": {
+    "kind": "frozen-test-only-snapshot",
+    "sourceInputCount": 520,
+    "sourceInputDigest": "d8b22c1cdc68402ff45c468463eb177cf38b1e839a789fb6e03e06c4d55dfeeb",
+    "testFiles": {
+      "internal/filekit/gc_linux_test.go": "9bbe4ff0e5595ccf89003f528f22b8fb9846de2096a3ef9aeb7a2ebc6749e71b",
+      "internal/filekit/tamper_linux_test.go": "fb2802afdd7867fa540ba6a008ad6f87abf1ad5178cd5cadeba7da1f231c41e6"
+    },
+    "archiveSHA256": "d97ae04befd87179b5a060b12cd3b09d00618c60f3a7b69178771800285577cf",
+    "testBinarySHA256": "939a890cbf439853db74d782ab55bf62b1d3dcdd21fadc159a868fddcc06ec20",
+    "productionCodeChanged": false
+  },
+  "environment": {
+    "platform": "isolated Linux amd64 HDD fixture",
+    "goVersion": "1.27.3",
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 199712768,
+    "memoryMaxEvents": 0,
+    "swapBytes": 0,
+    "oom": 0,
+    "network": "none",
+    "scope": "One compile/vet/focused-test container; not a per-role or whole-host peak."
+  },
+  "ordinary": {
+    "modules": "PASS",
+    "compile": "PASS",
+    "vet": "PASS",
+    "tests": {
+      "TestIndependentVersionsAndAttributes": 18.44,
+      "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency": 5.25,
+      "TestConfidentialNamesAndFileDomainIsolation": 3.61,
+      "TestTamperedKitNeverPublishesOutput": 37.72,
+      "TestMultipartDescriptorIsSelfContained": 41.26,
+      "TestCrossFileCiphertextAndVersionSubstitution": 1.62
+    },
+    "subtests": {
+      "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency/invalid-signature": 1.87,
+      "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency/unknown-version-entry": 1.99,
+      "TestGCAbortsBeforeDeletionOnInvalidRootOrMissingDependency/missing-payload": 1.37,
+      "TestTamperedKitNeverPublishesOutput/traversal-descriptor": 2.11,
+      "TestTamperedKitNeverPublishesOutput/overlong-metadata": 2.71,
+      "TestTamperedKitNeverPublishesOutput/missing-final-block": 2.42,
+      "TestTamperedKitNeverPublishesOutput/object-fifo": 1.76,
+      "TestTamperedKitNeverPublishesOutput/truncated-payload": 4.27,
+      "TestTamperedKitNeverPublishesOutput/corrupted-payload": 2.71,
+      "TestTamperedKitNeverPublishesOutput/wrong-key": 1.83,
+      "TestTamperedKitNeverPublishesOutput/root-extra-data": 2.61,
+      "TestTamperedKitNeverPublishesOutput/wrong-file-identity": 2.02,
+      "TestTamperedKitNeverPublishesOutput/object-symlink-escape": 2.75,
+      "TestTamperedKitNeverPublishesOutput/missing-descriptor-part": 1.71,
+      "TestTamperedKitNeverPublishesOutput/extra-payload-byte": 1.67,
+      "TestTamperedKitNeverPublishesOutput/bad-signature": 2.15,
+      "TestTamperedKitNeverPublishesOutput/descriptor-extra-data": 1.79,
+      "TestTamperedKitNeverPublishesOutput/reordered-blocks": 2.06,
+      "TestMultipartDescriptorIsSelfContained/missing-final-part": 6.27,
+      "TestMultipartDescriptorIsSelfContained/reordered-full-size-parts": 6.39
+    }
+  },
+  "assertions": {
+    "multipartLogicalBlocks": 60000,
+    "multipartMinimumParts": 3,
+    "reorderedParts": "two distinct full-size ciphertext parts, signed envelope verified before restore",
+    "missingFinalPart": "physical final descriptor dependency removed, signed reference retained",
+    "descriptorExtraData": "second JSON value encrypted and signed with otherwise correct envelope",
+    "failedOutputAndStagesAbsent": true,
+    "positiveIndependentRestore": true,
+    "privacyCorpusBytes": 131072,
+    "privacyMarkerPositions": ["beginning", "middle", "end"],
+    "privacyViews": [
+      "both stored version roots",
+      "every relative path and regular file in both exported kits"
+    ],
+    "independentCiphertextSets": true,
+    "minimumExportRegularFiles": 3
+  },
+  "logs": {
+    "results-focused.log": "eda38ef033cb92971adc91784953fe805cd7bdc406f090ab2923e3ceea7fc837",
+    "results-resources.log": "238e34c453b83aa63a1163b2b0b2d96897208aa67e355a842476b36e66fc6352",
+    "results-modules.log": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+    "results-compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "results-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "results-container-state.json": "51122d7b09038e2287c782dd59ff00cdb4ba002ac553d79d037de27888d28b01"
+  },
+  "limitations": [
+    "Bounded file-kit format/marker assertions only; no full100GiB, cloud, placement or product acceptance.",
+    "No production format, authority or runtime behavior changed.",
+    "Cleanup assertion uses the functioning fixture filesystem; storage-device failure cleanup and power-loss durability require separate evidence.",
+    "Synthetic marker absence is not a proof of confidentiality for all real sources, access logs or intermediary disks.",
+    "HDD execution is amd64; required native architecture CI and publication remain separate stages."
+  ],
+  "fullProductAcceptance": false
+}

@@ -1,0 +1,45 @@
+# Management interface
+
+[Русский](../ru/management-ui.md)
+
+The management service serves its embedded interface at `/`, with `/ui/app.js`, `/ui/journal.js` and `/ui/app.css`. These are exact, authenticated GET routes on the configured management origin. The same client-certificate identity and local role/scope assignments apply to the interface and API. No external scripts, fonts, analytics, payload proxy or decryption keys are involved. Direct API authorization remains authoritative.
+
+Choose an enrolled node and domain to inspect sources, placement, routes, storage targets, signed reports, generations, queues and space. A report's original observation time remains visible. Missing values mean unknown, not zero. A completed transfer is not proof of target readback or trusted restore. Refresh after an outage; changing scope clears the previous view.
+
+An owner selects an already signed configuration file, reviews its exact digest and changes, then applies that preview against the observed revision. The browser does not sign policy. An operator chooses an available command and exact target. Restore requires an explicit generation and a locally admitted recovery preset; optional file-version identifiers come from the private recovery inventory. Omitting versions requests the selected whole generation. A maintenance command requires a separately signed permit.
+
+Every mutation receives an operation identifier before transmission. An actor-scoped local browser journal retains up to 16 operations and 3 MiB across closed tabs and browser restarts. Web Locks serialize journal writes and bound waiting for same-actor dispatch to 15 seconds. Concurrent matching drafts reuse the retained request bytes and identifier; unrelated writes cannot replace another tab's records. New work requires working local storage and Web Locks. This coordination covers one browser profile and origin, not independent devices.
+
+Old session-storage records migrate only after the merged persistent journal is written and read back. A missing lock API, corrupt/full storage or interrupted migration blocks admission. Uncertain records cannot be removed; a terminal receipt can be removed locally without deleting its remote operation. A stale tab cannot resurrect a removed record. After capacity changes, review the draft again.
+
+Read the receipt after a lost reply; retrying configuration requires selecting the identical signed file. Current session roles/scopes are checked before dispatch, and saved configuration previews require an authorized receipt lookup or fresh preview. Role/scope changes clear the old view. Original signed grants and permits remain in the browser journal, so use a private browser profile on a controlled device. Browser storage can be cleared or evicted and is not the authoritative audit. Retain operation identifiers independently; the service's audit and receipt API remain the recovery path. Local removal and clearing browser data do not cancel remote work.
+
+The English/Russian interface uses native controls, explicit labels, visible keyboard focus, status text, bounded tables and a narrow-screen layout. Loading, empty, missing, forbidden, offline, stale and invalid states remain distinct. Automated browser checks, manual accessibility inspection and installed-service acceptance are separate gates. This document defines the interface contract before its implementation and does not grant permission to expose a port or change a working service.
+
+## Isolated checks
+
+The [browser suite](../../scripts/browser/check.mjs) runs a real loopback mTLS management fixture with disposable identities. Thirty-one browser journeys cover original report age, unknown space, bounded tables, keyboard focus, English/Russian accessibility scans, 320-pixel reflow and 200% text size, scope changes, offline/forbidden/empty states, role isolation and storage failure before mutation. It drops responses after actual command/configuration admission, reloads the page and verifies identical request bytes and operation identifiers. A competing signed policy publication rejects a stale browser preview.
+
+Playwright and axe versions and integrity hashes are pinned in the [test lockfile](../../scripts/browser/package-lock.json); the [CI job](../../.github/workflows/browser.yml) pins its browser image by digest. These are test-only dependencies. The product embeds static files in its Go binary. Both languages passed the automated checks with no reported violations; contrast checks on clipped table cells remain manual-review items. Screenshots and scripted focus/text-resize checks do not claim full WCAG conformance or screen-reader acceptance. The recovery journey checks exact admission and receipt display; actual recovered bytes are covered by the separate trusted recovery checks.
+
+Never-admitted request refusal is a bounded implementation candidate below; registry lifecycle, full manual accessibility and installed-service admission remain open. A report with no target evidence does not certify a cloud copy.
+
+A local storage failure after remote admission reports that a receipt was received; the original request remains retained. Manual receipt lookup preserves its original replay metadata across reload. Local removal affects only a completed tracking record, never the remote operation.
+
+Browser lifecycle checks additionally cover simultaneous tabs, actual persistent-profile Chromium restart after lost admission replies, migration, authorization loss, missing Web Locks, corrupt storage and terminal-receipt protection. The [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) provides origin-scoped mutual exclusion; [localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage) and its [storage event](https://developer.mozilla.org/en-US/docs/Web/API/Window/storage_event) provide persistence and cross-tab refresh. No mutation is automatically retried on a storage event.
+
+An owner can review abandonment from a retained operation row. The service checks the original request digest and proves no published effect again at confirmation. A published or unknown effect disables confirmation. Resolution has a separate identifier persisted inside the original record, so a full 16-record journal still permits it. Lost resolution replies reuse that identifier and exact bytes; `ABANDONED` means confirmed refusal before publication, not cancellation of already running work. Only then may the local tracking record be removed.
+
+Version5 [external-copy observations](external-copy-reporting.md) now carry original-age S3-compatible/WebDAV readback receipts. Unknown/missing proof and legacy-report support remain explicit; these observations do not assert current cloud health.
+
+## Never-admitted request refusal
+
+The owner review uses the ordinary resolution preview first. Only a404 response can lead to a separate server-checked refusal preview;503 and transport failure retain the unconfirmed record. The original command bytes remain in the journal. For a configuration, reselect the original signed file; its SHA256 and retained expected revision must match. Substituting another file cannot confirm refusal, and changing that selection invalidates its preview.
+
+Explicit confirmation first saves the same resolution identifier inside the existing browser-journal2 record, even when all16 slots are occupied. If the refusal reply is lost, reload reads the durable server fence and retries the ordinary resolution route with the identical resolution fields; it does not submit a new command. The service repeats current authority and ID checks under lock. Only a confirmed terminal receipt permits local removal. These bounded browser checks do not establish whole-environment recovery freshness or installed-service acceptance.
+
+## Interactive keyboard review
+
+The [scoped keyboard receipt](../manual-keyboard-evidence.json) supplements the automated browser checks with observed keyboard use of the recorded frontend: skip-to-content, node/domain selection, language switching, exact restore review and return to editing in English and Russian. The final English and 320px Russian confirmation frames showed a visible focus ring; the narrow button text wrapped without page-level horizontal overflow. No operation was submitted in this sample.
+
+This uses synthetic data through a fixed loopback test-client adapter with verified upstream mTLS; it does not certify product authentication or worker execution. The first controller reached its unchanged time budget and retained exit1; cleanup still closed the owned processes/listeners. A separate short control verified normal owner-requested stop, process join and tunnel closure without changing the helper or deadline. Native screenshots stay in the review chat; the receipt records measured DOM observations and five frontend hashes. Screen-reader use, signed-policy upload and wider device coverage remain separate.

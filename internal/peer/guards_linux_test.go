@@ -49,9 +49,9 @@ func TestPrematurePublicationAndInvalidObject(t *testing.T) {
 	_, e = client.Push(testContext, op, id, f.b.replica)
 	must(t, e)
 	must(t, f.a.replica.VerifyComplete(testContext, id))
-	job, e := f.a.journal.Read(testContext, Binding{op, "receive", f.trust.Domain, f.trust.Repository, f.trust.Epoch, id, f.b.id, f.a.id, id})
+	job, e := f.a.journal.Read(testContext, Binding{op, "receive", f.trust.Domain, f.trust.Repository, f.trust.Epoch, id, f.b.id, f.a.id, id, ""})
 	must(t, e)
-	if job.Phase != "COMPLETE" || job.LastReceipt == nil || job.LastReceipt.Verification != "target-full-read" {
+	if job.Phase != "COMPLETE" || job.LastReceipt == nil || job.LastReceipt.Verification != "target-window-read" {
 		t.Fatal("missing persisted target evidence", job)
 	}
 }
@@ -135,7 +135,7 @@ func TestJournalBoundsAndInterruptedSave(t *testing.T) {
 	f := newFixture(t)
 	id, _ := f.seal(t, 1, "")
 	j := f.b.journal
-	b := Binding{generation.Hash([]byte("journal limits")), "push", f.trust.Domain, f.trust.Repository, f.trust.Epoch, id, f.a.id, f.b.id, id}
+	b := Binding{generation.Hash([]byte("journal limits")), "push", f.trust.Domain, f.trust.Repository, f.trust.Epoch, id, f.a.id, f.b.id, id, ""}
 	_, e := j.Begin(testContext, b)
 	must(t, e)
 	s, e := j.load()

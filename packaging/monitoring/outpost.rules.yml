@@ -1,0 +1,111 @@
+groups:
+  - name: outpost
+    rules:
+      - record: outpost:telemetry_fresh
+        expr: |
+          (outpost_expected_telemetry_max_age_seconds > 0)
+            and on (outpost_node, outpost_domain)
+              (((time() - outpost_report_observed_timestamp_seconds) >= 0)
+                <= on (outpost_node, outpost_domain) outpost_expected_telemetry_max_age_seconds)
+
+      - record: outpost:space_observed_bytes
+        expr: |
+          outpost_space_free_bytes
+            and on (outpost_node, outpost_domain) (outpost_space_free_bytes_known == 1)
+            and on (outpost_node, outpost_domain) outpost:telemetry_fresh
+            and on (outpost_node, outpost_domain)
+              (timestamp(outpost_space_free_bytes)
+                == on (outpost_node, outpost_domain) outpost_report_observed_timestamp_seconds)
+
+      - alert: OutpostTelemetryMissing
+        expr: |
+          (outpost_expected_telemetry_max_age_seconds > 0)
+            unless on (outpost_node, outpost_domain) outpost:telemetry_fresh
+        labels:
+          severity: warning
+        annotations:
+          runbook: connectivity
+
+      - alert: OutpostInventoryUnknown
+        expr: |
+          outpost:telemetry_fresh
+            unless on (outpost_node, outpost_domain)
+              ((outpost_inventory_available == 1)
+                and on (outpost_node, outpost_domain)
+                  (timestamp(outpost_inventory_available)
+                    == on (outpost_node, outpost_domain) outpost_report_observed_timestamp_seconds))
+        labels:
+          severity: warning
+        annotations:
+          runbook: connectivity
+
+      - alert: OutpostJobsBlocked
+        expr: |
+          (outpost_jobs_blocked > 0)
+            and on (outpost_node, outpost_domain) outpost:telemetry_fresh
+            and on (outpost_node, outpost_domain)
+              (timestamp(outpost_jobs_blocked)
+                == on (outpost_node, outpost_domain) outpost_report_observed_timestamp_seconds)
+        labels:
+          severity: warning
+        annotations:
+          runbook: blocked-jobs
+
+      - alert: OutpostSpaceLow
+        expr: |
+          outpost:space_observed_bytes
+            < on (outpost_node, outpost_domain) (outpost_expected_free_bytes > 0)
+        labels:
+          severity: warning
+        annotations:
+          runbook: capacity
+
+      - alert: OutpostSpaceUnknown
+        expr: |
+          ((outpost_expected_free_bytes > 0)
+            and on (outpost_node, outpost_domain) outpost:telemetry_fresh)
+            unless on (outpost_node, outpost_domain) outpost:space_observed_bytes
+        labels:
+          severity: warning
+        annotations:
+          runbook: capacity
+
+      - alert: OutpostReplicaVerificationOverdue
+        expr: |
+          ((outpost_expected_copy_max_age_seconds > 0)
+            and on (outpost_node, outpost_domain) outpost:telemetry_fresh)
+            unless on (outpost_node, outpost_domain, outpost_target)
+              ((((time() - outpost_copy_verified_timestamp_seconds) >= 0)
+                 <= on (outpost_node, outpost_domain, outpost_target) outpost_expected_copy_max_age_seconds)
+                and on (outpost_node, outpost_domain, outpost_target) (outpost_copy_verified_timestamp_seconds_known == 1)
+                and on (outpost_node, outpost_domain, outpost_target)
+                  (timestamp(outpost_copy_verified_timestamp_seconds)
+                    == on (outpost_node, outpost_domain) group_left outpost_report_observed_timestamp_seconds))
+        labels:
+          severity: warning
+        annotations:
+          runbook: recovery
+
+      - alert: OutpostExternalAuditFailed
+        expr: |
+          (outpost_external_audit_result >= 2)
+            and on (outpost_node, outpost_domain) outpost:telemetry_fresh
+            and on (outpost_node, outpost_domain, outpost_target) (outpost_external_audit_result_known == 1)
+            and on (outpost_node, outpost_domain, outpost_target) (outpost_external_audit_expires_timestamp_seconds > time())
+            and on (outpost_node, outpost_domain, outpost_target)
+              (timestamp(outpost_external_audit_result)
+                == on (outpost_node, outpost_domain) group_left outpost_report_observed_timestamp_seconds)
+            and on (outpost_node, outpost_domain, outpost_target)
+              (timestamp(outpost_external_audit_expires_timestamp_seconds)
+                == on (outpost_node, outpost_domain) group_left outpost_report_observed_timestamp_seconds)
+        labels:
+          severity: warning
+        annotations:
+          runbook: integrity
+
+      - alert: OutpostMonitorHeartbeat
+        expr: vector(1)
+        labels:
+          severity: heartbeat
+        annotations:
+          runbook: monitoring

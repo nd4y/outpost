@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "outpost-filekit-1",
-  "status": "NOT_VERIFIED",
+  "status": "PASS",
   "sourceBytes": 107374182400,
   "contiguousChangeBytes": 8388608,
   "maximumIncrementalBytes": 134217728,

@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "status": "HDD_COMPONENT_PASS_PUBLICATION_PENDING",
+  "observedAt": "2026-11-15T13:04:02.422805+00:00",
+  "sourceBaseCommit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+  "testSource": {
+    "kind": "frozen-uncommitted-snapshot",
+    "sourceInputCount": 520,
+    "previousGoAndModuleInputsUnchanged": 518,
+    "sourceInputDigest": "fe9ebd576f1486040aa3a1c2ef116ac86b5ec40a5d8e79645b7079e2a6269404",
+    "testFiles": {
+      "cmd/outpost/cli_flow_linux_test.go": "6cf3b4a885bb61787082a8bcb59e189d3cf62d5a8cbc732d26b84e491bc54f20",
+      "cmd/outpost/cli_process_linux_test.go": "dd67266f5a20241e35a0e17454bb777e5a58da2d42a716e69f31e2aa515de453"
+    },
+    "archiveSHA256": "a309e257ba82b903899b324f9e2ca6ff84b6f3fc2cb6f3c608fe56580cf5c745",
+    "testBinarySHA256": "1c7622f82f4db728e42071ef3de9f183c378d71337d70e6fd7fdb6e7dd4bab17"
+  },
+  "selectedExecutable": {
+    "revision": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+    "sha256": "507b15c39d757cf8ad9d4063c096fa69c77441bab254612f6d4a77ad58d5494a",
+    "nativeArchitecture": "amd64",
+    "independentCandidateSelection": {
+      "archiveSHA256": "097541ed638d6768335e66d4063b62497d4ec2eb17393c6833b9bcef8de26c22",
+      "artifactId": 14154486700,
+      "artifactSHA256": "ec85373386471c7edaa525a2998de269c1c9063060233fb528a41b5b9936afae",
+      "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43696037395/artifacts/14154486700",
+      "commit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+      "format": "outpost-ci-artifact-selection-1",
+      "kind": "outpost-ci-candidate-1",
+      "manifestSHA256": "870655b4766bbfdc838b449d4da90ee65fdcb4f168cd174e376bbe6afb47e0ed",
+      "nativeArchitecture": "amd64",
+      "repository": "nd4y/outpost",
+      "runAttempt": 1,
+      "runId": 43696037395
+    },
+    "rebuilt": false
+  },
+  "environment": {
+    "platform": "isolated Linux amd64 HDD fixture",
+    "goVersion": "1.27.3",
+    "network": "none outside the fixture namespace",
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 395927552,
+    "memoryMaxEvents": 0,
+    "swapBytes": 0,
+    "oom": 0,
+    "resourceScope": "One compile/vet/functional-test container, not a separate per-role or whole-host peak."
+  },
+  "ordinary": {
+    "compile": "PASS",
+    "vet": "PASS",
+    "functionalSeconds": 109.22,
+    "report": {
+      "attributesVerified": ["bytes", "mode", "uid", "gid", "nanosecond-mtime", "hardlink"],
+      "binarySHA256": "507b15c39d757cf8ad9d4063c096fa69c77441bab254612f6d4a77ad58d5494a",
+      "bytesPerVersion": 2097152,
+      "controlPlaneClosedBeforeFollowerStart": true,
+      "format": "outpost-cli-process-flow-evidence-1",
+      "fullProductAcceptance": false,
+      "independentMaterializedRestores": 4,
+      "initialRequiredReceiverRefusal": true,
+      "newSHA256": "ece7a767c4cd007e76439c2bf53b209795d3f264b01cc00ea8a826f05f8add5e",
+      "oldSHA256": "f68fed3a9ee66f808914dbd78578f26923aea8bf4eda5ddc34e7dbe1f9affb76",
+      "outboundOnlyFollower": true,
+      "receivers": 2,
+      "restartReceiptsUnchanged": true,
+      "revision": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+      "scope": "Actual selected source and two worker-run CLI processes in one isolated fixture namespace; immutable-only hardlink views share physical ciphertext. No physical failure-domain, strict per-role mount isolation, 100GiB, cloud or production acceptance.",
+      "sourceAbsentBeforeFollowerCatchUp": true,
+      "sourceAuthorityAndRuntimeAbsentAtRestore": true,
+      "versions": 2
+    }
+  },
+  "negative": {
+    "wrongDigest": {
+      "status": "PASS_EXPECTED_REFUSAL",
+      "seconds": 0.48,
+      "stage": "before fixture identities/runtime"
+    },
+    "wrongRevision": {
+      "status": "PASS_EXPECTED_REFUSAL",
+      "seconds": 0.54,
+      "stage": "after version response, before fixture identities/runtime"
+    },
+    "missingRequiredReceiver": "Actual source-run failed without view release and retained the pending operation; same capture completed after receiver startup.",
+    "childLifecycle": "Actual worker-run graceful SIGTERM/join and repeated cleanup; no unbounded output buffer or raw private log publication."
+  },
+  "logs": {
+    "results-flow.log": "55089e99ad5712c938401a1e0affe9ce3986a90ab293cad57979520aaba94c8e",
+    "results-flow-report.json": "0e742cb0caefaa663b711948207c4d75d2e6c6ef67d1b201c06c6320d12a9b10",
+    "results-resources.log": "db1b47467531407a3067249519a6f8f5bbf3e0def9190836f01e4a957943adde",
+    "results-candidate-verification.json": "4635b214d4522b108b54fbcc613c641a79e4a3c554c5c855e93ee816802e5bcb",
+    "results-compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "results-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "limitations": [
+    "The actual distribution revision and frozen test source are separate bindings; later publication must not rewrite the execution identity.",
+    "Two2MiB versions and4materialized restores are not100GiB/cloud/asymmetric acceptance.",
+    "One fixture namespace/HDD with logically separate profiles is not hostile-process mount isolation or separate physical failure domains.",
+    "Immutable-only recovery views share holder ciphertext inodes via hardlinks; no additional physical-copy claim.",
+    "Both workers/source commands are actual selected executable processes; the authenticated center is a synthetic static configuration fixture.",
+    "Strict scratch-image installation/isolation, real enrollment/endpoint/network/physical coldboot and product completion remain separate."
+  ],
+  "fullProductAcceptance": false
+}

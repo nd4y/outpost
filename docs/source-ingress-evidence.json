@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_BOUNDED_COMPONENTS_ONLY",
+  "runtimeTree": "e121dac2e0c4bb1795508299f678080faa243c4c",
+  "ingressSuiteRuntimeTree": "d5b654da3dd48d407ce16f30d583458267080b92",
+  "protocolRuntimeTree": "55d1c54584b5bfa4a14321c594d25d1407665dbb",
+  "protocolReuse": "The final tree changes only sourceagent test synchronization and a generation assertion; all ingress source and tests are identical.",
+  "environment": {
+    "os": "Linux amd64",
+    "go": "1.27.3",
+    "stateStorage": "Dedicated ext4 HDD",
+    "cpuQuotaPercent": 100,
+    "memoryMaxBytes": 805306368,
+    "swapMaxBytes": 0,
+    "network": "none; authenticated HTTPS over container loopback"
+  },
+  "catalogCost": {
+    "baselineCommit": "90e817af52742b597b038d01045ac6c998cef8ed",
+    "baselineRequests": 3,
+    "baselineCatalogBytes": 862,
+    "baselineTotalBodyBytes": 2586,
+    "fixedRequests": 3,
+    "fixedCatalogBytes": 862,
+    "fixedTotalBodyBytes": 862,
+    "comparison": "Independent signed fixtures can differ in catalog length; compare full-body transmission count, three versus one.",
+    "checks": [
+      "real mutual TLS",
+      "bounded verification batches",
+      "durable candidate across reopen",
+      "original complete receipt on retry",
+      "post-ack refusal",
+      "legacy server and raw legacy client",
+      "wrong and ambiguous hints ignored",
+      "malformed response and mixed backend return an error before explicit full-body retry",
+      "missing, changed, foreign and ambiguous candidates refused",
+      "wrong source, operation and authority refused",
+      "actual expired signed intent refused by the TLS receiver"
+    ]
+  },
+  "expiryFixtureRCA": {
+    "baselineAndCandidateFailures": 4,
+    "cause": "Five-second test grants expired during real encryption, TLS and durable metadata preparation before the required publication precondition.",
+    "smallerInputOnly": "32KiB with five-second grants passed seven of eight repetitions; insufficient.",
+    "fix": "Prepare a nonempty32KiB file before issuing a30-second test grant; wait for its actual signed expiry before all historical-operation and payload-denial assertions. Assert that the intended durable interruption was reached.",
+    "productTTLOrRequestTimeoutChanged": false,
+    "fixedFocusedRuns": 8,
+    "allRacePackageCases": "PASS in bounded batches using the same exact binary",
+    "testCases": 49,
+    "originalCompletedCases": 47,
+    "remainingCases": [
+      "TestStagedCiphertextSurvivesTwoAuthorizedHopsAndBridgeReopen",
+      "TestStagedImportSIGKILLChild"
+    ],
+    "binarySHA256": "0b67e077d774223b5f426dc3a69ba51cbc9d85374ec955a1443d8c3f9dd173ad",
+    "unshardedProcess": "Retained FAIL: overall ten-minute test alarm during two-hop staged transfer;47 cases had completed, two remaining cases were executed separately. No assertion failure or race report preceded the alarm.",
+    "runnerBudget": "Six minutes for eight actual30-second expiry waits plus state work; an earlier three-minute runner interruption is retained as failed evidence.",
+    "helperOnlyParentSkips": ["TestRegistryRenewalSIGKILLChild", "TestStagedImportSIGKILLChild"]
+  },
+  "sourceRehearsal": {
+    "sourceBytes": 134217728,
+    "replacementBytes": 8388608,
+    "sourceBudgetBytes": 2147483648,
+    "timingObservation": "Each completed capture reports the existing durable source Status milestones: original snapshot observation, provider release, first replica verification and per-target verification. This best-effort source fixture does not measure physical snapshot destruction or first successful restore time.",
+    "captures": {
+      "base": {
+        "generation": "c5406ec915d14a6d602865e4b7cdc722b16895b0d631fb77542fc3da3ac2cde8",
+        "PayloadBytes": 134245379,
+        "MetadataBytes": 3790,
+        "SourceAllocatedBytes": 53248,
+        "FilePayloadBytes": 134220640,
+        "DescriptorBytes": 24739,
+        "Seconds": 66.483208789,
+        "milestones": {
+          "snapshotUnix": 1794639241,
+          "providerReleaseUnix": 1794639306,
+          "firstReplicaVerifiedUnix": 1794639304,
+          "replicas": [
+            {
+              "target": "85048b085daf6f0b7d3bb5bad695115403537aa11e4804146d45c36b0648727f",
+              "verifiedUnix": 1794639304
+            }
+          ]
+        }
+      },
+      "patched": {
+        "generation": "e9777fdb41b526334fa007b153c9195daefed63ed47eba6d8194bf3e163f6312",
+        "PayloadBytes": 12885739,
+        "MetadataBytes": 4006,
+        "SourceAllocatedBytes": 90112,
+        "FilePayloadBytes": 12860086,
+        "DescriptorBytes": 25653,
+        "Seconds": 27.880858537,
+        "milestones": {
+          "snapshotUnix": 1794639308,
+          "providerReleaseUnix": 1794639334,
+          "firstReplicaVerifiedUnix": 1794639330,
+          "replicas": [
+            {
+              "target": "85048b085daf6f0b7d3bb5bad695115403537aa11e4804146d45c36b0648727f",
+              "verifiedUnix": 1794639330
+            }
+          ]
+        }
+      },
+      "unchanged": {
+        "generation": "2c70257b87c6c286d025016942f8f6bfc4714ba37242094637021b5fd7feedc0",
+        "PayloadBytes": 458,
+        "MetadataBytes": 3999,
+        "SourceAllocatedBytes": 122880,
+        "FilePayloadBytes": 0,
+        "DescriptorBytes": 458,
+        "Seconds": 13.454076339,
+        "milestones": {
+          "snapshotUnix": 1794639336,
+          "providerReleaseUnix": 1794639349,
+          "firstReplicaVerifiedUnix": 1794639348,
+          "replicas": [
+            {
+              "target": "85048b085daf6f0b7d3bb5bad695115403537aa11e4804146d45c36b0648727f",
+              "verifiedUnix": 1794639348
+            }
+          ]
+        }
+      }
+    },
+    "bothVersionsAfterSourceRuntimeKeysAndServerRemoval": true,
+    "independentCleanConsumer": {
+      "stateIndexPresent": false,
+      "immutableCloneFiles": 27,
+      "immutableCloneBytes": 147138608,
+      "readerSHA256": "5a7d3fb2530e2d6d4367148501f48c15c5f31ce81b2162ca816bc5ac67fd0a0f",
+      "toolRevision": "dev-d21aa95938ef5a466fac7829653eb1cfb4907311ae4655f7d49b47b57c5da109",
+      "restores": {
+        "base": {
+          "allocatedBytes": 134221824,
+          "attributesVerified": true,
+          "bytesProcessed": 134217728,
+          "compressionRatio": 0,
+          "elapsedSeconds": 3.451651202,
+          "fileBytes": 134217728,
+          "maxRSSKiB": 13400,
+          "operation": "verify",
+          "phase": "base",
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025"
+        },
+        "patched": {
+          "allocatedBytes": 134221824,
+          "attributesVerified": true,
+          "bytesProcessed": 134217728,
+          "compressionRatio": 0,
+          "elapsedSeconds": 3.641195387,
+          "fileBytes": 134217728,
+          "maxRSSKiB": 13336,
+          "operation": "verify",
+          "phase": "patched",
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c"
+        }
+      }
+    },
+    "scope": "Physical128MiB rehearsal, not100GiB integrated acceptance."
+  },
+  "logSHA256": {
+    "full-ingress": "29a0afc985bebb8dc8ecd32ab127e5071955d87da9a063741692a04b7bc24967",
+    "expiry-fixed": "55abcbe6782ba02d5b333293532a1cb78767630a6fe7be0f77277751b5b1668d",
+    "catalog-fixed": "781c1f7808913dbd594b9b0affa28520589865e8a7844dd186c001c36ab28538",
+    "rehearsal": "94c5c17dfd7f85d0ae255471d1fbaa00286889667dee07403e8b3588820a062d"
+  },
+  "unverified": [
+    "100GiB integrated source ingress and complete-replica recovery",
+    "asymmetric four-holder topology and physical failure domains",
+    "S3-compatible and WebDAV throughput profile",
+    "power loss, cold boot and real endpoint admission",
+    "complete product or production readiness"
+  ],
+  "catalogPublicationFollowup": {
+    "receipt": "docs/catalog-publication-evidence.json",
+    "status": "BOUNDED_CATALOG_PUBLICATION_FIXED_48_ORDINARY_RACE_AND_128MIB_CLEAN_CONSUMERS_PASS_FULL100GIB_PENDING",
+    "sourceTree": "216408366493caa4080209c87a066c2f53975169",
+    "full100GiB": "ORIGINAL_FAIL_CORRECTED_REPEAT_PENDING"
+  }
+}

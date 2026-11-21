@@ -3,8 +3,15 @@ package generation
 import (
 	"context"
 	"errors"
+	"github.com/nd4y/outpost/internal/localfs"
 	"os"
 )
+
+// CheckRecoveryDestination prevents a trusted executor from placing plaintext
+// inside its ciphertext replica, or making that replica part of its output tree.
+func (r *Replica) CheckRecoveryDestination(ctx context.Context, destination *os.Root) error {
+	return localfs.Disjoint(ctx, r.root, destination)
+}
 
 // Trust returns public verification material only, detached from mutable state.
 func (r *Replica) Trust() Trust {
@@ -34,9 +41,18 @@ func Dependencies(raw []byte, trust Trust) ([]Object, error) {
 // Missing reports absent objects of an accepted reception. Existing corrupt
 // objects fail closed rather than being silently overwritten by a transfer.
 func (r *Replica) Missing(ctx context.Context, id string) ([]Object, error) {
+	return r.missing(ctx, id, false)
+}
+
+// MissingMetadata reports presence only, for protocols that subsequently
+// require VerifyWindow. It never certifies hashes or publishes COMPLETE.
+func (r *Replica) MissingMetadata(ctx context.Context, id string) ([]Object, error) {
+	return r.missing(ctx, id, true)
+}
+func (r *Replica) missing(ctx context.Context, id string, metadataOnly bool) ([]Object, error) {
 	missing := []Object{}
 	err := r.locked(ctx, func(s *state) error {
-		_, refs, err := get(s, id, r.trust)
+		_, refs, err := r.get(s, id, true)
 		if err != nil {
 			return err
 		}
@@ -44,7 +60,12 @@ func (r *Replica) Missing(ctx context.Context, id string) ([]Object, error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
-			if _, err = r.object(refs[key]); errors.Is(err, os.ErrNotExist) {
+			if metadataOnly {
+				_, err = r.objectStamp(refs[key])
+			} else {
+				_, err = r.object(refs[key])
+			}
+			if errors.Is(err, os.ErrNotExist) {
 				missing = append(missing, refs[key])
 			} else if err != nil {
 				return err
@@ -55,25 +76,29 @@ func (r *Replica) Missing(ctx context.Context, id string) ([]Object, error) {
 	return missing, err
 }
 
-// VerifyComplete is read-only. A status query must never publish an unfinished
-// reception, even when its last object has arrived.
+// VerifyComplete never publishes an unfinished reception, even when its last
+// object has arrived. Detected catalog damage is durably fenced under admission.
 func (r *Replica) VerifyComplete(ctx context.Context, id string) error {
 	return r.locked(ctx, func(s *state) error {
-		if !s.Generations[id].Complete {
-			return ErrIncomplete
-		}
-		_, refs, err := get(s, id, r.trust)
-		if err != nil {
+		return r.verifyComplete(ctx, s, id)
+	})
+}
+
+func (r *Replica) verifyComplete(ctx context.Context, s *state, id string) error {
+	if !s.Generations[id].Complete || s.Generations[id].Damaged {
+		return ErrIncomplete
+	}
+	_, refs, err := r.get(s, id, true)
+	if err != nil {
+		return err
+	}
+	for _, key := range sortedIDs(refs) {
+		if err = ctx.Err(); err != nil {
 			return err
 		}
-		for _, key := range sortedIDs(refs) {
-			if err = ctx.Err(); err != nil {
-				return err
-			}
-			if _, err = r.object(refs[key]); err != nil {
-				return ErrIncomplete
-			}
+		if _, err = r.object(refs[key]); err != nil {
+			return ErrIncomplete
 		}
-		return nil
-	})
+	}
+	return nil
 }

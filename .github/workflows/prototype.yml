@@ -12,7 +12,8 @@ permissions:
 jobs:
   go-prototype:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    # The serial Go suite and two bounded fixtures share this job.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -26,20 +27,29 @@ jobs:
           GOMAXPROCS: 2
         run: |
           test -z "$(gofmt -l cmd internal)"
-          go test -count=1 ./...
+          go test -p=1 -count=1 ./...
           go vet ./...
           mkdir -p out
           CGO_ENABLED=0 go build -trimpath -o out/outpost-lab ./cmd/outpost-lab
           CGO_ENABLED=0 go build -trimpath -o out/outpost-kit ./cmd/outpost-kit
           CGO_ENABLED=0 go build -trimpath -o out/outpost-fixture ./cmd/outpost-fixture
+      - name: File-kit runner admission and failure evidence
+        run: python3 -m unittest discover -s experiments/filekit -p test_run.py -v
+      - name: Retained-history metadata under restrictive file creation
+        run: |
+          umask 077
+          go test -p=1 -count=1 -run '^TestOfflineHistoryAcrossMaintenanceAndPolicyChange$' ./internal/peer
       - name: Independent file-kit fixture (bounded, not full-scale acceptance)
         run: |
           python3 experiments/filekit/run.py --root "$RUNNER_TEMP/outpost-filekit" \
             --kit-binary "$PWD/out/outpost-kit" --fixture-binary "$PWD/out/outpost-fixture" \
             --limits "$PWD/docs/g1-acceptance.json" --bytes 134217728
       - name: Checksum-pinned experimental restic
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fL --retry 2 -o out/restic.bz2 https://github.com/restic/restic/releases/download/v0.19.1/restic_0.19.1_linux_amd64.bz2
+          timeout 45s gh api -H 'Accept: application/octet-stream' \
+            repos/restic/restic/releases/assets/466999719 > out/restic.bz2
           echo 'f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c  out/restic.bz2' | sha256sum -c -
           bzip2 -dk out/restic.bz2
           chmod 755 out/restic

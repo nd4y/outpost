@@ -38,29 +38,33 @@ func must(t *testing.T, e error) {
 }
 
 type authority struct {
-	cert   *x509.Certificate
-	key    ed25519.PrivateKey
-	roots  *x509.CertPool
-	serial int64
+	cert         *x509.Certificate
+	key          ed25519.PrivateKey
+	roots        *x509.CertPool
+	serial       int64
+	nodeLifetime time.Duration
 }
 
 func newAuthority(t *testing.T) *authority {
+	return newAuthorityWithLifetime(t, time.Hour, 30*time.Minute)
+}
+func newAuthorityWithLifetime(t *testing.T, caLifetime, nodeLifetime time.Duration) *authority {
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
-	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "isolated test CA"}, NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "isolated test CA"}, NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(caLifetime), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	der, e := x509.CreateCertificate(rand.Reader, template, template, pub, key)
 	must(t, e)
 	cert, e := x509.ParseCertificate(der)
 	must(t, e)
 	roots := x509.NewCertPool()
 	roots.AddCert(cert)
-	return &authority{cert, key, roots, 1}
+	return &authority{cert, key, roots, 1, nodeLifetime}
 }
 func (a *authority) nodeCert(t *testing.T) tls.Certificate {
 	a.serial++
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
-	template := &x509.Certificate{SerialNumber: big.NewInt(a.serial), NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(30 * time.Minute), DNSNames: []string{"localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}}
+	template := &x509.Certificate{SerialNumber: big.NewInt(a.serial), NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(a.nodeLifetime), DNSNames: []string{"localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}}
 	der, e := x509.CreateCertificate(rand.Reader, template, a.cert, pub, a.key)
 	must(t, e)
 	private, e := x509.MarshalPKCS8PrivateKey(key)
@@ -77,16 +81,17 @@ type node struct {
 	journal *Journal
 }
 type fixture struct {
-	base    string
-	ca      *authority
-	trust   generation.Trust
-	writer  ed25519.PrivateKey
-	owner   filekit.Owner
-	source  *filekit.Store
-	input   string
-	old     []byte
-	version string
-	a, b, c *node
+	base        string
+	ca          *authority
+	trust       generation.Trust
+	writer      ed25519.PrivateKey
+	maintenance ed25519.PrivateKey
+	owner       filekit.Owner
+	source      *filekit.Store
+	input       string
+	old         []byte
+	version     string
+	a, b, c     *node
 }
 
 func testRoot(t *testing.T) string {
@@ -118,16 +123,18 @@ func newNode(t *testing.T, base, name string, a *authority, trust generation.Tru
 	return n
 }
 func newFixture(t *testing.T) *fixture {
+	return newFixtureWithAuthority(t, newAuthority(t))
+}
+func newFixtureWithAuthority(t *testing.T, ca *authority) *fixture {
 	base := testRoot(t)
-	ca := newAuthority(t)
 	owner, e := filekit.NewOwner()
 	must(t, e)
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
-	maintenance, _, e := ed25519.GenerateKey(rand.Reader)
+	maintenance, maintenanceKey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	trust := generation.Trust{Domain: owner.Domain, Repository: generation.Hash([]byte("test repository")), Epoch: 1, Writer: pub, Maintenance: maintenance}
-	f := &fixture{base: base, ca: ca, trust: trust, writer: key, owner: owner}
+	f := &fixture{base: base, ca: ca, trust: trust, writer: key, owner: owner, maintenance: maintenanceKey}
 	f.a = newNode(t, base, "a", ca, trust)
 	f.b = newNode(t, base, "b", ca, trust)
 	f.c = newNode(t, base, "c", ca, trust)
@@ -139,6 +146,7 @@ func newFixture(t *testing.T) *fixture {
 	_, e = rand.Read(f.old)
 	must(t, e)
 	must(t, os.WriteFile(f.input, f.old, 0640))
+	must(t, os.Chmod(f.input, 0640))
 	return f
 }
 func (f *fixture) policy(n *node, peers ...*node) Policy {
@@ -149,9 +157,12 @@ func (f *fixture) policy(n *node, peers ...*node) Policy {
 	return p
 }
 func (f *fixture) seal(t *testing.T, seq uint64, parent string) (string, string) {
+	return f.sealAt(t, seq, parent, time.Now().Unix(), 1)
+}
+func (f *fixture) sealAt(t *testing.T, seq uint64, parent string, snapshot int64, policy uint64) (string, string) {
 	v, e := f.source.Backup(testContext, f.input, filekit.BackupOptions{Names: []string{"private.bin", "alias.bin"}})
 	must(t, e)
-	c := generation.Catalog{Format: generation.Format, Domain: f.trust.Domain, Repository: f.trust.Repository, Epoch: 1, Sequence: seq, Parent: parent, SnapshotUnix: time.Now().Unix(), Policy: 1, KitFormat: generation.KitFormat}
+	c := generation.Catalog{Format: generation.Format, Domain: f.trust.Domain, Repository: f.trust.Repository, Epoch: 1, Sequence: seq, Parent: parent, SnapshotUnix: snapshot, Policy: policy, KitFormat: generation.KitFormat}
 	id, e := generation.Seal(testContext, f.source, []string{v.Version}, f.b.replica, c, f.writer)
 	must(t, e)
 	return id, v.Version
@@ -209,7 +220,7 @@ func TestAsynchronousBridgeOnlyTransferAndRestore(t *testing.T) {
 	pull := f.client(t, f.c, f.a, server.URL, f.policy(f.c, f.a))
 	one, e := push.Push(testContext, generation.Hash([]byte("push one")), first, f.b.replica)
 	must(t, e)
-	if one.Receipt.Verification != "client-full-readback" || one.TargetReceipt.Verification != "target-full-read" {
+	if one.Receipt.Verification != "client-full-readback" || one.TargetReceipt.Verification != "target-window-read" {
 		t.Fatal(one)
 	}
 	_, e = pull.Pull(testContext, generation.Hash([]byte("pull one")), first, f.c.replica)
@@ -230,7 +241,7 @@ func TestAsynchronousBridgeOnlyTransferAndRestore(t *testing.T) {
 	must(t, os.Remove(f.input))
 	result, e := pull.Pull(testContext, generation.Hash([]byte("pull two")), second, f.c.replica)
 	must(t, e)
-	if result.Receipt.Target != f.c.id || result.Receipt.Verification != "local-full-read" {
+	if result.Receipt.Target != f.c.id || result.Receipt.Verification != "local-window-read" {
 		t.Fatal(result)
 	}
 	if _, e = NewClient(server.URL, f.b.id, f.c.cert, f.ca.roots, f.policy(f.c, f.a), f.c.journal, f.trust, testLimits); !errors.Is(e, ErrDenied) {

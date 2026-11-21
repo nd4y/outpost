@@ -32,7 +32,9 @@ jobs:
       - name: Install pinned checker dependencies
         run: npm ci --prefix .standards --ignore-scripts --no-audit --no-fund
       - name: Install checksum-verified Gitleaks
-        run: node .standards/install-gitleaks.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/install-ci-scanner.sh
       - name: Check complete proposed change
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}

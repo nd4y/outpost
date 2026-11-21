@@ -1,0 +1,5862 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Outpost management API",
+    "version": "1.0.0-design",
+    "description": "Pre-implementation contract. TLS1.3, explicit principal roles and tenant/domain scopes. Availability does not imply completeness or freshness."
+  },
+  "security": [
+    {
+      "clientCertificate": []
+    }
+  ],
+  "paths": {
+    "/api/v1/session": {
+      "get": {
+        "operationId": "session",
+        "summary": "Read authenticated roles and scopes",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery", "node"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes": {
+      "get": {
+        "operationId": "nodes",
+        "summary": "List enrolled nodes without widening scope",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/enrollment": {
+      "put": {
+        "operationId": "enroll",
+        "summary": "Apply an owner-signed enrollment or capability revision",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/revocation": {
+      "put": {
+        "operationId": "revoke",
+        "summary": "Record an owner-signed revocation fence",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/configuration": {
+      "get": {
+        "operationId": "configuration",
+        "summary": "Read exact retained owner-signed configuration",
+        "x-required-roles": ["owner", "node"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Configuration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "applyConfiguration",
+        "summary": "Apply only the exact previewed owner-signed candidate",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/configuration/preview": {
+      "post": {
+        "operationId": "previewConfiguration",
+        "summary": "Preview exact signed candidate and observed capacity",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/reports": {
+      "post": {
+        "operationId": "publishReport",
+        "summary": "Persist a signed monotonic original-age node report",
+        "x-required-roles": ["node"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedReport"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/report": {
+      "get": {
+        "operationId": "report",
+        "summary": "Read the scoped report with original age",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/generations": {
+      "get": {
+        "operationId": "generations",
+        "summary": "List explicit complete/incomplete generation observations",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/jobs": {
+      "get": {
+        "operationId": "jobs",
+        "summary": "List actual observed jobs and errors",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/commands": {
+      "post": {
+        "operationId": "command",
+        "summary": "Admit a scoped bounded command; kind-specific role and authority required",
+        "x-required-roles": ["owner", "operator", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Command"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "commands",
+        "summary": "Fetch exact signed commands for the authenticated node",
+        "x-required-roles": ["node"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32,
+              "default": 32
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/commands/{operation}/receipt": {
+      "put": {
+        "operationId": "acknowledgeCommand",
+        "summary": "Record signed executor result, never infer completion from delivery",
+        "x-required-roles": ["node"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Required non-simple browser request header; browser Origin must match the configured public origin."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedCommandReceipt"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/operations/{operation}": {
+      "get": {
+        "operationId": "operation",
+        "summary": "Read scoped durable mutation result",
+        "x-required-roles": ["owner", "operator", "recovery"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans": {
+      "post": {
+        "operationId": "registerRetentionPlan",
+        "summary": "Register an immutable retention plan without dispatching commands",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionPlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original registered plan, including on an identical replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Identifier already occupied, request differs, or window expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans/{operationId}/steps": {
+      "post": {
+        "operationId": "stageRetentionPlanStep",
+        "summary": "Stage an exact signed retention step for periodic reconciliation",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionStepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original staging receipt without worker execution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionStepReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan unavailable in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Command differs from the plan or occupied operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/plans/{operationId}": {
+      "get": {
+        "operationId": "readRetentionPlanStatus",
+        "summary": "Read the registered plan and current command evidence without replaying it",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan, draft or confirmed retirement status at one registry revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionPlanStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan unavailable in this scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Registry changed during observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/draft": {
+      "post": {
+        "operationId": "retentionPermitDraft",
+        "summary": "Build an unsigned maintenance draft from matching signed survivor proofs",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unsigned draft or missing generation evidence at one registry revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Registry changed, window expired, or operation already submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/domains/{domain}/retention/preview": {
+      "post": {
+        "operationId": "retentionCoveragePreview",
+        "summary": "Preview trusted pinned copies surviving a proposed retirement",
+        "x-required-roles": ["owner", "operator"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "X-Outpost-Request",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetentionCoverageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed surviving coverage at one registry revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionCoverage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or role denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Domain unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Registry changed during evaluation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Observation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/audit": {
+      "get": {
+        "operationId": "audit",
+        "summary": "Read scoped audit history with revision-bound pagination",
+        "x-required-roles": ["owner", "operator"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/command-status": {
+      "get": {
+        "operationId": "commandStatus",
+        "summary": "List original-age observations of long worker commands",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandStatusPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/policy": {
+      "get": {
+        "operationId": "domainPolicy",
+        "summary": "Read only the selected domain policy and currently usable command grants",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenants/{tenant}/operations/{operation}/resolution": {
+      "get": {
+        "operationId": "resolutionPreview",
+        "summary": "Preview owner abandonment of an unpublished admitted intent",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "resolveUnpublished",
+        "summary": "Durably abandon an exact unpublished admitted intent",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or an observed snapshot as identified by the response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Revision, replay or operation conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State, quota or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveRequest"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "clientCertificate": {
+        "type": "mutualTLS",
+        "description": "Verified enrolled certificate public-key identity; role and scope checked per operation."
+      }
+    },
+    "schemas": {
+      "ID": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "RetentionStepRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-step-request-1"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          }
+        },
+        "required": ["format", "node", "command"]
+      },
+      "RetentionStepReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-step-1"
+          },
+          "planOperationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "requestDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "stagedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "stagingRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "format",
+          "planOperationId",
+          "operationId",
+          "actor",
+          "requestDigest",
+          "stagedUnix",
+          "stagingRevision"
+        ]
+      },
+      "RetentionPlanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-plan-request-1"
+          },
+          "preview": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "outpost-maintenance-permit-2"
+              },
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "repository": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "epoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "operation": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "retire": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "minItems": 1,
+                "maxItems": 64
+              },
+              "window": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "startUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "expiresUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  }
+                },
+                "required": ["node", "startUnix", "expiresUnix"]
+              }
+            },
+            "required": [
+              "format",
+              "domain",
+              "repository",
+              "epoch",
+              "revision",
+              "operation",
+              "retire",
+              "window"
+            ]
+          },
+          "holdCommands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Sorted command operation IDs for completed HOLD commands."
+          }
+        },
+        "required": ["format", "preview", "holdCommands"]
+      },
+      "RetentionPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-plan-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "registeredUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "registrationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "request": {
+            "$ref": "#/components/schemas/RetentionPlanRequest"
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "actor",
+          "registeredUnix",
+          "registrationRevision",
+          "request"
+        ]
+      },
+      "RetentionPlanStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-plan-status-1"
+          },
+          "state": {
+            "enum": [
+              "WAITING_FOR_HOLDS",
+              "READY_TO_SIGN",
+              "WINDOW_EXPIRED",
+              "POLICY_BLOCKED",
+              "COMMAND_CONFLICT",
+              "RETIREMENT_INTENT_RECORDED",
+              "RETIREMENT_QUEUED",
+              "RETIREMENT_REPORTED_COMPLETE",
+              "RETIREMENT_EFFECT_UNCONFIRMED",
+              "CLOSURE_PENDING",
+              "CLOSED_AWAITING_RELEASES",
+              "SETTLED"
+            ]
+          },
+          "authorization": {
+            "const": "NONE"
+          },
+          "registryRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "plan": {
+            "$ref": "#/components/schemas/RetentionPlan"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/RetentionDraft"
+          },
+          "retirement": {
+            "$ref": "#/components/schemas/Receipt"
+          },
+          "closeRequired": {
+            "type": "boolean"
+          },
+          "closure": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "commandOperationId": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "node": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "digest": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "observedUnix": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1099511627776
+              },
+              "proof": {
+                "type": "string",
+                "contentEncoding": "base64",
+                "maxLength": 5464,
+                "description": "Exact original signed node receipt."
+              }
+            },
+            "required": ["commandOperationId", "node", "digest", "observedUnix", "proof"]
+          },
+          "holds": {
+            "type": "array",
+            "maxItems": 2048,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "holdDigest": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "state": {
+                  "enum": ["HOLD_UNCONFIRMED", "HELD", "RELEASED"]
+                },
+                "release": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "commandOperationId": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "node": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "digest": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "observedUnix": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1099511627776
+                    },
+                    "proof": {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "maxLength": 5464,
+                      "description": "Exact original signed node receipt."
+                    }
+                  },
+                  "required": ["commandOperationId", "node", "digest", "observedUnix", "proof"]
+                }
+              },
+              "required": ["node", "holdDigest", "state"]
+            }
+          }
+        },
+        "required": [
+          "format",
+          "state",
+          "authorization",
+          "registryRevision",
+          "plan",
+          "closeRequired"
+        ]
+      },
+      "RetentionDraftRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-draft-request-1"
+          },
+          "preview": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "outpost-maintenance-permit-2"
+              },
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "repository": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "epoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "operation": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "retire": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "minItems": 1,
+                "maxItems": 64
+              },
+              "window": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "startUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "expiresUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  }
+                },
+                "required": ["node", "startUnix", "expiresUnix"]
+              }
+            },
+            "required": [
+              "format",
+              "domain",
+              "repository",
+              "epoch",
+              "revision",
+              "operation",
+              "retire",
+              "window"
+            ]
+          },
+          "holdCommands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true,
+            "description": "Sorted command operation IDs for completed HOLD commands."
+          }
+        },
+        "required": ["format", "preview", "holdCommands"]
+      },
+      "RetentionDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-draft-1"
+          },
+          "state": {
+            "enum": ["INSUFFICIENT_EVIDENCE", "READY_TO_SIGN"]
+          },
+          "authorization": {
+            "const": "NONE"
+          },
+          "registryRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "targetConfigurationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "evaluatedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "minimumCopies": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "missingGenerations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 0,
+            "maxItems": 64
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "generation": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "node": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "commandOperationId": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "reportDigest": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "proofDigest": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "observedUnix": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1099511627776
+                }
+              },
+              "required": [
+                "generation",
+                "node",
+                "commandOperationId",
+                "reportDigest",
+                "proofDigest",
+                "observedUnix"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 64
+          },
+          "permit": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "format": {
+                "const": "outpost-maintenance-permit-3"
+              },
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "repository": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "epoch": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "operation": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "retire": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "minItems": 1,
+                "maxItems": 64
+              },
+              "window": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "node": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "startUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  },
+                  "expiresUnix": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1099511627776
+                  }
+                },
+                "required": ["node", "startUnix", "expiresUnix"]
+              },
+              "coverage": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "minimumCopies": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  },
+                  "witnesses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "format": {
+                          "const": "outpost-retention-protection-receipt-1"
+                        },
+                        "node": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "nodeKey": {
+                          "type": "string",
+                          "contentEncoding": "base64",
+                          "minLength": 44,
+                          "maxLength": 44
+                        },
+                        "domain": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "repository": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "epoch": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "operationId": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "generation": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "state": {
+                          "const": "HELD"
+                        },
+                        "grantDigest": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "holdDigest": {
+                          "$ref": "#/components/schemas/ID"
+                        },
+                        "retirement": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "node": {
+                              "$ref": "#/components/schemas/ID"
+                            },
+                            "operationId": {
+                              "$ref": "#/components/schemas/ID"
+                            }
+                          },
+                          "required": ["node", "operationId"]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "observedUnix": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1099511627776
+                        },
+                        "signature": {
+                          "type": "string",
+                          "contentEncoding": "base64",
+                          "minLength": 88,
+                          "maxLength": 88
+                        }
+                      },
+                      "required": [
+                        "format",
+                        "node",
+                        "nodeKey",
+                        "domain",
+                        "repository",
+                        "epoch",
+                        "operationId",
+                        "generation",
+                        "state",
+                        "grantDigest",
+                        "holdDigest",
+                        "retirement",
+                        "revision",
+                        "observedUnix",
+                        "signature"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 64
+                  }
+                },
+                "required": ["minimumCopies", "witnesses"]
+              }
+            },
+            "required": [
+              "format",
+              "domain",
+              "repository",
+              "epoch",
+              "revision",
+              "operation",
+              "retire",
+              "window",
+              "coverage"
+            ]
+          }
+        },
+        "required": [
+          "format",
+          "state",
+          "authorization",
+          "registryRevision",
+          "targetConfigurationRevision",
+          "evaluatedUnix",
+          "minimumCopies",
+          "missingGenerations",
+          "sources"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "READY_TO_SIGN"
+                }
+              }
+            },
+            "then": {
+              "required": ["permit"]
+            },
+            "else": {
+              "not": {
+                "required": ["permit"]
+              }
+            }
+          }
+        ]
+      },
+      "RetentionCoverageRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-coverage-request-1"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "retiringNodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "generations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true
+          },
+          "minimumCopies": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        "required": ["format", "nodes", "retiringNodes", "generations", "minimumCopies"]
+      },
+      "RetentionCoverage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-retention-coverage-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "registryRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evaluatedUnix": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minimumCopies": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "authorization": {
+            "const": "NONE"
+          },
+          "generations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "generation": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "state": {
+                  "enum": ["OBSERVED_MINIMUM_MET", "INSUFFICIENT_EVIDENCE", "CONFLICTING_EVIDENCE"]
+                },
+                "witnesses": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "node": {
+                        "$ref": "#/components/schemas/ID"
+                      },
+                      "reportDigest": {
+                        "$ref": "#/components/schemas/ID"
+                      },
+                      "reportSequence": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "observedUnix": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "verifiedUnix": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "configurationRevision": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": [
+                      "node",
+                      "reportDigest",
+                      "reportSequence",
+                      "observedUnix",
+                      "verifiedUnix",
+                      "configurationRevision"
+                    ]
+                  },
+                  "minItems": 0,
+                  "maxItems": 8
+                }
+              },
+              "required": ["generation", "state", "witnesses"]
+            },
+            "minItems": 1,
+            "maxItems": 64
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "domain",
+          "repository",
+          "epoch",
+          "registryRevision",
+          "evaluatedUnix",
+          "minimumCopies",
+          "authorization",
+          "generations"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-error-1"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID",
+              "DENIED",
+              "UNAVAILABLE",
+              "CONFLICT",
+              "EXPIRED",
+              "CAPACITY",
+              "BUSY",
+              "CORRUPT",
+              "UNSUPPORTED"
+            ]
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          }
+        },
+        "required": ["format", "code"]
+      },
+      "Scope": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          }
+        },
+        "required": ["tenant", "domain"]
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-session-1"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["owner", "operator", "viewer", "recovery", "node"]
+            },
+            "maxItems": 5,
+            "uniqueItems": true
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "maxItems": 128
+          }
+        },
+        "required": ["format", "actor", "roles", "scopes"]
+      },
+      "Mutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "INITIAL_ENROLLMENT",
+              "POLICY_CHANGE",
+              "REVOKE",
+              "OPERATOR_RETRY",
+              "OPERATOR_PAUSE",
+              "OPERATOR_RESUME",
+              "VERIFY",
+              "RECOVER",
+              "MAINTAIN"
+            ]
+          }
+        },
+        "required": ["operationId", "reason"]
+      },
+      "SignedMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["INITIAL_ENROLLMENT", "POLICY_CHANGE", "REVOKE", "MAINTAIN"]
+          },
+          "document": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 44739244,
+            "description": "Exact canonical signed document bytes. Signatures and embedded format are validated independently; no credentials or paths."
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "previewDigest": {
+            "$ref": "#/components/schemas/ID"
+          }
+        },
+        "required": ["operationId", "reason", "document", "expectedRevision"]
+      },
+      "Receipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-receipt-1"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "requestDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["ADMITTED", "COMPLETE", "FAILED", "ABANDONED"]
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "resultDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "errorCode": {
+            "type": "string",
+            "maxLength": 48
+          }
+        },
+        "required": ["format", "operationId", "requestDigest", "state", "observedUnix"]
+      },
+      "Node": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "maxItems": 128
+          },
+          "class": {
+            "type": "string",
+            "enum": ["trusted", "untrusted"]
+          },
+          "enrollmentRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "reportSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "reportState": {
+            "type": "string",
+            "enum": ["MISSING", "CURRENT", "STALE", "ERROR"]
+          }
+        },
+        "required": [
+          "node",
+          "tenant",
+          "domains",
+          "class",
+          "enrollmentRevision",
+          "revoked",
+          "reportSequence",
+          "observedUnix",
+          "reportState"
+        ]
+      },
+      "NodePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-nodes-1"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            },
+            "maxItems": 128
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": ["format", "revision", "items"]
+      },
+      "Configuration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-config-1"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "digest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "document": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 44739244
+          }
+        },
+        "required": ["format", "node", "revision", "digest", "document"]
+      },
+      "Preview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-preview-1"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "currentRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "candidateRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "candidateDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "changedDomains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "maxItems": 128
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["HOLDER", "TRANSIT", "ROUTE", "EXTERNAL_TARGET", "DOMAIN", "AUTHORITY"]
+                },
+                "domain": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "before": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "maxItems": 256
+                },
+                "after": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ID"
+                  },
+                  "maxItems": 256
+                }
+              },
+              "required": ["kind", "domain", "before", "after"]
+            },
+            "maxItems": 1024
+          },
+          "capacityState": {
+            "type": "string",
+            "enum": ["UNKNOWN", "OBSERVED_INSUFFICIENT", "OBSERVED_SUFFICIENT"]
+          },
+          "estimatedBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "format",
+          "node",
+          "currentRevision",
+          "candidateRevision",
+          "candidateDigest",
+          "changedDomains",
+          "changes",
+          "capacityState",
+          "estimatedBytes"
+        ]
+      },
+      "SignedReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 11184812,
+            "description": "Signed outpost-management-report-1 through report-6. Version2 carries scrub/maintenance, version3 adds trusted restore, version4 adds unavailable catalog metadata, version5 adds original-age external-copy receipts, and version6 adds scheduled audit observations. Original times, sequence and exact tenant/domain scope are required."
+          }
+        },
+        "required": ["document"]
+      },
+      "Report": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "outpost-management-report-view-1",
+              "outpost-management-report-view-2",
+              "outpost-management-report-view-3",
+              "outpost-management-report-view-4",
+              "outpost-management-report-view-5",
+              "outpost-management-report-view-6"
+            ]
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "configurationRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
+          },
+          "documentDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Generation"
+            },
+            "maxItems": 256
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "maxItems": 4096
+          },
+          "space": {
+            "$ref": "#/components/schemas/Space"
+          },
+          "inventoryState": {
+            "type": "string",
+            "enum": ["UNKNOWN", "OBSERVED", "UNAVAILABLE"],
+            "description": "Missing in an older report means unknown, never an empty healthy inventory."
+          },
+          "commands": {
+            "type": "array",
+            "maxItems": 2048,
+            "items": {
+              "$ref": "#/components/schemas/CommandObservation"
+            }
+          },
+          "externalState": {
+            "type": "string",
+            "const": "OBSERVED",
+            "description": "The worker inspected its retained external-copy receipts. This is not a fresh probe of cloud health; absence in older report formats is unknown."
+          },
+          "externalCopies": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": {
+              "$ref": "#/components/schemas/ExternalCopy"
+            },
+            "description": "Historical readbacks per upload operation. Each operation/generation must match an UPLOAD job. Multiple observations of one target are not distinct copies."
+          }
+        },
+        "required": [
+          "format",
+          "node",
+          "tenant",
+          "domain",
+          "sequence",
+          "configurationRevision",
+          "observedUnix",
+          "state",
+          "documentDigest",
+          "generations",
+          "jobs",
+          "space"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-1"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": ["commands"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-2"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "commands": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": ["scrub", "maintenance", "retention"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "enum": [
+                    "outpost-management-report-view-1",
+                    "outpost-management-report-view-2",
+                    "outpost-management-report-view-3"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "generations": {
+                  "items": {
+                    "not": {
+                      "required": ["metadataState"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "enum": ["outpost-management-report-view-5", "outpost-management-report-view-6"]
+                }
+              }
+            },
+            "then": {
+              "required": ["externalState"]
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["externalState"]
+                  },
+                  {
+                    "required": ["externalCopies"]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-report-view-6"
+                }
+              }
+            },
+            "then": {
+              "required": ["externalCopies"],
+              "properties": {
+                "externalCopies": {
+                  "contains": {
+                    "required": ["audit"]
+                  },
+                  "maxContains": 128
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "externalCopies": {
+                  "items": {
+                    "not": {
+                      "required": ["audit"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Space": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["UNKNOWN", "OBSERVED"]
+          },
+          "logicalBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "physicalBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "freeBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "reservedBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["VOLUME"],
+            "description": "Physical/free bytes describe the entire admitted filesystem, which may contain other applications."
+          },
+          "accountedBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Conservative Outpost allocation ledger, separate from filesystem physical use."
+          }
+        },
+        "required": [
+          "state",
+          "logicalBytes",
+          "physicalBytes",
+          "freeBytes",
+          "reservedBytes",
+          "observedUnix"
+        ]
+      },
+      "Generation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "createdUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "status": {
+            "type": "string",
+            "enum": ["INCOMPLETE", "COMPLETE", "CORRUPT", "UNAVAILABLE"]
+          },
+          "target": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "verification": {
+            "type": "string",
+            "enum": ["NONE", "CIPHERTEXT", "DECRYPTED"]
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "restoreVerifiedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "logicalBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Null means unknown; ciphertext bytes or missing progress must not be presented as a known value."
+          },
+          "objects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "metadataState": {
+            "const": "UNAVAILABLE",
+            "description": "Only report4/view4 and generation page2. Catalog is unreadable; zero creation/object values are unknown, not measured empty values."
+          }
+        },
+        "required": [
+          "generation",
+          "sequence",
+          "createdUnix",
+          "status",
+          "target",
+          "verification",
+          "verifiedUnix",
+          "restoreVerifiedUnix",
+          "logicalBytes",
+          "objects",
+          "pinned"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": ["metadataState"]
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "CORRUPT"
+                },
+                "createdUnix": {
+                  "const": 0
+                },
+                "objects": {
+                  "const": 0
+                },
+                "logicalBytes": {
+                  "type": "null"
+                },
+                "verification": {
+                  "const": "NONE"
+                },
+                "verifiedUnix": {
+                  "const": 0
+                },
+                "restoreVerifiedUnix": {
+                  "const": 0
+                }
+              }
+            }
+          }
+        ]
+      },
+      "GenerationPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": ["outpost-management-generations-1", "outpost-management-generations-2"]
+          },
+          "reportSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Generation"
+            },
+            "maxItems": 256
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
+          },
+          "inventoryState": {
+            "type": "string",
+            "enum": ["UNKNOWN", "OBSERVED", "UNAVAILABLE"]
+          }
+        },
+        "required": [
+          "format",
+          "reportSequence",
+          "observedUnix",
+          "items",
+          "state",
+          "inventoryState"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-generations-1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "not": {
+                      "required": ["metadataState"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Job": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["SOURCE", "PEER", "UPLOAD", "SCRUB", "RESTORE", "MAINTENANCE"]
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "RETRY_WAIT",
+              "PAUSED",
+              "BLOCKED",
+              "COMPLETE",
+              "WITHDRAWN",
+              "FAILED"
+            ]
+          },
+          "updatedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "completedBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Null means unknown; ciphertext bytes or missing progress must not be presented as a known value."
+          },
+          "totalBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "errorCode": {
+            "type": "string",
+            "maxLength": 48
+          }
+        },
+        "required": [
+          "operationId",
+          "domain",
+          "generation",
+          "kind",
+          "phase",
+          "updatedUnix",
+          "completedBytes",
+          "totalBytes"
+        ]
+      },
+      "JobPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-jobs-1"
+          },
+          "reportSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "maxItems": 256
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
+          }
+        },
+        "required": ["format", "reportSequence", "observedUnix", "items", "state"]
+      },
+      "Command": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "OPERATOR_REQUEST",
+              "INCIDENT_RESPONSE",
+              "RECOVERY_DRILL",
+              "POLICY_CHANGE",
+              "OWNER_MAINTENANCE"
+            ]
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["retry", "pause", "resume", "scrub", "restore", "maintenance", "retention"]
+          },
+          "job": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            },
+            "maxItems": 256
+          },
+          "authority": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 87384,
+            "description": "Canonical owner-signed outpost-command-authority-1 grant for this service, node, tenant/domain/repository/writer epoch and command kind."
+          },
+          "expiresUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "expectedConfigurationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Exact owner-policy revision observed by the operator; stale commands cannot silently apply to a replacement policy."
+          },
+          "maintenancePermit": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 1398104,
+            "description": "Separate domain maintenance permit; required only for maintenance and verified independently by the worker."
+          },
+          "retentionGrant": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 5464,
+            "description": "Separate maintenance-signed HOLD, CLOSE or RELEASE grant. A bound RELEASE can embed the original signed HOLD as pendingHold. Required only for retention."
+          }
+        },
+        "required": [
+          "operationId",
+          "reason",
+          "tenant",
+          "domain",
+          "kind",
+          "expiresUnix",
+          "expectedConfigurationRevision",
+          "authority"
+        ]
+      },
+      "CommandPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-commands-2"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "commands": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "document": {
+                  "type": "string",
+                  "contentEncoding": "base64",
+                  "maxLength": 4194304
+                },
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["document", "sequence"]
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": ["format", "revision", "commands"]
+      },
+      "Audit": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 48
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 48
+          },
+          "state": {
+            "type": "string",
+            "enum": ["ADMITTED", "COMPLETE", "FAILED"]
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "requestDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "resultDigest": {
+            "$ref": "#/components/schemas/ID"
+          }
+        },
+        "required": [
+          "sequence",
+          "actor",
+          "tenant",
+          "operationId",
+          "reason",
+          "action",
+          "state",
+          "observedUnix",
+          "requestDigest"
+        ]
+      },
+      "AuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-audit-1"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Audit"
+            },
+            "maxItems": 256
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "required": ["format", "revision", "items"]
+      },
+      "SignedCommandReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 87384
+          }
+        },
+        "required": ["document"]
+      },
+      "CommandObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Historical node observation, separate from backup jobs and audit acknowledgement. Verification and completion times retain their original age; counts and kind-specific outcomes are validated by the signed-report reader.",
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "envelopeDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "resultDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["scrub", "maintenance", "restore", "retention"]
+          },
+          "phase": {
+            "type": "string",
+            "enum": ["QUEUED", "RUNNING", "RETRY_WAIT", "COMPLETE", "FAILED"]
+          },
+          "verification": {
+            "type": "string",
+            "enum": ["CIPHERTEXT", "DECRYPTED"]
+          },
+          "errorCode": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[A-Z0-9_]*$"
+          },
+          "maintenance": {
+            "$ref": "#/components/schemas/MaintenanceOutcome"
+          },
+          "retentionProof": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "maxLength": 5464,
+            "description": "Original canonical node-signed receipt of a completed retention command. Decoded bytes match resultDigest."
+          },
+          "startedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "finishedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "verifiedObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "nextAttemptMillis": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1125899906842624
+          },
+          "restore": {
+            "$ref": "#/components/schemas/RecoveryOutcome"
+          },
+          "cleanupPending": {
+            "type": "boolean",
+            "description": "Owned source pin/reservation cleanup remains pending; never means restored/staged bytes were deleted."
+          }
+        },
+        "required": [
+          "operationId",
+          "envelopeDigest",
+          "kind",
+          "phase",
+          "startedUnix",
+          "finishedUnix",
+          "attempts",
+          "nextAttemptMillis",
+          "verifiedObjects",
+          "totalObjects",
+          "verifiedUnix"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": { "const": "retention" },
+                "phase": { "const": "COMPLETE" }
+              }
+            },
+            "then": { "required": ["retentionProof"] },
+            "else": { "not": { "required": ["retentionProof"] } }
+          },
+          {
+            "if": {
+              "properties": {
+                "phase": {
+                  "const": "COMPLETE"
+                }
+              }
+            },
+            "then": {
+              "required": ["resultDigest"]
+            },
+            "else": {
+              "not": {
+                "required": ["resultDigest"]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "scrub"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["maintenance"]
+                  },
+                  {
+                    "required": ["restore"]
+                  },
+                  {
+                    "required": ["cleanupPending"]
+                  }
+                ]
+              },
+              "required": ["generation"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "maintenance"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["generation"]
+                  },
+                  {
+                    "required": ["verification"]
+                  },
+                  {
+                    "required": ["restore"]
+                  },
+                  {
+                    "required": ["cleanupPending"]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "restore"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": ["maintenance"]
+                  }
+                ]
+              },
+              "required": ["generation"],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "phase": {
+                        "const": "COMPLETE"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": ["restore", "verification"],
+                    "properties": {
+                      "verification": {
+                        "const": "DECRYPTED"
+                      }
+                    }
+                  },
+                  "else": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": ["restore"]
+                        },
+                        {
+                          "required": ["verification"]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "MaintenanceOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Original frozen GC outcome. Absent plus protected equals the candidate count. Absence is not physical erasure; a completed replay performs no new deletion.",
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "permit": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "candidateObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 131072
+          },
+          "absentObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 131072
+          },
+          "protectedObjects": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 131072
+          },
+          "candidateCatalogs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "absentCatalogs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "protectedCatalogs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024
+          },
+          "completedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          }
+        },
+        "required": [
+          "operation",
+          "permit",
+          "candidateObjects",
+          "absentObjects",
+          "protectedObjects",
+          "candidateCatalogs",
+          "absentCatalogs",
+          "protectedCatalogs",
+          "completedUnix"
+        ]
+      },
+      "CommandStatusPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": ["outpost-management-command-status-1", "outpost-management-command-status-2"]
+          },
+          "reportSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommandObservation"
+            },
+            "maxItems": 256
+          },
+          "nextCursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "state": {
+            "type": "string",
+            "enum": ["CURRENT", "STALE"]
+          }
+        },
+        "required": ["format", "reportSequence", "observedUnix", "items", "state"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "format": {
+                  "const": "outpost-management-command-status-1"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "items": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": ["scrub", "maintenance", "retention"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RecoverySummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "files": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "directories": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "symlinks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "aliases": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "implicitDirectories": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32768
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 288230376151711744
+          }
+        },
+        "required": ["files", "directories", "symlinks", "aliases", "implicitDirectories", "bytes"],
+        "description": "Actual selected output counts; total entries must be between 1 and 32768."
+      },
+      "GenerationRecoveryOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "checkpointMatch": {
+            "const": true
+          },
+          "restored": {
+            "$ref": "#/components/schemas/RecoverySummary"
+          }
+        },
+        "required": ["generation", "epoch", "sequence", "checkpointMatch", "restored"]
+      },
+      "RecoveryOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-recovery-result-1"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1125899906842624
+          },
+          "restored": {
+            "$ref": "#/components/schemas/GenerationRecoveryOutcome"
+          }
+        },
+        "required": ["format", "operation", "binding", "preset", "verifiedUnix", "restored"],
+        "description": "Historical opaque trusted recovery receipt. Binding must equal the command envelope digest; operation, generation and original verification time must match the observation. No paths or keys."
+      },
+      "DomainPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-domain-policy-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "writerEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "configurationRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "configurationDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "configurationState": {
+            "enum": ["ACTIVE", "INACTIVE"]
+          },
+          "expiresUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "placement": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "domain": {
+                "$ref": "#/components/schemas/ID"
+              },
+              "allowedClasses": {
+                "type": "array",
+                "items": {
+                  "enum": ["trusted", "untrusted", "external"]
+                },
+                "maxItems": 3
+              },
+              "holders": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "maxItems": 128
+              },
+              "transit": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "maxItems": 128
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "maxItems": 128
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "to": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "mode": {
+                      "enum": ["push", "pull"]
+                    }
+                  },
+                  "required": ["from", "to", "mode"]
+                },
+                "maxItems": 512
+              },
+              "cloudEdges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "node": {
+                      "$ref": "#/components/schemas/ID"
+                    },
+                    "target": {
+                      "$ref": "#/components/schemas/ID"
+                    }
+                  },
+                  "required": ["node", "target"]
+                },
+                "maxItems": 512
+              }
+            },
+            "required": [
+              "domain",
+              "allowedClasses",
+              "holders",
+              "transit",
+              "targets",
+              "edges",
+              "cloudEdges"
+            ]
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "class": {
+                  "enum": ["trusted", "untrusted"]
+                }
+              },
+              "required": ["id", "class"]
+            },
+            "maxItems": 128
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "kind": {
+                  "enum": ["s3", "webdav"]
+                },
+                "maxObjectBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["id", "kind", "maxObjectBytes"]
+            },
+            "maxItems": 128
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "profile": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "ingress": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "expiresUnix": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1099511627776
+                },
+                "state": {
+                  "enum": ["ACTIVE", "INACTIVE"]
+                }
+              },
+              "required": ["node", "profile", "ingress", "revision", "expiresUnix", "state"]
+            },
+            "maxItems": 128
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "authority": {
+                  "type": "string",
+                  "contentEncoding": "base64",
+                  "maxLength": 87384
+                },
+                "kinds": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "pause",
+                      "resume",
+                      "retry",
+                      "scrub",
+                      "restore",
+                      "maintenance",
+                      "retention"
+                    ]
+                  },
+                  "maxItems": 7
+                },
+                "expiresUnix": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1099511627776
+                }
+              },
+              "required": ["authority", "kinds", "expiresUnix"]
+            },
+            "maxItems": 128
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "node",
+          "domain",
+          "repository",
+          "writerEpoch",
+          "configurationRevision",
+          "configurationDigest",
+          "configurationState",
+          "expiresUnix",
+          "placement",
+          "nodes",
+          "targets",
+          "sources",
+          "capabilities"
+        ],
+        "description": "At most 2 MiB encoded JSON. Opaque selected-domain assignments only, without endpoints, credentials, private paths or other-domain configuration. Historical inactive policy is not an active route. Grants are filtered by current actor role, current enrollment/policy and signer. Every mutation is authorized again. This view is not a signed configuration or proof of backup coverage."
+      },
+      "ResolveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operationId", "targetRequestDigest", "reason"],
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "targetRequestDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reason": {
+            "const": "ABANDON_UNPUBLISHED"
+          }
+        }
+      },
+      "ResolutionPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "format",
+          "operationId",
+          "targetRequestDigest",
+          "node",
+          "domains",
+          "state",
+          "canAbandon",
+          "reason"
+        ],
+        "properties": {
+          "format": {
+            "const": "outpost-management-resolution-preview-1"
+          },
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "targetRequestDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domains": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "items": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          "state": {
+            "type": "string"
+          },
+          "canAbandon": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ExternalAuditObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "One scheduled result per current target. Successful observations keep the oldest supporting read. Expiry never renews with report delivery.",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["VERIFIED_CIPHERTEXT", "MISSING", "INVALID_CONTENT", "UNAVAILABLE"]
+          },
+          "observedUnix": { "type": "integer", "minimum": 1, "maximum": 1099511627776 },
+          "finishedUnix": { "type": "integer", "minimum": 1, "maximum": 1099511627776 },
+          "expiresUnix": { "type": "integer", "minimum": 1, "maximum": 1099511627776 }
+        },
+        "required": ["state", "observedUnix", "finishedUnix", "expiresUnix"]
+      },
+      "ExternalCopy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["UNCONFIRMED", "OBSERVED_COMPLETE", "UNAVAILABLE"]
+          },
+          "verification": {
+            "type": "string",
+            "enum": ["NONE", "full-target-readback", "cached-target-readback"]
+          },
+          "verifiedUnix": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776,
+            "description": "Original oldest supporting target read time; never refreshed by report delivery. Must not exceed the job update or report observation time."
+          },
+          "receiptDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "audit": {
+            "$ref": "#/components/schemas/ExternalAuditObservation"
+          },
+          "errorCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 48,
+            "pattern": "^[A-Z_]+$"
+          }
+        },
+        "required": [
+          "operationId",
+          "generation",
+          "target",
+          "state",
+          "verification",
+          "verifiedUnix"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "OBSERVED_COMPLETE"
+                }
+              }
+            },
+            "then": {
+              "required": ["receiptDigest"],
+              "properties": {
+                "verification": {
+                  "enum": ["full-target-readback", "cached-target-readback"]
+                },
+                "verifiedUnix": {
+                  "minimum": 1
+                }
+              },
+              "not": {
+                "required": ["errorCode"]
+              }
+            },
+            "else": {
+              "properties": {
+                "verification": {
+                  "const": "NONE"
+                },
+                "verifiedUnix": {
+                  "const": 0
+                }
+              },
+              "not": {
+                "anyOf": [{ "required": ["receiptDigest"] }, { "required": ["audit"] }]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "UNAVAILABLE"
+                }
+              }
+            },
+            "then": {
+              "required": ["errorCode"]
+            },
+            "else": {
+              "not": {
+                "required": ["errorCode"]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -2,13 +2,15 @@
 
 [Русский](../ru/standard-review.md)
 
-Review date: 6 November 2026. Specification 1.4, Development Standard 0.4.0, pinned source 75833a42311832d1de665d0e441adac2b5b701d2.
+Review date: 9 November 2026. Specification 1.5, Development Standard 0.4.0, pinned source 75833a42311832d1de665d0e441adac2b5b701d2.
 
 All 45 rules have a documented requirement or repository policy. PASS below means design coverage in this source revision. Product verification is NOT_VERIFIED for every rule: no production engine, full acceptance or release is implemented here; the synthetic G1 fixture is a separate partial result. Current repository execution and hosting evidence is read from the exact commit's Actions results and repository settings, separately from this author review.
 
 The review found missing explicit requirement stages/traceability, a compact project passport, accessibility acceptance, complete input-boundary tests, compatibility/migration terms, artifact delivery and end-to-end alert verification. REQ-47-REQ-53 and AT-31-AT-35 close those specification gaps. Capacity/SLO values remain measurements owned by M0 and each release profile. Placement now uses trusted nodes, untrusted nodes and external storage without personal-host or file-collection examples.
 
 Revision 1.2 adds mount/identity admission, enforced resource profiles, complete capacity accounting, source restore scope and explicit crash/quota traceability. Private host facts remain outside Git. This is design coverage; target runtime and cold-boot acceptance remain NOT_VERIFIED.
+
+Revision 1.5 adds parallel ingress, forwarding before seal and a separate source snapshot release threshold. REQ-05, REQ-25 and REQ-42 link the new behavior to AT-01, AT-10 and AT-30. This revision records design coverage and leaves runtime acceptance open.
 
 Revision 1.3 defines external storage by S3-compatible APIs and WebDAV, removes vendor-specific routes and archive branding, and keeps per-endpoint capability and credential-scope acceptance. REQ-28/30/40 and AT-16 remain traced; this does not declare every endpoint tested.
 

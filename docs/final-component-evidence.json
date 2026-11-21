@@ -1,0 +1,2568 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-17T20:05:35.053293+00:00",
+  "status": "PASS_SCOPED_DOWNLOADED_INSTALLATIONS_COLLECTOR_AND_CURRENT_AS128",
+  "currentRuntimeSource": {
+    "executedTree": "74f1369b61258b8a05c2933f00e563af4d7a919a",
+    "publishedPrerequisite": "4af376f2918d72c2a43da52fb3415a4f625969a0",
+    "goModuleInputCount": 527,
+    "inputManifestSHA256": "d1c83a45e73a028c250a59593fa714b814eaf895945fac8e97856d6c24f511d1",
+    "compiler": "go1.27.3 linux/amd64",
+    "image": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef"
+  },
+  "installations": [
+    {
+      "status": "PASS_SELECTED_DOWNLOADED_INSTALL_UPGRADE_ROLLBACK_AND_SMALL_RECOVERY",
+      "observedAt": "2026-11-17T19:53:42.134062+00:00",
+      "currentCommit": "8c783708704dbf55cbf05a2472be3436bc4a6d15",
+      "previousCommit": "9f0f71299a83a62768bbea3b20ca6be8952d52cb",
+      "currentCandidate": {
+        "commit": "8c783708704dbf55cbf05a2472be3436bc4a6d15",
+        "distributionManifestSHA256": "7eab927cffe16f8a2048906077b42f730df4cd26cf0f8e00f6c1653388d3a380",
+        "format": "outpost-ci-candidate-1",
+        "manifestSHA256": "9d69427ca2cadc1c08fcebf4d5cc0340949288d78281316fdadd127e2d15f532",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43963150020,
+        "runtimeAcceptance": false,
+        "state": "VERIFIED_CANDIDATE_BYTES"
+      },
+      "previousCandidate": {
+        "commit": "9f0f71299a83a62768bbea3b20ca6be8952d52cb",
+        "distributionManifestSHA256": "d353ab8f7d15f28c3cc70624c19569c5cc829229a5348ab6925c6831ef721147",
+        "format": "outpost-ci-candidate-1",
+        "manifestSHA256": "4d7b115762b359af2b8b52a1363b8e4048d09b810f9772e1e461408fd66d79a3",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43871339991,
+        "runtimeAcceptance": false,
+        "state": "VERIFIED_CANDIDATE_BYTES"
+      },
+      "helperSHA256": "eb58b9c731319841d61f02d081fb30333bfe3cb1c638aab3321ad1e292443092",
+      "sourceInputCount": 526,
+      "checks": [
+        {
+          "architecture": "amd64",
+          "state": "PASS",
+          "test": "image_and_enforced_isolation"
+        },
+        {
+          "cases": 3,
+          "state": "PASS",
+          "test": "unsafe_runtime_rejected_before_profile"
+        },
+        {
+          "clearSourceAbsent": true,
+          "node": "595ced3d4020215c3098fef7ecc304217c944ebf94e9bd8fe87a72ada5532c39",
+          "state": "PASS",
+          "test": "explicit_installation"
+        },
+        {
+          "ciphertextObjects": 4,
+          "revision": 2,
+          "state": "PASS",
+          "test": "cached_start_upgrade_stop_and_rollback"
+        },
+        {
+          "services": 4,
+          "state": "PASS",
+          "test": "compose_profile_preserves_runtime_constraints"
+        },
+        {
+          "state": "PASS",
+          "test": "missing_or_readonly_volume_fails_without_fallback"
+        },
+        {
+          "bytes": 19456,
+          "sha256": "64d0df35d001f0834e61831fa3139d8a205473196231b9913fd0be08115c0d74",
+          "state": "PASS",
+          "test": "independent_recovery_after_source_removal"
+        }
+      ],
+      "installationImage": "sha256:52e00ebb5b0c80016c71ecedd51ae52e0ab8b0b5a3df9880349ed0acc557d989",
+      "previousImage": "sha256:d7029c62bbc0eef1e2abcaaed089baf24376bc5223e5cfc3e6a731ed7ecc6420",
+      "architectureExecutedHere": "amd64",
+      "nativeOtherArchitecture": "Separate exact native CI/strict selected-byte evidence; no arm64 emulation on this host",
+      "resourceProfile": {
+        "cpuPerContainer": 1,
+        "memoryMaxBytes": 805306368,
+        "swapBytes": 0,
+        "containers": 23,
+        "terminalExitCounts": {
+          "0": 18,
+          "5": 5
+        },
+        "actualCgroupSampled": 8,
+        "notRecorded": 15,
+        "sampledMemoryPeakMaximumBytes": 4923392,
+        "actualSamples": [
+          {
+            "memoryPeakBytes": 4104192,
+            "samples": 6,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4362240,
+            "samples": 2,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4476928,
+            "samples": 2,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4628480,
+            "samples": 4,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4849664,
+            "samples": 14,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4784128,
+            "samples": 1,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4526080,
+            "samples": 10,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4923392,
+            "samples": 15,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          }
+        ],
+        "observerErrors": ["FileNotFoundError", "FileNotFoundError", "FileNotFoundError"],
+        "limitation": "memory.peak is read only while the owned cgroup exists. Unsampled short-lived containers remain NOT_RECORDED; no headroom or whole-host peak claim.",
+        "refusalControls": "Expected nonzero exits and unsafe attempted profiles are validated by the seven checks, not counted as successful unsafe operation."
+      },
+      "pending": [
+        "cold-host-boot-order",
+        "production-infrastructure-admission",
+        "full-product-acceptance"
+      ],
+      "scope": "Seven unchanged actual downloaded-binary checks, scoped install/upgrade/rollback and19456-byte independent recovery. No product100GiB/physical boot/live deployment/release claim. Short-lived unsampled cgroups stay unknown; no whole-host peak/headroom claim.",
+      "rawLogSHA256": {
+        "installation-admission.json": "3d7660c5f528fa52a24e209d820233b3336302119f54ac30030a9bf8563113c0",
+        "installation.log": "1f26a2bf5f136dd7750a922a80671d4c145e17163212b71cbd3c85e9f43daf82",
+        "installation-receipt.json": "e5d28df863f814ca12c91556ac6289b62e88132336367e2a1ecc1601e38f69d1",
+        "installed-versions.json": "812bc60d8c12a121cd27228356455af667d4bbe406fe3aad6b20dbc53fc1e942",
+        "reverified-candidates.json": "0add732a7bbbb1b139c94ba5d17e98069862fb015ef0165c0c4a73fadfee18b7",
+        "container-resources.json": "88f35cc8aa28acc578527d78817487472cb119665edaa6c7be17d752b3fb261f"
+      }
+    },
+    {
+      "status": "PASS_SELECTED_DOWNLOADED_INSTALL_UPGRADE_ROLLBACK_AND_SMALL_RECOVERY",
+      "observedAt": "2026-11-17T19:54:21.176704+00:00",
+      "currentCommit": "9f0f71299a83a62768bbea3b20ca6be8952d52cb",
+      "previousCommit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+      "currentCandidate": {
+        "commit": "9f0f71299a83a62768bbea3b20ca6be8952d52cb",
+        "distributionManifestSHA256": "d353ab8f7d15f28c3cc70624c19569c5cc829229a5348ab6925c6831ef721147",
+        "format": "outpost-ci-candidate-1",
+        "manifestSHA256": "4d7b115762b359af2b8b52a1363b8e4048d09b810f9772e1e461408fd66d79a3",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43871339991,
+        "runtimeAcceptance": false,
+        "state": "VERIFIED_CANDIDATE_BYTES"
+      },
+      "previousCandidate": {
+        "commit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+        "distributionManifestSHA256": "53e861600c8b8c520b918ae182cf8cb3e443068347b60c9ce5c2290087c3054b",
+        "format": "outpost-ci-candidate-1",
+        "manifestSHA256": "870655b4766bbfdc838b449d4da90ee65fdcb4f168cd174e376bbe6afb47e0ed",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43696037395,
+        "runtimeAcceptance": false,
+        "state": "VERIFIED_CANDIDATE_BYTES"
+      },
+      "helperSHA256": "d7bf02d235299017006533cbf5475a214b2f80f83a5b3a928644f02efca4325d",
+      "sourceInputCount": 523,
+      "checks": [
+        {
+          "architecture": "amd64",
+          "state": "PASS",
+          "test": "image_and_enforced_isolation"
+        },
+        {
+          "cases": 3,
+          "state": "PASS",
+          "test": "unsafe_runtime_rejected_before_profile"
+        },
+        {
+          "clearSourceAbsent": true,
+          "node": "07af97a859c67f11f0be38f975800c00508aaf080ad879b8864a9586028dec60",
+          "state": "PASS",
+          "test": "explicit_installation"
+        },
+        {
+          "ciphertextObjects": 4,
+          "revision": 2,
+          "state": "PASS",
+          "test": "cached_start_upgrade_stop_and_rollback"
+        },
+        {
+          "services": 4,
+          "state": "PASS",
+          "test": "compose_profile_preserves_runtime_constraints"
+        },
+        {
+          "state": "PASS",
+          "test": "missing_or_readonly_volume_fails_without_fallback"
+        },
+        {
+          "bytes": 19456,
+          "sha256": "64d0df35d001f0834e61831fa3139d8a205473196231b9913fd0be08115c0d74",
+          "state": "PASS",
+          "test": "independent_recovery_after_source_removal"
+        }
+      ],
+      "installationImage": "sha256:1d05d853fc2c289ecddebf1d4154773b17557e30ca86fa5592116b2f82bfe0ba",
+      "previousImage": "sha256:7aaa7ae808b53a2b2820f8c2dc66b79b5d20dee526632009104f397d93d27f62",
+      "architectureExecutedHere": "amd64",
+      "nativeOtherArchitecture": "Separate exact native CI/strict selected-byte evidence; no arm64 emulation on this host",
+      "resourceProfile": {
+        "cpuPerContainer": 1,
+        "memoryMaxBytes": 805306368,
+        "swapBytes": 0,
+        "containers": 23,
+        "terminalExitCounts": {
+          "0": 18,
+          "5": 5
+        },
+        "actualCgroupSampled": 9,
+        "notRecorded": 14,
+        "sampledMemoryPeakMaximumBytes": 4755456,
+        "actualSamples": [
+          {
+            "memoryPeakBytes": 4657152,
+            "samples": 11,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4337664,
+            "samples": 1,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4616192,
+            "samples": 2,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4526080,
+            "samples": 1,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4526080,
+            "samples": 3,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4313088,
+            "samples": 9,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4755456,
+            "samples": 1,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4743168,
+            "samples": 8,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4390912,
+            "samples": 6,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          }
+        ],
+        "observerErrors": [
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError"
+        ],
+        "limitation": "memory.peak is read only while the owned cgroup exists. Unsampled short-lived containers remain NOT_RECORDED; no headroom or whole-host peak claim.",
+        "refusalControls": "Expected nonzero exits and unsafe attempted profiles are validated by the seven checks, not counted as successful unsafe operation."
+      },
+      "pending": [
+        "cold-host-boot-order",
+        "production-infrastructure-admission",
+        "full-product-acceptance"
+      ],
+      "scope": "Seven unchanged actual downloaded-binary checks, scoped install/upgrade/rollback and19456-byte independent recovery. No product100GiB/physical boot/live deployment/release claim. Short-lived unsampled cgroups stay unknown; no whole-host peak/headroom claim.",
+      "rawLogSHA256": {
+        "installation-admission.json": "c55885fea01369c952bce4a5960db5c9a3040fc86279cb8d7e200ac2581e57c7",
+        "installation.log": "1f26a2bf5f136dd7750a922a80671d4c145e17163212b71cbd3c85e9f43daf82",
+        "installation-receipt.json": "96b6134b63a391b40aa3436b8d2de4fbb12003910cf4b93ea3e2b13cb8dbe98c",
+        "installed-versions.json": "e8ca51cf1d2f5470fdd401a0e83eb1ff822b31aa820110dcbeab59d9567001b1",
+        "reverified-candidates.json": "f0e0e5a8e67923e223a9da6d6c0ad637ddd0412fc929f8f8b28b3591e852691c",
+        "container-resources.json": "3ca20bbf3fbe3208cccead67e70f16c3faaed25da60a4ac2988d1cff2615b9ef"
+      }
+    },
+    {
+      "status": "PASS_SELECTED_DOWNLOADED_INSTALL_UPGRADE_ROLLBACK_AND_SMALL_RECOVERY",
+      "observedAt": "2026-11-17T19:56:59.735105+00:00",
+      "currentCommit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+      "previousCommit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+      "currentCandidate": {
+        "commit": "e9e90aca6cb9c4e0ebc9c009c4672f9a9646348d",
+        "distributionManifestSHA256": "53e861600c8b8c520b918ae182cf8cb3e443068347b60c9ce5c2290087c3054b",
+        "format": "outpost-ci-candidate-1",
+        "manifestSHA256": "870655b4766bbfdc838b449d4da90ee65fdcb4f168cd174e376bbe6afb47e0ed",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43696037395,
+        "runtimeAcceptance": false,
+        "state": "VERIFIED_CANDIDATE_BYTES"
+      },
+      "previousCandidate": {
+        "commit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+        "distributionManifestSHA256": "6d89bf20379cf08f0e34a4b437138278897f1f25bd3b2b632fc5b172ad32701f",
+        "format": "outpost-ci-candidate-1",
+        "manifestSHA256": "6be7729fa9bf59fcf0f1c982d3007c43fce85ba84e2f13871ae614e8c1c87d5c",
+        "nativeArchitecture": "amd64",
+        "repository": "nd4y/outpost",
+        "runAttempt": 1,
+        "runId": 43584314070,
+        "runtimeAcceptance": false,
+        "state": "VERIFIED_CANDIDATE_BYTES"
+      },
+      "helperSHA256": "755f5b9b11881fc438c366e86e87587cc53810af5c5ffd28ecab33642b940a77",
+      "sourceInputCount": 518,
+      "checks": [
+        {
+          "architecture": "amd64",
+          "state": "PASS",
+          "test": "image_and_enforced_isolation"
+        },
+        {
+          "cases": 3,
+          "state": "PASS",
+          "test": "unsafe_runtime_rejected_before_profile"
+        },
+        {
+          "clearSourceAbsent": true,
+          "node": "81fe0f6852473b33b97279a6e198cd3c3086378fc206b3c79ecf04a26ac872a1",
+          "state": "PASS",
+          "test": "explicit_installation"
+        },
+        {
+          "ciphertextObjects": 4,
+          "revision": 2,
+          "state": "PASS",
+          "test": "cached_start_upgrade_stop_and_rollback"
+        },
+        {
+          "services": 4,
+          "state": "PASS",
+          "test": "compose_profile_preserves_runtime_constraints"
+        },
+        {
+          "state": "PASS",
+          "test": "missing_or_readonly_volume_fails_without_fallback"
+        },
+        {
+          "bytes": 19456,
+          "sha256": "64d0df35d001f0834e61831fa3139d8a205473196231b9913fd0be08115c0d74",
+          "state": "PASS",
+          "test": "independent_recovery_after_source_removal"
+        }
+      ],
+      "installationImage": "sha256:5ce71d5b946000aae09017c990a217314ed4f79fa43f1e17f65c75e799ecae54",
+      "previousImage": "sha256:20cdfeffd6fc50f33cb0a304ae59b5e23e86ce616da9f29ef12abbce7c171edf",
+      "architectureExecutedHere": "amd64",
+      "nativeOtherArchitecture": "Separate exact native CI/strict selected-byte evidence; no arm64 emulation on this host",
+      "resourceProfile": {
+        "cpuPerContainer": 1,
+        "memoryMaxBytes": 805306368,
+        "swapBytes": 0,
+        "containers": 23,
+        "terminalExitCounts": {
+          "0": 18,
+          "5": 5
+        },
+        "actualCgroupSampled": 8,
+        "notRecorded": 15,
+        "sampledMemoryPeakMaximumBytes": 7811072,
+        "actualSamples": [
+          {
+            "memoryPeakBytes": 7811072,
+            "samples": 4,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4669440,
+            "samples": 7,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4567040,
+            "samples": 2,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4788224,
+            "samples": 3,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 6246400,
+            "samples": 16,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4816896,
+            "samples": 1,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4673536,
+            "samples": 15,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          },
+          {
+            "memoryPeakBytes": 4587520,
+            "samples": 10,
+            "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+          }
+        ],
+        "observerErrors": [
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError",
+          "FileNotFoundError"
+        ],
+        "limitation": "memory.peak is read only while the owned cgroup exists. Unsampled short-lived containers remain NOT_RECORDED; no headroom or whole-host peak claim.",
+        "refusalControls": "Expected nonzero exits and unsafe attempted profiles are validated by the seven checks, not counted as successful unsafe operation."
+      },
+      "pending": [
+        "cold-host-boot-order",
+        "production-infrastructure-admission",
+        "full-product-acceptance"
+      ],
+      "scope": "Seven unchanged actual downloaded-binary checks, scoped install/upgrade/rollback and19456-byte independent recovery. No product100GiB/physical boot/live deployment/release claim. Short-lived unsampled cgroups stay unknown; no whole-host peak/headroom claim.",
+      "rawLogSHA256": {
+        "installation-admission.json": "f797ffba7b4f1f8880aafb56984d19935309c40f739c252a0bdd36b6d44559cb",
+        "installation.log": "1f26a2bf5f136dd7750a922a80671d4c145e17163212b71cbd3c85e9f43daf82",
+        "installation-receipt.json": "099af621f1bf6cb7e54fd9e5a820e8ca6af465654deabd0e1505f2bfde1a4e6c",
+        "installed-versions.json": "909c75167e8239f87bdb597833e65b8d342f29d6c04ae94f4f0a8d17ddf32f3c",
+        "reverified-candidates.json": "a83dccc5219fa3a00c0c4991629a09b34a17ef7073e8d46b93e1ffd396e3c8de",
+        "container-resources.json": "19b971b40ad3db533f132fdbe3a84fd97309e079561b4ff1b86d5e0e80e9df7e"
+      }
+    }
+  ],
+  "collector": {
+    "status": "PASS_CURRENT_REAL_PINNED_COLLECTOR_BOTH_SIGNALS",
+    "observedAt": "2026-11-17T20:02:00.422290+00:00",
+    "collectorVersion": "0.163.2",
+    "collectorSHA256": "dbd12d55073b70add777895457040f8ede59fc1ee7198d6ae179a37087eea8bb",
+    "collectorBytes": 419160226,
+    "test": "internal/telemetry/collector_linux_test.go::TestTelemetryRealCollectorAcceptsBothSignals",
+    "testSeconds": 11.15,
+    "limits": {
+      "cpu": 1,
+      "memoryMaxBytes": 805306368,
+      "memoryPeakBytes": 597540864,
+      "memoryLimitEvents": 0,
+      "oom": 0,
+      "swapBytes": 0,
+      "fixtureOnlyExecTmpfsBytes": 536870912
+    },
+    "containerStartedAt": "2026-11-17T19:57:16.153046169Z",
+    "containerFinishedAt": "2026-11-17T19:58:04.445161377Z",
+    "scope": "Actual pinned child Collector receives logs+metrics via synthetic mTLS and exports original timestamps and unknown marker to local files. No live monitoring/endpoints/notifications, production profile or whole AT26/product claim.",
+    "rawLogSHA256": {
+      "admission.json": "8458ae1925dfecbac7a13147e0c9e1bb3c9a7135afb88e6fa9b49194964e2639",
+      "controller.log": "b3ec53b7bce19c778ea1415a2c8fff8c5f1739e3fe77ddf58de9d4a2409427e6",
+      "modules.log": "b4537ed75f533f993f371954de47e42a793b8e5b0587577de7e27fb3e50696bd",
+      "compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test-binary.sha256": "3c939ee4c236b762ae8d1e61c709cf756572c3c7a6b034b14cd2b3fae67ccccb",
+      "interop.log": "eb4e2bc8364dd62dc6bc1abdcc1501670fd5c19150147eccfe299f12052f6101",
+      "resources.log": "e571d5bfe0ed6581e8f1afb101622f8629f27768ffac94ad41a482a9fcbd060f",
+      "container-state.json": "5e53fa94236a62ca2c9296ed8be42a961ae747e5ab37b47391a948f184c7b3e3"
+    }
+  },
+  "asymmetric128": {
+    "status": "PASS_CURRENT_128MIB_AND_24_FRESH_READERS_FULL100_PENDING",
+    "observedAt": "2026-11-17T19:41:36.972492+00:00",
+    "sourceBytes": 134217728,
+    "changedBytes": 8388608,
+    "sourceTree": "74f1369b61258b8a05c2933f00e563af4d7a919a",
+    "testBinarySHA256": "896483804c27355b5bf40e7b4f0ea90a7f4f3a79b14ece5c526abe62ea481967",
+    "producerLogSHA256": "474ff84c4dfe7707d5a66bbcdf34ab4d0f98360cfa1dff74ced6c076c2f61286",
+    "matchedCases": 4,
+    "captures": 8,
+    "freshRestores": 24,
+    "freshOraclePhases": 24,
+    "reader": {
+      "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+      "binarySHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+      "restores": 24,
+      "namespace": "Each new no-network/non-root process mounts only immutable catalogs/objects, owner read-only recovery material/public trust, pinned executable and its empty output. No source/global index/runtime/operational keys. Hardlink immutable views share inodes and are not additional physical copies."
+    },
+    "profile": {
+      "cpu": 0.5,
+      "memoryMaxBytes": 536870912,
+      "memoryPeakBytes": 538021888,
+      "memoryLimitEvents": 2459,
+      "swapBytes": 0,
+      "oom": 0,
+      "readerCPU": 0.5,
+      "readerMemoryMaxBytes": 402653184,
+      "cohostedWithSoleSeparate100GiBProducer": false,
+      "applicationBodyCapsMbit": {
+        "a": 500,
+        "b": 500,
+        "c": 100,
+        "source": 1000
+      }
+    },
+    "actualIdleAdmission": true,
+    "sourceStateLimitBytes": 2147483648,
+    "sourceStateCheckpointBytes": [69632, 110592, 69632, 110592, 73728, 118784, 73728, 118784],
+    "consumerResources": [
+      {
+        "case": "complete-single",
+        "holder": 0,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 0,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 0,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 0,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 1,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 1,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 1,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 1,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 2,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 2,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 2,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-single",
+        "holder": 2,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 0,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 0,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 0,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 0,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 1,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 1,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 1,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 1,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 2,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 2,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 2,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "complete-paired",
+        "holder": 2,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 0,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 0,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 0,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 0,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 1,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 1,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 1,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 1,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 2,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 2,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 2,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-single",
+        "holder": 2,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 0,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 0,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 0,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 0,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 1,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 1,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 1,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 1,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 2,
+        "phase": "base",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 2,
+        "phase": "base",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 2,
+        "phase": "patched",
+        "action": "restore",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      },
+      {
+        "case": "split-paired",
+        "holder": 2,
+        "phase": "patched",
+        "action": "oracle-check",
+        "memoryMaxBytes": 402653184,
+        "memoryLimitEvents": 0,
+        "cpuQuota": 50000,
+        "cpuPeriod": 100000
+      }
+    ],
+    "maximumConsumerPeakBytes": 304132096,
+    "capturesAndFreshChecks": [
+      {
+        "case": "complete-single",
+        "phase": "base",
+        "generation": "fa2344ebfeac91e3e9d1278c9a965f479bcf7894b95483ba160a2f37c14585bf",
+        "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 134245367,
+        "allSourceRequestBodyBytes": 134314917,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 24269,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 788442.8943789087,
+        "initialBodyBytesPerSecondToSeal": 788605.2557411703,
+        "largePutIntervalsOverlap": false,
+        "sealedSeconds": 170.231387659,
+        "providerReleasedSeconds": 277.697984204,
+        "completeSeconds": 294.508302589,
+        "followerReadySeconds": 352.126967307,
+        "requestBodyBytes": {
+          "source>a": 134257707,
+          "source>b": 57210,
+          "b>a": 31680
+        },
+        "responseBodyBytes": {
+          "a>c": 141036592,
+          "a>source": 134336842,
+          "a>b": 134277047,
+          "b>source": 27121
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "940ee66b9489cbdf3efa4962c1aac7c0b2a28a7802602aca74d8bdbea6493bd4",
+            "bytes": 5366822,
+            "startedAt": "2026-11-17T18:33:56.429661217Z",
+            "durableResponseAt": "2026-11-17T18:33:58.173532157Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "2938d0cfef7144c59875983ba23e693f1a89a3628035a7b87dad055923e606c5",
+            "bytes": 8282892,
+            "startedAt": "2026-11-17T18:34:03.483112242Z",
+            "durableResponseAt": "2026-11-17T18:34:05.259843926Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "7b571f74bfcacd3fe7bf55ebdb205b08e11ca7b1d16f94741a6a1ce9704eb411",
+            "bytes": 6268464,
+            "startedAt": "2026-11-17T18:34:11.334615756Z",
+            "durableResponseAt": "2026-11-17T18:34:13.429151586Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "6b0641db1895069efe3101ff6d58a0a83b6745c30d8032c52cc0d8aa83904d03",
+            "bytes": 7862094,
+            "startedAt": "2026-11-17T18:34:20.083833972Z",
+            "durableResponseAt": "2026-11-17T18:34:22.165439137Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "a501f364941925c7a4a10020ce93dfcf588eebd633fc23dfcf5bb1e81bc00cce",
+            "bytes": 7761116,
+            "startedAt": "2026-11-17T18:34:30.283147582Z",
+            "durableResponseAt": "2026-11-17T18:34:32.085014375Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "9efa0771f6e2d60f09a7a435efd9ba3f2bdb8f9b3a84401ff90c60855b659c3c",
+            "bytes": 8356963,
+            "startedAt": "2026-11-17T18:34:38.942257479Z",
+            "durableResponseAt": "2026-11-17T18:34:41.094548403Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "0b083cd54d8af84de7ec4b3f226a65ebcaa0cc6e45040885f7b7630d93c64dd3",
+            "bytes": 6745097,
+            "startedAt": "2026-11-17T18:34:49.084160302Z",
+            "durableResponseAt": "2026-11-17T18:34:50.892496495Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "70838d1d1eb46eb4be4405868ba90c6de1dbb99e3db3370344a27864a14a84eb",
+            "bytes": 7519739,
+            "startedAt": "2026-11-17T18:34:57.321190793Z",
+            "durableResponseAt": "2026-11-17T18:34:59.566288456Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "65f91acf0c5adbf06d88662b48ba5acff2ba8147931675de888e4b3a317e62af",
+            "bytes": 6998317,
+            "startedAt": "2026-11-17T18:35:06.320355957Z",
+            "durableResponseAt": "2026-11-17T18:35:08.125409008Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "1d41de2b821acf287c75e95ed2c702284b6222af9c6cc6b76e25087be0105402",
+            "bytes": 8213082,
+            "startedAt": "2026-11-17T18:35:15.183166925Z",
+            "durableResponseAt": "2026-11-17T18:35:17.187761368Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "57f1528fcff2f9e67db9c8db66b26a9454d6ab5f438ccdf9cb71c06d54fe48ee",
+            "bytes": 8353541,
+            "startedAt": "2026-11-17T18:35:25.049162005Z",
+            "durableResponseAt": "2026-11-17T18:35:27.283432871Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "ebbeb4dac6c1c99b56124c9f54b17b0bd916986458f85e7fdcd3011401833a85",
+            "bytes": 8231192,
+            "startedAt": "2026-11-17T18:35:34.21632697Z",
+            "durableResponseAt": "2026-11-17T18:35:36.130167493Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "68f9addd685ef45c0091994ec49f76e4fabcde62b258a35e33eb3cd447cff60a",
+            "bytes": 6408800,
+            "startedAt": "2026-11-17T18:35:43.317891353Z",
+            "durableResponseAt": "2026-11-17T18:35:45.487653668Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "60d5295c7d2cf828bae87d422e2dc1b9f48c74fdc87bc42f9e73671254ee25f7",
+            "bytes": 7761047,
+            "startedAt": "2026-11-17T18:35:50.984049854Z",
+            "durableResponseAt": "2026-11-17T18:35:52.978351241Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "b5f289a476ac5bf49ca92625e9f064f6b48409f61c290573d8c8b8cb5396e68c",
+            "bytes": 7875076,
+            "startedAt": "2026-11-17T18:35:59.883212669Z",
+            "durableResponseAt": "2026-11-17T18:36:01.608891229Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "f3a620539346db33b46bf7327dd9705b96a62c45c9e52a6e41c5ebb69b7ba4a4",
+            "bytes": 7758985,
+            "startedAt": "2026-11-17T18:36:09.383203749Z",
+            "durableResponseAt": "2026-11-17T18:36:11.388128291Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "765024d3ea9a09bdb6d049b617ae84bfa2a25d297b51efd3c60511c3bbc01bcf",
+            "bytes": 7975722,
+            "startedAt": "2026-11-17T18:36:18.018325977Z",
+            "durableResponseAt": "2026-11-17T18:36:19.684612585Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "d676d1f87399c135c940af38d39e823645d76f4a329ea7b03e0782c12f0ea5e1",
+            "bytes": 6481691,
+            "startedAt": "2026-11-17T18:36:26.115297139Z",
+            "durableResponseAt": "2026-11-17T18:36:27.693637284Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "9e8725352a1a3fa5719b8993144e703b3758aa8817b75d376358f3a5f384ad6c",
+            "bytes": 24269,
+            "startedAt": "2026-11-17T18:36:31.720253515Z",
+            "durableResponseAt": "2026-11-17T18:36:31.988940028Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "609a696fd2b60c4162c116820db357d2171641bac842f24788457a98663d00c5",
+            "bytes": 458,
+            "startedAt": "2026-11-17T18:36:33.775779214Z",
+            "durableResponseAt": "2026-11-17T18:36:34.185899811Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 134245367,
+        "stagedPeerBodyBytesBeforeSeal": 134245367,
+        "requiredReplicaTimes": [
+          {
+            "node": "a",
+            "verifiedUnix": 1794940666
+          },
+          {
+            "node": "b",
+            "verifiedUnix": 1794940668
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794940666,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "fa2344ebfeac91e3e9d1278c9a965f479bcf7894b95483ba160a2f37c14585bf",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 39.130791773088276,
+            "oracleSeconds": 12.761070883949287,
+            "restoreMemoryPeakBytes": 301469696,
+            "oracleMemoryPeakBytes": 10682368,
+            "restoreLogSHA256": "4e04fe0a4365ffea0530da813eb3b9a40619f2cc82e144005523c7bde50e0f5a",
+            "oracleLogSHA256": "c53a0a7e1379c1175bec1d93dd8cf55c144121ea73dde63a1e16209e9513e742"
+          },
+          {
+            "holder": 1,
+            "generation": "fa2344ebfeac91e3e9d1278c9a965f479bcf7894b95483ba160a2f37c14585bf",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 41.32762135902885,
+            "oracleSeconds": 12.561064406996593,
+            "restoreMemoryPeakBytes": 304132096,
+            "oracleMemoryPeakBytes": 12148736,
+            "restoreLogSHA256": "69a8c97f7011d5e6531eb86d7242197bd875907c9a1a0aa16bef928acdcc8a3e",
+            "oracleLogSHA256": "bed138eff55c75acad6297e71e194ac83b38ee1dbabf38547d555e419b71f77d"
+          },
+          {
+            "holder": 2,
+            "generation": "fa2344ebfeac91e3e9d1278c9a965f479bcf7894b95483ba160a2f37c14585bf",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.66421788895968,
+            "oracleSeconds": 12.817918688990176,
+            "restoreMemoryPeakBytes": 298405888,
+            "oracleMemoryPeakBytes": 10715136,
+            "restoreLogSHA256": "39954fef85fd497538913be49978e7f53f6c6b1fcf354c8dbad444306df167e5",
+            "oracleLogSHA256": "10645ffe92d4111ab1999e14c35c001ff9fd21373360c93abe3dbb3493de26b1"
+          }
+        ]
+      },
+      {
+        "case": "complete-single",
+        "phase": "patched",
+        "generation": "35f04a0d20a265f83d6b4b848c7935916662dc8b17c202d3adfc64425483e00d",
+        "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 12885727,
+        "allSourceRequestBodyBytes": 12905291,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 49452,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 3021807.90263244,
+        "initialBodyBytesPerSecondToSeal": 290112.135408552,
+        "largePutIntervalsOverlap": false,
+        "sealedSeconds": 44.416366733,
+        "providerReleasedSeconds": 162.437307209,
+        "completeSeconds": 170.941287048,
+        "followerReadySeconds": 200.473723846,
+        "requestBodyBytes": {
+          "source>a": 12891077,
+          "source>b": 14214,
+          "b>a": 55935
+        },
+        "responseBodyBytes": {
+          "a>c": 12900903,
+          "a>source": 13049196,
+          "a>b": 12941662,
+          "b>source": 10688
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "97b26bd78bd7ff30153f8a38c53d99fc8a30de65c23ab61bf40efedb8744bd22",
+            "bytes": 7339753,
+            "startedAt": "2026-11-17T18:40:10.016278191Z",
+            "durableResponseAt": "2026-11-17T18:40:11.919854776Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "80f9d600d07ecac38c691ee46b94720d215cadc51df980a29c67f99a2ce21010",
+            "bytes": 5520333,
+            "startedAt": "2026-11-17T18:40:26.558125645Z",
+            "durableResponseAt": "2026-11-17T18:40:27.953837553Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "d6dc28cf25dfaa33f92483d6ac23d6a1db53766dc54a1528d11691f923a4c85d",
+            "bytes": 25183,
+            "startedAt": "2026-11-17T18:40:31.703310252Z",
+            "durableResponseAt": "2026-11-17T18:40:32.067649061Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "f21e7ab823ce0d3f6242563c4ff3ddf87dc6fb97cc1181b9599a85882e69202b",
+            "bytes": 458,
+            "startedAt": "2026-11-17T18:40:33.843918456Z",
+            "durableResponseAt": "2026-11-17T18:40:34.014496868Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 12885727,
+        "stagedPeerBodyBytesBeforeSeal": 12885727,
+        "requiredReplicaTimes": [
+          {
+            "node": "a",
+            "verifiedUnix": 1794940883
+          },
+          {
+            "node": "b",
+            "verifiedUnix": 1794940886
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794940883,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "35f04a0d20a265f83d6b4b848c7935916662dc8b17c202d3adfc64425483e00d",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 37.69917519809678,
+            "oracleSeconds": 13.6223561699735,
+            "restoreMemoryPeakBytes": 178409472,
+            "oracleMemoryPeakBytes": 12292096,
+            "restoreLogSHA256": "7b5c3dca8c0f1da6b0b06f7345ab6159ba37d6d2fd9074937ba9fe8a455edf40",
+            "oracleLogSHA256": "9ab823e31e8ce118e748f4f636a1a7afb956a5dc0949d9cb1a23bcd524836448"
+          },
+          {
+            "holder": 1,
+            "generation": "35f04a0d20a265f83d6b4b848c7935916662dc8b17c202d3adfc64425483e00d",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 37.20627138495911,
+            "oracleSeconds": 13.16935380792711,
+            "restoreMemoryPeakBytes": 174088192,
+            "oracleMemoryPeakBytes": 10702848,
+            "restoreLogSHA256": "2e27d58553cb1673932dc05c5633469d46d8bd5cb3f8c57cbcb8bf076e93296c",
+            "oracleLogSHA256": "2f97d2dad168896730a2a5aee174a24c7246d941adb1f32a964559a680397df0"
+          },
+          {
+            "holder": 2,
+            "generation": "35f04a0d20a265f83d6b4b848c7935916662dc8b17c202d3adfc64425483e00d",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 36.49234062200412,
+            "oracleSeconds": 13.361381141934544,
+            "restoreMemoryPeakBytes": 173592576,
+            "oracleMemoryPeakBytes": 12406784,
+            "restoreLogSHA256": "368d7cb97e3b1ed8bdb312f50fd2465b6dc24796c489759f6232cad7ff4110f1",
+            "oracleLogSHA256": "9dd374f24de0dbea6e32b4485e42925a49d3a01af2ed8e318baf6a40ec6244f9"
+          }
+        ]
+      },
+      {
+        "case": "complete-paired",
+        "phase": "base",
+        "generation": "fb0b2082e8c0f0a708fed4ae6405fd9ff879cedf7eb4f9dc52dbacf359fe3fd9",
+        "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 134245367,
+        "allSourceRequestBodyBytes": 134314917,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 24269,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 1007452.485366439,
+        "initialBodyBytesPerSecondToSeal": 1007659.9466285089,
+        "largePutIntervalsOverlap": true,
+        "sealedSeconds": 133.224871594,
+        "providerReleasedSeconds": 240.827885217,
+        "completeSeconds": 257.998216006,
+        "followerReadySeconds": 313.5947436,
+        "requestBodyBytes": {
+          "source>a": 69934380,
+          "source>b": 64380537,
+          "b>a": 32175
+        },
+        "responseBodyBytes": {
+          "a>source": 69993849,
+          "a>c": 140855985,
+          "a>b": 69936055,
+          "b>source": 64368878,
+          "b>a": 64341487
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "95c5d8a49838d7eb339ce4d2587d308ec10097d1c034adc97ba5363c61ac22ef",
+            "bytes": 5366822,
+            "startedAt": "2026-11-17T18:43:37.984941841Z",
+            "durableResponseAt": "2026-11-17T18:43:41.96302057Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "a872d7056d58283e1d3dc33ae26a5acf8f6a928d8d744580e7326fb47b9b3232",
+            "bytes": 8282892,
+            "startedAt": "2026-11-17T18:43:39.896180662Z",
+            "durableResponseAt": "2026-11-17T18:43:42.970319945Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "14718eb5bc30e80e1344ac0b15e46004ce3b4967b6113af7afe2e07efeb18aa7",
+            "bytes": 6268464,
+            "startedAt": "2026-11-17T18:43:50.057095543Z",
+            "durableResponseAt": "2026-11-17T18:43:54.50784374Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "8c8aa1cd5830e965aaa739f3d1636a427cff15c57db594a8da4cc7043de009b5",
+            "bytes": 7862094,
+            "startedAt": "2026-11-17T18:43:52.28268303Z",
+            "durableResponseAt": "2026-11-17T18:43:55.914640659Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "c52c1faa07b773656119c5a2b23cdf0485aa6176b256a9d8a8a9cd0f34aefc88",
+            "bytes": 7761116,
+            "startedAt": "2026-11-17T18:44:03.344022185Z",
+            "durableResponseAt": "2026-11-17T18:44:09.083652464Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "a6c38a1ee263de7662619dfa4c1761f65f15ce00c72f8966dca244a45666bdc9",
+            "bytes": 8356963,
+            "startedAt": "2026-11-17T18:44:05.830652857Z",
+            "durableResponseAt": "2026-11-17T18:44:09.827793323Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "2b4f8e8d50a68275eede740501ed81b2b056d02c8e8ac90b2410d2f0cd23063b",
+            "bytes": 6745097,
+            "startedAt": "2026-11-17T18:44:18.429374881Z",
+            "durableResponseAt": "2026-11-17T18:44:22.718697468Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "cf19f4aa8e8e0f920b4849255fbe6ce5845eaf22e2ce3939230c63d8983531cd",
+            "bytes": 7519739,
+            "startedAt": "2026-11-17T18:44:20.715564796Z",
+            "durableResponseAt": "2026-11-17T18:44:23.593477741Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "ca282ca469c7a106a54502c540c65acd4fb3b6d8c5520e10f520c3694468f3de",
+            "bytes": 6998317,
+            "startedAt": "2026-11-17T18:44:31.383181851Z",
+            "durableResponseAt": "2026-11-17T18:44:36.234406127Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "bf18963dc35929430780d869fa857ca521a90c57d049ded279054c288d479538",
+            "bytes": 8213082,
+            "startedAt": "2026-11-17T18:44:34.103944323Z",
+            "durableResponseAt": "2026-11-17T18:44:37.484549077Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "c6dfcdb3b41c56635e02b49399200c50d585b8499dbe3a2f51ed3bc26bb4a760",
+            "bytes": 8353541,
+            "startedAt": "2026-11-17T18:44:44.903447074Z",
+            "durableResponseAt": "2026-11-17T18:44:50.209424971Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "c3ef0cdcc3dcfb3ab40e06d42dec55387501d305e869a504d0100be4dcb1292a",
+            "bytes": 8231192,
+            "startedAt": "2026-11-17T18:44:47.414775852Z",
+            "durableResponseAt": "2026-11-17T18:44:50.838004897Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "68a8257cceed0089cdf67737cd8af7528b7df8dd0362de6f811135f544cb32ad",
+            "bytes": 6408800,
+            "startedAt": "2026-11-17T18:44:59.201946926Z",
+            "durableResponseAt": "2026-11-17T18:45:03.183521662Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "f98ea4309f7b9639b195b0f22f6d7deb04d0e2f69d5fb9a634f762c6bb10763b",
+            "bytes": 7761047,
+            "startedAt": "2026-11-17T18:45:04.62531783Z",
+            "durableResponseAt": "2026-11-17T18:45:06.520453663Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "16cf40a4475a648216dc3fd4f1a27d9cd4909c246bd21da1dd49a363f38c4b70",
+            "bytes": 7875076,
+            "startedAt": "2026-11-17T18:45:14.582604048Z",
+            "durableResponseAt": "2026-11-17T18:45:18.527428322Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "dbf6a298adac1839cc1a35a8438965e6890441ba974919b16fe01a525aec533d",
+            "bytes": 7758985,
+            "startedAt": "2026-11-17T18:45:15.704924744Z",
+            "durableResponseAt": "2026-11-17T18:45:18.655468794Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "4fc6accc0090680d49e0a7210c329260be9774d23f1acec5a566453c958ed884",
+            "bytes": 7975722,
+            "startedAt": "2026-11-17T18:45:26.882686513Z",
+            "durableResponseAt": "2026-11-17T18:45:29.724902126Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "b28c025ed525bcc50531a7c598eb1e21e29dee1b323f59db2b7105c5d8013415",
+            "bytes": 6481691,
+            "startedAt": "2026-11-17T18:45:28.526455021Z",
+            "durableResponseAt": "2026-11-17T18:45:30.982668926Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "580f3a1e629d238ab6493f242b350d589bb9a11e5e0eeff4132481b7d0706d1d",
+            "bytes": 24269,
+            "startedAt": "2026-11-17T18:45:36.549853055Z",
+            "durableResponseAt": "2026-11-17T18:45:37.01487542Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "db56dfcef3d71b3b67f2cb300f04402f5bf9e31a11e75feff541ee0f05489417",
+            "bytes": 458,
+            "startedAt": "2026-11-17T18:45:41.192935426Z",
+            "durableResponseAt": "2026-11-17T18:45:41.852075463Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 134245367,
+        "stagedPeerBodyBytesBeforeSeal": 134245367,
+        "requiredReplicaTimes": [
+          {
+            "node": "a",
+            "verifiedUnix": 1794941214
+          },
+          {
+            "node": "b",
+            "verifiedUnix": 1794941217
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794941214,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "fb0b2082e8c0f0a708fed4ae6405fd9ff879cedf7eb4f9dc52dbacf359fe3fd9",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.25902569806203,
+            "oracleSeconds": 12.714283086941577,
+            "restoreMemoryPeakBytes": 294338560,
+            "oracleMemoryPeakBytes": 10706944,
+            "restoreLogSHA256": "74050ca1e8ed1de1a8a367211324c26756aa60a6e5e3a29812078d7a2c681540",
+            "oracleLogSHA256": "f6e7d6c019fea9135d48408fe091614466c5592133356e81120da49468e20971"
+          },
+          {
+            "holder": 1,
+            "generation": "fb0b2082e8c0f0a708fed4ae6405fd9ff879cedf7eb4f9dc52dbacf359fe3fd9",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 39.36694944091141,
+            "oracleSeconds": 13.083726259996183,
+            "restoreMemoryPeakBytes": 301600768,
+            "oracleMemoryPeakBytes": 10727424,
+            "restoreLogSHA256": "d538ad9095d4350985304b4ea2c12c94483810fd7e508ca44ea7ba673491c308",
+            "oracleLogSHA256": "75b22db094466b1c7f5abdc497d72aab4440cf620a13e10e649ea9fb32abad87"
+          },
+          {
+            "holder": 2,
+            "generation": "fb0b2082e8c0f0a708fed4ae6405fd9ff879cedf7eb4f9dc52dbacf359fe3fd9",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.46775464795064,
+            "oracleSeconds": 12.359981480054557,
+            "restoreMemoryPeakBytes": 299667456,
+            "oracleMemoryPeakBytes": 10735616,
+            "restoreLogSHA256": "3f355ded9b4dbc6abd81d763a3a87d8a81910b95177a259a4a2b8feaf459af6a",
+            "oracleLogSHA256": "8221240821ef13eef132047c4d0437bb4681382bc494461203093bfeff89ae93"
+          }
+        ]
+      },
+      {
+        "case": "complete-paired",
+        "phase": "patched",
+        "generation": "85105721a85b4932d48aa4463e489f7cb37dc801f801faa78a071e0a021c1695",
+        "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 12885727,
+        "allSourceRequestBodyBytes": 12905291,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 49452,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 2841560.9101289744,
+        "initialBodyBytesPerSecondToSeal": 272807.3160483949,
+        "largePutIntervalsOverlap": false,
+        "sealedSeconds": 47.233802915,
+        "providerReleasedSeconds": 162.694707476,
+        "completeSeconds": 173.589064047,
+        "followerReadySeconds": 202.291843917,
+        "requestBodyBytes": {
+          "source>a": 7350743,
+          "source>b": 5554548,
+          "b>a": 56430
+        },
+        "responseBodyBytes": {
+          "a>source": 7499645,
+          "a>c": 12900425,
+          "a>b": 7396183,
+          "b>source": 5556749,
+          "b>a": 5545974
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "eadfbdcb0ff8d87174c301c3c8a3e3a0af0a2ac23aa6e1cd34b7b51c93af64e1",
+            "bytes": 7339753,
+            "startedAt": "2026-11-17T18:49:18.948080711Z",
+            "durableResponseAt": "2026-11-17T18:49:21.206615299Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "22db68e0359037ac661db84c95a7839ac10cc025bec01408ce3f74a578ad9947",
+            "bytes": 5520333,
+            "startedAt": "2026-11-17T18:49:35.182590825Z",
+            "durableResponseAt": "2026-11-17T18:49:36.635000883Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "980da98286121e2c57760a7d5064a602af3616d4a57fc268be9a8c6c1ec63d87",
+            "bytes": 25183,
+            "startedAt": "2026-11-17T18:49:40.543263637Z",
+            "durableResponseAt": "2026-11-17T18:49:41.133856972Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "c750546425d5a8ab8fa1429179bd804edccdd7e88d249c37ba97f2ae922d2206",
+            "bytes": 458,
+            "startedAt": "2026-11-17T18:49:42.706315283Z",
+            "durableResponseAt": "2026-11-17T18:49:42.96240167Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 12885727,
+        "stagedPeerBodyBytesBeforeSeal": 12885727,
+        "requiredReplicaTimes": [
+          {
+            "node": "a",
+            "verifiedUnix": 1794941432
+          },
+          {
+            "node": "b",
+            "verifiedUnix": 1794941435
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794941432,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "85105721a85b4932d48aa4463e489f7cb37dc801f801faa78a071e0a021c1695",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 36.394943627063185,
+            "oracleSeconds": 12.35959929402452,
+            "restoreMemoryPeakBytes": 179277824,
+            "oracleMemoryPeakBytes": 10674176,
+            "restoreLogSHA256": "5d2b5b1af6345380fdab257540ee589ae536a6d7743761b5432b13ec4ca67398",
+            "oracleLogSHA256": "30676ac19e8b042ed9dfabc7bada4558857134924f4b5806e26c3d0ef1a80044"
+          },
+          {
+            "holder": 1,
+            "generation": "85105721a85b4932d48aa4463e489f7cb37dc801f801faa78a071e0a021c1695",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 38.513686305028386,
+            "oracleSeconds": 13.064341133926064,
+            "restoreMemoryPeakBytes": 173400064,
+            "oracleMemoryPeakBytes": 10690560,
+            "restoreLogSHA256": "013673689a7d38b5596a45a58add8c91596346ad5dd47fd49d1db6773ce268fb",
+            "oracleLogSHA256": "31dd376e9806736477652b5f4ed4d316230ed21b7eaef1306ff89b903758b1dc"
+          },
+          {
+            "holder": 2,
+            "generation": "85105721a85b4932d48aa4463e489f7cb37dc801f801faa78a071e0a021c1695",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 36.19421101198532,
+            "oracleSeconds": 13.122374834958464,
+            "restoreMemoryPeakBytes": 173682688,
+            "oracleMemoryPeakBytes": 10698752,
+            "restoreLogSHA256": "0d92d6a327caf782681fb616b5066456b9fdd55a1d9efb049554d1c3cf4f0fe5",
+            "oracleLogSHA256": "b8355117b69dee25136b5059624150a2c5b603e4dacc7abc4480ba817608c8d3"
+          }
+        ]
+      },
+      {
+        "case": "split-single",
+        "phase": "base",
+        "generation": "7201d97678cf81e5cbe2bb97171273e3842e2ca1caf20b34e66857ec32bdad48",
+        "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 134245367,
+        "allSourceRequestBodyBytes": 134343547,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 24269,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 798489.5446748798,
+        "initialBodyBytesPerSecondToSeal": 798653.9749096492,
+        "largePutIntervalsOverlap": false,
+        "sealedSeconds": 168.089524647,
+        "providerReleasedSeconds": 176.295672923,
+        "completeSeconds": 508.450960403,
+        "followerReadySeconds": 609.630587433,
+        "requestBodyBytes": {
+          "b>a": 77715,
+          "source>a": 134266171,
+          "source>b": 77376
+        },
+        "responseBodyBytes": {
+          "a>b": 134323082,
+          "a>c": 134281289,
+          "a>source": 134401320,
+          "b>source": 27421
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "29f133a60525ef9b646f3bc35848e7a34f55358e275f1728fc80e332e62d1034",
+            "bytes": 5366822,
+            "startedAt": "2026-11-17T18:52:52.408671538Z",
+            "durableResponseAt": "2026-11-17T18:52:54.683516129Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "5ac6f893891a0a08483bdfa2584895df6a84d116ace945d8ae8cb9b58602be7f",
+            "bytes": 8282892,
+            "startedAt": "2026-11-17T18:52:58.484051797Z",
+            "durableResponseAt": "2026-11-17T18:53:00.379152862Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "e4991faebe747b89564ebcf0a9267896e460046b6c083ba7b73b51f76899b939",
+            "bytes": 6268464,
+            "startedAt": "2026-11-17T18:53:08.21663305Z",
+            "durableResponseAt": "2026-11-17T18:53:10.349358416Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "5bc7900346257006b136d712314aff31378936309a8a0413ecb37b940d29bd5b",
+            "bytes": 7862094,
+            "startedAt": "2026-11-17T18:53:14.117794707Z",
+            "durableResponseAt": "2026-11-17T18:53:16.183170511Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "24131d766c0c9f1f2b93e774cc110f73312a5e41c9049c210b1e39c665ee7f7a",
+            "bytes": 7761116,
+            "startedAt": "2026-11-17T18:53:24.028832735Z",
+            "durableResponseAt": "2026-11-17T18:53:25.698519901Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "bfb66be05f0ec1b42dd240dc90317f3ac9d46c223767401932bae71bda81a64e",
+            "bytes": 8356963,
+            "startedAt": "2026-11-17T18:53:30.32190608Z",
+            "durableResponseAt": "2026-11-17T18:53:32.686361934Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "749c3d803237e626fea2980c0c8dcf91946a61a6eef1c9e38fc46afcd57d5c4f",
+            "bytes": 6745097,
+            "startedAt": "2026-11-17T18:53:42.256601606Z",
+            "durableResponseAt": "2026-11-17T18:53:44.170116721Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "74a6581b6edfe98df24353581dd08784a31ca404537b8f88cce5eca5b9b2c463",
+            "bytes": 7519739,
+            "startedAt": "2026-11-17T18:53:52.706658857Z",
+            "durableResponseAt": "2026-11-17T18:53:55.297342993Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "78b223065492a713b403a8c96e92c9bfff37af54c1a24a14ea78bf27b658b20d",
+            "bytes": 6998317,
+            "startedAt": "2026-11-17T18:54:03.311185474Z",
+            "durableResponseAt": "2026-11-17T18:54:05.041987986Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "1ef19f41058449e261d0cc3035ec6f80d5a73ad0b96d72dbbfdb3d01a4f92a22",
+            "bytes": 8213082,
+            "startedAt": "2026-11-17T18:54:14.0831531Z",
+            "durableResponseAt": "2026-11-17T18:54:16.453739597Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "bffb965450a9b6a50cc66701a3395ec7a15b1307fe944326ccb9ad1b22040eca",
+            "bytes": 8353541,
+            "startedAt": "2026-11-17T18:54:24.658802502Z",
+            "durableResponseAt": "2026-11-17T18:54:27.244167522Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "aa74a9bc03d9e2e10e851c76ef2533060fd29870243efbc75eb8a3d8a9de267f",
+            "bytes": 8231192,
+            "startedAt": "2026-11-17T18:54:34.919622052Z",
+            "durableResponseAt": "2026-11-17T18:54:37.362504217Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "cab8a5d607eac08c8146b9ab1dd33cb6e46a0e93f7cf1d9769318dae1600fc82",
+            "bytes": 6408800,
+            "startedAt": "2026-11-17T18:54:41.708598623Z",
+            "durableResponseAt": "2026-11-17T18:54:43.477596188Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "e3b966cbf3601dcc4d1a35db7be95adfef8534a9f6280eec7b3d3fce34340aa5",
+            "bytes": 7761047,
+            "startedAt": "2026-11-17T18:54:47.783635628Z",
+            "durableResponseAt": "2026-11-17T18:54:50.023808553Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "4d1cca4bdf1c785ff85eb417d78ef246dcd10d61a0ab4e9e8578bf09d4c13897",
+            "bytes": 7875076,
+            "startedAt": "2026-11-17T18:54:55.120945153Z",
+            "durableResponseAt": "2026-11-17T18:54:57.405167658Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "e4e5f64807c74ef2ede389e08a68b994f90b2ef6add6133fe6d17b08cefa43e8",
+            "bytes": 7758985,
+            "startedAt": "2026-11-17T18:55:02.205050712Z",
+            "durableResponseAt": "2026-11-17T18:55:04.741074436Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "92751361ad0653ba7cf037677056e9f04d6444e8dead03dab09402ba64a2ec8e",
+            "bytes": 7975722,
+            "startedAt": "2026-11-17T18:55:08.582715332Z",
+            "durableResponseAt": "2026-11-17T18:55:10.932343128Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "c31011f2358dd3c65cc38eede335435c3cc2341a75a2cf8ce79106be08fd1968",
+            "bytes": 6481691,
+            "startedAt": "2026-11-17T18:55:18.505864822Z",
+            "durableResponseAt": "2026-11-17T18:55:20.528763049Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "47a8254402e3992a28ca97ee13a8682044308b390d09e55a3862446cd6487c9c",
+            "bytes": 24269,
+            "startedAt": "2026-11-17T18:55:23.126989174Z",
+            "durableResponseAt": "2026-11-17T18:55:23.96832925Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "a4d5b66227ff0a94884c055c1fb04ae66e0b51c88b8d742aa223f130e90c9e65",
+            "bytes": 458,
+            "startedAt": "2026-11-17T18:55:25.621139942Z",
+            "durableResponseAt": "2026-11-17T18:55:26.25993371Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 134245367,
+        "stagedPeerBodyBytesBeforeSeal": 70307447,
+        "requiredReplicaTimes": [
+          {
+            "node": "a",
+            "verifiedUnix": 1794941847
+          },
+          {
+            "node": "b",
+            "verifiedUnix": 1794941952
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794941847,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "7201d97678cf81e5cbe2bb97171273e3842e2ca1caf20b34e66857ec32bdad48",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.66522901901044,
+            "oracleSeconds": 12.813143934938125,
+            "restoreMemoryPeakBytes": 291221504,
+            "oracleMemoryPeakBytes": 10702848,
+            "restoreLogSHA256": "54fd48ea8d019037ef7f8557289091d0c68b0b7e878fa8ea08468c0dbe36b93c",
+            "oracleLogSHA256": "2910869c932cc0315d7a6e8178d6239d39e7cce28c4a4f5e6b82822bbaa98a5f"
+          },
+          {
+            "holder": 1,
+            "generation": "7201d97678cf81e5cbe2bb97171273e3842e2ca1caf20b34e66857ec32bdad48",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 37.64870565501042,
+            "oracleSeconds": 12.715488206013106,
+            "restoreMemoryPeakBytes": 300077056,
+            "oracleMemoryPeakBytes": 12206080,
+            "restoreLogSHA256": "7d70ba5afa2ab06e077c0d8f09d24125c14c39dfd46df4a2731f560533b745b9",
+            "oracleLogSHA256": "d16c5427ee006389d1f8419718ae75663ed26c60ccafa38884a929d6b519fe14"
+          },
+          {
+            "holder": 2,
+            "generation": "7201d97678cf81e5cbe2bb97171273e3842e2ca1caf20b34e66857ec32bdad48",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.014034381951205,
+            "oracleSeconds": 12.212977996910922,
+            "restoreMemoryPeakBytes": 301244416,
+            "oracleMemoryPeakBytes": 10686464,
+            "restoreLogSHA256": "992818b4c523d3322088cd9302067177b0081a7add41de1a01ce381246beaaf2",
+            "oracleLogSHA256": "5753830b5ee74d4ccd4778c47fa68efbaa1cc89d37bd4493b5a2edc12995abd8"
+          }
+        ]
+      },
+      {
+        "case": "split-single",
+        "phase": "patched",
+        "generation": "d5409d8094feb49419873cd15930349205f1697fe0eceadcfc8dea3e319695b7",
+        "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 12885727,
+        "allSourceRequestBodyBytes": 12919977,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 49452,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 2355993.9559715725,
+        "initialBodyBytesPerSecondToSeal": 226189.90339562073,
+        "largePutIntervalsOverlap": false,
+        "sealedSeconds": 56.968621528,
+        "providerReleasedSeconds": 63.029407424,
+        "completeSeconds": 215.547892486,
+        "followerReadySeconds": 259.141470997,
+        "requestBodyBytes": {
+          "b>a": 70785,
+          "source>a": 12899977,
+          "source>b": 20000
+        },
+        "responseBodyBytes": {
+          "a>b": 12956512,
+          "a>c": 12908330,
+          "a>source": 13070405,
+          "b>source": 8673
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "e36cf974053f3cfb3dd4b5403571d4e96a27bacae8cb03307ecb260740289f92",
+            "bytes": 7339753,
+            "startedAt": "2026-11-17T19:03:29.723288603Z",
+            "durableResponseAt": "2026-11-17T19:03:31.731146077Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "522e619fd0773dff95cf87b7f078477397d85a4227d8908e8af15abfb684dbbf",
+            "bytes": 5520333,
+            "startedAt": "2026-11-17T19:03:42.927184531Z",
+            "durableResponseAt": "2026-11-17T19:03:45.992975189Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "61faff88c310e395bb3b10cfa08e70217375e003aaca8f7e83f3703eb7120666",
+            "bytes": 25183,
+            "startedAt": "2026-11-17T19:03:51.179827196Z",
+            "durableResponseAt": "2026-11-17T19:03:52.423981942Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "781cb4f3c6e317f29af65a95fa0f5468be516dd3164a99c274043d3efdaa6281",
+            "bytes": 458,
+            "startedAt": "2026-11-17T19:03:55.644931781Z",
+            "durableResponseAt": "2026-11-17T19:03:55.876063076Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 12885727,
+        "stagedPeerBodyBytesBeforeSeal": 5520791,
+        "requiredReplicaTimes": [
+          {
+            "node": "a",
+            "verifiedUnix": 1794942297
+          },
+          {
+            "node": "b",
+            "verifiedUnix": 1794942306
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794942297,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "d5409d8094feb49419873cd15930349205f1697fe0eceadcfc8dea3e319695b7",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 36.49455709208269,
+            "oracleSeconds": 12.111914629000239,
+            "restoreMemoryPeakBytes": 177348608,
+            "oracleMemoryPeakBytes": 10727424,
+            "restoreLogSHA256": "517af7fd6f2874d7827e574e2e834fee794d5eff2fb4de3681655d029fcc575b",
+            "oracleLogSHA256": "d612a99cc555d17eea8e0209859bc5f2eb628469036b0835385a8af542742c35"
+          },
+          {
+            "holder": 1,
+            "generation": "d5409d8094feb49419873cd15930349205f1697fe0eceadcfc8dea3e319695b7",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 38.91733641899191,
+            "oracleSeconds": 12.509109159000218,
+            "restoreMemoryPeakBytes": 178524160,
+            "oracleMemoryPeakBytes": 10620928,
+            "restoreLogSHA256": "606359b9e5b143d48e65407bb2c24094b9db9d42ddb541140e3485c082106b79",
+            "oracleLogSHA256": "5657e491778792512ea91f42f00e74640a0ea6c3431fef9216cdcb1c1d9aa9e1"
+          },
+          {
+            "holder": 2,
+            "generation": "d5409d8094feb49419873cd15930349205f1697fe0eceadcfc8dea3e319695b7",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 37.1997404639842,
+            "oracleSeconds": 12.6656422119122,
+            "restoreMemoryPeakBytes": 173400064,
+            "oracleMemoryPeakBytes": 10702848,
+            "restoreLogSHA256": "119065e088a54c51d126f65aea66c898c291444df8b0d3cda49885c4b87ef210",
+            "oracleLogSHA256": "7eae3b23d7f028c071eb6c1a68f3819bfa69561b072ac4bc1a6bb9202382da3d"
+          }
+        ]
+      },
+      {
+        "case": "split-paired",
+        "phase": "base",
+        "generation": "41e4ca57b8d9833707984237491b2a5637a11b9490733ada3311f6cd8348911f",
+        "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 134245367,
+        "allSourceRequestBodyBytes": 134376981,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 24269,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 927438.3288226562,
+        "initialBodyBytesPerSecondToSeal": 927629.3130417478,
+        "largePutIntervalsOverlap": true,
+        "sealedSeconds": 144.718763317,
+        "providerReleasedSeconds": 150.800191425,
+        "completeSeconds": 401.072545366,
+        "followerReadySeconds": 483.046591101,
+        "requestBodyBytes": {
+          "b>a": 47025,
+          "source>b": 56049488,
+          "source>a": 78327493
+        },
+        "responseBodyBytes": {
+          "b>a": 55975248,
+          "b>source": 56025702,
+          "a>b": 78317144,
+          "a>source": 78353466,
+          "a>c": 140757235
+        },
+        "initialObjectRequests": [
+          {
+            "node": "b",
+            "object": "e416738fd3adc66f1a618b10b7fd680651d8a7c0e608e781853582899ecf0690",
+            "bytes": 5366822,
+            "startedAt": "2026-11-17T19:07:59.799647924Z",
+            "durableResponseAt": "2026-11-17T19:08:02.327804219Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "45ccd86af6b4c9a97e78be30f7764a0be347b93cc1d94b65ec695acef3cac570",
+            "bytes": 8282892,
+            "startedAt": "2026-11-17T19:08:00.4341463Z",
+            "durableResponseAt": "2026-11-17T19:08:03.274204356Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "30b13ed381533d166fefa5b634792830349413c4f76ccb0dc6917a280bde47f2",
+            "bytes": 6268464,
+            "startedAt": "2026-11-17T19:08:06.439362603Z",
+            "durableResponseAt": "2026-11-17T19:08:08.556362862Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "15a921fa3282e374ee14afaee0abf4787f9cdbdfb959e93af9e892c308158cee",
+            "bytes": 7862094,
+            "startedAt": "2026-11-17T19:08:13.999040867Z",
+            "durableResponseAt": "2026-11-17T19:08:18.536528547Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "9ac3d2ae35f91b31417ccd969cc9cab5fdf1ffe6f976e915d5f46b71e38b7e5c",
+            "bytes": 7761116,
+            "startedAt": "2026-11-17T19:08:18.121481881Z",
+            "durableResponseAt": "2026-11-17T19:08:22.217218699Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "1fce587bcc0038c88fd3f0d5a8b7d89bc1b8541fa900f5c6467789b87525105e",
+            "bytes": 8356963,
+            "startedAt": "2026-11-17T19:08:32.183190276Z",
+            "durableResponseAt": "2026-11-17T19:08:36.511010966Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "1b8c04c08d60104d78a0cfdfd034b4226005ed7237c76a85b351935695384a96",
+            "bytes": 6745097,
+            "startedAt": "2026-11-17T19:08:37.202378311Z",
+            "durableResponseAt": "2026-11-17T19:08:39.888503453Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "460e42893b448c2d0824d4ef0088ba3d4b3fe6f2126b01ab5ef472876466e3dc",
+            "bytes": 7519739,
+            "startedAt": "2026-11-17T19:08:46.586062491Z",
+            "durableResponseAt": "2026-11-17T19:08:51.611822618Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "cd4cac2d39d124e4b07dc6fc161a9cd9f91874d097ca95c43abf818b133e8588",
+            "bytes": 6998317,
+            "startedAt": "2026-11-17T19:08:48.698660861Z",
+            "durableResponseAt": "2026-11-17T19:08:52.046930202Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "c90113d33c35b27ae7becf1b4e0c03f2ddbf11d1ab5a81f42e0059053d389d45",
+            "bytes": 8213082,
+            "startedAt": "2026-11-17T19:09:04.522255258Z",
+            "durableResponseAt": "2026-11-17T19:09:09.403803896Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "5aea7e443d4486635dc16e405d86ae57fbec852d6349ecea15f4aeb559c9eac5",
+            "bytes": 8353541,
+            "startedAt": "2026-11-17T19:09:05.637829577Z",
+            "durableResponseAt": "2026-11-17T19:09:09.7909032Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "9f167ba175abf77c0c6bbae99c0516a8e4a2a713faba1267b46d4ee52ecfd0fc",
+            "bytes": 8231192,
+            "startedAt": "2026-11-17T19:09:15.416518568Z",
+            "durableResponseAt": "2026-11-17T19:09:19.434053367Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "5e252477862d8da1f578e154e006169e2c89e732d1db3b2435ca9b3d4c03ccf9",
+            "bytes": 6408800,
+            "startedAt": "2026-11-17T19:09:20.304796885Z",
+            "durableResponseAt": "2026-11-17T19:09:23.883817353Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "32c18d061bfb06fe09378af8070bd363f202dfa5b1b8323dfef54aabf6d22770",
+            "bytes": 7761047,
+            "startedAt": "2026-11-17T19:09:25.522565318Z",
+            "durableResponseAt": "2026-11-17T19:09:28.410971217Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "c22480508cc355d17042f55b5e462d0b7662b5bd532beaec5c6a658a27bd8269",
+            "bytes": 7875076,
+            "startedAt": "2026-11-17T19:09:34.799176093Z",
+            "durableResponseAt": "2026-11-17T19:09:39.878828411Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "346e1b82ef3ea3e213e98e17356674748bda023610dfb5e5aa8b496f30a30be2",
+            "bytes": 7758985,
+            "startedAt": "2026-11-17T19:09:38.515228325Z",
+            "durableResponseAt": "2026-11-17T19:09:42.300086752Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "bbb898037c57eb0cd5cd39703ea816cc0336ba371b4699b5d7220d40faa2c11d",
+            "bytes": 7975722,
+            "startedAt": "2026-11-17T19:09:47.118819327Z",
+            "durableResponseAt": "2026-11-17T19:09:50.160654996Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "a66203cd869daaf08d66b088d6604a07e39f05f78d6c68f2ab33ea3e7b88d567",
+            "bytes": 6481691,
+            "startedAt": "2026-11-17T19:09:48.548951435Z",
+            "durableResponseAt": "2026-11-17T19:09:52.604909157Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "2a1b5c523b0f4e57ee3513c5bd56c3d29eb028b6078f2a4911f5ee46173ab810",
+            "bytes": 24269,
+            "startedAt": "2026-11-17T19:09:56.639832746Z",
+            "durableResponseAt": "2026-11-17T19:09:59.147538084Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "5b5024279d4a6ba0efbdeeb495f7abdce9648adbf1e62f98aa1a613eb76bc826",
+            "bytes": 458,
+            "startedAt": "2026-11-17T19:10:04.400820109Z",
+            "durableResponseAt": "2026-11-17T19:10:06.144033116Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 134245367,
+        "stagedPeerBodyBytesBeforeSeal": 36818622,
+        "requiredReplicaTimes": [
+          {
+            "node": "b",
+            "verifiedUnix": 1794942802
+          },
+          {
+            "node": "a",
+            "verifiedUnix": 1794942770
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794942770,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "41e4ca57b8d9833707984237491b2a5637a11b9490733ada3311f6cd8348911f",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.81495265197009,
+            "oracleSeconds": 11.756086159031838,
+            "restoreMemoryPeakBytes": 301338624,
+            "oracleMemoryPeakBytes": 10711040,
+            "restoreLogSHA256": "ca4c0fa293ef2e5dc71bee9b22d420e3a812037fee0d2db994c7b4ae9e4100eb",
+            "oracleLogSHA256": "a6fe8816d99d475de309feeee7b2f8f02cc4c39ae46f29d9e98165c0d3c78905"
+          },
+          {
+            "holder": 1,
+            "generation": "41e4ca57b8d9833707984237491b2a5637a11b9490733ada3311f6cd8348911f",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 39.363635924994014,
+            "oracleSeconds": 12.862318743020296,
+            "restoreMemoryPeakBytes": 286388224,
+            "oracleMemoryPeakBytes": 14020608,
+            "restoreLogSHA256": "385cb7d551b5f68e705961a785e4fc784bf9425a47ddd6d3c3992fa36d0da750",
+            "oracleLogSHA256": "0e2977b49da179c100c6565c90d9c8fb464b7bcf2150297c7d1a203bdf1b43a5"
+          },
+          {
+            "holder": 2,
+            "generation": "41e4ca57b8d9833707984237491b2a5637a11b9490733ada3311f6cd8348911f",
+            "bytes": 134217728,
+            "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+            "attributesVerified": true,
+            "restoreSeconds": 38.90486427291762,
+            "oracleSeconds": 13.120347494957969,
+            "restoreMemoryPeakBytes": 298795008,
+            "oracleMemoryPeakBytes": 10653696,
+            "restoreLogSHA256": "4fc8ae1dbb65c379bff27a7bf9c98b7881a63a4ae3497046a25f6d70d16a3199",
+            "oracleLogSHA256": "cd69d01f60f6aa372c1569434202e07a51ef89d6d135b27375a6c11ba54a2630"
+          }
+        ]
+      },
+      {
+        "case": "split-paired",
+        "phase": "patched",
+        "generation": "7ebd6da7ade65837570f7cb25ce10a6376ddd4bf61d23b244afb6c38b3704120",
+        "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+        "sourceReadBytes": 134217728,
+        "initialObjectBodyBytes": 12885727,
+        "allSourceRequestBodyBytes": 12928957,
+        "duplicateObjectBodyBytes": 0,
+        "ciphertextReadbackBytes": 49452,
+        "requiredProofRefused": true,
+        "sourceReadBytesPerSecondToSeal": 3137066.6742241755,
+        "initialBodyBytesPerSecondToSeal": 301177.686041971,
+        "largePutIntervalsOverlap": false,
+        "sealedSeconds": 42.784467765,
+        "providerReleasedSeconds": 48.670915502,
+        "completeSeconds": 214.802097665,
+        "followerReadySeconds": 263.922743308,
+        "requestBodyBytes": {
+          "b>a": 65835,
+          "source>b": 46977,
+          "source>a": 12881980
+        },
+        "responseBodyBytes": {
+          "b>a": 25641,
+          "b>source": 84234,
+          "a>b": 12925921,
+          "a>source": 12996174,
+          "a>c": 12910242
+        },
+        "initialObjectRequests": [
+          {
+            "node": "a",
+            "object": "3e89eeee7fc94064b09031b94c2c9a55df7b1dd7eb9cd119d4616e72c8047001",
+            "bytes": 7339753,
+            "startedAt": "2026-11-17T19:16:21.086047407Z",
+            "durableResponseAt": "2026-11-17T19:16:23.95005041Z",
+            "status": 200
+          },
+          {
+            "node": "a",
+            "object": "1ffa16ebcafcda972f2fb7580017d84f9f12665e72f804150f01246bbcb8e827",
+            "bytes": 5520333,
+            "startedAt": "2026-11-17T19:16:35.983827145Z",
+            "durableResponseAt": "2026-11-17T19:16:37.93329328Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "23276f3ce98f30568104c271bf6605d7156252f3e25e679a0f1842d31442901a",
+            "bytes": 25183,
+            "startedAt": "2026-11-17T19:16:39.853917501Z",
+            "durableResponseAt": "2026-11-17T19:16:40.212621378Z",
+            "status": 200
+          },
+          {
+            "node": "b",
+            "object": "ad758c8fa0118af6dc62c4da242f6daa0c6e87e771e05e45df8f8f53ba6c5110",
+            "bytes": 458,
+            "startedAt": "2026-11-17T19:16:41.292712549Z",
+            "durableResponseAt": "2026-11-17T19:16:41.438688734Z",
+            "status": 200
+          }
+        ],
+        "stagedPeerBodyBytes": 12885727,
+        "stagedPeerBodyBytesBeforeSeal": 0,
+        "requiredReplicaTimes": [
+          {
+            "node": "b",
+            "verifiedUnix": 1794943076
+          },
+          {
+            "node": "a",
+            "verifiedUnix": 1794943073
+          }
+        ],
+        "firstRequiredReplicaVerifiedUnix": 1794943073,
+        "freshReaderChecks": [
+          {
+            "holder": 0,
+            "generation": "7ebd6da7ade65837570f7cb25ce10a6376ddd4bf61d23b244afb6c38b3704120",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 36.34513142006472,
+            "oracleSeconds": 13.011447916040197,
+            "restoreMemoryPeakBytes": 174718976,
+            "oracleMemoryPeakBytes": 10690560,
+            "restoreLogSHA256": "f45a557127a89deebcfdb348bb2e73c39b2d11c30fc2f89173e1aca86739fcb0",
+            "oracleLogSHA256": "7ed0e13714b5936655b8227ba53b36cfdac151697551a10384e60b01a74e43ff"
+          },
+          {
+            "holder": 1,
+            "generation": "7ebd6da7ade65837570f7cb25ce10a6376ddd4bf61d23b244afb6c38b3704120",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 39.472404510946944,
+            "oracleSeconds": 13.060542253078893,
+            "restoreMemoryPeakBytes": 176152576,
+            "oracleMemoryPeakBytes": 10645504,
+            "restoreLogSHA256": "229830cd5bbcea24f662f7fb018e54a0ad477660d261e72aafc35f05ee6a6da0",
+            "oracleLogSHA256": "0eb376615d1fc60064933901797f84560b2a33a9e5def0280a7be468455c496d"
+          },
+          {
+            "holder": 2,
+            "generation": "7ebd6da7ade65837570f7cb25ce10a6376ddd4bf61d23b244afb6c38b3704120",
+            "bytes": 134217728,
+            "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+            "attributesVerified": true,
+            "restoreSeconds": 37.55952604603954,
+            "oracleSeconds": 12.866154000977986,
+            "restoreMemoryPeakBytes": 173473792,
+            "oracleMemoryPeakBytes": 11702272,
+            "restoreLogSHA256": "66acdc2181f874091c45a3550103f7fc56d0ae58e1b85a9593f21ee021c5e133",
+            "oracleLogSHA256": "5ff75a8e9b11b25d0288dcb396e28f8788f6ac9ee941c1c62d11c03623e08bc2"
+          }
+        ]
+      }
+    ],
+    "limits": [
+      "128MiB is bounded rehearsal, not specified physical100GiB acceptance.",
+      "Changed-input full-byte oracle is a separately reported preparation read before capture counters/timing. All 24 later actual fresh-reader restores independently match the saved input hash and attributes.",
+      "Application-body caps and source/receiver timing use the declared isolated fixture CPU/HDD and deliberate proof refusal; no raw-wire saturation, universal PUT overlap or speedup guarantee.",
+      "Holder stores are 3 physically separate complete replicas on one test HDD; no separate host/controller failure-domain claim.",
+      "The selected previous-format executable remains a compatibility check, not a published release or real source/provider/production admission."
+    ],
+    "legacyProducerTimingFlagBoundary": "Legacy producer field uses not-full; actual admission has no concurrent source when allowedSourceContainer is null. Raw terminal unchanged."
+  },
+  "remaining": [
+    "Physical100GiB four-case asymmetry and24fresh readers",
+    "Physical100GiB three-worker S3-compatible/WebDAV and7fresh readers",
+    "Final distinct acceptance of applicable53requirements/35scenarios"
+  ],
+  "holds": [
+    "Physical host boot and real infrastructure/source/storage/monitoring profiles remain separate",
+    "No merge, release/tag, deployment, actual endpoint/account/notification enrollment, working-service or network/storage-capacity changes"
+  ],
+  "interfaceTrace": {
+    "observedAt": "2026-11-17T21:03:31.926404+00:00",
+    "head": "6571b24b58025b8e46ff71f70f471d2abd21ce4b",
+    "requirement": "REQ-49",
+    "scenario": "AT-31",
+    "missingDirectLinks": [
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIConfigSigningAndNoOverwriteWithUnicodePaths"
+      },
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIStableErrorsDoNotExposeSensitivePaths"
+      },
+      {
+        "path": "cmd/outpost/cli_flow_linux_test.go",
+        "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+      }
+    ],
+    "previousUniqueCount": 636,
+    "existingUnregisteredCases": [
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIConfigSigningAndNoOverwriteWithUnicodePaths"
+      },
+      {
+        "path": "cmd/outpost/main_linux_test.go",
+        "name": "TestCLIStableErrorsDoNotExposeSensitivePaths"
+      }
+    ],
+    "codeOrBehaviorGapFound": false,
+    "all527InputsUnchanged": true,
+    "newRuntimeTests": 0,
+    "runtimeEvidenceSourceCommit": "6571b24b58025b8e46ff71f70f471d2abd21ce4b",
+    "prototypeJob": 134336035252,
+    "cliPackageExecution": "2026-11-17T20:15:00.6389663Z ok  \tgithub.com/nd4y/outpost/cmd/outpost\t7.938s",
+    "nativeSelectedFlow": {
+      "amd64": {
+        "namedPass": "2026-11-17T20:24:19.7586309Z --- PASS: TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory (1.21s)",
+        "summary": "2026-11-17T20:24:19.7491372Z     cli_flow_linux_test.go:379: CLI_PROCESS_FLOW_PASS revision=6571b24b58025b8e46ff71f70f471d2abd21ce4b bytes=2097152 versions=2 workers=2 independent-immutable-restores=4 source-and-center-offline=true"
+      },
+      "arm64": {
+        "namedPass": "2026-11-17T20:23:55.6598899Z --- PASS: TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory (1.17s)",
+        "summary": "2026-11-17T20:23:55.6535355Z     cli_flow_linux_test.go:379: CLI_PROCESS_FLOW_PASS revision=6571b24b58025b8e46ff71f70f471d2abd21ce4b bytes=2097152 versions=2 workers=2 independent-immutable-restores=4 source-and-center-offline=true"
+      }
+    },
+    "browserJob": 134336035379,
+    "browserCases": 31,
+    "manualFrontendFilesUnchanged": {
+      "internal/management/ui/app.css": "84b4fb6265c517658c42d6ada436ec21d419c100a5ea3f267f7c16a1805244c8",
+      "internal/management/ui/app.js": "00156210efd31b07464f1cac5270d74b81267736ec6718d09d203914282fb5dc",
+      "internal/management/ui/index.html": "3af8e444fde02c0902e907a8c4c59fee2833fc22831098c1d907e0fb7642306b",
+      "internal/management/ui/journal.js": "2f59e631cdbeef07ff77c64b2c9acfd9f42143574395be37e296d12062969eb7",
+      "internal/management/ui_linux.go": "f44ff342b293c6980534880baf0ec17c63f47194a38c82f4909f0f975c4c3f1c"
+    },
+    "manualObservedAt": "2026-11-14T14:16:26.388549+00:00",
+    "signalBoundary": "Existing actual CLI flow sends SIGTERM and requires graceful child join; canceled-error mapping separately verifies130. No separately executed SIGINT-process result is claimed.",
+    "status": "DIRECT_EXISTING_CLI_TRACE_REPAIRED_NO_EXECUTABLE_CHANGE",
+    "uniqueChecksAfter": 638,
+    "scope": "Direct existing CLI checks for Unicode/spaced key paths, no overwrite, stable error/exit mapping and actual selected SIGTERM daemon stop. Current 31 browser scenarios and byte-identical scoped manual EN/RU keyboard/focus/320px evidence remain distinct. No new test, screen-reader, wider-device, separately executed SIGINT-process or whole AT-31/product assertion."
+  }
+}
