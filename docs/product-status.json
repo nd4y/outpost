@@ -9125,6 +9125,10 @@
           "name": "TestScaleRetainedTrafficUsesActualMultipartIDs"
         },
         {
+          "path": "internal/upload/scale_linux_test.go",
+          "name": "TestScaleUnchangedPartsSeparateSignedCatalog"
+        },
+        {
           "path": "internal/sourceagent/unavailable_linux_test.go",
           "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
         }

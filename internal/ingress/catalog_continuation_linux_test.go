@@ -142,6 +142,18 @@ func testCatalogContinuation(t *testing.T, mode string, reopen bool) {
 			break
 		}
 		if step == 0 && reopen {
+			cue := client.catalogResume.Load()
+			if cue == nil || cue.id != storage.Hash(raw) || cue.objects != progress.TotalObjects {
+				t.Fatal("continuation did not retain the verified digest and dependency count")
+			}
+			before := calls.Load()
+			changed := append(bytes.Clone(raw), ' ')
+			if _, _, e := client.FinishStep(ctx, changed); !errors.Is(e, ErrDenied) {
+				t.Fatal("changed catalog used the existing continuation", e)
+			}
+			if calls.Load() != before || client.catalogResume.Load() != cue {
+				t.Fatal("invalid local catalog changed the remote operation or continuation")
+			}
 			func() {
 				wireMu.Lock()
 				defer wireMu.Unlock()

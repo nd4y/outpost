@@ -271,6 +271,11 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 	return &http.Server{Handler: handler, TLSConfig: config, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: limits.Timeout, WriteTimeout: limits.Timeout, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 << 10}, nil
 }
 
+type catalogContinuation struct {
+	id      string
+	objects int
+}
+
 type Client struct {
 	http                         *http.Client
 	endpoint                     *url.URL
@@ -284,7 +289,7 @@ type Client struct {
 	peerPublicationGrant         []byte
 	inspection                   bool
 	settlement                   []byte
-	catalogResume                atomic.Pointer[string]
+	catalogResume                atomic.Pointer[catalogContinuation]
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
 type countedBody struct {
@@ -569,17 +574,29 @@ func (c *Client) FinishStep(ctx context.Context, raw []byte) (result generation.
 	if e != nil {
 		return result, nil, e
 	}
-	catalog, e := generation.VerifyCatalog(raw, a.Trust)
-	if e != nil || !c.intent.matches(catalog) {
+	if len(raw) == 0 || len(raw) > generation.MaxCatalog {
 		return result, nil, ErrDenied
-	}
-	refs, e := generation.Dependencies(raw, a.Trust)
-	if e != nil {
-		return result, nil, e
 	}
 	id := storage.Hash(raw)
 	payload, resumeID := raw, ""
 	cue := c.catalogResume.Load()
+	var objects int
+	if cue != nil && cue.id == id {
+		// This digest was verified with this client's immutable intent and
+		// authority before the receiver confirmed partial progress.
+		objects = cue.objects
+		payload, resumeID = nil, id
+	} else {
+		catalog, e := generation.VerifyCatalog(raw, a.Trust)
+		if e != nil || !c.intent.matches(catalog) {
+			return result, nil, ErrDenied
+		}
+		refs, e := generation.Dependencies(raw, a.Trust)
+		if e != nil {
+			return result, nil, e
+		}
+		objects = len(refs)
+	}
 	defer func() {
 		if err != nil && cue != nil {
 			// Include malformed progress and failed final readback. Another
@@ -587,15 +604,12 @@ func (c *Client) FinishStep(ctx context.Context, raw []byte) (result generation.
 			c.catalogResume.CompareAndSwap(cue, nil)
 		}
 	}()
-	if cue != nil && *cue == id {
-		payload, resumeID = nil, id
-	}
 	status, headers, body, e := c.requestCatalog(ctx, http.MethodPut, "catalog", nil, payload, 8192, resumeID)
 	if e != nil {
 		return result, nil, e
 	}
 	var reply finishReply
-	if decodeReply(body, &reply) != nil || reply.Progress.Generation != storage.Hash(raw) || reply.Progress.TotalObjects != len(refs) || reply.Progress.VerifiedObjects < 0 || reply.Progress.VerifiedObjects > reply.Progress.TotalObjects || reply.Progress.ReadBytes < 0 || reply.Progress.ReadBytes > 256<<20 || reply.Progress.WrittenBytes < 0 || reply.Progress.WrittenBytes > 256<<20 {
+	if decodeReply(body, &reply) != nil || reply.Progress.Generation != id || reply.Progress.TotalObjects != objects || reply.Progress.VerifiedObjects < 0 || reply.Progress.VerifiedObjects > reply.Progress.TotalObjects || reply.Progress.ReadBytes < 0 || reply.Progress.ReadBytes > 256<<20 || reply.Progress.WrittenBytes < 0 || reply.Progress.WrittenBytes > 256<<20 {
 		return result, nil, ErrProtocol
 	}
 	if status == http.StatusAccepted {
@@ -603,13 +617,13 @@ func (c *Client) FinishStep(ctx context.Context, raw []byte) (result generation.
 			return result, nil, ErrProtocol
 		}
 		if hints := headers.Values(catalogResumeHeader); len(hints) == 1 && hints[0] == id {
-			c.catalogResume.Store(&id)
+			c.catalogResume.Store(&catalogContinuation{id: id, objects: objects})
 		}
 		return reply.Progress, nil, nil
 	}
 	r := reply.Receipt
 	i := c.intent
-	if !reply.Progress.Complete || reply.Progress.VerifiedObjects != reply.Progress.TotalObjects || r == nil || r.Operation != i.Operation || r.Ingress != i.Ingress || r.Tenant != i.Tenant || r.Domain != i.Domain || r.Generation != storage.Hash(raw) || r.NewBytes < 0 || r.NewBytes > i.MaxBytes || r.NewObjects < 0 || r.NewObjects > i.MaxObjects || r.VerifiedAt < i.NotBefore || r.VerifiedAt > time.Now().Unix() {
+	if !reply.Progress.Complete || reply.Progress.VerifiedObjects != reply.Progress.TotalObjects || r == nil || r.Operation != i.Operation || r.Ingress != i.Ingress || r.Tenant != i.Tenant || r.Domain != i.Domain || r.Generation != id || r.NewBytes < 0 || r.NewBytes > i.MaxBytes || r.NewObjects < 0 || r.NewObjects > i.MaxObjects || r.VerifiedAt < i.NotBefore || r.VerifiedAt > time.Now().Unix() {
 		return result, nil, ErrProtocol
 	}
 	_, _, published, e := c.request(ctx, http.MethodGet, "catalog", nil, nil, generation.MaxCatalog)

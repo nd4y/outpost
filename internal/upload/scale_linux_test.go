@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -135,11 +136,16 @@ func externalScaleRead(root *os.Root, name string, maximum int64) ([]byte, error
 	return root.ReadFile(name)
 }
 
+type externalScalePartWrites struct {
+	requests int
+	bytes    int64
+}
+
 type externalScaleTraffic struct {
 	mu        sync.Mutex
 	putBytes  int64
 	partBytes int64
-	partPUTs  map[string]int
+	partPUTs  map[string]externalScalePartWrites
 	partGETs  map[string]int
 }
 
@@ -270,7 +276,11 @@ func (c *externalScaleTraffic) observe(_ http.ResponseWriter, r *http.Request, _
 		c.putBytes += int64(len(body))
 		if strings.HasPrefix(key, "part-") {
 			c.partBytes += int64(len(body))
-			c.partPUTs[strings.TrimPrefix(key, "part-")]++
+			id := strings.TrimPrefix(key, "part-")
+			writes := c.partPUTs[id]
+			writes.requests++
+			writes.bytes += int64(len(body))
+			c.partPUTs[id] = writes
 		}
 		c.mu.Unlock()
 	}
@@ -281,7 +291,7 @@ func (c *externalScaleTraffic) reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.putBytes, c.partBytes = 0, 0
-	c.partPUTs = map[string]int{}
+	c.partPUTs = map[string]externalScalePartWrites{}
 	c.partGETs = map[string]int{}
 }
 
@@ -305,6 +315,34 @@ func externalScalePhysicalParts(plan Plan) map[string]int {
 		}
 	}
 	return parts
+}
+
+func externalScaleUnchangedParts(catalog storage.Blob, writes map[string]externalScalePartWrites, retained, current map[string]int) (catalogBytes, dependencyBytes int64, err error) {
+	catalogParts := make(map[string]int, len(catalog.Parts))
+	for _, part := range catalog.Parts {
+		catalogParts[part.ID] = part.Bytes
+	}
+	for id, write := range writes {
+		if _, existed := retained[id]; existed {
+			return 0, 0, fmt.Errorf("unchanged phase retransmitted retained part %s", id)
+		}
+		if size, known := catalogParts[id]; known {
+			if write.requests < 1 || write.bytes != int64(size)*int64(write.requests) {
+				return 0, 0, fmt.Errorf("unexpected catalog part body size for %s", id)
+			}
+			catalogBytes += write.bytes
+			continue
+		}
+		size, known := current[id]
+		if !known || write.requests < 1 || write.bytes != int64(size)*int64(write.requests) {
+			return 0, 0, fmt.Errorf("unexpected dependency part or body size for %s", id)
+		}
+		dependencyBytes += write.bytes
+	}
+	if dependencyBytes > 64<<10 {
+		return 0, 0, fmt.Errorf("unchanged phase sent %d new dependency part bytes, exceeding 64 KiB", dependencyBytes)
+	}
+	return catalogBytes, dependencyBytes, nil
 }
 
 func externalScaleCacheRecords(t *testing.T, cfg childConfig, directory string, age int64, backend *storage.Backend) (map[string]readback.Record, int64) {
@@ -370,7 +408,7 @@ func TestScaleRetainedTrafficUsesActualMultipartIDs(t *testing.T) {
 		part := blob.Parts[0]
 		must(t, backend.PutPart(t.Context(), part, payload[:part.Bytes]))
 		_, _, attempts := traffic.snapshot()
-		if attempts[part.ID] != 1 || retained[part.ID] != part.Bytes || server.Snapshot().Writes["part-"+part.ID] != 1 {
+		if attempts[part.ID] != (externalScalePartWrites{requests: 1, bytes: int64(part.Bytes)}) || retained[part.ID] != part.Bytes || server.Snapshot().Writes["part-"+part.ID] != 1 {
 			t.Fatal("retained multipart PUT was missed or immutable data was rewritten")
 		}
 		return
@@ -378,12 +416,75 @@ func TestScaleRetainedTrafficUsesActualMultipartIDs(t *testing.T) {
 	t.Fatal("fixture did not create a real split object")
 }
 
-func (c *externalScaleTraffic) snapshot() (int64, int64, map[string]int) {
+func TestScaleUnchangedPartsSeparateSignedCatalog(t *testing.T) {
+	f := fixtureBytes(t, 128<<10)
+	traffic := &externalScaleTraffic{}
+	traffic.reset()
+	server := f.server(t, "webdav", 0, traffic.observe)
+	backend := f.backend(t, server, 0)
+	trust := f.authority.Generation
+	metadata := []byte("new synthetic dependency metadata")
+	ref := generation.Object{ID: storage.Hash(metadata), Bytes: len(metadata)}
+	objects := []generation.Object{ref}
+	for n := range 1024 {
+		objects = append(objects, generation.Object{ID: storage.Hash([]byte(strconv.Itoa(n))), Bytes: 1})
+	}
+	sort.Slice(objects, func(i, j int) bool { return objects[i].ID < objects[j].ID })
+	raw, err := generation.SignCatalog(generation.Catalog{
+		Format: generation.Format, Domain: trust.Domain, Repository: trust.Repository, Epoch: trust.Epoch,
+		Sequence: 1, SnapshotUnix: 1, Policy: 1, KitFormat: generation.TypedKitFormat,
+		Kits: []generation.Kit{{File: storage.Hash([]byte("test file")), Version: storage.Hash([]byte("test version")),
+			Root: generation.Object{ID: storage.Hash([]byte("test root")), Bytes: 1}, Objects: objects}},
+	}, f.writer)
+	must(t, err)
+	_, err = generation.VerifyCatalog(raw, trust)
+	must(t, err)
+	if len(raw) <= 64<<10 {
+		t.Fatal("catalog fixture did not exceed the dependency bound")
+	}
+	ctx := t.Context()
+	catalog := generation.Object{ID: storage.Hash(raw), Bytes: len(raw)}
+	blob, err := storage.Describe(catalog, raw, server.Options.MaxObject)
+	must(t, err)
+	if len(blob.Parts) < 2 {
+		t.Fatal("fixture did not create a split catalog")
+	}
+	for range 3 {
+		must(t, backend.PutBlob(ctx, catalog, raw))
+	}
+	must(t, backend.PutPart(ctx, ref, metadata))
+	_, total, writes := traffic.snapshot()
+	current := map[string]int{ref.ID: ref.Bytes}
+	catalogBytes, dependencyBytes, err := externalScaleUnchangedParts(blob, writes, nil, current)
+	must(t, err)
+	if catalogBytes != 3*int64(len(raw)) || dependencyBytes != int64(len(metadata)) || total != catalogBytes+dependencyBytes {
+		t.Fatal("catalog and dependency bodies were not separately accounted", catalogBytes, dependencyBytes, total)
+	}
+	if _, _, err := externalScaleUnchangedParts(blob, writes, current, current); err == nil {
+		t.Fatal("retained dependency PUT escaped the accounting")
+	}
+	if _, _, err := externalScaleUnchangedParts(blob, writes, nil, nil); err == nil {
+		t.Fatal("unknown dependency PUT escaped the accounting")
+	}
+	tooLarge := externalScalePartWrites{requests: 1, bytes: 64<<10 + 1}
+	if _, _, err := externalScaleUnchangedParts(blob, map[string]externalScalePartWrites{ref.ID: tooLarge}, nil, map[string]int{ref.ID: int(tooLarge.bytes)}); err == nil {
+		t.Fatal("new dependency PUT exceeded the unchanged byte bound")
+	}
+	part := blob.Parts[0]
+	write := writes[part.ID]
+	write.bytes++
+	writes[part.ID] = write
+	if _, _, err := externalScaleUnchangedParts(blob, writes, nil, current); err == nil {
+		t.Fatal("catalog part with an incorrect body size escaped the accounting")
+	}
+}
+
+func (c *externalScaleTraffic) snapshot() (int64, int64, map[string]externalScalePartWrites) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	parts := make(map[string]int, len(c.partPUTs))
-	for id, count := range c.partPUTs {
-		parts[id] = count
+	parts := make(map[string]externalScalePartWrites, len(c.partPUTs))
+	for id, writes := range c.partPUTs {
+		parts[id] = writes
 	}
 	return c.putBytes, c.partBytes, parts
 }
@@ -619,14 +720,15 @@ func TestFullGenerationExternalScale(t *testing.T) {
 					if readbackAge > 0 && traffic.retainedReads(retainedParts) != 0 {
 						t.Fatal("enabled readback reuse fetched retained payload during unchanged capture")
 					}
-					if partBytes > 64<<10 {
-						t.Fatal("unchanged source created unexpected new file-sized payload", partBytes)
+					catalog := generation.Object{ID: ids[phase], Bytes: len(catalogs[phase])}
+					catalogBlob, err := storage.Describe(catalog, catalogs[phase], p.MaxObjectBytes)
+					must(t, err)
+					catalogBytes, dependencyBytes, err := externalScaleUnchangedParts(catalogBlob, partPUTs, retainedParts, externalScalePhysicalParts(verifiedPlan))
+					must(t, err)
+					if catalogBytes+dependencyBytes != partBytes {
+						t.Fatal("unchanged part accounting differs from total received part bytes")
 					}
-					for id := range partPUTs {
-						if _, existed := retainedParts[id]; existed {
-							t.Fatal("unchanged phase retransmitted a retained payload or descriptor", id)
-						}
-					}
+					t.Logf("EXTERNAL_SCALE_UNCHANGED_PARTS protocol=%s catalog-body-bytes=%d dependency-body-bytes=%d total-part-body-bytes=%d", kind, catalogBytes, dependencyBytes, partBytes)
 				}
 				snapshot := target.Snapshot()
 				actors := map[string]bool{}

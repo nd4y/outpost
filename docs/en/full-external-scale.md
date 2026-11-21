@@ -29,10 +29,12 @@ The checks require:
 - Three distinct concurrent uploaders and immutable target keys written physically once.
 - Complete base, replacement and unchanged generations on each target, with refusal of the incomplete replacement before upload.
 - At most 128 MiB of received PUT bodies for the 8 MiB replacement, conservatively including its negative publication check. HTTP responses and TCP/TLS overhead are separate costs.
-- No retransmission of retained parts during the unchanged phase, and at most 64 KiB of new encrypted metadata parts for this fixed source corpus. The producer's separately verified zero file-payload observation remains part of the combined evidence.
+- No retransmission of retained dependency parts during the unchanged phase, and at most 64 KiB of new dependency part bodies for this corpus. Measure newly signed catalog parts separately by their exact physical IDs and body sizes. Include both classes in the total HTTP byte count. The producer's independent zero file-payload observation remains part of the combined evidence.
 - A fresh complete materialized store downloaded through each actual storage adapter, retaining all three checkpoints.
 
 Retained-traffic checks use physical part IDs from the verified upload plan, including split objects. Logical object IDs cannot identify their smaller parts. `TestScaleRetainedTrafficUsesActualMultipartIDs` reads a real split object over HTTPS and repeats a conditional part PUT: it checks that both operations are counted while the immutable target key is physically written once. Scope this result separately from a corpus whose objects fit the target cap without splitting.
+
+`TestScaleUnchangedPartsSeparateSignedCatalog` measures a signed multipart catalog larger than 64 KiB over HTTPS. It checks that all catalog attempts stay in the total and that retained or unknown parts, oversized dependency traffic and incorrect catalog part lengths are rejected.
 
 The endpoint holds the first authenticated part request from each identity at a bounded 15-second rendezvous before any of those payloads is written. All three must arrive; cancellation or a missing participant fails the check. The ordinary temporary-file, fsync, immutable creation and readback follow this barrier. This controls request concurrency rather than claiming simultaneous physical disk operations or throughput. A separate real-HTTP check proves that two waiting participants create no part files and that a third releases three actual writes; cancellation keeps them unwritten.
 
