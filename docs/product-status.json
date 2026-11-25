@@ -9134,7 +9134,7 @@
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],
-      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. Physical host/controller power loss, real unlock ordering, complete topology and full-scale acceptance remain separate."
+      "remaining": "Integrated security/compatibility checks, release evidence and final admitted-scale cost/RPO/RTO measurements. A bounded guest-kernel fixture passed four power-cut/recovery boundaries and five cold volume-ordering boots with actual selected CLIs (14 phases total); see docs/vm-powerloss-evidence.json. The isolated 100 GiB S3-compatible and WebDAV profile records all six publication phases, two fresh adapter downloads and seven independent full-byte and attribute restores in docs/full-external-100gib-evidence.json. Physical host/controller power loss, real unlock ordering, comparative throughput, real endpoint capability, full asymmetric ingress and operational acceptance remain open."
     }
   ],
   "acceptance": [

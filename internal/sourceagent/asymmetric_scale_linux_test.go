@@ -46,9 +46,25 @@ func TestAsymmetricSourceScale(t *testing.T) {
 		t.Fatal("admitted filesystem differs")
 	}
 	reserve := uint64(disk.Blocks) * uint64(disk.Bsize) / 5
-	if uint64(disk.Bavail)*uint64(disk.Bsize) < reserve+uint64(18*size)+(1<<30) {
-		t.Fatal("four retained three-holder cases, recovery overlap and20percent reserve unavailable")
+	// One active case can overlap the source, three completed replicas and
+	// two staging copies. Prior cases remain accounted for in actual free
+	// space. The source input is disposable after the final capture.
+	caseOverlap := uint64(13*size/2) + (4 << 30)
+	checkSpace := func(t *testing.T) {
+		t.Helper()
+		var current unix.Statfs_t
+		must(t, unix.Statfs(root, &current))
+		free := uint64(current.Bavail) * uint64(current.Bsize)
+		if current.Fsid != disk.Fsid || free < reserve+caseOverlap {
+			t.Fatal("active three-holder case and 20 percent reserve unavailable")
+		}
+		t.Logf("ASYMMETRIC_SCALE_ADMISSION free-bytes=%d reserve-bytes=%d overlap-bytes=%d", free, reserve, caseOverlap)
 	}
+	caseLimit := 48 * time.Hour
+	if size == 100<<30 {
+		caseLimit = 96 * time.Hour
+	}
+	authorityLifetime := caseLimit + 24*time.Hour
 	tool := os.Getenv("OUTPOST_ASYMMETRIC_ORACLE")
 	info, err := os.Lstat(tool)
 	must(t, err)
@@ -83,6 +99,7 @@ func TestAsymmetricSourceScale(t *testing.T) {
 	maintenance, _, err := ed25519.GenerateKey(rand.Reader)
 	must(t, err)
 	epoch := &fixtureEpoch{owner: owner, writer: private, trust: generation.Trust{Domain: owner.Domain, Repository: storage.Hash([]byte("asymmetric-scale-repo")), Epoch: 1, Writer: writer, Maintenance: maintenance}}
+	completedCases := 0
 	for _, split := range []bool{false, true} {
 		for _, single := range []bool{true, false} {
 			name := "complete-paired"
@@ -93,12 +110,14 @@ func TestAsymmetricSourceScale(t *testing.T) {
 				name = name[:len(name)-len("paired")] + "single"
 			}
 			t.Run(name, func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(t.Context(), 48*time.Hour)
+				checkSpace(t)
+				ctx, cancel := context.WithTimeout(t.Context(), caseLimit)
 				defer cancel()
 				var initialHash string
-				x := newAsymmetricFixtureOptions(t, epoch, split, int64(72*time.Hour/time.Second), fixtureOptions{
+				var initialInput os.FileInfo
+				x := newAsymmetricFixtureOptions(t, epoch, split, int64(authorityLifetime/time.Second), fixtureOptions{
 					Directory: filepath.Join(root, "asymmetric-scale-"+name), MaxSourceBytes: size, MaxBytes: 128 << 30, MaxObjects: generation.MaxObjects,
-					Limits: diskbudget.Limits{Capacity: 2 << 30, Reserve: 256 << 20, Spool: 1 << 30, Telemetry: 1 << 20}, CertificateLifetime: 72 * time.Hour, RetainContext: true,
+					Limits: diskbudget.Limits{Capacity: 2 << 30, Reserve: 256 << 20, Spool: 1 << 30, Telemetry: 1 << 20}, CertificateLifetime: authorityLifetime, RetainContext: true,
 					InitialSource: func(t *testing.T, tree string) {
 						file := filepath.Join(tree, "private.bin")
 						initialHash = oracle(t, "generate", file, "base")
@@ -107,6 +126,7 @@ func TestAsymmetricSourceScale(t *testing.T) {
 						if info.Size() != size || info.Sys().(*syscall.Stat_t).Blocks*512 < size {
 							t.Fatal("source was not fully physically allocated")
 						}
+						initialInput = info
 					},
 				}, control.Limits{Parallel: 2, AttemptMillis: 30000, PollSeconds: 1, CapacityBytes: 512 << 30, ReserveBytes: 16 << 30, SpoolBytes: 256 << 30, TelemetryBytes: 1 << 20})
 				x.removeVerifiedRestores = true
@@ -163,7 +183,18 @@ func TestAsymmetricSourceScale(t *testing.T) {
 				write := func(name string, value any) {
 					b, e := json.Marshal(value)
 					must(t, e)
-					must(t, os.WriteFile(filepath.Join(x.f.base, name), b, 0600))
+					file, e := os.OpenFile(filepath.Join(x.f.base, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+					must(t, e)
+					defer file.Close()
+					_, e = file.Write(b)
+					must(t, e)
+					must(t, file.Sync())
+				}
+				syncDirectory := func(path string) {
+					dir, e := os.Open(path)
+					must(t, e)
+					defer dir.Close()
+					must(t, dir.Sync())
 				}
 				write("recovery-owner.json", recovery)
 				write("trust.json", x.f.grant.Trust)
@@ -177,11 +208,27 @@ func TestAsymmetricSourceScale(t *testing.T) {
 					Replicas                  []string
 					InProcessRecoveryDeferred bool
 				}{size, results, paths, x.deferRecoveries})
+				syncDirectory(x.f.base)
+				if x.deferRecoveries {
+					input := filepath.Join(x.f.tree, "private.bin")
+					info, err := os.Lstat(input)
+					must(t, err)
+					if initialInput == nil || !info.Mode().IsRegular() || info.Size() != size || !os.SameFile(initialInput, info) {
+						t.Fatal("final source input differs from the owned fixture")
+					}
+					must(t, os.Remove(input))
+					syncDirectory(x.f.tree)
+					t.Logf("ASYMMETRIC_SCALE_INPUT_REMOVED name=%s bytes=%d", name, size)
+				}
+				completedCases++
 				t.Logf("ASYMMETRIC_SCALE_CASE_PASS name=%s bytes=%d retained-generations=2 physical-holders=3 independent-process-consumers=pending", name, size)
 			})
 		}
 	}
 	if !t.Failed() {
-		t.Logf("ASYMMETRIC_SCALE_PASS bytes=%d matched-cases=4 independent-process-consumers=pending", size)
+		if completedCases != 4 {
+			t.Fatal("full acceptance requires four executed matched cases", completedCases)
+		}
+		t.Logf("ASYMMETRIC_SCALE_PASS bytes=%d matched-cases=%d independent-process-consumers=pending", size, completedCases)
 	}
 }

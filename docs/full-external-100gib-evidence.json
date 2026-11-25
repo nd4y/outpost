@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_PHYSICAL_100GIB_SYNTHETIC_EXTERNAL",
+  "observedAt": "2026-11-25T04:18:57.375604+00:00",
+  "implementationCommit": "d94229181d1b5c982e81cd4aaf195555665b2dd7",
+  "sourceTree": "d9d4a2c5fdeeba9533ec56e267e8285eaae6077a",
+  "sourceBytes": 107374182400,
+  "replacementBytes": 8388608,
+  "retainedGenerationsPerTarget": 3,
+  "physicalLocalHolders": 3,
+  "uploadProcesses": 3,
+  "producerCompletedAt": "2026-11-23T17:42:37.259049+00:00",
+  "producerCompileSHA256": "2bda26bb6bceaa8f5a86a60a6f43fde0abca6087be4283af31fade1b7b9c7fa3",
+  "producerProofSHA256": "df45c8be2ad135178ceb582b6d158437a2d5d7fd48b6b064d223f40afc3e1118",
+  "producerProfile": {
+    "cpu": 1.5,
+    "memoryBytes": 1073741824,
+    "swapBytes": 0,
+    "childHours": 24,
+    "testHours": 96,
+    "slotMillis": 30000,
+    "readbackMaxAgeSeconds": 86400,
+    "maximumObjectBytes": 8388608
+  },
+  "producerResources": {
+    "memoryPeak": 1077301248,
+    "memoryMax": 1073741824,
+    "memoryLimitEvents": 12153480,
+    "oom": 0,
+    "oomKilled": 0,
+    "swapBytes": 0
+  },
+  "measured": {
+    "s3": {
+      "phases": {
+        "base": {
+          "putBytes": 107432123681,
+          "partBytes": 107399407255,
+          "parts": 14549,
+          "actors": 3,
+          "peak": 3,
+          "seconds": 45770.046811
+        },
+        "patched": {
+          "putBytes": 35144625,
+          "partBytes": 35033431,
+          "parts": 9,
+          "actors": 3,
+          "peak": 3,
+          "seconds": 1296.394364
+        },
+        "unchanged": {
+          "putBytes": 3933372,
+          "partBytes": 3930210,
+          "parts": 1,
+          "actors": 3,
+          "peak": 3,
+          "seconds": 152.87172
+        }
+      },
+      "adapterDownload": {
+        "requests": 29121,
+        "getRequests": 29121,
+        "putRequests": 0,
+        "moveRequests": 0,
+        "requestBytes": 0,
+        "objectRequestBytes": 0,
+        "repeatedRequestBytes": 0,
+        "responseBytes": 107433933291,
+        "objectResponseBytes": 107430510784,
+        "stagingResponseBytes": 0,
+        "incomplete": false
+      },
+      "unchangedCatalogBytes": 3930210,
+      "unchangedDependencyBytes": 0
+    },
+    "webdav": {
+      "phases": {
+        "base": {
+          "putBytes": 107428408554,
+          "partBytes": 107399407255,
+          "parts": 14549,
+          "actors": 3,
+          "peak": 3,
+          "seconds": 40607.551218
+        },
+        "patched": {
+          "putBytes": 35144625,
+          "partBytes": 35033431,
+          "parts": 9,
+          "actors": 3,
+          "peak": 3,
+          "seconds": 1253.364842
+        },
+        "unchanged": {
+          "putBytes": 3933372,
+          "partBytes": 3930210,
+          "parts": 1,
+          "actors": 3,
+          "peak": 3,
+          "seconds": 155.86416
+        }
+      },
+      "adapterDownload": {
+        "requests": 29121,
+        "getRequests": 29121,
+        "putRequests": 0,
+        "moveRequests": 0,
+        "requestBytes": 0,
+        "objectRequestBytes": 0,
+        "repeatedRequestBytes": 0,
+        "responseBytes": 107433933291,
+        "objectResponseBytes": 107430510784,
+        "stagingResponseBytes": 0,
+        "incomplete": false
+      },
+      "unchangedCatalogBytes": 3930210,
+      "unchangedDependencyBytes": 0
+    }
+  },
+  "readerCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+  "readerSHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+  "readerProfile": {
+    "cpu": 1,
+    "memoryBytes": 805306368,
+    "swapBytes": 0
+  },
+  "readerSummarySHA256": "51d1fb76a718478d77c6c76876f3f64f4edb7b84f1f85dcfc03820600ab4a531",
+  "freshRestores": [
+    {
+      "group": "holder-0",
+      "phase": "patched",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 12491.629118616926,
+          "logSHA256": "88b8d73060e4a2bc90ed77f361080f194d21ab4021aa0b37a98c21279a7eead4",
+          "peakBytes": 805572608,
+          "limitEvents": 848160
+        },
+        "oracle": {
+          "seconds": 3212.690727071138,
+          "logSHA256": "c507b0819551a103ec95d9f865bf35bc4330bb1a1cfa28e76a78779f78ac4eb1",
+          "peakBytes": 805314560,
+          "limitEvents": 406652
+        }
+      },
+      "durableOutputProofSHA256": "725f2ac4e0ca4d5fe76f899b3bf1612e68d26e999d362a8ce33f443fc50d2884"
+    },
+    {
+      "group": "holder-1",
+      "phase": "patched",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 12643.835644036997,
+          "logSHA256": "16f9e876fc2dce100627e6c4a6bb269c128a665e8dea90df4313671da44cfa7f",
+          "peakBytes": 805318656,
+          "limitEvents": 853269
+        },
+        "oracle": {
+          "seconds": 3473.382970914943,
+          "logSHA256": "92d949167b3e5a6ade63ceec8de7caa1baaa076984983a91bc38ce2fd34c4c3f",
+          "peakBytes": 804454400,
+          "limitEvents": 0
+        }
+      },
+      "durableOutputProofSHA256": "0d95343f7a1270f907acbdb27ee695063c0d1a061ee4aae4cf9301f3cc0a3856"
+    },
+    {
+      "group": "holder-2",
+      "phase": "patched",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 12546.98905885499,
+          "logSHA256": "aa1080756d478dca5ac3270b276743657d27d40a668930c3aae131b1a1fa2b46",
+          "peakBytes": 771715072,
+          "limitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3314.6535627611447,
+          "logSHA256": "d9aece532268ffe8cb27720a7baf7c2c9daaa891035da948beb688053959648f",
+          "peakBytes": 689291264,
+          "limitEvents": 0
+        }
+      },
+      "durableOutputProofSHA256": "423905fd2cb188129ed8114385f783047d5242570d3036ce5f6e91ff93c1dcd3"
+    },
+    {
+      "group": "s3",
+      "phase": "base",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 12749.696705152048,
+          "logSHA256": "54bb820b3923d5cfed550424bcdec9d9d42415433a3726d9b20d55951bd8b434",
+          "peakBytes": 681426944,
+          "limitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3297.685921024997,
+          "logSHA256": "515ec354328bbf87b8c9e76f57e0e42dd3501ba5daf673d0b6546daf074c2b7f",
+          "peakBytes": 622686208,
+          "limitEvents": 0
+        }
+      },
+      "durableOutputProofSHA256": "f57eea6d973866eb395407c1d44076e4f1198d385cdffa13400fc584664dfb94"
+    },
+    {
+      "group": "s3",
+      "phase": "patched",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 12687.789430201985,
+          "logSHA256": "94505492c03d222b8d508f6851e8fd2d798f39efc2b77382ef8864532b16fc71",
+          "peakBytes": 630816768,
+          "limitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3219.4696010609623,
+          "logSHA256": "f4f6b514cdc3db3b57def44af8120ed52030c25062e87cd56eada188547ea956",
+          "peakBytes": 570580992,
+          "limitEvents": 0
+        }
+      },
+      "durableOutputProofSHA256": "4c825938f96e17879fe28bfef9579458bce42f09d312d15933540ad1c8112f8d"
+    },
+    {
+      "group": "webdav",
+      "phase": "base",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "0bca52c883beb0e89c0351fa91213bdd8d4c041e9430cea335e9e29767f779a1",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 12131.410716952058,
+          "logSHA256": "68eb5de57caf6089ddaaffd2ea8ddd28a0f76786c8244bb8bfd69a9ff11d013e",
+          "peakBytes": 563040256,
+          "limitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3506.595310740173,
+          "logSHA256": "5805bb507e75deb3101d653a504940f49fa2cf45a3be68f6a890ef2a106b60e9",
+          "peakBytes": 516800512,
+          "limitEvents": 0
+        }
+      },
+      "durableOutputProofSHA256": "e38512faaefcaa921df63ba97ce83b3bde3c431f52730ec8b395e3532e8b7835"
+    },
+    {
+      "group": "webdav",
+      "phase": "patched",
+      "bytes": 107374182400,
+      "allocated": 107374198784,
+      "sha256": "70c6689c6d7703495930d5965678998b41cb30dba788efa1e6c4144ac5e00dfe",
+      "attributesVerified": true,
+      "stages": {
+        "restore": {
+          "seconds": 13352.121420577867,
+          "logSHA256": "281d37d0d9f4870a041bbd4c6963763ff8fbfad0556cc34608a9ba14bffe5d09",
+          "peakBytes": 517152768,
+          "limitEvents": 0
+        },
+        "oracle": {
+          "seconds": 3606.1784537809435,
+          "logSHA256": "cd1ef0d8b2c039db549c55b3791239af26c6384173b3d5dfa7c06d16f35505a2",
+          "peakBytes": 468201472,
+          "limitEvents": 0
+        }
+      },
+      "durableOutputProofSHA256": "716f983b86525d1bb9e3eba04e400677b81ec08ea1190066daf12308b62af858"
+    }
+  ],
+  "readerObserverRecovery": {
+    "localSSHInterruptions": 2,
+    "completedRemoteCasesReplayed": 0,
+    "failureAndPartialLogEvidenceRetained": true
+  },
+  "combinedProofSHA256": "54c933adc6cff919327605efd8702fea4a02baa6dbebc0da08d78bd18c3b2a2d",
+  "scope": "Controlled S3-compatible and WebDAV HTTPS on one isolated Linux HDD. Each target accepted three signed generations and a fresh adapter download. Three local holders restored the latest version. Both target downloads independently restored the original and edited versions with the pinned offline executable.",
+  "remaining": "Asymmetric ingress, separate physical failure domains, real endpoint capability and measured comparative throughput remain required within their own profiles.",
+  "fullProductAcceptance": false
+}
