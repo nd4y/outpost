@@ -1,6 +1,8 @@
 # Outpost
 
-[Current component acceptance](docs/en/component-acceptance.md) verifies downloaded 8c installation/upgrade/rollback, separately versioned predecessor checks, actual pinned Collector logs/metrics and four matched 128 MiB cases with 24 fresh offline restores. Full 100 GiB asymmetric/cloud acceptance and final product decisions remain open.
+[Current component acceptance](docs/en/component-acceptance.md) verifies downloaded 8c installation/upgrade/rollback, separately versioned predecessor checks, actual pinned Collector logs/metrics and four matched 128 MiB cases with 24 fresh offline restores. The [100 GiB external fixture](docs/en/full-external-scale.md) records seven independent restores using isolated S3-compatible and WebDAV targets. Live target admission and full asymmetric acceptance remain open.
+
+[Copy verification](docs/en/copy-observations.md) can advance across several bounded batches per attempt after it saves progress. A signed observation retains the time of the oldest supporting read. The [asymmetric test profile](docs/en/asymmetric-source.md) records why the previous one-hour synthetic window could not finish a full-size case and defines the window for a corrected run.
 
 The [owner export correction](docs/en/owner-export-mount.md) accepts the same enrolled source after a mount-namespace restart and pins a fresh observation during export. Its bounded HDD controls also cover all configured ingress receivers being unavailable. The prior 100 GiB run completed three captures but failed before recovery export; the [separate composed recovery workflow](docs/en/source-ingress-scale.md) now verifies both retained versions with four fresh offline restores.
 

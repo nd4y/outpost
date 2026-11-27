@@ -2862,6 +2862,14 @@
         },
         {
           "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationVerificationBurstBoundsProgressAndPreservesOldestRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationVerificationBurstYieldsOnErrorsTimeoutAndNoProgress"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
           "name": "TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption"
         },
         {
@@ -3165,6 +3173,14 @@
         {
           "path": "internal/worker/observation_window_linux_test.go",
           "name": "TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationVerificationBurstBoundsProgressAndPreservesOldestRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationVerificationBurstYieldsOnErrorsTimeoutAndNoProgress"
         },
         {
           "path": "internal/peer/repair_linux_test.go",
@@ -4173,6 +4189,14 @@
         {
           "path": "internal/worker/observation_window_linux_test.go",
           "name": "TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationVerificationBurstBoundsProgressAndPreservesOldestRead"
+        },
+        {
+          "path": "internal/worker/observation_window_linux_test.go",
+          "name": "TestObservationVerificationBurstYieldsOnErrorsTimeoutAndNoProgress"
         },
         {
           "path": "internal/worker/observation_window_linux_test.go",
@@ -8088,6 +8112,10 @@
           "name": "test_archive_missing_dependency_and_path_injection_are_rejected"
         },
         {
+          "path": "scripts/check-release.py",
+          "name": "test_distribution_tar_headers_are_refused_before_reading_bodies"
+        },
+        {
           "path": "scripts/check-container.py",
           "name": "test_image_and_enforced_isolation"
         },
@@ -8881,6 +8909,10 @@
           "name": "test_selected_build_and_archives"
         },
         {
+          "path": "scripts/check-release.py",
+          "name": "test_distribution_tar_headers_are_refused_before_reading_bodies"
+        },
+        {
           "path": "scripts/check-container.py",
           "name": "test_cached_start_upgrade_stop_and_rollback"
         },
@@ -9127,6 +9159,10 @@
         {
           "path": "internal/upload/scale_linux_test.go",
           "name": "TestScaleUnchangedPartsSeparateSignedCatalog"
+        },
+        {
+          "path": "internal/sourceagent/asymmetric_linux_test.go",
+          "name": "TestAsymmetricObservationPollingFloor"
         },
         {
           "path": "internal/sourceagent/unavailable_linux_test.go",

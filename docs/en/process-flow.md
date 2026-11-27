@@ -16,7 +16,7 @@ The check requires these distinct results:
 - With the source, primary and center unavailable, the follower restarts with unchanged accepted receipts and attempt counts.
 - With both receiver processes stopped, the selected executable restores both versions from each holder. Each recovery input contains only immutable catalogs and objects plus the separate owner recovery material and public trust, without a mutable replica index. Full bytes, mode, UID/GID, nanosecond mtime and hard-link identity must match.
 
-The Go process owns each child it starts, records bounded private logs and requires graceful joined shutdown. An unexpected daemon exit or missed deadline fails the test. Unknown or missing result data does not become success.
+The Go test owns each child it starts, records bounded private logs and requires graceful joined shutdown. It sends `SIGTERM` to the primary worker and `SIGINT` (Ctrl+C) to the outbound-only follower before restarting it. After the restart, the test compares the accepted receipts and attempt counts. An unexpected daemon exit or missed deadline fails the test. Unknown or missing result data does not become success.
 
 ## Independent selection and execution
 

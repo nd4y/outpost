@@ -33,7 +33,7 @@ func TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead(t *testing.T
 	replica, e := generation.Open(dir, f.domain.Trust, false)
 	must(t, e)
 	defer replica.Close()
-	v := &view{domains: map[string]*domainState{f.domain.Trust.Domain: {replica: replica}}}
+	v := &view{cfg: f.cfg, domains: map[string]*domainState{f.domain.Trust.Domain: {replica: replica}}}
 	catalog, e := replica.Catalog(ctx, f.generation)
 	must(t, e)
 	refs, e := generation.Dependencies(catalog, f.domain.Trust)
@@ -90,6 +90,80 @@ func TestObservationWindowRenewsExpiredProofOnlyAfterNewContentRead(t *testing.T
 	}
 }
 
+func TestObservationVerificationBurstBoundsProgressAndPreservesOldestRead(t *testing.T) {
+	ctx := context.Background()
+	calls := 0
+	partial, err := verifyObservationBurst(ctx, func(context.Context) (generation.BatchResult, error) {
+		calls++
+		return generation.BatchResult{VerifiedObjects: calls, ReadBytes: generation.MaxObject}, nil
+	})
+	if !errors.Is(err, observation.ErrPending) || calls != 8 || partial.VerifiedObjects != calls {
+		t.Fatal("progress exceeded its grant slot", calls, partial, err)
+	}
+
+	calls = 0
+	const oldest = 17
+	complete, err := verifyObservationBurst(ctx, func(context.Context) (generation.BatchResult, error) {
+		calls++
+		return generation.BatchResult{
+			VerifiedObjects: calls, ReadBytes: 1, Complete: calls == 2, VerifiedAt: oldest,
+		}, nil
+	})
+	must(t, err)
+	if calls != 2 || !complete.Complete || complete.VerifiedAt != oldest {
+		t.Fatal("completion did not retain its oldest supporting read", calls, complete)
+	}
+}
+
+func TestObservationVerificationBurstYieldsOnErrorsTimeoutAndNoProgress(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		second generation.BatchResult
+		err    error
+		want   error
+	}{
+		{"damage", generation.BatchResult{VerifiedObjects: 3, ReadBytes: 1}, generation.ErrIncomplete, generation.ErrIncomplete},
+		{"empty", generation.BatchResult{VerifiedObjects: 3}, nil, observation.ErrPending},
+		{"unchanged", generation.BatchResult{VerifiedObjects: 2, ReadBytes: 1}, nil, observation.ErrPending},
+		{"regressed", generation.BatchResult{VerifiedObjects: 1, ReadBytes: 1}, nil, observation.ErrPending},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			_, err := verifyObservationBurst(context.Background(), func(context.Context) (generation.BatchResult, error) {
+				calls++
+				if calls == 1 {
+					return generation.BatchResult{VerifiedObjects: 2, ReadBytes: 1}, nil
+				}
+				return tt.second, tt.err
+			})
+			if calls != 2 || !errors.Is(err, tt.want) {
+				t.Fatal("immediate retry despite stopped progress", calls, err)
+			}
+		})
+	}
+	expired, done := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer done()
+	_, err := verifyObservationBurst(expired, func(context.Context) (generation.BatchResult, error) {
+		t.Fatal("verification started after the attempt deadline")
+		return generation.BatchResult{}, nil
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("attempt timeout was not preserved", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	_, err = verifyObservationBurst(ctx, func(context.Context) (generation.BatchResult, error) {
+		calls++
+		cancel()
+		return generation.BatchResult{Complete: true, VerifiedObjects: 1, ReadBytes: 1}, nil
+	})
+	if !errors.Is(err, context.Canceled) || calls != 1 {
+		t.Fatal("revocation after a batch permitted completion or another read", calls, err)
+	}
+}
+
 func TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruption(t *testing.T) {
 	f := newFixture(t)
 	w := f.nodes[0]
@@ -108,6 +182,14 @@ func TestObservationWindowExpiresWithoutChangingOldEvidenceAndPreservesCorruptio
 	must(t, e)
 	if next == first {
 		t.Fatal("expired window reused")
+	}
+	g.ExpiresUnix = first.StartedUnix + 100
+	if first.deadline(g).Unix() != first.StartedUnix+g.MaxAgeSeconds+1 {
+		t.Fatal("verification deadline exceeds the persisted age")
+	}
+	g.ExpiresUnix = first.StartedUnix + 10
+	if first.deadline(g).Unix() != g.ExpiresUnix {
+		t.Fatal("verification deadline exceeds grant expiry")
 	}
 	if _, e = w.observationWindow(ctx, grant, g, f.generation, nil, now); !errors.Is(e, ErrDenied) {
 		t.Fatal("clock rollback accepted", e)

@@ -113,6 +113,11 @@ func (p *cliFlowProcess) Status() cliFlowStatus {
 // concurrent calls are serialized and become no-ops after the first Stop.
 func (p *cliFlowProcess) Stop(t *testing.T) {
 	t.Helper()
+	p.stopWithSignal(t, syscall.SIGTERM)
+}
+
+func (p *cliFlowProcess) stopWithSignal(t *testing.T, signal syscall.Signal) {
+	t.Helper()
 	p.stopMu.Lock()
 	defer p.stopMu.Unlock()
 
@@ -128,8 +133,8 @@ func (p *cliFlowProcess) Stop(t *testing.T) {
 	}
 
 	if !exited {
-		if err := p.cmd.Process.Signal(syscall.SIGTERM); err != nil && !errors.Is(err, os.ErrProcessDone) {
-			t.Errorf("cli flow %s: send SIGTERM: %v", p.name, err)
+		if err := p.cmd.Process.Signal(signal); err != nil {
+			t.Errorf("cli flow %s: send %s: %v", p.name, signal, err)
 		}
 	}
 
@@ -144,7 +149,7 @@ func (p *cliFlowProcess) Stop(t *testing.T) {
 	t.Errorf("cli flow %s: graceful stop exceeded deadline", p.name)
 
 	if err := p.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-		t.Errorf("cli flow %s: kill after SIGTERM timeout: %v", p.name, err)
+		t.Errorf("cli flow %s: kill after %s timeout: %v", p.name, signal, err)
 	}
 	kill := time.NewTimer(cliFlowKillGrace)
 	defer kill.Stop()

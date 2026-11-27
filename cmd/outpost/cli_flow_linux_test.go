@@ -314,7 +314,7 @@ func TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory(t *testing.T)
 	}
 	wait(follower, caughtUp)
 	prior := workerStatus(bPath)
-	follower.Stop(t)
+	follower.stopWithSignal(t, syscall.SIGINT)
 	primary.Stop(t)
 	follower = startCLIFlowProcess(t, binary, logs, "worker-run", "--bootstrap", bPath)
 	wait(follower, caughtUp)
@@ -376,6 +376,10 @@ func TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory(t *testing.T)
 		}
 		containerJSON(t, path, report)
 	}
+	if t.Failed() {
+		return
+	}
+	t.Log("CLI_PROCESS_FLOW_SHUTDOWN signals=SIGTERM,SIGINT")
 	t.Logf("CLI_PROCESS_FLOW_PASS revision=%s bytes=%d versions=2 workers=2 independent-immutable-restores=%d source-and-center-offline=true", revision, len(oldBytes), restores)
 }
 

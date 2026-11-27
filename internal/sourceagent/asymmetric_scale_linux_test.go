@@ -61,8 +61,10 @@ func TestAsymmetricSourceScale(t *testing.T) {
 		t.Logf("ASYMMETRIC_SCALE_ADMISSION free-bytes=%d reserve-bytes=%d overlap-bytes=%d", free, reserve, caseOverlap)
 	}
 	caseLimit := 48 * time.Hour
+	observationAge := time.Hour
 	if size == 100<<30 {
 		caseLimit = 96 * time.Hour
+		observationAge = caseLimit
 	}
 	authorityLifetime := caseLimit + 24*time.Hour
 	tool := os.Getenv("OUTPOST_ASYMMETRIC_ORACLE")
@@ -115,7 +117,7 @@ func TestAsymmetricSourceScale(t *testing.T) {
 				defer cancel()
 				var initialHash string
 				var initialInput os.FileInfo
-				x := newAsymmetricFixtureOptions(t, epoch, split, int64(authorityLifetime/time.Second), fixtureOptions{
+				x := newAsymmetricFixtureOptions(t, epoch, split, authorityLifetime, observationAge, fixtureOptions{
 					Directory: filepath.Join(root, "asymmetric-scale-"+name), MaxSourceBytes: size, MaxBytes: 128 << 30, MaxObjects: generation.MaxObjects,
 					Limits: diskbudget.Limits{Capacity: 2 << 30, Reserve: 256 << 20, Spool: 1 << 30, Telemetry: 1 << 20}, CertificateLifetime: authorityLifetime, RetainContext: true,
 					InitialSource: func(t *testing.T, tree string) {

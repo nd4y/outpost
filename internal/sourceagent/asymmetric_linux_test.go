@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -341,7 +342,7 @@ type asymmetricFixture struct {
 
 func newAsymmetricFixture(t *testing.T, epoch *fixtureEpoch, payload []byte, split bool) *asymmetricFixture {
 	t.Helper()
-	return newAsymmetricFixtureOptions(t, epoch, split, 7200, fixtureOptions{
+	return newAsymmetricFixtureOptions(t, epoch, split, 2*time.Hour, time.Hour, fixtureOptions{
 		MaxSourceBytes: int64(len(payload)), MaxBytes: 64 << 20, MaxObjects: 4096,
 		InitialSource: func(t *testing.T, tree string) {
 			must(t, os.WriteFile(filepath.Join(tree, "private.bin"), payload, 0640))
@@ -349,10 +350,46 @@ func newAsymmetricFixture(t *testing.T, epoch *fixtureEpoch, payload []byte, spl
 	}, control.Limits{Parallel: 2, AttemptMillis: 30000, PollSeconds: 1, CapacityBytes: 256 << 20, ReserveBytes: 16 << 20, SpoolBytes: 64 << 20, TelemetryBytes: 1 << 20})
 }
 
-func newAsymmetricFixtureOptions(t *testing.T, epoch *fixtureEpoch, split bool, lifetime int64, options fixtureOptions, limits control.Limits) *asymmetricFixture {
+func checkAsymmetricObservationWindow(sourceBytes, maximumPassBytes, pollSeconds, observationAgeSeconds int64) error {
+	// The observation worker sleeps PollSeconds between passes. This fixture
+	// data is incompressible. The test assumes that each pass can read the
+	// full byte ceiling and ignores hashing, disk I/O and per-pass work.
+	pollingFloor := (sourceBytes - 1) / maximumPassBytes * pollSeconds
+	if observationAgeSeconds <= pollingFloor {
+		return fmt.Errorf("observation age %d seconds cannot fit the %d-second polling floor", observationAgeSeconds, pollingFloor)
+	}
+	return nil
+}
+
+func TestAsymmetricObservationPollingFloor(t *testing.T) {
+	maximumPassBytes := int64(worker.ObservationVerificationPassMaxBytes)
+	for _, tc := range []struct {
+		name                                                      string
+		sourceBytes, maximumPassBytes, pollSeconds, maxAgeSeconds int64
+		wantError                                                 bool
+	}{
+		{"single pass", maximumPassBytes, maximumPassBytes, 60, 60, false},
+		{"second pass consumes the full age", maximumPassBytes + 1, maximumPassBytes, 60, 60, true},
+		{"second pass has time left for work", maximumPassBytes + 1, maximumPassBytes, 60, 61, false},
+		{"legacy 100 GiB polling floor exceeds one hour", 100 << 30, generation.MaxObject, 1, 3600, true},
+		{"current 100 GiB polling floor fits the case age", 100 << 30, maximumPassBytes, 1, 96 * 3600, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := checkAsymmetricObservationWindow(tc.sourceBytes, tc.maximumPassBytes, tc.pollSeconds, tc.maxAgeSeconds); (err != nil) != tc.wantError {
+				t.Fatalf("unexpected observation-window admission: %v", err)
+			}
+		})
+	}
+}
+
+func newAsymmetricFixtureOptions(t *testing.T, epoch *fixtureEpoch, split bool, authorityLifetime, observationAge time.Duration, options fixtureOptions, limits control.Limits) *asymmetricFixture {
 	t.Helper()
+	observationAgeSeconds := int64(observationAge / time.Second)
+	must(t, checkAsymmetricObservationWindow(options.MaxSourceBytes, worker.ObservationVerificationPassMaxBytes, limits.PollSeconds, observationAgeSeconds))
+	t.Logf("ASYMMETRIC_OBSERVATION_WINDOW max-age-seconds=%d poll-seconds=%d max-bytes-per-pass=%d",
+		observationAgeSeconds, limits.PollSeconds, worker.ObservationVerificationPassMaxBytes)
 	var follower tls.Certificate
-	f := newFixtureWithOptions(t, lifetime, &follower, epoch, options)
+	f := newFixtureWithOptions(t, int64(authorityLifetime/time.Second), &follower, epoch, options)
 	x := &asymmetricFixture{f: f, split: split, retained: map[string]asymmetricExpected{}}
 	id := func(cert tls.Certificate) string {
 		leaf, err := x509.ParseCertificate(cert.Certificate[0])
@@ -404,7 +441,7 @@ func newAsymmetricFixtureOptions(t *testing.T, epoch *fixtureEpoch, split bool, 
 	companionGrant.Ingress = x.ids[1]
 	companion, err := ingress.SignAuthority(companionGrant, f.ownerSigner)
 	must(t, err)
-	proof, err := observation.SignGrant(observation.Grant{Format: observation.GrantFormat, Trust: f.grant.Trust, Reader: f.grant.Source, Collector: x.ids[0], Targets: []string{x.ids[1]}, Epoch: 1, NotBefore: f.grant.NotBefore, ExpiresUnix: f.grant.ExpiresUnix, MaxAgeSeconds: 3600}, f.ownerSigner)
+	proof, err := observation.SignGrant(observation.Grant{Format: observation.GrantFormat, Trust: f.grant.Trust, Reader: f.grant.Source, Collector: x.ids[0], Targets: []string{x.ids[1]}, Epoch: 1, NotBefore: f.grant.NotBefore, ExpiresUnix: f.grant.ExpiresUnix, MaxAgeSeconds: observationAgeSeconds}, f.ownerSigner)
 	must(t, err)
 	planner, _, err := ed25519.GenerateKey(rand.Reader)
 	must(t, err)

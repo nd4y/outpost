@@ -258,6 +258,45 @@ func (w *Worker) recordObservation(ctx context.Context, v *view, grant, id strin
 	}
 	return w.state.WithLock(ctx, func() error { return w.state.Write("observations.json", raw) })
 }
+
+const (
+	observationBurstBatches              = 8
+	observationVerificationBatchMaxBytes = generation.MaxObject
+
+	// ObservationVerificationPassMaxBytes bounds payload reads for one grant
+	// and generation in a single scheduler pass.
+	ObservationVerificationPassMaxBytes = observationBurstBatches * observationVerificationBatchMaxBytes
+)
+
+// Keep the original per-grant slot and commit each bounded batch separately.
+// Continue only after fresh reads increase the durable checkpoint. Errors and
+// nonprogress return to ordinary polling, including under external damage.
+func verifyObservationBurst(ctx context.Context, verify func(context.Context) (generation.BatchResult, error)) (generation.BatchResult, error) {
+	var result generation.BatchResult
+	verified := 0
+	for range observationBurstBatches {
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
+		next, err := verify(ctx)
+		result = next
+		if err != nil {
+			return result, err
+		}
+		if err = ctx.Err(); err != nil {
+			return result, err
+		}
+		if result.Complete {
+			return result, nil
+		}
+		if result.ReadBytes <= 0 || result.VerifiedObjects <= verified {
+			break
+		}
+		verified = result.VerifiedObjects
+	}
+	return result, observation.ErrPending
+}
+
 func (w *Worker) observeOne(ctx context.Context, v *view, raw []byte, g observation.Grant, id string) error {
 	local := v.domains[g.Trust.Domain]
 	if local == nil {
@@ -290,12 +329,30 @@ func (w *Worker) observeOne(ctx context.Context, v *view, raw []byte, g observat
 		if err != nil {
 			return err
 		}
-		result, err := local.replica.VerifyWindow(ctx, id, window, 8, generation.MaxObject)
+		verifyCtx, cancel := context.WithDeadline(ctx, window.deadline(g))
+		defer cancel()
+		guard := func() error {
+			now := time.Now()
+			if !g.Active(now) || v.cfg.Active(now) != nil || !w.certificateCurrent() ||
+				v.paused(g.Trust.Domain, "") || now.Unix() < window.StartedUnix {
+				return observation.ErrDenied
+			}
+			if now.Unix()-window.StartedUnix > g.MaxAgeSeconds {
+				return observation.ErrPending
+			}
+			return verifyCtx.Err()
+		}
+		result, err := verifyObservationBurst(verifyCtx, func(ctx context.Context) (generation.BatchResult, error) {
+			if err := guard(); err != nil {
+				return generation.BatchResult{}, err
+			}
+			return local.replica.VerifyWindow(ctx, id, window.Window, 8, observationVerificationBatchMaxBytes)
+		})
 		if err != nil {
 			return err
 		}
-		if !result.Complete {
-			return observation.ErrPending
+		if err = guard(); err != nil {
+			return err
 		}
 		proof, e = observation.SignProof(raw, w.owner, id, result.VerifiedAt, w.cert.PrivateKey.(ed25519.PrivateKey), time.Now())
 		if e != nil {

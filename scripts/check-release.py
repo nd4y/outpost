@@ -118,6 +118,25 @@ def test_archive_missing_dependency_and_path_injection_are_rejected(root, digest
         rejected(lambda: verifier.verify(copy, selected))
 
 
+def test_distribution_tar_headers_are_refused_before_reading_bodies(root, digest, work):
+    files = {f"linux_amd64/{name}": {"sha256": "0" * 64, "bytes": 1} for name in ("outpost", "outpost-kit")}
+    for kind, size in ((tarfile.XHDTYPE, 1), (tarfile.GNUTYPE_LONGNAME, 1),
+                       (tarfile.GNUTYPE_SPARSE, 1), (tarfile.REGTYPE, verifier.MAX_FILE + 1)):
+        target = work / ("distribution-header-" + kind.hex())
+        target.mkdir()
+        header = tarfile.TarInfo("outpost")
+        header.type, header.size = kind, size
+        # An EOF from consuming an extension body is not a header rejection.
+        with gzip.open(target / "outpost-linux-amd64.tar.gz", "wb") as output:
+            output.write(header.tobuf(format=tarfile.USTAR_FORMAT))
+        try:
+            verifier.verify_archive(target, "amd64", files)
+        except ValueError as error:
+            assert str(error) == "unsupported or oversized distribution tar header", str(error)
+        else:
+            raise AssertionError("distribution did not refuse the invalid fixed header")
+
+
 def test_archive_generation_is_reproducible(root, digest, work):
     copy = clone(root, work)
     for architecture in ("amd64", "arm64"):
@@ -166,6 +185,7 @@ TESTS = [test_selected_build_and_archives, test_wrong_manifest_never_selects_arc
          test_changed_payload_is_rejected, test_wrong_elf_architecture_is_rejected_even_with_new_checksums,
          test_symlink_and_unlisted_files_are_rejected,
          test_archive_missing_dependency_and_path_injection_are_rejected,
+         test_distribution_tar_headers_are_refused_before_reading_bodies,
          test_archive_generation_is_reproducible, test_output_collision_and_failed_build_keep_original,
          test_build_cli_emits_one_json_receipt]
 

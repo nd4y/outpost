@@ -25,7 +25,12 @@ type observationWindowState struct {
 func observationWindowID(binding string, started int64) string {
 	return storage.Hash([]byte(observationWindowFormat + "/" + binding + "/" + strconv.FormatInt(started, 10)))
 }
-func (w *Worker) observationWindow(ctx context.Context, grant []byte, g observation.Grant, id string, previous []byte, now time.Time) (string, error) {
+func (s observationWindowState) deadline(g observation.Grant) time.Time {
+	// Age is recorded in whole seconds and the grant permits equality.
+	return time.Unix(min(s.StartedUnix+g.MaxAgeSeconds+1, g.ExpiresUnix), 0)
+}
+
+func (w *Worker) observationWindow(ctx context.Context, grant []byte, g observation.Grant, id string, previous []byte, now time.Time) (observationWindowState, error) {
 	scope := storage.Hash([]byte(storage.Hash(grant) + "/" + id + "/" + w.node))
 	binding := storage.Hash([]byte(scope + "/" + storage.Hash(previous)))
 	name := "observation-window-" + scope + ".json"
@@ -51,5 +56,5 @@ func (w *Worker) observationWindow(ctx context.Context, grant []byte, g observat
 		}
 		return nil
 	})
-	return s.Window, e
+	return s, e
 }

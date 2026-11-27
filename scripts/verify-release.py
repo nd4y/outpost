@@ -28,6 +28,26 @@ def unique(pairs):
     return value
 
 
+def safe_archive_name(name):
+    return (
+        isinstance(name, str)
+        and re.fullmatch(r"[A-Za-z0-9_./-]{1,180}", name) is not None
+        and all(part not in ("", ".", "..") for part in name.split("/"))
+    )
+
+
+class BoundedTarInfo(tarfile.TarInfo):
+    header_error = "unsupported or oversized distribution tar header"
+
+    def _proc_member(self, archive):
+        # Both packagers emit regular USTAR files. Refuse extension headers
+        # before tarfile interprets their bodies.
+        if (self.type not in (tarfile.REGTYPE, tarfile.AREGTYPE) or not safe_archive_name(self.name)
+                or not 0 < self.size <= MAX_FILE):
+            raise ValueError(self.header_error)
+        return super()._proc_member(archive)
+
+
 def regular(path, maximum):
     # Refuse symlinks, FIFOs/devices and size changes before returning bytes.
     if path.is_symlink() or not path.is_file() or path.stat().st_size > maximum:
@@ -58,7 +78,7 @@ def verify_archive(root, architecture, files):
     expected.update({name: value for name, value in files.items() if name.startswith("licenses/")})
     seen = set()
     with regular(root / ("outpost-linux-" + architecture + ".tar.gz"), MAX_FILE) as raw:
-        with tarfile.open(fileobj=raw, mode="r|gz") as archive:
+        with tarfile.open(fileobj=raw, mode="r|gz", tarinfo=BoundedTarInfo) as archive:
             for member in archive:
                 if member.name not in expected or member.name in seen or not member.isfile():
                     raise ValueError("unexpected archive member")

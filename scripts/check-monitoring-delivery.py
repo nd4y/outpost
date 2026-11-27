@@ -4,6 +4,7 @@ import argparse
 import base64
 from contextlib import ExitStack
 import hashlib
+from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
@@ -13,6 +14,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from urllib.parse import urlencode
 
 
 MONITOR = "synthetic-primary"
@@ -34,6 +36,9 @@ class Fixture:
     def __init__(self):
         self.lock = threading.Lock()
         self.blocked = 0
+        self.report = None
+        self.replay_report = False
+        self.replayed_scrapes = 0
         self.last_heartbeat = None
         self.events = []
 
@@ -41,12 +46,17 @@ class Fixture:
         with self.lock:
             now = int(time.time())
             if path == "/primary-metrics":
+                if self.replay_report:
+                    self.replayed_scrapes += 1
+                else:
+                    self.report = (now, self.blocked)
+                observed, blocked = self.report
                 scope = 'outpost_node="node",outpost_domain="domain"'
                 return (
                     f"outpost_expected_telemetry_max_age_seconds{{{scope}}} 6\n"
-                    f"outpost_report_observed_timestamp_seconds{{{scope}}} {now} {now * 1000}\n"
-                    f"outpost_inventory_available{{{scope}}} 1 {now * 1000}\n"
-                    f"outpost_jobs_blocked{{{scope}}} {self.blocked} {now * 1000}\n"
+                    f"outpost_report_observed_timestamp_seconds{{{scope}}} {observed} {observed * 1000}\n"
+                    f"outpost_inventory_available{{{scope}}} 1 {observed * 1000}\n"
+                    f"outpost_jobs_blocked{{{scope}}} {blocked} {observed * 1000}\n"
                 )
             scope = f'outpost_monitor="{MONITOR}"'
             metrics = f"outpost_expected_monitor_max_age_seconds{{{scope}}} 5\n"
@@ -55,16 +65,19 @@ class Fixture:
             return metrics
 
     def receive(self, path, message):
-        alert = message["commonLabels"]["alertname"]
+        labels = message["commonLabels"]
+        alert = labels["alertname"]
         phase = message["status"]
         expected = {
-            "/heartbeat": "OutpostMonitorHeartbeat",
-            "/primary": "OutpostJobsBlocked",
-            "/watchdog": "OutpostMonitoringDeliveryMissing",
+            "/heartbeat": ("OutpostMonitorHeartbeat",),
+            "/primary": ("OutpostJobsBlocked", "OutpostTelemetryMissing"),
+            "/watchdog": ("OutpostMonitoringDeliveryMissing",),
         }
-        if expected.get(path) != alert or phase not in ("firing", "resolved"):
+        if alert not in expected.get(path, ()) or phase not in ("firing", "resolved"):
             return False
-        if message["commonLabels"].get("outpost_monitor") != MONITOR:
+        if labels.get("outpost_monitor") != MONITOR:
+            return False
+        if path == "/primary" and (labels.get("outpost_node"), labels.get("outpost_domain")) != ("node", "domain"):
             return False
         with self.lock:
             if path == "/heartbeat" and phase == "firing":
@@ -184,6 +197,26 @@ def prometheus_args(data):
     return [f"--storage.tsdb.path={data}", "--rules.alert.resend-delay=1s"]
 
 
+def primary_scrapes_retained_report(port, observed):
+    query = (
+        'outpost_report_observed_timestamp_seconds{outpost_node="node",outpost_domain="domain"} '
+        'and on (job, instance) (up{job="fixture"} == 1)'
+    )
+    connection = HTTPConnection("127.0.0.1", port, timeout=1)
+    try:
+        connection.request("GET", "/api/v1/query?" + urlencode({"query": query}))
+        response = connection.getresponse()
+        body = response.read(16385)
+        if response.status != 200 or len(body) > 16384:
+            return False
+        result = json.loads(body)["data"]["result"]
+        return len(result) == 1 and float(result[0]["value"][1]) == observed
+    except (OSError, HTTPException, ValueError, KeyError, TypeError, IndexError):
+        return False
+    finally:
+        connection.close()
+
+
 def test_delivery(prometheus, alertmanager, rules, work):
     fixture = Fixture()
     primary_prom, primary_am, watch_prom, watch_am = reserve_ports(4)
@@ -218,7 +251,8 @@ def test_delivery(prometheus, alertmanager, rules, work):
             primary = primary_notifier()
             start(prometheus, "primary-evaluator", prometheus_config(rules, httpd.server_port, primary_am, True),
                   primary_prom, prometheus_args)
-            wait_for(lambda: fixture.count("OutpostMonitorHeartbeat", "firing") > 0, "heartbeat was not delivered")
+            heartbeat = "OutpostMonitorHeartbeat"
+            wait_for(lambda: fixture.count(heartbeat, "firing") > 0, "heartbeat was not delivered")
             start(alertmanager, "watchdog-notifier", alertmanager_config(httpd.server_port, False), watch_am,
                   lambda data: ["--cluster.listen-address=", f"--storage.path={data}"])
             start(prometheus, "watchdog-evaluator", prometheus_config(rules, httpd.server_port, watch_am, False),
@@ -236,16 +270,65 @@ def test_delivery(prometheus, alertmanager, rules, work):
                 fixture.blocked = 0
             wait_for(lambda: fixture.count(blocked, "resolved") == 1, "recovery was not delivered")
 
+            missing = "OutpostTelemetryMissing"
+            if fixture.count(missing, "firing") != 0:
+                raise AssertionError("fresh reports triggered a telemetry outage before replay")
+            with fixture.lock:
+                observed, blocked_jobs = fixture.report
+                if blocked_jobs != 0:
+                    raise AssertionError("retained fixture report should describe an unblocked job queue")
+                fixture.replay_report = True
+            try:
+                wait_for(lambda: fixture.count(missing, "firing") == 1, "replayed stale telemetry was treated as fresh")
+                quiet_until = time.monotonic() + 4
+                with fixture.lock:
+                    scrapes_at_firing = fixture.replayed_scrapes
+                heartbeats_at_firing = fixture.count(heartbeat, "firing")
+
+                def continued_replay():
+                    with fixture.lock:
+                        continued = fixture.replayed_scrapes >= scrapes_at_firing + 2
+                    return (
+                        continued
+                        and time.monotonic() >= quiet_until
+                        and fixture.count(heartbeat, "firing") > heartbeats_at_firing
+                        and primary_scrapes_retained_report(primary_prom, observed)
+                    )
+
+                wait_for(continued_replay, "original report or heartbeat was not observed after the stale-report alert")
+                with fixture.lock:
+                    replayed_scrapes = fixture.replayed_scrapes
+                heartbeats_after_firing = fixture.count(heartbeat, "firing") - heartbeats_at_firing
+                if (
+                    fixture.count(missing, "firing") != 1
+                    or fixture.count(missing, "resolved") != 0
+                ):
+                    raise AssertionError("replay must continue with one firing and no resolution")
+                if fixture.count(delivery, "firing") != 0:
+                    raise AssertionError("independent heartbeat route failed during telemetry replay")
+            finally:
+                with fixture.lock:
+                    fixture.replay_report = False
+            wait_for(lambda: fixture.count(missing, "resolved") == 1, "fresh-report recovery was not delivered")
+
             stop(primary)
             wait_for(lambda: fixture.count(delivery, "firing") == 1, "independent route missed the notifier outage")
             primary_notifier()
             wait_for(lambda: fixture.count(delivery, "resolved") == 1, "independent route missed recovery")
+            if fixture.count(missing, "firing") != 1 or fixture.count(missing, "resolved") != 1:
+                raise AssertionError("fresh reports did not stay quiet after recovery")
             return {
                 "blockedFiring": fixture.count(blocked, "firing"),
                 "blockedResolved": fixture.count(blocked, "resolved"),
+                "telemetryMissingFiring": fixture.count(missing, "firing"),
+                "telemetryMissingResolved": fixture.count(missing, "resolved"),
+                "telemetryReplayedScrapes": replayed_scrapes,
+                "telemetryReplayedScrapesAfterFiring": replayed_scrapes - scrapes_at_firing,
+                "telemetryReplayObservedTimestampSeconds": observed,
+                "heartbeatReceiptsAfterReplayFiring": heartbeats_after_firing,
                 "watchdogFiring": fixture.count(delivery, "firing"),
                 "watchdogResolved": fixture.count(delivery, "resolved"),
-                "heartbeatReceipts": fixture.count("OutpostMonitorHeartbeat", "firing"),
+                "heartbeatReceipts": fixture.count(heartbeat, "firing"),
             }
         except Exception:
             for path in dict.fromkeys(logs):

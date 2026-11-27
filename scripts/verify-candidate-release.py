@@ -28,19 +28,11 @@ def document(path, maximum=MAX_DOCUMENT):
     return raw, json.loads(raw, object_pairs_hook=distribution.unique)
 
 
-def safe_name(name):
-    return isinstance(name, str) and bool(re.fullmatch(r"[A-Za-z0-9_./-]{1,180}", name)) and all(p not in ("", ".", "..") for p in name.split("/"))
+safe_name = distribution.safe_archive_name
 
 
-class BoundedTarInfo(tarfile.TarInfo):
-    def _proc_member(self, archive):
-        # Validate the fixed-size header before tarfile can allocate/read a
-        # PAX, GNU-longname or sparse extension body. Our packager emits USTAR
-        # regular files only; richer tar dialects are not candidate formats.
-        if (self.type not in (tarfile.REGTYPE, tarfile.AREGTYPE) or not safe_name(self.name)
-                or not 0 < self.size <= distribution.MAX_FILE):
-            raise ValueError("unsupported or oversized candidate tar header")
-        return super()._proc_member(archive)
+class BoundedTarInfo(distribution.BoundedTarInfo):
+    header_error = "unsupported or oversized candidate tar header"
 
 
 def selection(repository, commit, run_id, attempt, architecture):
