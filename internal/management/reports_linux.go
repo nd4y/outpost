@@ -145,6 +145,10 @@ func (r *Registry) PublishReport(ctx context.Context, actor, tenant, node string
 	return out, e
 }
 func (r *Registry) Report(ctx context.Context, p Principal, tenant, node, domain string, maxAge time.Duration) (ReportView, error) {
+	return r.report(ctx, p, tenant, node, domain, maxAge, nil)
+}
+
+func (r *Registry) report(ctx context.Context, p Principal, tenant, node, domain string, maxAge time.Duration, restores *[]VerifiedRestore) (ReportView, error) {
 	var out ReportView
 	if p.Validate() != nil || !p.Allows(tenant, domain) || !storage.ID(node) || !storage.ID(domain) || !oneOfRole(p, "owner", "operator", "viewer", "recovery") || maxAge < time.Second || maxAge > 24*time.Hour {
 		return out, ErrDenied
@@ -190,6 +194,10 @@ func (r *Registry) Report(ctx context.Context, p Principal, tenant, node, domain
 		}
 		if report.Format == CommandReportFormat {
 			out.Format = "outpost-management-report-view-2"
+		}
+		if restores != nil {
+			*restores = r.verifiedRestores(ctx, s, report)
+			return ctx.Err()
 		}
 		return nil
 	})

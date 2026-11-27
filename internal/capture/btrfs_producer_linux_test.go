@@ -67,6 +67,106 @@ func TestNativeBtrfsProducerRejectsOrdinaryTreeBeforeState(t *testing.T) {
 	}
 }
 
+func TestNativeBtrfsSnapshotCapacityChecksRetainedAndFreeFloor(t *testing.T) {
+	staging, err := localfs.OpenRoot(teststore.Root(t))
+	must(t, err)
+	defer staging.Close()
+	fd, err := staging.Open(".")
+	must(t, err)
+	defer fd.Close()
+
+	profile := BtrfsProducerProfile{MaxRetained: 2}
+	first := nativeSnapshotPrefix + storage.Hash([]byte("retained-first"))
+	second := nativeSnapshotPrefix + storage.Hash([]byte("retained-second"))
+	must(t, staging.Mkdir(first, 0700))
+	count, err := checkNativeSnapshotCapacity(staging, fd, profile)
+	must(t, err)
+	if count != 1 {
+		t.Fatalf("retained count = %d, want 1", count)
+	}
+	blocked := profile
+	blocked.MinFreeBytes = ^uint64(0)
+	if _, err := checkNativeSnapshotCapacity(staging, fd, blocked); !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatal("volume below requested reserve admitted", err)
+	}
+	must(t, staging.Mkdir(second, 0700))
+	if _, err := checkNativeSnapshotCapacity(staging, fd, profile); !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatal("staging at the retained limit admitted", err)
+	}
+	for _, name := range []string{first, second} {
+		_, err = staging.Stat(name)
+		must(t, err)
+	}
+}
+
+func TestNativeBtrfsSharedStagingSerializesIndependentJournals(t *testing.T) {
+	base := teststore.Root(t)
+	stagingPath := filepath.Join(base, "staging")
+	must(t, os.Mkdir(stagingPath, 0700))
+	openProducer := func(name string) (*statefile.Store, *os.File) {
+		t.Helper()
+		journalPath := filepath.Join(base, name)
+		must(t, os.Mkdir(journalPath, 0700))
+		journal, err := statefile.Open(journalPath, 4096, false)
+		must(t, err)
+		t.Cleanup(func() { must(t, journal.Close()) })
+		root, err := localfs.OpenRoot(stagingPath)
+		must(t, err)
+		t.Cleanup(func() { must(t, root.Close()) })
+		fd, err := root.Open(".")
+		must(t, err)
+		t.Cleanup(func() { must(t, fd.Close()) })
+		return journal, fd
+	}
+	firstJournal, firstFD := openProducer("first-journal")
+	secondJournal, secondFD := openProducer("second-journal")
+	staging, err := localfs.OpenRoot(stagingPath)
+	must(t, err)
+	defer staging.Close()
+
+	ctx := t.Context()
+	profile := BtrfsProducerProfile{MaxRetained: 1}
+	n := nativeSnapshotPrefix + storage.Hash([]byte("first-created"))
+	must(t, firstJournal.WithLock(ctx, func() error {
+		return withNativeStagingLock(ctx, firstFD, func() error {
+			journalWait, cancel := context.WithTimeout(ctx, time.Second)
+			defer cancel()
+			journalEntered := false
+			err := secondJournal.WithLock(journalWait, func() error {
+				journalEntered = true
+				wait, cancel := context.WithTimeout(journalWait, 40*time.Millisecond)
+				defer cancel()
+				return withNativeStagingLock(wait, secondFD, func() error {
+					t.Fatal("independent journal bypassed the shared staging lock")
+					return nil
+				})
+			})
+			if !journalEntered || !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("wait cancelled in wrong boundary: journal entered = %v, error = %v", journalEntered, err)
+			}
+			// The first allocation becomes visible before releasing the lock.
+			return staging.Mkdir(n, 0700)
+		})
+	}))
+
+	retry, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	err = secondJournal.WithLock(retry, func() error {
+		return withNativeStagingLock(retry, secondFD, func() error {
+			_, err := checkNativeSnapshotCapacity(staging, secondFD, profile)
+			return err
+		})
+	})
+	if !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatal("second producer did not observe the allocated slot after unlock", err)
+	}
+	entries, err := readNativeDirectory(staging, 2)
+	must(t, err)
+	if len(entries) != 1 || entries[0].Name() != n {
+		t.Fatalf("staging lock created an unexpected entry: %v", entries)
+	}
+}
+
 func TestNativeBtrfsProducerReusesExactKernelSnapshot(t *testing.T) {
 	root := os.Getenv("OUTPOST_BTRFS_ROOT")
 	if root == "" {
@@ -188,6 +288,17 @@ func TestNativeBtrfsProducerReusesExactKernelSnapshot(t *testing.T) {
 			Operation: second.Operation, Sequence: 2, Started: time.Now().Unix()}, key)
 	}))
 	must(t, journal.Close())
+	// A prefix entry can fill the retained capacity between journal admission
+	// and the first or retried ioctl. It must not cause a new snapshot.
+	placeholder := nativeSnapshotPrefix + storage.Hash([]byte("staging-filled-after-admission"))
+	must(t, stageRoot.Mkdir(placeholder, 0700))
+	if _, err = ProduceBtrfsExport(ctx, second, key); !errors.Is(err, statefile.ErrCapacity) {
+		t.Fatal("pending operation bypassed the retained snapshot limit", err)
+	}
+	if _, err = stageRoot.Lstat(secondName); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("capacity refusal published a snapshot", err)
+	}
+	must(t, stageRoot.Remove(placeholder))
 	must(t, createNativeSnapshot(sourceFD, stageFD, secondName))
 	secondRoot, err := localfs.OpenAt(stageRoot, secondName, false)
 	must(t, err)
@@ -203,6 +314,11 @@ func TestNativeBtrfsProducerReusesExactKernelSnapshot(t *testing.T) {
 	third := BtrfsProducerRequest{Profile: profile, Operation: storage.Hash([]byte("over-retention")), Sequence: 3}
 	if _, err = ProduceBtrfsExport(ctx, third, key); !errors.Is(err, statefile.ErrCapacity) {
 		t.Fatal("producer exceeded the retained snapshot limit", err)
+	}
+	atLimit, err := ProduceBtrfsExport(ctx, second, key)
+	must(t, err)
+	if !bytes.Equal(atLimit, secondRaw) {
+		t.Fatal("retained limit prevented replay of the existing exact snapshot")
 	}
 	count, err := countNativeSnapshots(stageRoot)
 	must(t, err)

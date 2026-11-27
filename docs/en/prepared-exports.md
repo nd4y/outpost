@@ -76,6 +76,12 @@ outpost source-native-btrfs-export --input /private/snapshot-request.json \
 
 The producer persists its signed operation before the native snapshot call and verifies the resulting read-only subvolume, parent UUID and creation time. A repeated request reopens the same snapshot and returns the exact signed manifest. An unrecorded destination or a changed acquired UUID blocks the operation. The next producer operation advances the sequence by one and waits if the retained count reaches its limit. Keep the producer journal in its original admitted directory and select a private manifest parent disjoint from the source, staging and producer state. The manifest includes source names and stays in the trusted zone.
 
+Configure optional `minFreeBytes` in the private producer profile before its first export. It sets a free-space floor on the held staging filesystem, which is also the source filesystem. The producer checks available filesystem blocks and `maxRetained` before recording a fresh intent and again before each attempt to create a missing snapshot. If the floor or retained limit blocks admission, the producer reports a capacity error. It can still reopen an already acquired snapshot. The original profile without this field retains the count limit. Keep the exact profile alongside its journal.
+
+Outpost producers sharing a staging directory serialize the retained-count and free-space checks with snapshot creation, even when they use separate journals. Each request applies its own profile limits to the live directory. Waiting for the directory lock is cancellable and limited to 30 seconds. The lock coordinates participating producers. Older versions and administrator actions can still change the directory or available space.
+
+The floor is an admission measurement. Measure retained snapshot growth and free space separately under the source workload, since copy-on-write growth after admission and Btrfs metadata exhaustion need their own evidence. A blocked producer preserves existing snapshots for the authorized release path.
+
 This profile snapshots one subvolume. Btrfs snapshot boundaries and the prepared export's regular-file restrictions apply. The source agent consumes the manifest through the ordinary prepared workflow.
 
 #### Release a native snapshot

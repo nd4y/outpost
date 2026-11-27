@@ -213,6 +213,9 @@ const words = {
     refreshReceipt: "Refresh receipt",
     terminal: "Terminal receipt",
     noRestore: "No verified restore reported",
+    restoredWhole: "Whole generation",
+    restoredSelection: "Selected file versions",
+    restoredScopeUnknown: "Reported by node · Scope unavailable",
     recoveryScope: "Recovery selection",
     previewInvalidated: "Input or scope changed. Review again before submitting.",
     pending: "Result not confirmed",
@@ -427,6 +430,9 @@ const words = {
     refreshReceipt: "Обновить квитанцию",
     terminal: "Конечная квитанция",
     noRestore: "Проверенное восстановление не заявлено",
+    restoredWhole: "Полное поколение",
+    restoredSelection: "Выбранные версии файлов",
+    restoredScopeUnknown: "По отчёту ноды · Область неизвестна",
     recoveryScope: "Выбор восстановления",
     previewInvalidated: "Ввод или область изменились. Проверьте вариант перед отправкой.",
     pending: "Результат не подтверждён",
@@ -931,6 +937,7 @@ async function loadDomain() {
   state.loading = true;
   state.abort?.abort();
   state.abort = new AbortController();
+  const signal = state.abort.signal;
   state.command = null;
   state.config = null;
   state.resolution = null;
@@ -942,7 +949,7 @@ async function loadDomain() {
   notice("loading");
   let error = null;
   try {
-    const p = await api(`${domainPath(s)}/policy`, { signal: state.abort.signal });
+    const p = await api(`${domainPath(s)}/policy`, { signal });
     if (epoch !== state.epoch || key !== scopeKey()) return;
     if (
       p.format !== "outpost-management-domain-policy-1" ||
@@ -962,7 +969,7 @@ async function loadDomain() {
     error = e;
   }
   try {
-    const r = await api(`${domainPath(s)}/report`, { signal: state.abort.signal });
+    const r = await api(`${domainPath(s)}/report`, { signal });
     if (epoch !== state.epoch || key !== scopeKey()) return;
     if (
       r.node !== s.node ||
@@ -972,6 +979,7 @@ async function loadDomain() {
       r.generations.length > 256 ||
       !Array.isArray(r.jobs) ||
       r.jobs.length > 4096 ||
+      (r.commands !== undefined && (!Array.isArray(r.commands) || r.commands.length > 2048)) ||
       !/^outpost-management-report-view-[1-6]$/.test(r.format) ||
       (r.externalState !== undefined &&
         (!/^outpost-management-report-view-[56]$/.test(r.format) ||
@@ -986,6 +994,16 @@ async function loadDomain() {
       (r.format === "outpost-management-report-view-6" && !r.externalCopies?.some((c) => c.audit))
     )
       throw new Error("INVALID");
+    r.verifiedRestores = new Map();
+    if (r.commands?.some((c) => c?.kind === "restore" && c.phase === "COMPLETE")) {
+      try {
+        const proof = await api(`${domainPath(s)}/verified-restores`, { signal });
+        r.verifiedRestores = verifiedRestoreProjection(r, proof);
+      } catch {
+        // The signed copy report remains useful when its restore summary is unavailable.
+      }
+    }
+    if (epoch !== state.epoch || key !== scopeKey()) return;
     state.report = r;
     state.retrieved = Date.now();
     state.reportOffline = false;
@@ -1161,6 +1179,68 @@ function renderExternalCopies() {
     rows,
   );
 }
+function matchesRestoreCommand(command, generation, verifiedUnix, observedUnix) {
+  return (
+    command?.kind === "restore" &&
+    command.phase === "COMPLETE" &&
+    command.verification === "DECRYPTED" &&
+    command.generation === generation &&
+    command.verifiedUnix === verifiedUnix &&
+    command.restore?.verifiedUnix === verifiedUnix &&
+    command.restore?.restored?.generation === generation &&
+    Number.isSafeInteger(verifiedUnix) &&
+    verifiedUnix > 0 &&
+    verifiedUnix <= observedUnix
+  );
+}
+function verifiedRestoreProjection(report, proof) {
+  const results = new Map();
+  if (
+    !proof ||
+    proof.format !== "outpost-management-verified-restores-1" ||
+    !ID.test(proof.documentDigest) ||
+    proof.documentDigest !== report.documentDigest ||
+    !Array.isArray(proof.items) ||
+    proof.items.length > 256
+  )
+    return results;
+  const commands = new Map(report.commands.map((command) => [command.operationId, command]));
+  const generations = new Set(
+    report.generations
+      .filter((copy) => copy.target === report.node && copy.metadataState !== "UNAVAILABLE")
+      .map((copy) => copy.generation),
+  );
+  for (const entry of proof.items) {
+    if (!entry || entry.target !== report.node || !generations.has(entry.generation)) continue;
+    const command = commands.get(entry.operationId);
+    if (
+      !matchesRestoreCommand(command, entry.generation, entry.verifiedUnix, report.observedUnix) ||
+      !["WHOLE_GENERATION", "SELECTED_VERSIONS"].includes(entry.scope)
+    )
+      continue;
+    if ((results.get(entry.generation)?.verifiedUnix || 0) >= entry.verifiedUnix) continue;
+    const measurement = entry.logicalMeasurement;
+    const measured = commands.get(measurement?.operationId);
+    const validMeasurement =
+      measurement &&
+      typeof measurement.logicalBytes === "string" &&
+      /^(0|[1-9][0-9]{0,17})$/.test(measurement.logicalBytes) &&
+      BigInt(measurement.logicalBytes) <= 1n << 58n &&
+      matchesRestoreCommand(
+        measured,
+        entry.generation,
+        measurement.measuredUnix,
+        entry.verifiedUnix,
+      ) &&
+      Number(measurement.logicalBytes) === measured.restore.restored.restored?.bytes &&
+      (measurement.operationId !== entry.operationId || entry.scope === "WHOLE_GENERATION");
+    results.set(entry.generation, {
+      ...entry,
+      logicalMeasurement: validMeasurement ? measurement : undefined,
+    });
+  }
+  return results;
+}
 function renderReport() {
   const r = state.report;
   $("report-state").textContent = r
@@ -1199,7 +1279,7 @@ function renderReport() {
       "restored",
       "metadata",
       "objects",
-      "bytes",
+      "logical",
       "pinned",
       "recoveryScope",
     ],
@@ -1210,10 +1290,23 @@ function renderReport() {
       date(g.createdUnix),
       label(g.verification),
       date(g.verifiedUnix),
-      g.restoreVerifiedUnix ? date(g.restoreVerifiedUnix) : tr("noRestore"),
+      () => {
+        const restore = g.target === r.node ? r.verifiedRestores.get(g.generation) : undefined;
+        if (restore)
+          return `${date(restore.verifiedUnix)} · ${tr(restore.scope === "WHOLE_GENERATION" ? "restoredWhole" : "restoredSelection")}`;
+        if (g.target === r.node && g.restoreVerifiedUnix)
+          return `${date(g.restoreVerifiedUnix)} · ${tr("restoredScopeUnknown")}`;
+        return tr("noRestore");
+      },
       label(g.metadataState || "OBSERVED"),
       g.metadataState === "UNAVAILABLE" ? tr("unknown") : g.objects,
-      g.logicalBytes,
+      () => {
+        const restore = g.target === r.node ? r.verifiedRestores.get(g.generation) : undefined;
+        const measurement = restore?.logicalMeasurement;
+        return measurement
+          ? `${measurement.logicalBytes} · ${date(measurement.measuredUnix)}`
+          : tr("unknown");
+      },
       tr(g.pinned ? "yes" : "no"),
       () => {
         const b = button("selectedGeneration", () => {

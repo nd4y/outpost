@@ -6,6 +6,14 @@ The [bounded verification-window contract](verification-windows.md) specifies th
 
 Status: bounded Linux library candidate in `internal/peer`, built on the [G2 replica](generation-replicas.md). It transfers real encrypted file kits over mutually authenticated HTTPS. Full G3, distributed external upload, large-file bandwidth and operational acceptance remain **NOT_VERIFIED**. No worker daemon, live certificates or network configuration are installed by this change.
 
+## Local worker bandwidth
+
+Set `peerReceiveBodyBytesPerSecond` and `peerSendBodyBytesPerSecond` in the worker's private `outpost-bootstrap-2` configuration. Each accepts an integer from 1048576 to 1073741824 bytes per second. Zero or omission leaves that direction unlimited by this feature. A configured peer or ingress rate below 1 MiB/s is unsupported. Reopen the worker with the updated bootstrap to change a rate.
+
+Each direction shares one allowance across the worker's domains, listeners and outbound requests. It covers ciphertext and catalog bodies in direct push and pull, autonomous replication and repair, capture ingress, staging and relay. At a relay the incoming body consumes receive allowance once and the outgoing body consumes send allowance once. Control and lease requests continue to use their existing bounds. [External storage allowances](external-upload.md) and the [source process allowance](source-agent.md) are configured separately.
+
+These are application HTTP body limits. Measure transport buffering, TLS framing and other traffic when planning a physical link. The rate is aggregate. At 1 MiB/s, one 8 MiB object uses about 8 seconds of body allowance and four such requests use about 32 seconds in the same direction. A maximum catalog also uses 8 MiB, plus request framing when it is sent for split coverage. Parallel requests have no guaranteed share. Waiting for allowance counts toward the signed attempt window of 100 to 300000 milliseconds and any earlier parent, certificate or authority deadline. A 30-second attempt has room for one maximum object at the floor, subject to other traffic and receiver I/O. Choose the rate, parallelism and attempt window together.
+
 ## Trust and routes
 
 The retained-history recovery fixture explicitly sets the source file permissions before capture. Its metadata oracle therefore checks the same declared permissions under restrictive and ordinary process umasks. Restored aliases must still refer to one inode, and restored permission bits must match the captured source.

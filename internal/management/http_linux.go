@@ -575,7 +575,7 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if r.Method == http.MethodPost {
-				out, e := h.registry.PreviewConfiguration(ctx, p, tenant, node, input)
+				out, e := h.registry.previewConfiguration(ctx, p, tenant, node, input, h.maxAge)
 				if e != nil {
 					failHTTP(w, e)
 					return
@@ -601,6 +601,20 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			writeHTTP(w, 200, out)
+			return
+		}
+		if kind == "verified-restores" && r.URL.RawQuery == "" {
+			var restores []VerifiedRestore
+			view, e := h.registry.report(ctx, p, tenant, node, domain, h.maxAge, &restores)
+			if e != nil {
+				failHTTP(w, e)
+				return
+			}
+			writeHTTP(w, 200, struct {
+				Format         string            `json:"format"`
+				DocumentDigest string            `json:"documentDigest"`
+				Items          []VerifiedRestore `json:"items"`
+			}{"outpost-management-verified-restores-1", view.DocumentDigest, restores})
 			return
 		}
 		if kind != "report" && kind != "generations" && kind != "jobs" && kind != "command-status" {

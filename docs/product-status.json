@@ -4660,6 +4660,14 @@
       ],
       "checks": [
         {
+          "path": "internal/management/verified_restores_linux_test.go",
+          "name": "TestManagementVerifiedRestoresUseExactAuthenticatedScope"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "verified restore time and selection are separate from copy coverage"
+        },
+        {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceScheduleInitialPendingHeadKeepsOriginalCopyAge"
         },
@@ -6645,6 +6653,7 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": [
+        "internal/capture",
         "internal/management",
         "internal/managementservice",
         "internal/worker",
@@ -6659,6 +6668,78 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/filekit/repack_capacity_linux_test.go",
+          "name": "TestRepackPeakAdmissionPreservesRetainedVersionsAndKit"
+        },
+        {
+          "path": "internal/filekit/export_capacity_linux_test.go",
+          "name": "TestExportPeakAdmissionRefusesBeforeDestinationAndPreservesKit"
+        },
+        {
+          "path": "internal/filekit/export_capacity_linux_test.go",
+          "name": "TestExportPublicationDoesNotReplaceRacingDestination"
+        },
+        {
+          "path": "internal/sourceagent/body_pacing_linux_test.go",
+          "name": "TestSourceIngressBodyLimitReopensOriginalBinding"
+        },
+        {
+          "path": "internal/ingress/body_pacing_linux_test.go",
+          "name": "TestIngressSharedBodyBudgetPacesReadbackAndHonorsCancellation"
+        },
+        {
+          "path": "internal/ingress/body_pacing_linux_test.go",
+          "name": "TestIngressMinimumBodyRateFitsTwoNearMaximumTLSReadbacks"
+        },
+        {
+          "path": "internal/storage/body_budget_test.go",
+          "name": "TestHTTPBodyBudgetCarriesShortReadsWithoutRefund"
+        },
+        {
+          "path": "internal/worker/peer_body_budgets_linux_test.go",
+          "name": "TestBootstrapPeerBodyBudgetsAreIndependentAndOptional"
+        },
+        {
+          "path": "internal/peer/body_pacing_linux_test.go",
+          "name": "TestPeerBodyBudgetsPreserveCancelledPushAndVerifiedPull"
+        },
+        {
+          "path": "internal/worker/ingress_linux_test.go",
+          "name": "TestWorkerPublishesCaptureThroughPacedOfflineBridge"
+        },
+        {
+          "path": "internal/worker/discovery_linux_test.go",
+          "name": "TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode"
+        },
+        {
+          "path": "internal/sourceagent/parallel_linux_test.go",
+          "name": "TestExpiredPairedCoveragePublishesAndSettlesOfflineSource"
+        },
+        {
+          "path": "internal/management/verified_restores_linux_test.go",
+          "name": "TestManagementVerifiedRestoresUseExactAuthenticatedScope"
+        },
+        {
+          "path": "internal/management/verified_restores_linux_test.go",
+          "name": "TestVerifiedRestoreLogicalMeasurementSurvivesSelectedRestore"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "verified restore time and selection are separate from copy coverage"
+        },
+        {
+          "path": "internal/management/config_capacity_linux_test.go",
+          "name": "TestManagementConfigurationPreviewReportsObservedVolumeShortfall"
+        },
+        {
+          "path": "internal/capture/btrfs_producer_linux_test.go",
+          "name": "TestNativeBtrfsSnapshotCapacityChecksRetainedAndFreeFloor"
+        },
+        {
+          "path": "internal/capture/btrfs_producer_linux_test.go",
+          "name": "TestNativeBtrfsSharedStagingSerializesIndependentJournals"
+        },
         {
           "path": "internal/diskbudget/budget_linux_test.go",
           "name": "TestCheckPeakReportsConcurrentShortfallWithoutReservation"

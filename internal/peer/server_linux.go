@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/storage"
 )
 
 type handler struct {
@@ -54,13 +55,16 @@ func (h *handler) bind(op, peer, id, kind string) Binding {
 func leasePin(b Binding) string {
 	return generation.Hash([]byte(Format + "/lease/" + b.Executor + "/" + b.Peer + "/" + b.Operation + "/" + b.Generation))
 }
-func body(w http.ResponseWriter, r *http.Request, max int) ([]byte, error) {
+func body(ctx context.Context, w http.ResponseWriter, r *http.Request, max int, budget *storage.HTTPBodyBudget) ([]byte, error) {
 	if r.ContentLength > int64(max) || r.Header.Get("Content-Encoding") != "" {
 		return nil, ErrProtocol
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, int64(max))
-	b, e := io.ReadAll(r.Body)
+	b, e := io.ReadAll(budget.PaceResponse(ctx, r.Body))
 	if e != nil {
+		if ctxErr := ctx.Err(); budget != nil && ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, ErrProtocol
 	}
 	return b, nil
@@ -166,7 +170,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	binding := h.bind(op, peer, id, kind)
 	binding.Repair = repair
 	if push && r.Method == http.MethodPut && resource == "catalog" {
-		raw, e := body(w, r, generation.MaxCatalog)
+		raw, e := body(ctx, w, r, generation.MaxCatalog, h.limits.Bodies.Receive)
 		if e != nil {
 			fail(w, e)
 			return
@@ -207,7 +211,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !push && r.Method == http.MethodPost && resource == "lease" {
-		if _, e := body(w, r, 0); e != nil {
+		if _, e := body(ctx, w, r, 0, nil); e != nil {
 			fail(w, e)
 			return
 		}
@@ -240,7 +244,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !push && r.Method == http.MethodDelete && resource == "lease" {
-		if _, e = body(w, r, 0); e != nil {
+		if _, e = body(ctx, w, r, 0, nil); e != nil {
 			fail(w, e)
 			return
 		}
@@ -269,7 +273,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if resource == "catalog" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
-			_, _ = w.Write(raw)
+			_ = h.limits.Bodies.Send.WriteBody(ctx, w, raw)
 			return
 		}
 		if resource == "objects" && validID(parts[6]) {
@@ -288,7 +292,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/octet-stream")
 					w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 					w.Header().Set("ETag", `"`+ref.ID+`"`)
-					_, _ = w.Write(b)
+					_ = h.limits.Bodies.Send.WriteBody(ctx, w, b)
 					return
 				}
 			}
@@ -301,7 +305,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if resource == "objects" && r.Method == http.MethodPut && validID(parts[6]) {
-		b, e := body(w, r, generation.MaxObject)
+		b, e := body(ctx, w, r, generation.MaxObject, h.limits.Bodies.Receive)
 		if e != nil {
 			fail(w, e)
 			return
@@ -326,7 +330,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, ErrProtocol)
 		return
 	}
-	if _, e = body(w, r, 0); e != nil {
+	if _, e = body(ctx, w, r, 0, nil); e != nil {
 		fail(w, e)
 		return
 	}

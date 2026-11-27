@@ -142,6 +142,9 @@ func (a *Agent) openPreviousHolder(s state, i ingress.Intent, limits peer.Limits
 			return nil
 		}
 		client, _ := ingress.NewClient(r.endpoint, r.authority, r.raw, a.b.Local.Owner, a.cert, a.roots, limits)
+		if client != nil {
+			client.SetPayloadBudget(a.payloadBudget)
+		}
 		return client
 	}
 	return nil

@@ -79,10 +79,15 @@ type httpFixture struct {
 
 func network(t *testing.T, wrap func(http.Handler) http.Handler) *httpFixture {
 	t.Helper()
+	return networkWithLimits(t, wrap, httpLimits)
+}
+
+func networkWithLimits(t *testing.T, wrap func(http.Handler) http.Handler, limits peer.Limits) *httpFixture {
+	t.Helper()
 	ca := newCA(t)
 	source, receiver := ca.node(t), ca.node(t)
 	f := setupIDs(t, certID(t, source), certID(t, receiver))
-	wire, e := NewServer(f.session, receiver, ca.roots, httpLimits)
+	wire, e := NewServer(f.session, receiver, ca.roots, limits)
 	must(t, e)
 	handler := wire.Handler
 	if wrap != nil {
@@ -92,7 +97,7 @@ func network(t *testing.T, wrap func(http.Handler) http.Handler) *httpFixture {
 	server.TLS = wire.TLSConfig
 	server.StartTLS()
 	t.Cleanup(server.Close)
-	client, e := NewClient(server.URL, f.options.Authority, f.options.Intent, f.options.Owner, source, ca.roots, httpLimits)
+	client, e := NewClient(server.URL, f.options.Authority, f.options.Intent, f.options.Owner, source, ca.roots, limits)
 	must(t, e)
 	t.Cleanup(client.Close)
 	must(t, f.source.Close())

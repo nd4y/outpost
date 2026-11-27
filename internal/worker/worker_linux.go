@@ -41,6 +41,7 @@ type Options struct {
 	Initialize  bool
 	Recovery    *recovery.Executor
 	Fetcher     *control.Fetcher
+	PeerBodies  peer.BodyBudgets
 	// Resolve is local, bounded and context-aware. No secrets enter shared state.
 	Resolve func(context.Context, storage.Profile) (*storage.Backend, error)
 }
@@ -81,6 +82,7 @@ type Worker struct {
 	state, lease *statefile.Store
 	fetcher      *control.Fetcher
 	resolve      func(context.Context, storage.Profile) (*storage.Backend, error)
+	peerBodies   peer.BodyBudgets
 	// Only the execution lease owner replaces this map. Each view reads its own map.
 	requestGates map[string]*storage.RequestGate
 	mu           sync.Mutex
@@ -106,7 +108,7 @@ func Open(o Options) (*Worker, error) {
 	if !ok || !publicOK || len(private) != ed25519.PrivateKeySize || !bytes.Equal(public, private.Public().(ed25519.PublicKey)) {
 		return nil, ErrDenied
 	}
-	w := &Worker{recovery: o.Recovery, guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...)}
+	w := &Worker{recovery: o.Recovery, guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...), peerBodies: o.PeerBodies}
 	if e = w.check(context.Background()); e != nil {
 		return nil, e
 	}
@@ -345,6 +347,10 @@ func peerPolicy(c control.Config, d control.Domain, self string, inbound bool, j
 	}
 	return p
 }
+func (w *Worker) transferLimits(limits control.Limits) peer.Limits {
+	return peer.Limits{Concurrency: limits.Parallel, Timeout: time.Duration(limits.AttemptMillis) * time.Millisecond, Attempts: 2, Bodies: w.peerBodies}
+}
+
 func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 	status, e := w.Status(ctx)
 	if e != nil {
@@ -421,7 +427,7 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		}
 		p := peerPolicy(c, d, w.node, true, control.Job{})
 		if len(p.Peers) > 0 {
-			s, e := peer.NewServer(local.replica, local.journal, p, w.cert, w.roots, peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2})
+			s, e := peer.NewServer(local.replica, local.journal, p, w.cert, w.roots, w.transferLimits(c.Limits))
 			if e != nil {
 				return fail(e)
 			}
@@ -471,7 +477,7 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		}
 		e = w.createOrOpen(ctx, dir, func(init bool) error {
 			var e error
-			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Parent: w.root, Directory: w.relative(dir), Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Staging: captureStagingRoutes(c, a.Trust.Domain, a.Source), RelayOnly: relayOnly, Limits: peer.Limits{Concurrency: c.Limits.Parallel, Timeout: time.Duration(c.Limits.AttemptMillis) * time.Millisecond, Attempts: 2}, Admission: func(prefix string) statefile.Admission {
+			local.ingress, e = ingress.OpenRegistry(v.ctx, ingress.RegistryOptions{Parent: w.root, Directory: w.relative(dir), Authority: raw, Owner: w.owner, Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: init, Staging: captureStagingRoutes(c, a.Trust.Domain, a.Source), RelayOnly: relayOnly, Limits: w.transferLimits(c.Limits), Admission: func(prefix string) statefile.Admission {
 				return w.admission(filepath.ToSlash(filepath.Join(relative, prefix)))
 			}, CheckRegistryWrite: func(ctx context.Context, size int) error {
 				if e := w.check(ctx); e != nil {
@@ -875,7 +881,7 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 	}
 	if j.Kind == "push" || j.Kind == "pull" {
 		n, _ := v.cfg.NodeByID(j.Peer)
-		client, e := peer.NewClient(n.Endpoint, j.Peer, w.cert, w.roots, peerPolicy(v.cfg, d, w.node, false, j), local.journal, d.Trust, peer.Limits{Concurrency: v.cfg.Limits.Parallel, Timeout: time.Duration(v.cfg.Limits.AttemptMillis) * time.Millisecond, Attempts: 2})
+		client, e := peer.NewClient(n.Endpoint, j.Peer, w.cert, w.roots, peerPolicy(v.cfg, d, w.node, false, j), local.journal, d.Trust, w.transferLimits(v.cfg.Limits))
 		if e != nil {
 			return nil, e
 		}

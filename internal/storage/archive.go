@@ -102,7 +102,7 @@ func (r *archiveReply) read(ctx context.Context, method string, response *http.R
 		return nil
 	}
 	const maxError = 4096
-	raw, err := io.ReadAll(io.LimitReader(traffic.response(budget.response(ctx, response.Body)), maxError+1))
+	raw, err := io.ReadAll(io.LimitReader(traffic.response(budget.PaceResponse(ctx, response.Body)), maxError+1))
 	var detail struct {
 		XMLName xml.Name `xml:"Error"`
 		Code    string   `xml:"Code"`

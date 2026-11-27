@@ -140,10 +140,15 @@ func (g *Registry) readStagedInventory(ctx context.Context, target Intent, origi
 }
 
 func (g *Registry) readStagingDocument(ctx context.Context, origin, path string, headers http.Header, limit int) ([]byte, error) {
-	return g.readStagingResponse(ctx, origin, path, headers, "application/json", limit)
+	return g.readStagingResponse(ctx, origin, path, headers, "application/json", limit, nil)
 }
 
-func (g *Registry) readStagingResponse(ctx context.Context, origin, path string, headers http.Header, media string, limit int) ([]byte, error) {
+func (g *Registry) readStagingResponse(ctx context.Context, origin, path string, headers http.Header, media string, limit int, budget *storage.HTTPBodyBudget) ([]byte, error) {
+	if budget != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, g.options.Limits.Timeout)
+		defer cancel()
+	}
 	h, u, err := peer.AuthenticatedHTTP(g.options.Staging.Origins[origin], g.options.Certificate, g.options.Roots, g.authority.Ingress, origin, g.options.Limits)
 	if err != nil {
 		return nil, err
@@ -182,7 +187,7 @@ func (g *Registry) readStagingResponse(ctx context.Context, origin, path string,
 	if res.ContentLength > int64(limit) || res.Header.Get("Content-Encoding") != "" || res.Header.Get("Content-Type") != media {
 		return nil, ErrProtocol
 	}
-	raw, err := io.ReadAll(io.LimitReader(res.Body, int64(limit)+1))
+	raw, err := io.ReadAll(io.LimitReader(budget.PaceResponse(ctx, res.Body), int64(limit)+1))
 	if err != nil {
 		return nil, err
 	}

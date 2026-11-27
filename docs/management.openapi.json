@@ -2692,6 +2692,65 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/verified-restores": {
+      "get": {
+        "operationId": "verifiedRestores",
+        "summary": "List original-age verified restores matched to local generations",
+        "x-required-roles": ["owner", "operator", "viewer", "recovery"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ID" }
+          },
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ID" }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ID" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest matching evidence for each reported local generation",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/VerifiedRestores" } }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "404": {
+            "description": "Unavailable or outside scope",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "503": {
+            "description": "State or dependency unavailable",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/policy": {
       "get": {
         "operationId": "domainPolicy",
@@ -4983,6 +5042,42 @@
           }
         },
         "required": ["document"]
+      },
+      "VerifiedRestores": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["format", "documentDigest", "items"],
+        "properties": {
+          "format": { "const": "outpost-management-verified-restores-1" },
+          "documentDigest": { "$ref": "#/components/schemas/ID" },
+          "items": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["operationId", "generation", "target", "verifiedUnix", "scope"],
+              "properties": {
+                "operationId": { "$ref": "#/components/schemas/ID" },
+                "generation": { "$ref": "#/components/schemas/ID" },
+                "target": { "$ref": "#/components/schemas/ID" },
+                "verifiedUnix": { "type": "integer", "minimum": 1, "maximum": 1125899906842624 },
+                "scope": { "enum": ["WHOLE_GENERATION", "SELECTED_VERSIONS"] },
+                "logicalMeasurement": {
+                  "type": "object",
+                  "description": "Newest authenticated whole-generation restore in the exact selected report, independent of its newest selected restore.",
+                  "additionalProperties": false,
+                  "required": ["operationId", "logicalBytes", "measuredUnix"],
+                  "properties": {
+                    "operationId": { "$ref": "#/components/schemas/ID" },
+                    "logicalBytes": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,17})$" },
+                    "measuredUnix": { "type": "integer", "minimum": 1, "maximum": 1125899906842624 }
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "CommandObservation": {
         "type": "object",

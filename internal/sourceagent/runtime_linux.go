@@ -55,6 +55,14 @@ type Bootstrap struct {
 	Standby         bool                `json:"standby,omitempty"`
 	Companion       *CompanionIngress   `json:"companionIngress,omitempty"`
 	JournalCopy     *JournalCopy        `json:"journalCopy,omitempty"`
+
+	IngressBodyBytesPerSecond int64 `json:"ingressBodyBytesPerSecond,omitempty"`
+}
+
+func (b Bootstrap) validIngressBodyRate() bool {
+	rate := b.IngressBodyBytesPerSecond
+	return (rate == 0 || rate >= peer.MinBodyBytesPerSecond && rate <= 1<<30) &&
+		b.Local.PeerReceiveBodyBytesPerSecond == 0 && b.Local.PeerSendBodyBytesPerSecond == 0
 }
 
 func Load(path string) (Bootstrap, error) {
@@ -63,7 +71,7 @@ func Load(path string) (Bootstrap, error) {
 	if e != nil {
 		return b, e
 	}
-	if worker.DecodeInput(raw, &b, 65536) != nil {
+	if worker.DecodeInput(raw, &b, 65536) != nil || !b.validIngressBodyRate() {
 		return b, ErrInvalid
 	}
 	return b, nil
@@ -143,6 +151,7 @@ type Agent struct {
 	runtimeDirectory   string
 	root               *os.Root
 	budget             *diskbudget.Budget
+	payloadBudget      *storage.HTTPBodyBudget
 	store, lease       *statefile.Store
 	journal            *sourceJournal
 	owner              filekit.Owner
@@ -176,6 +185,9 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 }
 
 func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, directory string, fault func(string) error) (*Agent, error) {
+	if !b.validIngressBodyRate() {
+		return nil, ErrInvalid
+	}
 	if (b.Format != Format && b.Format != PreparedAgentFormat) || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
 		return nil, ErrInvalid
 	}
@@ -211,6 +223,12 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 	}
 	a := &Agent{b: b, runtimeDirectory: directory, Fault: fault}
 	var e error
+	if b.IngressBodyBytesPerSecond != 0 {
+		a.payloadBudget, e = storage.NewHTTPBodyBudget(b.IngressBodyBytesPerSecond)
+		if e != nil {
+			return nil, ErrInvalid
+		}
+	}
 	a.authority, e = worker.ReadPrivate(b.AuthorityFile, ingress.MaxDocument)
 	if e != nil {
 		return nil, e
@@ -283,6 +301,10 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		return nil, ErrInvalid
 	}
 	a.initialObservation = bytes.Clone(a.observation)
+	// Process-local pacing can change on restart without changing the original
+	// installation, grants or the journal binding of an unfinished capture.
+	bindingBootstrap := b
+	bindingBootstrap.IngressBodyBytesPerSecond = 0
 	identity, _ := json.Marshal(struct {
 		Bootstrap          Bootstrap
 		Authority          []byte
@@ -290,7 +312,7 @@ func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, dir
 		Data               filekit.Owner
 		CompanionAuthority []byte `json:",omitempty"`
 		ReserveAuthority   []byte `json:",omitempty"`
-	}{b, a.authority, a.observation, a.owner, a.companionAuthority, a.reserveAuthority})
+	}{bindingBootstrap, a.authority, a.observation, a.owner, a.companionAuthority, a.reserveAuthority})
 	a.binding = storage.Hash(identity)
 	if initialize {
 		// The parent must already exist. Checking it by held identities rejects
@@ -782,6 +804,7 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 	if e != nil {
 		return nil, nil, e
 	}
+	client.SetPayloadBudget(a.payloadBudget)
 	initialize := s.Phase == "PREPARING" || s.RoutePreparing && !inspect
 	operationPrefix := path.Join("operations", i.Operation)
 	prefix := operationPrefix

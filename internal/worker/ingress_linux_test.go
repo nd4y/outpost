@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/tls"
@@ -317,9 +318,25 @@ func TestWorkerAdvancesStagedImportBetweenQueuedTransfers(t *testing.T) {
 }
 
 func TestWorkerPublishesCaptureThroughOfflineBridge(t *testing.T) {
+	testWorkerPublishesCaptureThroughOfflineBridge(t, false)
+}
+
+func TestWorkerPublishesCaptureThroughPacedOfflineBridge(t *testing.T) {
+	testWorkerPublishesCaptureThroughOfflineBridge(t, true)
+}
+
+func testWorkerPublishesCaptureThroughOfflineBridge(t *testing.T, paced bool) {
+	t.Helper()
 	f := newFixture(t)
 	ctx := t.Context()
 	source, bridge, target := f.nodes[0], f.nodes[1], f.nodes[2]
+	if paced {
+		var err error
+		bridge.peerBodies, err = (Bootstrap{PeerReceiveBodyBytesPerSecond: peer.MinBodyBytesPerSecond, PeerSendBodyBytesPerSecond: peer.MinBodyBytesPerSecond}).peerBodyBudgets()
+		must(t, err)
+		target.peerBodies, err = (Bootstrap{PeerReceiveBodyBytesPerSecond: peer.MinBodyBytesPerSecond}).peerBodyBudgets()
+		must(t, err)
+	}
 	bridgeServer := f.endpoint(t, nil)
 	f.cfg.Format = control.SettlementConfigFormat
 	f.cfg.Limits.Parallel, f.cfg.Limits.AttemptMillis = 1, 60000
@@ -369,9 +386,16 @@ func TestWorkerPublishesCaptureThroughOfflineBridge(t *testing.T) {
 	must(t, upstream.OfferRelayIntent(ctx, targetGrant, targetIntent))
 	must(t, upstream.OfferRelayIntent(ctx, targetGrant, targetIntent))
 	data := []byte("ciphertext sent in the first connectivity window")
+	if paced {
+		data = bytes.Repeat([]byte{0x5c}, 512<<10)
+	}
 	object := filekit.Object{ID: storage.Hash(data), Bytes: len(data)}
+	started := time.Now()
 	_, err = upstream.Write(ctx, object, data)
 	must(t, err)
+	if paced && time.Since(started) < 750*time.Millisecond {
+		t.Fatal("relay's primary ingress PUT and readback did not use both paced directions")
+	}
 	upstream.Close()
 	stopBridge()
 

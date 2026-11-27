@@ -107,7 +107,7 @@ func (g *Registry) AdvanceRelayedPublication(ctx context.Context, paused func(st
 		return false, ErrProtocol
 	}
 	if len(catalog) == 0 {
-		catalog, err = g.readStagingDocument(bounded, origin, route(i)+"/"+relayCatalogResource, nil, generation.MaxCatalog)
+		catalog, err = g.readStagingResponse(bounded, origin, route(i)+"/"+relayCatalogResource, nil, "application/json", generation.MaxCatalog, g.options.Limits.Bodies.Receive)
 		if err != nil {
 			return false, err
 		}
@@ -144,7 +144,7 @@ func (g *Registry) AdvanceRelayedPublication(ctx context.Context, paused func(st
 	}
 	headers := http.Header{}
 	headers.Set("Outpost-Bytes", strconv.Itoa(missing.Bytes))
-	b, err := g.readStagingResponse(bounded, origin, route(i)+"/"+relayObjectPrefix+missing.ID, headers, "application/octet-stream", missing.Bytes)
+	b, err := g.readStagingResponse(bounded, origin, route(i)+"/"+relayObjectPrefix+missing.ID, headers, "application/octet-stream", missing.Bytes, g.options.Limits.Bodies.Receive)
 	if err != nil {
 		return false, err
 	}

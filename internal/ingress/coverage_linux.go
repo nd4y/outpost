@@ -154,7 +154,7 @@ func (g *Registry) serveCoverage(w http.ResponseWriter, r *http.Request, intent 
 	if partition {
 		max = maxSessionDocument
 	}
-	raw, err := readBody(w, r, max)
+	raw, err := readPacedBody(ctx, w, r, max, g.options.Limits.Bodies.Receive)
 	if err != nil {
 		fail(w, err)
 		return

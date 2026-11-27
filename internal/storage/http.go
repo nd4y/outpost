@@ -392,7 +392,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 		} else {
 			req.SetBasicAuth(b.credentials.Access, b.credentials.Secret)
 		}
-		b.bodyBudget.request(req)
+		b.bodyBudget.PaceRequest(req)
 		traffic.begin(req)
 		res, e := b.client.Do(req)
 		delay := time.Duration(attempt+1) * 50 * time.Millisecond
@@ -408,7 +408,7 @@ func (b *Backend) requestWith(ctx context.Context, method, key string, payload [
 					res.Body.Close()
 					return nil, last, ErrIntegrity
 				}
-				reader := b.bodyBudget.response(ctx, res.Body)
+				reader := b.bodyBudget.PaceResponse(ctx, res.Body)
 				data, readErr := io.ReadAll(io.LimitReader(traffic.response(reader), int64(b.profile.MaxObjectBytes)+1))
 				res.Body.Close()
 				if len(data) > b.profile.MaxObjectBytes {

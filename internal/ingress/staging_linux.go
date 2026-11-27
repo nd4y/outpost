@@ -263,7 +263,7 @@ func (g *Registry) serveStaging(w http.ResponseWriter, r *http.Request) bool {
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", strconv.Itoa(len(b)))
-		_, _ = w.Write(b)
+		_ = g.options.Limits.Bodies.Send.WriteBody(ctx, w, b)
 		return true
 	}
 	g.mu.Unlock()

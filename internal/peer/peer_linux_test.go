@@ -168,7 +168,12 @@ func (f *fixture) sealAt(t *testing.T, seq uint64, parent string, snapshot int64
 	return id, v.Version
 }
 func (f *fixture) endpoint(t *testing.T, n *node, p Policy, wrap func(http.Handler) http.Handler) *httptest.Server {
-	server, e := NewServer(n.replica, n.journal, p, n.cert, f.ca.roots, testLimits)
+	t.Helper()
+	return f.endpointWithLimits(t, n, p, wrap, testLimits)
+}
+func (f *fixture) endpointWithLimits(t *testing.T, n *node, p Policy, wrap func(http.Handler) http.Handler, limits Limits) *httptest.Server {
+	t.Helper()
+	server, e := NewServer(n.replica, n.journal, p, n.cert, f.ca.roots, limits)
 	must(t, e)
 	if wrap != nil {
 		server.Handler = wrap(server.Handler)

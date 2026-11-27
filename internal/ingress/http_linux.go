@@ -68,11 +68,18 @@ func fail(w http.ResponseWriter, e error) {
 	http.Error(w, http.StatusText(status), status)
 }
 func readBody(w http.ResponseWriter, r *http.Request, max int) ([]byte, error) {
+	return readPacedBody(r.Context(), w, r, max, nil)
+}
+
+func readPacedBody(ctx context.Context, w http.ResponseWriter, r *http.Request, max int, budget *storage.HTTPBodyBudget) ([]byte, error) {
 	if r.ContentLength > int64(max) || r.Header.Get("Content-Encoding") != "" {
 		return nil, ErrProtocol
 	}
-	b, e := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(max)))
+	b, e := io.ReadAll(budget.PaceResponse(ctx, http.MaxBytesReader(w, r.Body, int64(max))))
 	if e != nil {
+		if ctxErr := ctx.Err(); budget != nil && ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, ErrProtocol
 	}
 	return b, nil
@@ -169,7 +176,7 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 			return
 		}
 		if resource == "catalog" && r.Method == http.MethodPut {
-			raw, e := readBody(w, r, generation.MaxCatalog)
+			raw, e := readPacedBody(ctx, w, r, generation.MaxCatalog, limits.Bodies.Receive)
 			if e != nil {
 				fail(w, e)
 				return
@@ -218,7 +225,7 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write(raw)
+			_ = limits.Bodies.Send.WriteBody(ctx, w, raw)
 			return
 		}
 		if !strings.HasPrefix(resource, "objects/") {
@@ -235,7 +242,7 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 		}
 		switch r.Method {
 		case http.MethodPut:
-			b, e := readBody(w, r, generation.MaxObject)
+			b, e := readPacedBody(ctx, w, r, generation.MaxObject, limits.Bodies.Receive)
 			if e != nil {
 				fail(w, e)
 				return
@@ -256,7 +263,7 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 			}
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Length", strconv.Itoa(len(b)))
-			_, _ = w.Write(b)
+			_ = limits.Bodies.Send.WriteBody(ctx, w, b)
 		case http.MethodHead:
 			if e := s.Check(ctx, ref); e != nil {
 				fail(w, e)
@@ -289,6 +296,7 @@ type Client struct {
 	peerPublicationGrant         []byte
 	inspection                   bool
 	settlement                   []byte
+	bodyBudgets                  peer.BodyBudgets
 	catalogResume                atomic.Pointer[catalogContinuation]
 	UploadedBytes, ReadbackBytes atomic.Int64
 }
@@ -343,7 +351,7 @@ func clientWithIdentity(endpoint, self string, i Intent, authority, intent []byt
 		h.CloseIdleConnections()
 		return nil, e
 	}
-	return &Client{http: h, endpoint: u, intent: i, cert: leaf, authority: bytes.Clone(authority), intentRaw: bytes.Clone(intent), owner: bytes.Clone(owner), cleanup: cleanup}, nil
+	return &Client{http: h, endpoint: u, intent: i, cert: leaf, authority: bytes.Clone(authority), intentRaw: bytes.Clone(intent), owner: bytes.Clone(owner), cleanup: cleanup, bodyBudgets: limits.Bodies}, nil
 }
 func (c *Client) IntentID() string { return storage.Hash(c.intentRaw) }
 
@@ -352,6 +360,12 @@ func (c *Client) ValidReceipt(r Receipt) bool {
 }
 
 func (c *Client) Close() { c.http.CloseIdleConnections() }
+
+// SetPayloadBudget attaches the process's common data-body budget. Set it
+// before using the client concurrently. Nil preserves the unpaced behavior.
+func (c *Client) SetPayloadBudget(budget *storage.HTTPBodyBudget) {
+	c.bodyBudgets = peer.BodyBudgets{Receive: budget, Send: budget}
+}
 func (c *Client) request(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int) (int, http.Header, []byte, error) {
 	return c.requestCatalog(ctx, method, resource, ref, payload, max, "")
 }
@@ -410,6 +424,17 @@ func (c *Client) requestCatalog(ctx context.Context, method, resource string, re
 	if c.cert.NotAfter.Before(deadline) {
 		deadline = c.cert.NotAfter
 	}
+	object := strings.HasPrefix(resource, "objects/")
+	paceUpload := c.bodyBudgets.Send != nil && method == http.MethodPut &&
+		(object || resource == "catalog" || resource == "coverage" || resource == "partition")
+	paceDownload := c.bodyBudgets.Receive != nil && method == http.MethodGet &&
+		(object || resource == "catalog" || strings.HasPrefix(resource, "staged/"))
+	if (paceUpload || paceDownload) && c.http.Timeout > 0 {
+		// Body allowance waits must honor the client deadline even before net/http reads.
+		if rpcDeadline := time.Now().Add(c.http.Timeout); rpcDeadline.Before(deadline) {
+			deadline = rpcDeadline
+		}
+	}
 	bounded, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	u := *c.endpoint
@@ -434,6 +459,9 @@ func (c *Client) requestCatalog(ctx context.Context, method, resource string, re
 	}
 	if ref != nil {
 		r.Header.Set("Outpost-Bytes", strconv.Itoa(ref.Bytes))
+	}
+	if paceUpload {
+		c.bodyBudgets.Send.PaceRequest(r)
 	}
 	response, e := c.http.Do(r)
 	if e != nil {
@@ -482,7 +510,11 @@ func (c *Client) requestCatalog(ctx context.Context, method, resource string, re
 	if response.ContentLength > int64(max) {
 		return 0, nil, nil, ErrProtocol
 	}
-	body, e := io.ReadAll(io.LimitReader(response.Body, int64(max)+1))
+	var reader io.Reader = response.Body
+	if paceDownload {
+		reader = c.bodyBudgets.Receive.PaceResponse(bounded, reader)
+	}
+	body, e := io.ReadAll(io.LimitReader(reader, int64(max)+1))
 	c.ReadbackBytes.Add(int64(len(body)))
 	if e != nil {
 		return 0, nil, nil, e

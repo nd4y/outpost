@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -165,10 +166,19 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 	companion, e := ingress.SignAuthority(companionGrant, f.ownerSigner)
 	must(t, e)
 	aDir, bDir := filepath.Join(f.base, "holder-a"), filepath.Join(f.base, "holder-b")
-	aWorker, e := worker.Open(worker.Options{Directory: aDir, Node: aID, Owner: f.b.Local.Owner, Certificate: f.destination, Roots: f.roots, Initialize: true})
+	var aBodies, bBodies peer.BodyBudgets
+	if expire {
+		for _, bodies := range []*peer.BodyBudgets{&aBodies, &bBodies} {
+			bodies.Receive, e = storage.NewHTTPBodyBudget(peer.MinBodyBytesPerSecond)
+			must(t, e)
+			bodies.Send, e = storage.NewHTTPBodyBudget(peer.MinBodyBytesPerSecond)
+			must(t, e)
+		}
+	}
+	aWorker, e := worker.Open(worker.Options{Directory: aDir, Node: aID, Owner: f.b.Local.Owner, Certificate: f.destination, Roots: f.roots, Initialize: true, PeerBodies: aBodies})
 	must(t, e)
 	t.Cleanup(func() { aWorker.Close() })
-	bWorker, e := worker.Open(worker.Options{Directory: bDir, Node: bID, Owner: f.b.Local.Owner, Certificate: f.replicaCertificate, Roots: f.roots, Initialize: true})
+	bWorker, e := worker.Open(worker.Options{Directory: bDir, Node: bID, Owner: f.b.Local.Owner, Certificate: f.replicaCertificate, Roots: f.roots, Initialize: true, PeerBodies: bBodies})
 	must(t, e)
 	t.Cleanup(func() { bWorker.Close() })
 	cDir := filepath.Join(f.base, "outbound-follower")
@@ -202,6 +212,40 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 		peerImports.Add(1)
 		return false
 	}
+	var lateBulkMu sync.Mutex
+	var cancelledLateBulk string
+	var pacedLateRetry atomic.Bool
+	servePeerRead := func(out http.ResponseWriter, r *http.Request, handler http.HandlerFunc) {
+		length, _ := strconv.Atoi(r.Header.Get("Outpost-Bytes"))
+		if !expire || r.Method != http.MethodGet || !strings.Contains(r.URL.Path, "/staged/") ||
+			r.Header.Get("Outpost-Publication-Grant") == "" || length < 128<<10 {
+			handler(out, r)
+			return
+		}
+		binding := r.URL.Path + "\x00" + r.Header.Get("Outpost-Publication-Grant")
+		lateBulkMu.Lock()
+		first := cancelledLateBulk == ""
+		if first {
+			cancelledLateBulk = binding
+		}
+		matches := binding == cancelledLateBulk
+		lateBulkMu.Unlock()
+		if first {
+			short, cancel := context.WithTimeout(r.Context(), 50*time.Millisecond)
+			defer cancel()
+			handler(out, r.WithContext(short))
+			if !errors.Is(short.Err(), context.DeadlineExceeded) {
+				t.Error("granted expired-slot body escaped its short attempt deadline")
+			}
+			return
+		}
+		start := time.Now()
+		handler(out, r)
+		tail := time.Duration(length-(64<<10)) * time.Second / peer.MinBodyBytesPerSecond
+		if matches && out.Header().Get("Content-Length") == strconv.Itoa(length) && time.Since(start) >= tail {
+			pacedLateRetry.Store(true)
+		}
+	}
 	f.intercept = func(out http.ResponseWriter, r *http.Request) bool {
 		if peerRead(out, r) {
 			return true
@@ -226,7 +270,7 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 			_, _ = out.Write(rec.Body.Bytes())
 			return true
 		}
-		aHandler(out, r)
+		servePeerRead(out, r, aHandler)
 		return true
 	}
 	bHandler := traffic.watch(bID, bWorker)
@@ -238,7 +282,7 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 			http.Error(w, "required coverage unavailable", http.StatusPreconditionFailed)
 			return
 		}
-		bHandler.ServeHTTP(w, r)
+		servePeerRead(w, r, bHandler)
 	}))
 	bServer.TLS, e = peer.AuthenticatedServerTLS(f.replicaCertificate, f.roots, bID)
 	must(t, e)
@@ -308,6 +352,9 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 	if coverage {
 		f.b.Profile.ReleasePolicy = releasePolicy
 		size = 32 << 10
+	}
+	if expire {
+		size = 512 << 10
 	}
 	payload := make([]byte, size)
 	_, e = rand.Read(payload)
@@ -476,9 +523,14 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 			must(t, f.a.Close())
 			f.a = nil
 		}
-		allowPublication.Store(true)
+		if !expire {
+			allowPublication.Store(true)
+		}
 		runCaptureWorker(t, ctx, aWorker)
 		runCaptureWorker(t, ctx, bWorker)
+		if expire {
+			allowPublication.Store(true)
+		}
 		for idx, dir := range paths {
 			replica, e := generation.Open(dir, f.grant.Trust, false)
 			must(t, e)
@@ -509,6 +561,9 @@ func testPairedCapture(t *testing.T, releasePolicy string, expire, interruptedDe
 		}
 		lateReads := peerImports.Load()
 		if expire {
+			if !pacedLateRetry.Load() {
+				t.Fatal("expired-slot publication did not retry the paced authorized staged GET")
+			}
 			endpoint, node, reader, authority, wrong := f.server.URL, aID, f.replicaCertificate, f.authority, primary
 			if ingress.CoverageHolder(object, aID, bID) == bID {
 				endpoint, node, reader, authority, wrong = bServer.URL, bID, f.destination, companion.Authority, companion

@@ -15,6 +15,7 @@ import (
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/filekit"
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/peer"
 )
 
 func (f *fixture) rules() (control.Replication, control.Replication) {
@@ -38,6 +39,12 @@ func TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode(t *
 	f := newFixture(t)
 	// Durable transfers can spend longer in fsync on a shared test HDD.
 	f.cfg.Limits.AttemptMillis = 60000
+	bridgeBodies, e := (Bootstrap{PeerReceiveBodyBytesPerSecond: peer.MinBodyBytesPerSecond, PeerSendBodyBytesPerSecond: peer.MinBodyBytesPerSecond}).peerBodyBudgets()
+	must(t, e)
+	followerBodies, e := (Bootstrap{PeerReceiveBodyBytesPerSecond: peer.MinBodyBytesPerSecond}).peerBodyBudgets()
+	must(t, e)
+	f.nodes[1].peerBodies = bridgeBodies
+	f.nodes[2].peerBodies = followerBodies
 	server := f.endpoint(t, nil)
 	push, pull := f.rules()
 	ctx := context.Background()
@@ -79,7 +86,7 @@ func TestAutonomousDiscoveryReplicatesRetainedHistoryThroughOutboundOnlyNode(t *
 	stopC()
 	stopB()
 	server.Close()
-	reopened, e := Open(Options{Directory: f.nodes[2].dir, Node: f.nodes[2].node, Owner: f.owner.Public().(ed25519.PublicKey), Certificate: f.nodes[2].cert, Roots: f.ca.pool})
+	reopened, e := Open(Options{Directory: f.nodes[2].dir, Node: f.nodes[2].node, Owner: f.owner.Public().(ed25519.PublicKey), Certificate: f.nodes[2].cert, Roots: f.ca.pool, PeerBodies: followerBodies})
 	must(t, e)
 	defer reopened.Close()
 	stop := start(t, reopened)

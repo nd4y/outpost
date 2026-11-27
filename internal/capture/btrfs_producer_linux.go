@@ -35,6 +35,7 @@ type BtrfsProducerProfile struct {
 	StateDirectory string         `json:"stateDirectory"`
 	Trust          PreparedTrust  `json:"trust"`
 	MaxRetained    int            `json:"maxRetained"`
+	MinFreeBytes   uint64         `json:"minFreeBytes,omitempty"`
 }
 
 type BtrfsProducerRequest struct {
@@ -154,6 +155,67 @@ func countNativeSnapshots(root *os.Root) (int, error) {
 		if strings.HasPrefix(entry.Name(), nativeSnapshotPrefix) {
 			count++
 		}
+	}
+	return count, nil
+}
+
+// withNativeStagingLock serializes snapshot allocation across producer journals
+// that share this staging inode. The held directory descriptor is also the
+// snapshot ioctl target. Closing it releases the lock if the process exits.
+func withNativeStagingLock(ctx context.Context, staging *os.File, run func() error) error {
+	wait, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	for {
+		if err := wait.Err(); err != nil {
+			return err
+		}
+		err := unix.Flock(int(staging.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		if err == nil {
+			defer unix.Flock(int(staging.Fd()), unix.LOCK_UN)
+			if err := wait.Err(); err != nil {
+				return err
+			}
+			return run()
+		}
+		if err != unix.EWOULDBLOCK && err != unix.EINTR {
+			return err
+		}
+		select {
+		case <-wait.Done():
+			return wait.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// checkNativeSnapshotCapacity checks admission on the held staging directory.
+// Btrfs free-block reporting is an instantaneous measurement, not a bound on
+// future copy-on-write growth or a guarantee of available metadata chunks.
+func checkNativeSnapshotCapacity(staging *os.Root, fd *os.File, p BtrfsProducerProfile) (int, error) {
+	count, err := countNativeSnapshots(staging)
+	if err != nil {
+		return 0, err
+	}
+	if count >= p.MaxRetained {
+		return 0, statefile.ErrCapacity
+	}
+	if p.MinFreeBytes == 0 {
+		return count, nil
+	}
+	var space unix.Statfs_t
+	if err := unix.Fstatfs(int(fd.Fd()), &space); err != nil {
+		return 0, err
+	}
+	if space.Bsize <= 0 || space.Bavail > space.Blocks {
+		return 0, ErrInvalid
+	}
+	blockSize := uint64(space.Bsize)
+	required := p.MinFreeBytes / blockSize
+	if p.MinFreeBytes%blockSize != 0 {
+		required++
+	}
+	if space.Bavail < required {
+		return 0, statefile.ErrCapacity
 	}
 	return count, nil
 }
@@ -284,43 +346,52 @@ func ProduceBtrfsExport(ctx context.Context, request BtrfsProducerRequest, key e
 			}
 			return saveNativeRecord(store, r, key)
 		}
-		now := time.Now().Unix()
-		r, err := loadNativeRecord(store, binding, p.Trust.Producer, now)
-		if errors.Is(err, os.ErrNotExist) || err == nil && r.Operation != request.Operation {
-			if err == nil && (len(r.Manifest) == 0 || r.Sequence == ^uint64(0) || request.Sequence != r.Sequence+1) {
+		var r btrfsProducerRecord
+		if err := withNativeStagingLock(ctx, dst, func() error {
+			var err error
+			now := time.Now().Unix()
+			r, err = loadNativeRecord(store, binding, p.Trust.Producer, now)
+			if errors.Is(err, os.ErrNotExist) || err == nil && r.Operation != request.Operation {
+				if err == nil && (len(r.Manifest) == 0 || r.Sequence == ^uint64(0) || request.Sequence != r.Sequence+1) {
+					return ErrInvalid
+				}
+				if _, err = staging.Lstat(name); !errors.Is(err, os.ErrNotExist) {
+					return ErrInvalid
+				}
+				count, err := checkNativeSnapshotCapacity(staging, dst, p)
+				if err != nil {
+					return err
+				}
+				if r.Operation == "" && (count != 0 || request.Sequence != 1) {
+					return ErrInvalid
+				}
+				r = btrfsProducerRecord{Format: btrfsProducerRecordFormat, Binding: binding, Operation: request.Operation, Sequence: request.Sequence, Started: now}
+				if err = write(r); err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
+			if r.Sequence != request.Sequence {
 				return ErrInvalid
 			}
-			if _, err = staging.Lstat(name); !errors.Is(err, os.ErrNotExist) {
-				return ErrInvalid
-			}
-			count, err := countNativeSnapshots(staging)
-			if err != nil {
+			if _, err = staging.Lstat(name); errors.Is(err, os.ErrNotExist) && r.Snapshot == "" {
+				// A persisted intent without a snapshot may be resumed after
+				// staging occupancy or free space changes.
+				if _, err = checkNativeSnapshotCapacity(staging, dst, p); err != nil {
+					return err
+				}
+				if err = guard(); err != nil {
+					return err
+				}
+				if err = createNativeSnapshot(src, dst, name); err != nil {
+					return err
+				}
+			} else if err != nil {
 				return err
 			}
-			if count >= p.MaxRetained {
-				return statefile.ErrCapacity
-			}
-			if r.Operation == "" && (count != 0 || request.Sequence != 1) {
-				return ErrInvalid
-			}
-			r = btrfsProducerRecord{Format: btrfsProducerRecordFormat, Binding: binding, Operation: request.Operation, Sequence: request.Sequence, Started: now}
-			if err = write(r); err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		}
-		if r.Sequence != request.Sequence {
-			return ErrInvalid
-		}
-		if _, err = staging.Lstat(name); errors.Is(err, os.ErrNotExist) && r.Snapshot == "" {
-			if err = guard(); err != nil {
-				return err
-			}
-			if err = createNativeSnapshot(src, dst, name); err != nil {
-				return err
-			}
-		} else if err != nil {
+			return nil
+		}); err != nil {
 			return err
 		}
 		snapshot, err := localfs.OpenAt(staging, name, false)

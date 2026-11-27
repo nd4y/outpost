@@ -49,7 +49,7 @@ The account limit covers this worker process. Configuration refresh retains its 
 
 Use `externalLinkBudgets` to group credential-bearing target profiles that share this worker's external link. In each group set `targets` to the exact profile IDs and `bodyBytesPerSecond` to an integer from 65536 to 1073741824. The link groups independently partition every key in `credentialFiles` and can be configured together with account groups. Omit the field to keep the previous behavior.
 
-Each group shares one allowance for reading outgoing request bodies and consuming incoming response bodies, including verification and retries. Reads reserve up to 32 KiB at a time. Short reads can leave some of a reservation unused. The existing request deadline includes time spent pacing. The transport can buffer bytes, and TLS, TCP, IP, peer replication and traffic from other processes are outside this allowance. The configured rate represents this process's share of the link. Measure a real shared link separately before choosing combined rates for several workers.
+Each group shares one allowance for reading outgoing request bodies and consuming incoming response bodies, including verification and retries. A reader reserves up to 32 KiB at a time and spends that allowance across short reads. Any unused tail at the end of the body stays reserved. The existing request deadline includes time spent pacing. The allowance covers the HTTP bodies this process consumes for these targets. Measure transport buffering, TLS, TCP and IP overhead, peer replication and traffic from other processes when choosing combined rates for a real shared link.
 
 ## WebDAV targets without conditional PUT
 

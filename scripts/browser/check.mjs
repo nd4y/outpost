@@ -97,6 +97,154 @@ try {
       original.split(" · View retrieved")[0],
     );
   });
+  await test("verified restore time and selection are separate from copy coverage", async () => {
+    const reportRoute = "**/domains/**/report";
+    const proofRoute = "**/domains/**/verified-restores";
+    const identifier = () => randomBytes(32).toString("hex");
+    const commandId = identifier(),
+      selectedId = identifier(),
+      failedId = identifier(),
+      otherGeneration = identifier(),
+      otherTarget = identifier();
+    const originalState = await page
+      .locator("#generations tbody tr")
+      .locator("td")
+      .allTextContents();
+    let documentDigest, verifiedUnix;
+    let scope = "WHOLE_GENERATION";
+    let proofState = "MATCHED";
+    const logicalBytes = "9007199254740993";
+    await page.route(reportRoute, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      documentDigest = body.documentDigest;
+      verifiedUnix = body.observedUnix - 300;
+      const [original] = body.generations;
+      original.logicalBytes = 451;
+      body.generations.push(
+        { ...original, generation: otherGeneration },
+        { ...original, target: otherTarget },
+      );
+      original.restoreVerifiedUnix = verifiedUnix + 1;
+      const observation = (operationId, timestamp, bytes) => ({
+        operationId,
+        kind: "restore",
+        phase: "COMPLETE",
+        generation: meta.generation,
+        verification: "DECRYPTED",
+        verifiedUnix: timestamp,
+        restore: {
+          verifiedUnix: timestamp,
+          restored: { generation: meta.generation, restored: { bytes } },
+        },
+      });
+      body.commands = [
+        observation(commandId, verifiedUnix, Number(logicalBytes)),
+        observation(selectedId, verifiedUnix + 2, 128),
+        { operationId: failedId, kind: "restore", phase: "FAILED", generation: otherGeneration },
+      ];
+      await route.fulfill({ response, json: body });
+    });
+    await page.route(proofRoute, (route) => {
+      if (proofState === "UNAVAILABLE") return route.fulfill({ status: 404 });
+      const selected = scope === "SELECTED_VERSIONS";
+      const invalidMeasurement = proofState === "SELECTION_AS_MEASUREMENT";
+      const result = {
+        operationId: selected ? selectedId : commandId,
+        generation: meta.generation,
+        target: meta.node,
+        verifiedUnix: selected ? verifiedUnix + 2 : verifiedUnix,
+        scope,
+        logicalMeasurement: {
+          operationId: invalidMeasurement ? selectedId : commandId,
+          logicalBytes: invalidMeasurement ? "128" : logicalBytes,
+          measuredUnix: invalidMeasurement ? verifiedUnix + 2 : verifiedUnix,
+        },
+      };
+      return route.fulfill({
+        json: {
+          format: "outpost-management-verified-restores-1",
+          documentDigest: proofState === "MISMATCHED" ? identifier() : documentDigest,
+          items: [
+            { ...result, target: otherTarget, verifiedUnix: verifiedUnix + 5 },
+            { ...result, generation: otherGeneration },
+            { ...result, generation: otherGeneration, operationId: failedId },
+            result,
+          ],
+        },
+      });
+    });
+    const rows = page.locator("#generations tbody tr");
+    try {
+      await page.locator("#refresh").click();
+      await contains(page, "#generations", "Whole generation");
+      const expected = await page.evaluate(
+        (t) => new Date(t * 1000).toLocaleString("en", { timeZoneName: "short" }),
+        verifiedUnix,
+      );
+      assert.deepEqual(
+        (await rows.nth(0).locator("td").allTextContents()).slice(2, 6),
+        originalState.slice(2, 6),
+      );
+      assert.equal(
+        await rows.nth(0).locator("td").nth(6).innerText(),
+        `${expected} · Whole generation`,
+      );
+      assert.equal(
+        await rows.nth(0).locator("td").nth(9).innerText(),
+        `${logicalBytes} · ${expected}`,
+      );
+      for (const n of [1, 2])
+        assert.equal(
+          await rows.nth(n).locator("td").nth(6).innerText(),
+          "No verified restore reported",
+        );
+      for (const n of [1, 2])
+        assert.equal(await rows.nth(n).locator("td").nth(9).innerText(), "Unknown");
+      scope = "SELECTED_VERSIONS";
+      await page.locator("#refresh").click();
+      await contains(page, "#generations", "Selected file versions");
+      const selectedDate = await page.evaluate(
+        (t) => new Date(t * 1000).toLocaleString("en", { timeZoneName: "short" }),
+        verifiedUnix + 2,
+      );
+      assert.equal(
+        await rows.nth(0).locator("td").nth(6).innerText(),
+        `${selectedDate} · Selected file versions`,
+      );
+      assert.equal(
+        await rows.nth(0).locator("td").nth(9).innerText(),
+        `${logicalBytes} · ${expected}`,
+      );
+      proofState = "SELECTION_AS_MEASUREMENT";
+      await page.locator("#refresh").click();
+      await contains(page, "#notice", "View loaded");
+      assert.equal(await rows.nth(0).locator("td").nth(9).innerText(), "Unknown");
+      const legacyDate = await page.evaluate(
+        (t) => new Date(t * 1000).toLocaleString("en", { timeZoneName: "short" }),
+        verifiedUnix + 1,
+      );
+      for (const unavailable of ["MISMATCHED", "UNAVAILABLE"]) {
+        proofState = unavailable;
+        await page.locator("#refresh").click();
+        await contains(page, "#notice", "View loaded");
+        assert.equal(
+          await rows.nth(0).locator("td").nth(6).innerText(),
+          `${legacyDate} · Reported by node · Scope unavailable`,
+        );
+        assert.equal(
+          await rows.nth(1).locator("td").nth(6).innerText(),
+          "No verified restore reported",
+        );
+        assert.equal(await rows.nth(0).locator("td").nth(9).innerText(), "Unknown");
+      }
+    } finally {
+      await page.unroute(reportRoute);
+      await page.unroute(proofRoute);
+      await page.locator("#refresh").click();
+      await contains(page, "#notice", "View loaded");
+    }
+  });
   await test("external target observations preserve original readback age and unconfirmed state", async () => {
     const row = page.locator("#external-copies tbody tr").filter({ hasText: meta.cloudTarget });
     assert.equal(await row.count(), 1);

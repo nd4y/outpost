@@ -47,6 +47,9 @@ func lockInstallParent(ctx context.Context, directory *os.File) error {
 // not reuse, remove or reset them. Only this local constructor can select the
 // temporary physical directory; the signed binding uses the final bootstrap.
 func initializeAgent(ctx context.Context, b Bootstrap, fault func(string) error) (*Agent, error) {
+	if !b.validIngressBodyRate() {
+		return nil, ErrInvalid
+	}
 	if e := b.Limits.Validate(); e != nil {
 		return nil, e
 	}

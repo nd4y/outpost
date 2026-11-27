@@ -137,6 +137,7 @@ func (a *Agent) openParallelSink(i ingress.Intent, prefix, companionID, endpoint
 	if e != nil {
 		return nil, e
 	}
+	companion.SetPayloadBudget(a.payloadBudget)
 	dir := path.Join(prefix, "input")
 	store, e := statefile.OpenAt(a.root, dir, maxState, initialize)
 	if e != nil {

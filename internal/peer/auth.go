@@ -13,9 +13,13 @@ import (
 	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/readback"
 	"github.com/nd4y/outpost/internal/statefile"
+	"github.com/nd4y/outpost/internal/storage"
 )
 
 const Format = "outpost-peer-1"
+
+// MinBodyBytesPerSecond is the minimum configured peer or ingress body rate.
+const MinBodyBytesPerSecond = 1 << 20
 
 var (
 	ErrDenied      = errors.New("peer operation denied")
@@ -52,6 +56,14 @@ type Limits struct {
 	Concurrency int
 	Timeout     time.Duration
 	Attempts    int
+	Bodies      BodyBudgets
+}
+
+// BodyBudgets bounds local bulk traffic per direction, independently of the
+// TLS connection initiator. The owning process can share it across routes.
+type BodyBudgets struct {
+	Receive *storage.HTTPBodyBudget
+	Send    *storage.HTTPBodyBudget
 }
 
 func (l Limits) valid() bool {

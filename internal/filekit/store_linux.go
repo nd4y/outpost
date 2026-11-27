@@ -52,13 +52,7 @@ func openStoreAt(parent *os.Root, dir string, owner Owner, create bool, backend 
 			r.Close()
 			return nil, err
 		}
-		for _, name := range []string{"objects", "versions", ".txn"} {
-			if err = r.MkdirAll(name, 0700); err != nil {
-				r.Close()
-				return nil, err
-			}
-		}
-		if err = s.syncDir("."); err != nil {
+		if err = s.initializeDirectories(); err != nil {
 			r.Close()
 			return nil, err
 		}
@@ -105,12 +99,26 @@ func (s *Store) authorize() error {
 	}
 	return nil
 }
+func (s *Store) initializeDirectories() error {
+	for _, name := range []string{"objects", "versions", ".txn"} {
+		if err := s.root.MkdirAll(name, 0700); err != nil {
+			return err
+		}
+	}
+	return s.syncDir(".")
+}
+
 func (s *Store) initialize() error {
 	if err := s.authorize(); err == nil {
 		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	return s.initializeEmpty()
+}
+
+// A fresh export stage cannot adopt even a compatible initialized store.
+func (s *Store) initializeEmpty() error {
 	f, err := s.root.Open(".")
 	if err != nil {
 		return err

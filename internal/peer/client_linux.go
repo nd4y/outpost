@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -95,6 +96,12 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 		if c.certificate.NotAfter.Before(deadline) {
 			deadline = c.certificate.NotAfter
 		}
+		bulk := resource == "catalog" || strings.HasPrefix(resource, "objects/")
+		paceUpload := bulk && method == http.MethodPut && c.limits.Bodies.Send != nil
+		paceDownload := bulk && method == http.MethodGet && c.limits.Bodies.Receive != nil
+		if rpcDeadline := time.Now().Add(c.limits.Timeout); (paceUpload || paceDownload) && rpcDeadline.Before(deadline) {
+			deadline = rpcDeadline
+		}
 		bounded, cancel := context.WithDeadline(ctx, deadline)
 		address := c.endpoint.String() + "/v1/" + c.policy.Domain + "/generations/" + id + "/" + resource
 		req, e := http.NewRequestWithContext(bounded, method, address, bytes.NewReader(payload))
@@ -119,6 +126,9 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Accept-Encoding", "identity")
+		if paceUpload {
+			c.limits.Bodies.Send.PaceRequest(req)
+		}
 		if submitted != nil {
 			submitted.Add(int64(len(payload)))
 		}
@@ -136,7 +146,11 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 					cancel()
 					return result, ErrProtocol
 				}
-				b, readErr := io.ReadAll(io.LimitReader(res.Body, int64(max)+1))
+				var reader io.Reader = res.Body
+				if paceDownload {
+					reader = c.limits.Bodies.Receive.PaceResponse(bounded, reader)
+				}
+				b, readErr := io.ReadAll(io.LimitReader(reader, int64(max)+1))
 				res.Body.Close()
 				cancel()
 				if readErr == nil && len(b) <= max {
@@ -166,6 +180,9 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 			}
 		} else {
 			cancel()
+		}
+		if e := ctx.Err(); (paceUpload || paceDownload) && e != nil {
+			return result, e
 		}
 		if retry && attempt+1 < c.limits.Attempts {
 			select {

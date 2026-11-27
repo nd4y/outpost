@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/ingress"
-	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 )
 
@@ -36,7 +35,7 @@ func (w *Worker) openSettlements(v *view) error {
 			Settlement: item.Grant, SettlementIntent: item.Intent, Owner: w.owner,
 			Staging: captureStagingRoutes(v.cfg, g.Domain, a.Source),
 			Replica: local.replica, Certificate: w.cert, Roots: w.roots, Initialize: false,
-			Limits: peer.Limits{Concurrency: v.cfg.Limits.Parallel, Timeout: time.Duration(v.cfg.Limits.AttemptMillis) * time.Millisecond, Attempts: 2},
+			Limits: w.transferLimits(v.cfg.Limits),
 			Admission: func(prefix string) statefile.Admission {
 				return w.admission(filepath.ToSlash(filepath.Join(relative, prefix)))
 			},

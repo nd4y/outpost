@@ -4,13 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
+	"github.com/nd4y/outpost/internal/localfs"
 	"golang.org/x/sys/unix"
 )
 
@@ -39,27 +40,39 @@ func dependencies(e Envelope, d Descriptor) (map[string]Object, error) {
 // Export copies the selected kit BEFORE loss of any shared state. Its payload
 // files are separate inodes, not links into the original object store.
 func (s *Store) Export(ctx context.Context, version, dest string) error {
+	return s.ExportWithOptions(ctx, version, dest, ExportOptions{})
+}
+
+type ExportOptions struct {
+	MinFreeBytes uint64
+}
+
+func (s *Store) ExportWithOptions(ctx context.Context, version, dest string, options ExportOptions) error {
 	unlock, err := s.lock(ctx, false)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	if !filepath.IsAbs(dest) || filepath.Clean(dest) != dest {
+	if !filepath.IsAbs(dest) || filepath.Clean(dest) != dest || filepath.Dir(dest) == dest {
 		return ErrInvalid
-	}
-	sourceRoot, err := filepath.EvalSymlinks(s.root.Name())
-	if err != nil {
-		return err
 	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(dest))
 	if err != nil {
 		return err
 	}
-	dest = filepath.Join(parent, filepath.Base(dest))
-	rel, err := filepath.Rel(sourceRoot, dest)
-	if err != nil || rel == "." || !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+	target, err := localfs.OpenRoot(parent)
+	if err != nil {
+		return err
+	}
+	defer target.Close()
+	inside, err := localfs.Contains(ctx, s.root, target)
+	if err != nil {
+		return err
+	}
+	if inside {
 		return ErrInvalid
 	}
+	name := filepath.Base(dest)
 	e, d, err := s.LoadVersionContext(ctx, version)
 	if err != nil {
 		return err
@@ -68,14 +81,47 @@ func (s *Store) Export(ctx context.Context, version, dest string) error {
 	if err != nil {
 		return err
 	}
-	if err = os.Mkdir(dest, 0700); err != nil {
+	if _, err = target.Lstat(name); err == nil {
+		return &os.PathError{Op: "mkdir", Path: dest, Err: os.ErrExist}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	kit, err := OpenStore(dest, s.Owner, true)
+	directory, err := target.Open(".")
 	if err != nil {
 		return err
 	}
+	defer directory.Close()
+	if err = s.checkExportSpace(ctx, directory, e, refs, options.MinFreeBytes); err != nil {
+		return err
+	}
+	if err = s.Owner.validate(); err != nil {
+		return err
+	}
+	tmp := ".outpost-kit-" + randomID()
+	if tmp == name {
+		return ErrInvalid
+	}
+	if err = target.Mkdir(tmp, 0700); err != nil {
+		return err
+	}
+	// Leave a private unpublished sibling on interruption. The caller's
+	// destination and other entries are never reclaimed by this operation.
+	stage, err := localfs.OpenAt(target, tmp, false)
+	if err != nil {
+		return err
+	}
+	kit := &Store{root: stage, Owner: s.Owner}
 	defer kit.Close()
+	created, err := stage.Stat(".")
+	if err != nil {
+		return err
+	}
+	if err = kit.initializeEmpty(); err != nil {
+		return err
+	}
+	if err = kit.initializeDirectories(); err != nil {
+		return err
+	}
 	for _, ref := range refs {
 		if err = ctx.Err(); err != nil {
 			return err
@@ -94,9 +140,70 @@ func (s *Store) Export(ctx context.Context, version, dest string) error {
 	if err = kit.writeEnvelope("kit.json", e); err != nil {
 		return err
 	}
-	// The recovery entrypoint uses only kit.json and its listed objects.
-	return kit.syncDir(".")
+	if err = kit.syncDir("."); err != nil {
+		return err
+	}
+	if err = s.checkpoint("export-before-publish"); err != nil {
+		return err
+	}
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	current, err := localfs.Stat(target, tmp)
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(created, current) {
+		return ErrInvalid
+	}
+	fd := int(directory.Fd())
+	if err = unix.Renameat2(fd, tmp, fd, name, unix.RENAME_NOREPLACE); err != nil {
+		return err
+	}
+	return directory.Sync()
 }
+
+func (s *Store) checkExportSpace(ctx context.Context, directory *os.File, envelope Envelope, refs map[string]Object, reserve uint64) error {
+	root, err := json.Marshal(envelope)
+	if err != nil {
+		return err
+	}
+	marker, err := json.Marshal(storeMarker{Format: Format, Domain: s.Owner.Domain})
+	if err != nil {
+		return err
+	}
+	space, err := readAllocationSpace(directory)
+	if err != nil {
+		return err
+	}
+	peak := allocationPeak{unit: space.unit}
+	fanout := map[string]struct{}{}
+	for id, ref := range refs {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		fanout[id[:2]] = struct{}{}
+		if err = peak.add(ref.Bytes); err != nil {
+			return err
+		}
+	}
+	if err = peak.add(len(root)); err != nil {
+		return err
+	}
+	if err = peak.add(len(marker)); err != nil {
+		return err
+	}
+	// The destination, objects, versions, .txn and each fanout directory.
+	if err = peak.addBlocks(uint64(4 + len(fanout))); err != nil {
+		return err
+	}
+	space, err = readAllocationSpace(directory)
+	if err != nil {
+		return err
+	}
+	return peak.admit(space, reserve)
+}
+
 func refIsMetadata(e Envelope, id string) bool {
 	for _, p := range e.Parts {
 		if p.ID == id {

@@ -222,6 +222,10 @@ func (s *Store) Retire(ctx context.Context, ids []string) (MaintenanceStats, err
 // records into new bounded objects. All retained logical versions keep their
 // identities. Old objects are collected only after all roots are durable.
 func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
+	return s.RepackWithOptions(ctx, RepackOptions{})
+}
+
+func (s *Store) RepackWithOptions(ctx context.Context, options RepackOptions) (MaintenanceStats, error) {
 	var result MaintenanceStats
 	if s.backend != nil {
 		return result, ErrRemoteMaintenance
@@ -232,6 +236,16 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	}
 	defer unlock()
 	s.Stats = Stats{}
+	directory, err := s.root.Open(".")
+	if err != nil {
+		return result, err
+	}
+	defer directory.Close()
+	space, err := readAllocationSpace(directory)
+	if err != nil {
+		return result, err
+	}
+	peak := allocationPeak{unit: space.unit}
 	versions, err := s.versions()
 	if err != nil {
 		return result, err
@@ -239,8 +253,11 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	byFile := map[string][]string{}
 	oldPayload := map[string]bool{}
 	for _, id := range versions {
-		_, d, e := s.LoadVersionContext(ctx, id)
+		envelope, d, e := s.LoadVersionContext(ctx, id)
 		if e != nil {
+			return result, e
+		}
+		if e = peak.addRepackVersion(envelope, d); e != nil {
 			return result, e
 		}
 		byFile[d.File] = append(byFile[d.File], id)
@@ -259,21 +276,29 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	}
 	sort.Strings(files)
 	for _, file := range files {
-		unique := map[string]Block{}
-		for _, id := range byFile[file] {
-			_, d, e := s.LoadVersionContext(ctx, id)
-			if e != nil {
+		unique, e := s.repackBlocks(ctx, byFile[file])
+		if e != nil {
+			return result, e
+		}
+		// Charging unique ciphertext records separately bounds the rounded
+		// allocation of packs formed by concatenating those records.
+		for _, b := range unique {
+			if e = peak.add(b.CipherBytes); e != nil {
 				return result, e
 			}
-			for _, b := range d.Blocks {
-				if old, ok := unique[b.Hash]; ok && old.Bytes != b.Bytes {
-					return result, ErrInvalid
-				}
-				unique[b.Hash] = b
-			}
-			if len(unique) > MaxBlocks {
-				return result, ErrInvalid
-			}
+		}
+	}
+	space, err = readAllocationSpace(directory)
+	if err != nil {
+		return result, err
+	}
+	if err = peak.admit(space, options.MinFreeBytes); err != nil {
+		return result, err
+	}
+	for _, file := range files {
+		unique, e := s.repackBlocks(ctx, byFile[file])
+		if e != nil {
+			return result, e
 		}
 		group := map[string][]Block{}
 		for _, b := range unique {
@@ -363,6 +388,26 @@ func (s *Store) Repack(ctx context.Context) (MaintenanceStats, error) {
 	result.GarbageObjectsRemoved, err = s.gcLocked(ctx)
 	result.Stats = s.Stats
 	return result, err
+}
+
+func (s *Store) repackBlocks(ctx context.Context, versions []string) (map[string]Block, error) {
+	unique := map[string]Block{}
+	for _, id := range versions {
+		_, d, err := s.LoadVersionContext(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		for _, b := range d.Blocks {
+			if old, ok := unique[b.Hash]; ok && old.Bytes != b.Bytes {
+				return nil, ErrInvalid
+			}
+			unique[b.Hash] = b
+		}
+		if len(unique) > MaxBlocks {
+			return nil, ErrInvalid
+		}
+	}
+	return unique, nil
 }
 
 // RemoveAbandoned removes only unpublished staging files under the private

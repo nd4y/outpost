@@ -146,7 +146,7 @@ func (g *Registry) serveRelayIntent(w http.ResponseWriter, r *http.Request) bool
 		} else {
 			w.Header().Set("Content-Type", media)
 			w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
-			_, _ = w.Write(raw)
+			_ = g.options.Limits.Bodies.Send.WriteBody(ctx, w, raw)
 		}
 		return true
 	}

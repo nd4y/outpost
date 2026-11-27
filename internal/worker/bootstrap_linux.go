@@ -16,6 +16,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/control"
 	"github.com/nd4y/outpost/internal/localfs"
+	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/storage"
 	"github.com/nd4y/outpost/internal/volume"
@@ -40,6 +41,9 @@ type Bootstrap struct {
 	Credentials            map[string]string       `json:"credentialFiles"`
 	ExternalRequestBudgets []ExternalRequestBudget `json:"externalRequestBudgets,omitempty"`
 	ExternalLinkBudgets    []ExternalLinkBudget    `json:"externalLinkBudgets,omitempty"`
+
+	PeerReceiveBodyBytesPerSecond int64 `json:"peerReceiveBodyBytesPerSecond,omitempty"`
+	PeerSendBodyBytesPerSecond    int64 `json:"peerSendBodyBytesPerSecond,omitempty"`
 }
 
 // ExternalRequestBudget is one local account allowance for a private set of
@@ -53,6 +57,27 @@ type ExternalRequestBudget struct {
 type ExternalLinkBudget struct {
 	Targets            []string `json:"targets"`
 	BodyBytesPerSecond int64    `json:"bodyBytesPerSecond"`
+}
+
+func (b Bootstrap) peerBodyBudgets() (peer.BodyBudgets, error) {
+	optional := func(rate int64) (*storage.HTTPBodyBudget, error) {
+		if rate == 0 {
+			return nil, nil
+		}
+		if rate < peer.MinBodyBytesPerSecond {
+			return nil, ErrDenied
+		}
+		return storage.NewHTTPBodyBudget(rate)
+	}
+	receive, err := optional(b.PeerReceiveBodyBytesPerSecond)
+	if err != nil {
+		return peer.BodyBudgets{}, ErrDenied
+	}
+	send, err := optional(b.PeerSendBodyBytesPerSecond)
+	if err != nil {
+		return peer.BodyBudgets{}, ErrDenied
+	}
+	return peer.BodyBudgets{Receive: receive, Send: send}, nil
 }
 
 func assignExternalBudget[T any](credentials map[string]string, byTarget map[string]T, targets []string, budget T) error {
@@ -196,6 +221,9 @@ func LoadBootstrap(path string) (Bootstrap, error) {
 	if _, e := b.bodyBudgets(); e != nil {
 		return b, e
 	}
+	if _, e := b.peerBodyBudgets(); e != nil {
+		return b, e
+	}
 	return b, nil
 }
 func (b Bootstrap) TLS() (tls.Certificate, *x509.CertPool, error) {
@@ -234,6 +262,10 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 	if b.Format != BootstrapFormat || b.Volume.Scope != b.Node {
 		return nil, nil, ErrDenied
 	}
+	peerBodies, e := b.peerBodyBudgets()
+	if e != nil {
+		return nil, nil, e
+	}
 	resolve, e := b.storageResolver()
 	if e != nil {
 		return nil, nil, e
@@ -261,7 +293,7 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 		return nil, nil, e
 	}
 	// The guard owns this descriptor until cleanup; Worker keeps its own clone.
-	w, e := Open(Options{Recovery: x, Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: resolve})
+	w, e := Open(Options{Recovery: x, Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: resolve, PeerBodies: peerBodies})
 	if e != nil {
 		root.Close()
 		if fetcher != nil {

@@ -277,7 +277,14 @@ func previewChanges(before, after control.Config) Preview {
 	}
 	return p
 }
+
+// PreviewConfiguration describes a policy change without a capacity freshness
+// policy. The HTTP service supplies its configured report maximum age.
 func (r *Registry) PreviewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation) (Preview, error) {
+	return r.previewConfiguration(ctx, p, tenant, node, input, 0)
+}
+
+func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation, reportMaxAge time.Duration) (Preview, error) {
 	var out Preview
 	if p.Validate() != nil || !p.Role("owner") || !storage.ID(tenant) || !storage.ID(node) || !storage.ID(input.Operation) || input.Reason != "POLICY_CHANGE" || !safe(input.Expected) {
 		return out, ErrDenied
@@ -314,10 +321,63 @@ func (r *Registry) PreviewConfiguration(ctx context.Context, p Principal, tenant
 		}
 		out = previewChanges(old, next)
 		out.CandidateDigest = storage.Hash(input.Document)
+		if reportMaxAge > 0 && r.observedCapacityShortfall(s, tenant, old, next, time.Now(), reportMaxAge) {
+			out.CapacityState = "OBSERVED_INSUFFICIENT"
+		}
 		return nil
 	})
 	return out, e
 }
+
+// observedCapacityShortfall tests only the current volume and ledger against
+// the candidate limits. Headroom here does not estimate an assignment's cost.
+func (r *Registry) observedCapacityShortfall(s registryState, tenant string, before, after control.Config, now time.Time, maxAge time.Duration) bool {
+	if before.Revision == 0 || before.Active(now) != nil {
+		return false
+	}
+	enrollment, err := VerifyEnrollment(s.Enrollments[after.Node], r.owner)
+	if err != nil || enrollment.Tenant != tenant || !enrollment.Active(now) {
+		return false
+	}
+	cutoff := max(before.NotBefore, now.Unix()-int64(maxAge/time.Second))
+	var domain string
+	var latest int64
+	// Every domain report describes the same node volume. Use the newest
+	// applicable report, with one bounded document read and no stale fallback.
+	for _, d := range before.Domains {
+		id := d.Trust.Domain
+		next, ok := after.DomainByID(id)
+		if !ok || next.Trust.Repository != d.Trust.Repository || next.Trust.Epoch != d.Trust.Epoch {
+			continue
+		}
+		pointer, ok := s.Reports[reportKey(after.Node, id)]
+		if ok && pointer.EnrollmentRevision == enrollment.Revision && pointer.ObservedUnix >= cutoff &&
+			pointer.ObservedUnix <= now.Unix() && (pointer.ObservedUnix > latest || pointer.ObservedUnix == latest && id < domain) {
+			domain, latest = id, pointer.ObservedUnix
+		}
+	}
+	if domain == "" {
+		return false
+	}
+	report, _, err := r.readReport(s, after.Node, domain)
+	if err != nil || report.Tenant != tenant || report.ConfigurationRevision != before.Revision ||
+		report.Space.State != "OBSERVED" || report.Space.Scope != "VOLUME" || report.Space.ObservedUnix < cutoff {
+		return false
+	}
+	// Verified reports bound each quantity to MaxSafeInteger. Absent ledger
+	// quantities contribute no measured bytes to the lower bound.
+	space := report.Space
+	var accounted, pending int64
+	if space.AccountedBytes != nil {
+		accounted = *space.AccountedBytes
+	}
+	if space.ReservedBytes != nil {
+		pending = *space.ReservedBytes
+	}
+	return *space.FreeBytes-pending < after.Limits.ReserveBytes ||
+		accounted+pending > after.Limits.CapacityBytes-after.Limits.ReserveBytes
+}
+
 func configurationRequestDigest(p Principal, tenant, node string, input SignedMutation) string {
 	request, _ := json.Marshal(struct {
 		Actor, Tenant, Node string
