@@ -101,6 +101,7 @@ const words = {
     metadata: "Metadata",
     verification: "Verification",
     observed: "Original observation",
+    copyReportedAt: "Complete in report at",
     retrieved: "View retrieved",
     progress: "Measured progress",
     error: "Error",
@@ -319,6 +320,7 @@ const words = {
     metadata: "Метаданные",
     verification: "Проверка",
     observed: "Исходное наблюдение",
+    copyReportedAt: "Полная копия в отчёте от",
     retrieved: "Представление получено",
     progress: "Измеренный прогресс",
     error: "Ошибка",
@@ -1241,6 +1243,31 @@ function verifiedRestoreProjection(report, proof) {
   }
   return results;
 }
+function assignedCopyObservation(report) {
+  const p = state.policy;
+  if (
+    state.reportOffline ||
+    report.state !== "CURRENT" ||
+    report.inventoryState !== "OBSERVED" ||
+    !p ||
+    p.configurationState !== "ACTIVE" ||
+    p.tenant !== report.tenant ||
+    p.node !== report.node ||
+    p.domain !== report.domain ||
+    !Number.isSafeInteger(p.configurationRevision) ||
+    p.configurationRevision <= 0 ||
+    p.configurationRevision !== report.configurationRevision ||
+    !Array.isArray(p.placement?.holders) ||
+    !p.placement.holders.includes(report.node) ||
+    !p.nodes.some((node) => node.id === report.node && node.class === "trusted") ||
+    !Number.isSafeInteger(report.observedUnix) ||
+    report.observedUnix <= 0 ||
+    !Number.isSafeInteger(p.expiresUnix) ||
+    report.observedUnix >= p.expiresUnix
+  )
+    return "";
+  return date(report.observedUnix);
+}
 function renderReport() {
   const r = state.report;
   $("report-state").textContent = r
@@ -1265,6 +1292,7 @@ function renderReport() {
     ["reserved", s.reservedBytes],
     ["observed", date(s.observedUnix)],
   ]);
+  const copyObservedAt = assignedCopyObservation(r);
   for (const g of r.generations)
     if (ID.test(g.generation)) $("generation-list").append(new Option(g.generation, g.generation));
   table(
@@ -1286,7 +1314,9 @@ function renderReport() {
     r.generations.map((g) => [
       g.generation,
       g.target,
-      label(g.status),
+      copyObservedAt && g.target === r.node && g.status === "COMPLETE" && !g.metadataState
+        ? `${label(g.status)} · ${tr("copyReportedAt")} ${copyObservedAt}`
+        : label(g.status),
       date(g.createdUnix),
       label(g.verification),
       date(g.verifiedUnix),

@@ -131,9 +131,13 @@ func (r *Registry) retentionReport(ctx context.Context, s registryState, node, d
 	if !ok {
 		return Report{}, reportPointer{}, 0, false
 	}
-	report, pointer, e := r.readReport(s, node, domain)
+	return r.retainedHolderReport(s, enrollment, cfg, d, now, maxAge)
+}
+
+func (r *Registry) retainedHolderReport(s registryState, enrollment Enrollment, cfg control.Config, d control.Domain, now time.Time, maxAge time.Duration) (Report, reportPointer, int64, bool) {
+	report, pointer, e := r.readReport(s, enrollment.Node, d.Trust.Domain)
 	cutoff := now.Unix() - int64(maxAge/time.Second)
-	if e != nil || report.Tenant != fence.Tenant || report.EnrollmentRevision != enrollment.Revision || report.ObservedUnix < cutoff || report.ObservedUnix > now.Unix() || report.InventoryState != "OBSERVED" || cfg.Revision != report.ConfigurationRevision || report.ObservedUnix < cfg.NotBefore {
+	if e != nil || report.Tenant != enrollment.Tenant || report.EnrollmentRevision != enrollment.Revision || report.ObservedUnix < cutoff || report.ObservedUnix > now.Unix() || report.InventoryState != "OBSERVED" || cfg.Revision != report.ConfigurationRevision || report.ObservedUnix < cfg.NotBefore {
 		return Report{}, reportPointer{}, 0, false
 	}
 	if d.PeerReadbackMaxAgeSeconds > 0 {

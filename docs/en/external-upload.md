@@ -95,6 +95,8 @@ Workers upload and verify physical parts first, then seal immutable logical-obje
 
 Old generations and shared chunks remain immutable. A later version uploads missing ciphertext parts, while both versions remain recoverable. This is reuse of G1's chunked version format, not encryption of the whole original file as one object. No mutable `latest` pointer or listing is needed. Recovery needs a selected generation ID, public generation trust, target read credentials and the owner's file-kit key for final plaintext restoration. A retained recovery inventory must supply the IDs/keys; discovery and key escrow are separate work.
 
+The AT-16 fixture [`TestExternalRecoveryUsesSignedNamesDespiteIncompleteListings`](../../internal/upload/listing_linux_test.go) serves an S3 ListObjectsV2 response with HTTP 200 and a truncated empty page, and a WebDAV PROPFIND response with HTTP 207 and only the collection. Both omit the earlier complete generation. The test requires publication and recovery to use the names from signed catalogs. It expects an absent dependency to block the new completion marker and leave the earlier generation recoverable. Once the missing object is present, it compares the bytes restored independently from both generations. AT-16 still requires capability and failure checks on each configured endpoint.
+
 Minimal library sequence, using the admitted resources supplied by the caller:
 
 1. Open complete G2 source replicas. Construct `storage.Profile`, including `Namespace = storage.Hash([]byte(domain + "/" + repository))`, endpoint, region where applicable and verified capability limits.

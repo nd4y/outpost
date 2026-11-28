@@ -2692,6 +2692,119 @@
         }
       }
     },
+    "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/generations/{generation}/complete-observation": {
+      "get": {
+        "operationId": "completeObservation",
+        "summary": "Read one retained COMPLETE observation for the selected assigned trusted holder",
+        "x-required-roles": ["owner"],
+        "parameters": [
+          {
+            "name": "tenant",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "node",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          },
+          {
+            "name": "generation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original-age COMPLETE observation bound to the selected holder and active policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompleteObservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No qualifying retained observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Unresolved enrollment for an in-scope holder or registry revision conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Bounded concurrency exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "State or dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tenants/{tenant}/nodes/{node}/domains/{domain}/verified-restores": {
       "get": {
         "operationId": "verifiedRestores",
@@ -5050,6 +5163,82 @@
           }
         },
         "required": ["document"]
+      },
+      "CompleteObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-complete-observation-1"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "node": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "writerEpoch": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "generation": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "generationSequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "enrollmentRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "configurationRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "configurationDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reportDigest": {
+            "$ref": "#/components/schemas/ID"
+          },
+          "reportSequence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "observedUnix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          }
+        },
+        "required": [
+          "format",
+          "tenant",
+          "node",
+          "domain",
+          "repository",
+          "writerEpoch",
+          "generation",
+          "generationSequence",
+          "enrollmentRevision",
+          "configurationRevision",
+          "configurationDigest",
+          "reportDigest",
+          "reportSequence",
+          "observedUnix"
+        ]
       },
       "VerifiedRestores": {
         "type": "object",

@@ -10,6 +10,10 @@
       "remaining": "Actual endpoint durability/visibility contract and repair of corrupt immutable objects",
       "tests": [
         {
+          "path": "internal/upload/listing_linux_test.go",
+          "name": "TestExternalRecoveryUsesSignedNamesDespiteIncompleteListings"
+        },
+        {
           "path": "internal/peer/guards_linux_test.go",
           "name": "TestPrematurePublicationAndInvalidObject"
         },
@@ -323,6 +327,10 @@
       "scope": "Size/capability probes, verified physical multipart resume, conditional writes, quota, delayed-read retries and throttling in synthetic protocols; explicit WebDAV MOVE with bounded durable staging and no-overwrite publication",
       "remaining": "Actual S3-compatible/WebDAV endpoint matrix including listing/range/ACL/quota characteristics; unsupported capabilities are explicit",
       "tests": [
+        {
+          "path": "internal/upload/listing_linux_test.go",
+          "name": "TestExternalRecoveryUsesSignedNamesDespiteIncompleteListings"
+        },
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolMultipartAndImmutableReadback"

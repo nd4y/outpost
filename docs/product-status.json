@@ -953,6 +953,10 @@
       "implementation": ["internal/generation", "internal/peer", "internal/upload"],
       "checks": [
         {
+          "path": "internal/upload/listing_linux_test.go",
+          "name": "TestExternalRecoveryUsesSignedNamesDespiteIncompleteListings"
+        },
+        {
           "path": "internal/peer/guards_linux_test.go",
           "name": "TestPrematurePublicationAndInvalidObject"
         },
@@ -3596,6 +3600,10 @@
       "state": "IN_DEVELOPMENT",
       "implementation": ["internal/storage", "internal/upload"],
       "checks": [
+        {
+          "path": "internal/upload/listing_linux_test.go",
+          "name": "TestExternalRecoveryUsesSignedNamesDespiteIncompleteListings"
+        },
         {
           "path": "internal/storage/http_test.go",
           "name": "TestProtocolMultipartAndImmutableReadback"
@@ -6267,6 +6275,22 @@
       ],
       "checks": [
         {
+          "path": "internal/management/complete_observation_linux_test.go",
+          "name": "TestManagementCompleteObservationHTTPSOriginalAgeAndScope"
+        },
+        {
+          "path": "internal/management/complete_observation_linux_test.go",
+          "name": "TestManagementCompleteObservationConcealsForeignPendingEnrollment"
+        },
+        {
+          "path": "internal/management/complete_observation_linux_test.go",
+          "name": "TestManagementCompleteObservationRejectsUnreadyOrExpiredReports"
+        },
+        {
+          "path": "internal/management/complete_observation_linux_test.go",
+          "name": "TestManagementCompleteObservationRejectsOldPolicyAndPendingRevocation"
+        },
+        {
           "path": "internal/worker/telemetry_restore_linux_test.go",
           "name": "TestWorkerRestoreFailureMetricsRequireObservedTerminalCommands"
         },
@@ -6289,6 +6313,18 @@
         {
           "path": "internal/sourceagent/capture_measurements_linux_test.go",
           "name": "TestSourceCaptureMeasurementsDistinguishUnavailableJobFromDamagedMetadata"
+        },
+        {
+          "path": "internal/sourceagent/primary_ingress_readback_linux_test.go",
+          "name": "TestPrimaryIngressReadbackUsesDurableReceiptBeforeCopyCheckpoint"
+        },
+        {
+          "path": "internal/sourceagent/primary_ingress_readback_linux_test.go",
+          "name": "TestPrimaryIngressReadbackRefusesMismatchedRouteClockAndCatalog"
+        },
+        {
+          "path": "cmd/outpost/main_linux_test.go",
+          "name": "TestCLIPrimaryIngressReadbackFlagIsScopedToSourceStatus"
         },
         {
           "path": "cmd/outpost/cli_flow_linux_test.go",
@@ -6496,7 +6532,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. The management API can project the earliest retained authenticated whole restore per node and generation. Full-scale snapshot retention, globally first independent restore and readiness timing for every assigned replica remain open."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. The management API can project the earliest retained authenticated whole restore per node and generation. Owners can also read the original retained COMPLETE time for a selected assigned trusted holder. The view does not maintain first-observation history. Full-scale snapshot retention, globally first independent restore and continuous readiness timing for every assigned replica remain open."
     },
     {
       "id": "REQ-43",

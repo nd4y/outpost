@@ -96,6 +96,71 @@ try {
       (await page.locator("#report-age").innerText()).split(" · View retrieved")[0],
       original.split(" · View retrieved")[0],
     );
+    const reportText = page.locator("#generations");
+    const tableRows = page.locator("#generations tbody tr");
+    const english = "Complete in report at";
+    const russian = "Полная копия в отчёте от";
+    assert.doesNotMatch(await reportText.innerText(), new RegExp(english));
+    const reportRoute = "**/domains/**/report";
+    const policyRoute = "**/domains/**/policy";
+    let boundary = "matching";
+    await page.route(reportRoute, async (intercepted) => {
+      if (boundary === "offline") return intercepted.abort("failed");
+      const response = await intercepted.fetch();
+      const report = await response.json();
+      report.state = boundary === "stale" ? "STALE" : "CURRENT";
+      report.inventoryState = "OBSERVED";
+      if (boundary === "different revision") report.configurationRevision++;
+      if (boundary === "withdrawn") report.generations = [];
+      await intercepted.fulfill({ response, json: report });
+    });
+    await page.route(policyRoute, async (intercepted) => {
+      if (boundary !== "inactive policy" && boundary !== "unassigned")
+        return intercepted.continue();
+      const response = await intercepted.fetch();
+      const policy = await response.json();
+      if (boundary === "inactive policy") policy.configurationState = "INACTIVE";
+      if (boundary === "unassigned") policy.placement.holders = [];
+      await intercepted.fulfill({ response, json: policy });
+    });
+    try {
+      await page.locator("#refresh").click();
+      await contains(page, "#generations", english);
+      const observed = original.split(" · View retrieved")[0].replace("Original observation: ", "");
+      assert.ok((await reportText.innerText()).includes(`${english} ${observed}`));
+      await page.locator("#language").selectOption("ru");
+      await contains(page, "#generations", russian);
+      const observedRussian = (await page.locator("#report-age").innerText())
+        .split(" · Представление получено")[0]
+        .replace("Исходное наблюдение: ", "");
+      assert.ok((await reportText.innerText()).includes(`${russian} ${observedRussian}`));
+      await page.locator("#language").selectOption("en");
+
+      boundary = "offline";
+      await page.locator("#refresh").click();
+      await contains(page, "#notice", "Connection unavailable");
+      await contains(page, "#report-state", "Last known view");
+      assert.equal(await tableRows.count(), 1);
+      assert.ok(!(await reportText.innerText()).includes(english));
+
+      for (boundary of [
+        "different revision",
+        "inactive policy",
+        "unassigned",
+        "stale",
+        "withdrawn",
+      ]) {
+        await page.locator("#refresh").click();
+        await contains(page, "#notice", "View loaded");
+        assert.equal(await tableRows.count(), boundary === "withdrawn" ? 0 : 1, boundary);
+        assert.ok(!(await reportText.innerText()).includes(english), boundary);
+      }
+    } finally {
+      await page.unroute(reportRoute);
+      await page.unroute(policyRoute);
+    }
+    await page.locator("#refresh").click();
+    await contains(page, "#report-state", "STALE");
   });
   await test("verified restore time and selection are separate from copy coverage", async () => {
     const reportRoute = "**/domains/**/report";

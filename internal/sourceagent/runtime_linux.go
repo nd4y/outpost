@@ -129,7 +129,13 @@ type Status struct {
 	WriterFence       *WriterFenceStatus `json:"writerFence,omitempty"`
 
 	CaptureMeasurements         *capture.CaptureMeasurements `json:"captureMeasurements,omitempty"`
+	PrimaryIngressReadback      *capture.IngressReadback     `json:"primaryIngressReadback,omitempty"`
 	OutgoingIngressObjectBodies *SourceObjectBodySnapshot    `json:"outgoingIngressObjectBodies,omitempty"`
+}
+
+type StatusOptions struct {
+	CaptureMeasurements    bool
+	PrimaryIngressReadback bool
 }
 
 type Milestones struct {
@@ -1072,14 +1078,18 @@ func (a *Agent) fenceCapture(ctx context.Context, s *state) error {
 }
 
 func (a *Agent) Status(ctx context.Context) (Status, error) {
-	return a.status(ctx, false, nil)
+	return a.StatusWithOptions(ctx, StatusOptions{})
 }
 
 func (a *Agent) StatusWithCaptureMeasurements(ctx context.Context) (Status, error) {
-	return a.status(ctx, true, nil)
+	return a.StatusWithOptions(ctx, StatusOptions{CaptureMeasurements: true})
 }
 
-func (a *Agent) status(ctx context.Context, measure bool, bodies *sourceObjectSamples) (Status, error) {
+func (a *Agent) StatusWithOptions(ctx context.Context, options StatusOptions) (Status, error) {
+	return a.status(ctx, options, nil)
+}
+
+func (a *Agent) status(ctx context.Context, options StatusOptions, bodies *sourceObjectSamples) (Status, error) {
 	var out Status
 	e := a.lease.WithLock(ctx, func() error {
 		if e := a.guard(ctx); e != nil {
@@ -1159,7 +1169,7 @@ func (a *Agent) status(ctx context.Context, measure bool, bodies *sourceObjectSa
 			}
 		}
 		active := s.Phase == "ACTIVE" && !s.RoutePreparing
-		measureComplete := measure && s.Phase == "COMPLETE" && s.RouteCatalog == ""
+		measureComplete := options.CaptureMeasurements && s.Phase == "COMPLETE" && s.RouteCatalog == ""
 		if measureComplete {
 			// Recovery can adopt a completed checkpoint without local job receipts.
 			// Missing metadata inside a local job must still fail measurement.
@@ -1189,11 +1199,21 @@ func (a *Agent) status(ctx context.Context, measure bool, bodies *sourceObjectSa
 				out.Job = &j
 				out.Milestones.addReplicas(j.Copies)
 			}
-			if measure {
+			if options.CaptureMeasurements {
 				out.CaptureMeasurements, e = job.Measurements(ctx)
 				if e != nil {
 					return e
 				}
+			}
+			if active && options.PrimaryIngressReadback && out.WriterFence == nil {
+				readback, err := job.CommittedIngressReadback(ctx)
+				if err != nil {
+					return err
+				}
+				if readback != nil && (readback.Target != out.Receiver || readback.Generation != out.Job.Generation) {
+					return ErrInvalid
+				}
+				out.PrimaryIngressReadback = readback
 			}
 		}
 		return nil

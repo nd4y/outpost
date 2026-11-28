@@ -102,6 +102,11 @@ func newHTTPFixture(t *testing.T) *httpFixture {
 }
 func newHTTPFixtureWithRelay(t *testing.T, allowRelay bool) *httpFixture {
 	t.Helper()
+	return newHTTPFixtureWithReportAge(t, allowRelay, 5*time.Second)
+}
+
+func newHTTPFixtureWithReportAge(t *testing.T, allowRelay bool, reportAge time.Duration) *httpFixture {
+	t.Helper()
 	f := newFixture(t)
 	now := time.Now()
 	caPub, caKey, e := ed25519.GenerateKey(rand.Reader)
@@ -132,7 +137,7 @@ func newHTTPFixtureWithRelay(t *testing.T, allowRelay bool) *httpFixture {
 	f.p.Actor = identity(ownerKey.Public().(ed25519.PublicKey))
 	viewer := Principal{Actor: identity(viewerKey.Public().(ed25519.PublicKey)), Roles: []string{"viewer"}, Scopes: append([]Scope(nil), f.p.Scopes...)}
 	// Functional requests include durable writes on the fixture's HDD.
-	options := HTTPOptions{Principals: []Principal{f.p, viewer}, Origin: "https://management.invalid", Concurrency: 2, Timeout: 2 * time.Second, ReportMaxAge: 5 * time.Second}
+	options := HTTPOptions{Principals: []Principal{f.p, viewer}, Origin: "https://management.invalid", Concurrency: 2, Timeout: 2 * time.Second, ReportMaxAge: reportAge}
 	if allowRelay {
 		options.Relays = map[string][]string{viewer.Actor: {f.e.Node}}
 	}

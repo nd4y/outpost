@@ -145,17 +145,9 @@ func (r *Registry) DomainPolicy(ctx context.Context, p Principal, tenant, node, 
 		}
 		// A pending enrollment blocks command admission on this node. Do not
 		// advertise grants that the existing mutation path cannot currently use.
-		pending := false
-		for _, op := range s.Operations {
-			if op.Receipt.State == "ADMITTED" && !resolved(s, op.Receipt.Operation) {
-				next, e := VerifyEnrollment(op.Document, r.owner)
-				if e != nil {
-					return e
-				}
-				if next.Node == node {
-					pending = true
-				}
-			}
+		pending, e := r.pendingEnrollment(ctx, s, node)
+		if e != nil {
+			return e
 		}
 		if active && !pending {
 			for _, raw := range cfg.Commands {
@@ -195,4 +187,23 @@ func (r *Registry) DomainPolicy(ctx context.Context, p Principal, tenant, node, 
 		return nil
 	})
 	return out, e
+}
+
+func (r *Registry) pendingEnrollment(ctx context.Context, s registryState, node string) (bool, error) {
+	pending := false
+	for _, op := range s.Operations {
+		if e := ctx.Err(); e != nil {
+			return false, e
+		}
+		if op.Receipt.State == "ADMITTED" && !resolved(s, op.Receipt.Operation) {
+			next, e := VerifyEnrollment(op.Document, r.owner)
+			if e != nil {
+				return false, e
+			}
+			if next.Node == node {
+				pending = true
+			}
+		}
+	}
+	return pending, nil
 }

@@ -351,3 +351,11 @@ func TestCLIStableErrorsDoNotExposeSensitivePaths(t *testing.T) {
 		}
 	}
 }
+
+func TestCLIPrimaryIngressReadbackFlagIsScopedToSourceStatus(t *testing.T) {
+	for _, command := range []string{"source-run", "source-next", "worker-status"} {
+		if _, err := run(t.Context(), []string{command, "--primary-ingress-readback"}); !errors.Is(err, errUsage) {
+			t.Fatalf("unexpected flag acceptance for %s: %v", command, err)
+		}
+	}
+}

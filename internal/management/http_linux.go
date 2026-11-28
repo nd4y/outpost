@@ -596,6 +596,15 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if len(parts) == 11 && action == "domains" && parts[8] == "generations" && parts[10] == "complete-observation" && r.Method == http.MethodGet {
+		out, e := h.registry.ObserveComplete(ctx, p, tenant, node, parts[7], parts[9], h.maxAge)
+		if e != nil {
+			failHTTP(w, e)
+			return
+		}
+		writeHTTP(w, 200, out)
+		return
+	}
 	if len(parts) == 9 && action == "domains" && storage.ID(parts[7]) && r.Method == http.MethodGet {
 		domain, kind := parts[7], parts[8]
 		if kind == "policy" && r.URL.RawQuery == "" {

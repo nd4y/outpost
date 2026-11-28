@@ -47,7 +47,7 @@ func (a *Agent) RunWithObjectBodyObservations(ctx context.Context, relay []byte)
 	if err != nil {
 		return Status{}, err
 	}
-	return a.status(ctx, false, samples)
+	return a.status(ctx, StatusOptions{}, samples)
 }
 
 func sourceObjectRoute(a ingress.Authority) string {
