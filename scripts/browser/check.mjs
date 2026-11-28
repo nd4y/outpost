@@ -576,6 +576,47 @@ try {
     assert.match(await page.locator("#operations").innerText(), /ADMITTED/);
     await page.unroute("**/commands");
   });
+  await test("owner placement preview shows declared upload volume separately from capacity", async () => {
+    const query = /\/configuration\/preview\?include=declared-upload-volume$/;
+    const target = "c".repeat(64);
+    await page.route(query, async (route) => {
+      const response = await route.fetch();
+      assert.equal(response.status(), 200);
+      const body = await response.json();
+      assert.equal(body.format, "outpost-management-preview-with-upload-volume-1");
+      assert.deepEqual(body.uploadVolumes, []);
+      body.uploadVolumes.push({
+        operationId: "b".repeat(64),
+        domain: meta.domain,
+        generation: meta.generation,
+        target,
+        uniquePartBytes: 65553,
+        uniqueParts: 4,
+        catalogBytes: 372,
+      });
+      await route.fulfill({ response, json: body });
+    });
+    try {
+      await page.locator("#config-file").setInputFiles(meta.config);
+      await page
+        .locator("#config-form")
+        .getByRole("button", { name: "Preview changes", exact: true })
+        .click();
+      await contains(page, "#config-changes", "Declared external upload volume");
+      const row = page.locator("#config-changes").getByRole("row").filter({ hasText: target });
+      assert.deepEqual(await row.getByRole("cell").allTextContents(), [
+        "b".repeat(64),
+        meta.domain,
+        target,
+        meta.generation,
+        "4",
+        "65553",
+        "372",
+      ]);
+    } finally {
+      await page.unroute(query);
+    }
+  });
   await test("owner signed policy preview and lost apply reply survive reload", async () => {
     await page.locator("#config-file").setInputFiles(meta.config);
     await page

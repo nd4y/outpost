@@ -703,7 +703,7 @@
     "/api/v1/tenants/{tenant}/nodes/{node}/configuration/preview": {
       "post": {
         "operationId": "previewConfiguration",
-        "summary": "Preview exact signed candidate and observed capacity",
+        "summary": "Preview exact signed candidate, observed capacity and optional declared upload volumes",
         "x-required-roles": ["owner"],
         "parameters": [
           {
@@ -723,6 +723,13 @@
             }
           },
           {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": { "const": "declared-upload-volume" },
+            "description": "Include exact declared parts and catalog volumes for applicable signed upload jobs."
+          },
+          {
             "name": "X-Outpost-Request",
             "in": "header",
             "required": true,
@@ -738,7 +745,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Preview"
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/Preview" },
+                    { "$ref": "#/components/schemas/UploadVolumePreview" }
+                  ]
                 }
               }
             }
@@ -4309,6 +4319,64 @@
           }
         },
         "required": ["format", "node", "revision", "digest", "document"]
+      },
+      "UploadVolumePreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "outpost-management-preview-with-upload-volume-1"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/Preview"
+          },
+          "uploadVolumes": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "operationId": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "domain": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "generation": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "target": {
+                  "$ref": "#/components/schemas/ID"
+                },
+                "uniquePartBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "uniqueParts": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "catalogBytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8388608
+                }
+              },
+              "required": [
+                "operationId",
+                "domain",
+                "generation",
+                "target",
+                "uniquePartBytes",
+                "uniqueParts",
+                "catalogBytes"
+              ]
+            }
+          }
+        },
+        "required": ["format", "preview", "uploadVolumes"]
       },
       "Preview": {
         "type": "object",

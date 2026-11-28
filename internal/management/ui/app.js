@@ -61,6 +61,12 @@ const words = {
     signedConfig: "Signed configuration",
     configFile: "Configuration file (up to 32 MiB)",
     preview: "Preview changes",
+    declaredUploadVolume: "Declared external upload volume",
+    declaredUploadHelp:
+      "Part bytes and catalog length are read from the signed candidate. Existing data and free space on the target require a separate check.",
+    uniquePartBytes: "Unique part bytes",
+    uniqueParts: "Unique parts",
+    catalogBytes: "Catalog bytes",
     apply: "Apply this preview",
     receiptHelp:
       "Keep the operation identifier. A lost reply does not mean failure. Read the receipt or retry the same request; do not create a replacement operation.",
@@ -281,6 +287,12 @@ const words = {
     signedConfig: "Подписанная конфигурация",
     configFile: "Файл конфигурации (до 32 МиБ)",
     preview: "Просмотреть изменения",
+    declaredUploadVolume: "Объём внешней загрузки по плану",
+    declaredUploadHelp:
+      "Размеры частей и каталога взяты из подписанного кандидата. Наличие данных и свободное место на цели требуют отдельной проверки.",
+    uniquePartBytes: "Байты уникальных частей",
+    uniqueParts: "Уникальные части",
+    catalogBytes: "Байты каталога",
     apply: "Применить этот вариант",
     receiptHelp:
       "Сохраните идентификатор операции. Потеря ответа не означает отказ. Прочитайте квитанцию или повторите тот же запрос; не создавайте замену с новым идентификатором.",
@@ -1637,8 +1649,35 @@ async function previewConfig() {
       preview = null;
     }
   }
-  if (!preview)
-    preview = await api(`${nodePath(s)}/configuration/preview`, { method: "POST", body });
+  let uploadVolumes = [];
+  if (!preview) {
+    const result = await api(
+      `${nodePath(s)}/configuration/preview?include=declared-upload-volume`,
+      {
+        method: "POST",
+        body,
+      },
+    );
+    if (
+      result.format !== "outpost-management-preview-with-upload-volume-1" ||
+      result.preview?.format !== "outpost-management-preview-1" ||
+      !Array.isArray(result.uploadVolumes) ||
+      result.uploadVolumes.length > 64 ||
+      !result.uploadVolumes.every(
+        (row) =>
+          row &&
+          [row.operationId, row.domain, row.generation, row.target].every(
+            (id) => typeof id === "string" && ID.test(id),
+          ) &&
+          [row.uniquePartBytes, row.uniqueParts, row.catalogBytes].every(
+            (value) => Number.isSafeInteger(value) && value > 0,
+          ),
+      )
+    )
+      throw new Error("INVALID");
+    preview = result.preview;
+    uploadVolumes = result.uploadVolumes;
+  }
   if (legacyScope) await journal.authorize(record.operation, record.accessDomains);
   if (key !== scopeKey() || edit !== state.configEdit) return;
   if (
@@ -1668,6 +1707,31 @@ async function previewConfig() {
     preview.changes.map((c) => [c.kind, c.domain, c.before.join(", "), c.after.join(", ")]),
   );
   box.append(list);
+  if (uploadVolumes.length) {
+    const volumes = el("div");
+    table(
+      volumes,
+      [
+        "operationId",
+        "domain",
+        "target",
+        "generation",
+        "uniqueParts",
+        "uniquePartBytes",
+        "catalogBytes",
+      ],
+      uploadVolumes.map((row) => [
+        row.operationId,
+        row.domain,
+        row.target,
+        row.generation,
+        row.uniqueParts,
+        row.uniquePartBytes,
+        row.catalogBytes,
+      ]),
+    );
+    box.append(el("h3", tr("declaredUploadVolume")), el("p", tr("declaredUploadHelp")), volumes);
+  }
   $("config-preview").hidden = false;
   $("apply-config").focus();
   notice("configReady");

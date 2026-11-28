@@ -281,10 +281,10 @@ func previewChanges(before, after control.Config) Preview {
 // PreviewConfiguration describes a policy change without a capacity freshness
 // policy. The HTTP service supplies its configured report maximum age.
 func (r *Registry) PreviewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation) (Preview, error) {
-	return r.previewConfiguration(ctx, p, tenant, node, input, 0)
+	return r.previewConfiguration(ctx, p, tenant, node, input, 0, nil)
 }
 
-func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation, reportMaxAge time.Duration) (Preview, error) {
+func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation, reportMaxAge time.Duration, volumes *[]DeclaredUploadVolume) (Preview, error) {
 	var out Preview
 	if p.Validate() != nil || !p.Role("owner") || !storage.ID(tenant) || !storage.ID(node) || !storage.ID(input.Operation) || input.Reason != "POLICY_CHANGE" || !safe(input.Expected) {
 		return out, ErrDenied
@@ -326,6 +326,9 @@ func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant
 		}
 		return nil
 	})
+	if e == nil && volumes != nil {
+		*volumes, e = declaredUploadVolumes(ctx, next)
+	}
 	return out, e
 }
 

@@ -4700,6 +4700,14 @@
       ],
       "checks": [
         {
+          "path": "internal/management/config_upload_volume_linux_test.go",
+          "name": "TestManagementConfigurationPreviewUsesSignedUploadVolume"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "owner placement preview shows declared upload volume separately from capacity"
+        },
+        {
           "path": "internal/management/verified_restores_linux_test.go",
           "name": "TestManagementVerifiedRestoresUseExactAuthenticatedScope"
         },
@@ -6855,6 +6863,10 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/management/config_upload_volume_linux_test.go",
+          "name": "TestManagementConfigurationPreviewUsesSignedUploadVolume"
+        },
         {
           "path": "internal/filekit/repack_capacity_linux_test.go",
           "name": "TestRepackPeakAdmissionPreservesRetainedVersionsAndKit"
