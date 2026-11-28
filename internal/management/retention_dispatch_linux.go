@@ -39,6 +39,15 @@ type retentionStepRecord struct {
 	Input   RetentionStepRequest `json:"input"`
 }
 
+func (step retentionStepRecord) audit() Audit {
+	receipt, req := step.Receipt, step.Input.Command
+	return Audit{
+		Sequence: receipt.StagingRevision, Actor: receipt.Actor, Tenant: req.Tenant, Domain: req.Domain,
+		Operation: receipt.Operation, Reason: req.Reason, Action: "STAGE_RETENTION_STEP",
+		State: "ADMITTED", ObservedUnix: receipt.StagedUnix, RequestDigest: receipt.RequestDigest,
+	}
+}
+
 func validRetentionStepInput(input RetentionStepRequest) bool {
 	if input.Format != RetentionStepRequestFormat || !storage.ID(input.Node) || !storage.ID(input.Command.Operation) ||
 		!oneOf(input.Command.Kind, "maintenance", "retention") {
@@ -58,7 +67,7 @@ func validateRetentionSteps(s registryState) error {
 		plan, exists := s.RetentionPlans[receipt.Plan]
 		if !exists || !validRetentionStepInput(input) || receipt.Format != "outpost-retention-step-1" ||
 			receipt.Operation != id || input.Command.Operation != id || input.Command.Tenant != plan.Plan.Tenant ||
-			input.Command.Domain != plan.Trust.Domain || !storage.ID(receipt.Actor) ||
+			input.Command.Domain != plan.Trust.Domain || input.Command.Reason != "OWNER_MAINTENANCE" || !storage.ID(receipt.Actor) ||
 			receipt.RequestDigest != commandRequestDigest(Principal{Actor: receipt.Actor}, input.Node, input.Command) ||
 			!validTime(receipt.StagedUnix) || receipt.StagedUnix > s.ObservedUnix ||
 			receipt.StagingRevision <= plan.Plan.RegistrationRevision || receipt.StagingRevision > s.Revision ||

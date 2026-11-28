@@ -38,6 +38,17 @@ func TestAsymmetricSourceScale(t *testing.T) {
 	if recoveryMode != "" && recoveryMode != "1" || size == 100<<30 && recoveryMode != "1" {
 		t.Fatal("full profile requires separately admitted fresh executable consumers;128MiB also supports the original in-process control")
 	}
+	serialCase := os.Getenv("OUTPOST_ASYMMETRIC_SERIAL_CASE")
+	if serialCase != "" {
+		switch serialCase {
+		case "complete-single", "complete-paired", "split-single", "split-paired":
+		default:
+			t.Fatal("expected one named asymmetric serial case")
+		}
+		if recoveryMode != "1" {
+			t.Fatal("serial case requires fresh independent executable consumers")
+		}
+	}
 	root := os.Getenv("OUTPOST_TEST_ROOT")
 	var disk unix.Statfs_t
 	must(t, unix.Statfs(root, &disk))
@@ -94,13 +105,20 @@ func TestAsymmetricSourceScale(t *testing.T) {
 		t.Logf("ASYMMETRIC_ORACLE operation=%s phase=%s result=%s", op, phase, out)
 		return result.SHA256
 	}
-	owner, err := filekit.NewOwner()
-	must(t, err)
-	writer, private, err := ed25519.GenerateKey(rand.Reader)
-	must(t, err)
-	maintenance, _, err := ed25519.GenerateKey(rand.Reader)
-	must(t, err)
-	epoch := &fixtureEpoch{owner: owner, writer: private, trust: generation.Trust{Domain: owner.Domain, Repository: storage.Hash([]byte("asymmetric-scale-repo")), Epoch: 1, Writer: writer, Maintenance: maintenance}}
+	var epoch *fixtureEpoch
+	var epochFingerprint string
+	if serialCase != "" {
+		epoch, epochFingerprint, err = loadAsymmetricSerialEpoch("/epoch/seed")
+		must(t, err)
+	} else {
+		owner, err := filekit.NewOwner()
+		must(t, err)
+		writer, private, err := ed25519.GenerateKey(rand.Reader)
+		must(t, err)
+		maintenance, _, err := ed25519.GenerateKey(rand.Reader)
+		must(t, err)
+		epoch = &fixtureEpoch{owner: owner, writer: private, trust: generation.Trust{Domain: owner.Domain, Repository: storage.Hash([]byte("asymmetric-scale-repo")), Epoch: 1, Writer: writer, Maintenance: maintenance}}
+	}
 	completedCases := 0
 	for _, split := range []bool{false, true} {
 		for _, single := range []bool{true, false} {
@@ -110,6 +128,9 @@ func TestAsymmetricSourceScale(t *testing.T) {
 			}
 			if single {
 				name = name[:len(name)-len("paired")] + "single"
+			}
+			if serialCase != "" && name != serialCase {
+				continue
 			}
 			t.Run(name, func(t *testing.T) {
 				checkSpace(t)
@@ -209,7 +230,8 @@ func TestAsymmetricSourceScale(t *testing.T) {
 					Results                   map[string]asymmetricResult
 					Replicas                  []string
 					InProcessRecoveryDeferred bool
-				}{size, results, paths, x.deferRecoveries})
+					FixtureEpochFingerprint   string `json:",omitempty"`
+				}{size, results, paths, x.deferRecoveries, epochFingerprint})
 				syncDirectory(x.f.base)
 				if x.deferRecoveries {
 					input := filepath.Join(x.f.tree, "private.bin")
@@ -228,6 +250,13 @@ func TestAsymmetricSourceScale(t *testing.T) {
 		}
 	}
 	if !t.Failed() {
+		if serialCase != "" {
+			if completedCases != 1 {
+				t.Fatal("serial case acceptance requires one executed matched case", completedCases)
+			}
+			t.Logf("ASYMMETRIC_SCALE_SERIAL_CASE_PASS name=%s bytes=%d fixture-epoch=%s independent-process-consumers=pending", serialCase, size, epochFingerprint)
+			return
+		}
 		if completedCases != 4 {
 			t.Fatal("full acceptance requires four executed matched cases", completedCases)
 		}

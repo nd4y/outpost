@@ -1310,10 +1310,11 @@ function renderReport() {
       tr(g.pinned ? "yes" : "no"),
       () => {
         const b = button("selectedGeneration", () => {
-          $("generation").value = g.generation;
+          const generation = $("generation");
+          generation.value = g.generation;
           invalidateCommand();
           $("commands").scrollIntoView();
-          $("generation").focus();
+          (generation.matches(":disabled") ? $("commands-title") : generation).focus();
         });
         b.disabled = $("command-fields").disabled;
         return b;

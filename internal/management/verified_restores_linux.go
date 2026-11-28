@@ -10,12 +10,18 @@ import (
 )
 
 type VerifiedRestore struct {
-	Operation          string              `json:"operationId"`
-	Generation         string              `json:"generation"`
-	Target             string              `json:"target"`
-	VerifiedUnix       int64               `json:"verifiedUnix"`
-	Scope              string              `json:"scope"`
-	LogicalMeasurement *LogicalMeasurement `json:"logicalMeasurement,omitempty"`
+	Operation                    string                `json:"operationId"`
+	Generation                   string                `json:"generation"`
+	Target                       string                `json:"target"`
+	VerifiedUnix                 int64                 `json:"verifiedUnix"`
+	Scope                        string                `json:"scope"`
+	LogicalMeasurement           *LogicalMeasurement   `json:"logicalMeasurement,omitempty"`
+	EarliestRetainedWholeRestore *RetainedWholeRestore `json:"earliestRetainedWholeRestore,omitempty"`
+}
+
+type RetainedWholeRestore struct {
+	Operation    string `json:"operationId"`
+	VerifiedUnix int64  `json:"verifiedUnix"`
 }
 
 type LogicalMeasurement struct {
@@ -24,8 +30,16 @@ type LogicalMeasurement struct {
 	MeasuredUnix int64  `json:"measuredUnix"`
 }
 
-func updateVerifiedRestore(previous, current VerifiedRestore, restoredBytes int64) VerifiedRestore {
+func (r *RetainedWholeRestore) canAdvance(operation string, at int64) bool {
+	return r == nil || at < r.VerifiedUnix || at == r.VerifiedUnix && operation < r.Operation
+}
+
+func updateVerifiedRestore(previous, current VerifiedRestore, restoredBytes int64, recordEarliest bool) VerifiedRestore {
 	measurement := previous.LogicalMeasurement
+	earliest := previous.EarliestRetainedWholeRestore
+	if recordEarliest && current.Scope == "WHOLE_GENERATION" && earliest.canAdvance(current.Operation, current.VerifiedUnix) {
+		earliest = &RetainedWholeRestore{Operation: current.Operation, VerifiedUnix: current.VerifiedUnix}
+	}
 	if current.Scope == "WHOLE_GENERATION" && (measurement == nil || current.VerifiedUnix >= measurement.MeasuredUnix) {
 		measurement = &LogicalMeasurement{Operation: current.Operation, LogicalBytes: restoredBytes, MeasuredUnix: current.VerifiedUnix}
 	}
@@ -34,12 +48,13 @@ func updateVerifiedRestore(previous, current VerifiedRestore, restoredBytes int6
 		current = previous
 	}
 	current.LogicalMeasurement = measurement
+	current.EarliestRetainedWholeRestore = earliest
 	return current
 }
 
 // verifiedRestores projects original evidence from the same locked report view.
 // Selection comes from the verified command, never from restored file counts.
-func (r *Registry) verifiedRestores(ctx context.Context, state registryState, report Report) []VerifiedRestore {
+func (r *Registry) verifiedRestores(ctx context.Context, state registryState, report Report, includeEarliest bool) []VerifiedRestore {
 	verified := make([]VerifiedRestore, 0)
 	if len(report.Commands) == 0 || len(report.Generations) == 0 {
 		return verified
@@ -63,7 +78,8 @@ func (r *Registry) verifiedRestores(ctx context.Context, state registryState, re
 			result == nil || result.Restored.Sequence != sequence {
 			continue
 		}
-		if measurement := previous.LogicalMeasurement; measurement != nil &&
+		couldAdvanceEarliest := includeEarliest && previous.EarliestRetainedWholeRestore.canAdvance(observation.Operation, observation.VerifiedUnix)
+		if measurement := previous.LogicalMeasurement; !couldAdvanceEarliest && measurement != nil &&
 			observation.VerifiedUnix < previous.VerifiedUnix && observation.VerifiedUnix < measurement.MeasuredUnix {
 			continue
 		}
@@ -95,7 +111,14 @@ func (r *Registry) verifiedRestores(ctx context.Context, state registryState, re
 			Operation: observation.Operation, Generation: observation.Generation, Target: report.Node,
 			VerifiedUnix: result.VerifiedUnix, Scope: scope,
 		}
-		latest[observation.Generation] = updateVerifiedRestore(previous, current, result.Restored.Restored.Bytes)
+		recordEarliest := false
+		if couldAdvanceEarliest && scope == "WHOLE_GENERATION" {
+			// The retained command authority supplies the original writer epoch.
+			// The selected report's generation projection has no epoch field.
+			authority, err := command.VerifyAuthority(envelope.Request.Authority, r.owner)
+			recordEarliest = err == nil && result.Restored.Epoch == authority.WriterEpoch
+		}
+		latest[observation.Generation] = updateVerifiedRestore(previous, current, result.Restored.Restored.Bytes, recordEarliest)
 	}
 	for _, generation := range report.Generations {
 		if result, ok := latest[generation.Generation]; ok && generation.Target == result.Target {

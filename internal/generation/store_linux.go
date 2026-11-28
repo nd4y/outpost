@@ -376,10 +376,14 @@ func (r *Replica) locked(ctx context.Context, fn func(*state) error) error {
 	})
 }
 func (r *Replica) exclusive(ctx context.Context, fn func() error) error {
+	return r.withLock(ctx, os.O_CREATE|os.O_RDWR, syscall.LOCK_EX, fn)
+}
+
+func (r *Replica) withLock(ctx context.Context, openFlags, lockMode int, fn func() error) error {
 	if e := ctx.Err(); e != nil {
 		return e
 	}
-	f, e := localfs.OpenFile(r.root, ".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(r.root, ".lock", openFlags|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return e
 	}
@@ -392,7 +396,7 @@ func (r *Replica) exclusive(ctx context.Context, fn func() error) error {
 		return ErrInvalid
 	}
 	for {
-		e = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		e = syscall.Flock(int(f.Fd()), lockMode|syscall.LOCK_NB)
 		if e == nil {
 			break
 		}
@@ -464,10 +468,18 @@ func (r *Replica) Begin(ctx context.Context, raw []byte) (string, error) {
 	return id, e
 }
 func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) error {
+	_, err := r.PutWithPresence(ctx, generation, id, b)
+	return err
+}
+
+// PutWithPresence reports whether the accepted object already existed with the
+// same length and hash when checked under the replica lock.
+func (r *Replica) PutWithPresence(ctx context.Context, generation, id string, b []byte) (bool, error) {
 	if len(b) > MaxObject || !validID(id) || Hash(b) != id {
-		return ErrInvalid
+		return false, ErrInvalid
 	}
-	return r.locked(ctx, func(s *state) error {
+	alreadyPresent := false
+	err := r.locked(ctx, func(s *state) error {
 		_, refs, e := r.get(s, generation, false)
 		if e != nil {
 			return e
@@ -477,6 +489,7 @@ func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) erro
 			return ErrInvalid
 		}
 		if _, e = r.object(ref); e == nil {
+			alreadyPresent = true
 			return nil
 		} else if !errors.Is(e, os.ErrNotExist) {
 			return e
@@ -486,6 +499,7 @@ func (r *Replica) Put(ctx context.Context, generation, id string, b []byte) erro
 		}
 		return r.point("object-durable")
 	})
+	return alreadyPresent, err
 }
 func (r *Replica) Complete(ctx context.Context, id string) error {
 	return r.locked(ctx, func(s *state) error {

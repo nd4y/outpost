@@ -23,7 +23,7 @@ x-runtime: &runtime
   volumes:
     - type: bind
       source: "${OUTPOST_DATA:?set the already enrolled worker volume root}"
-      target: /var/lib/outpost
+      target: "${OUTPOST_RUNTIME_DATA_PATH:-/var/lib/outpost}"
       bind:
         create_host_path: false
     - type: bind

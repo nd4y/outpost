@@ -164,6 +164,21 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	if staged.Operation != closeReq.Operation || staged.Plan != op {
 		t.Fatal(staged)
 	}
+	status, raw = h.request(t, h.owner, "GET", "/api/v1/tenants/"+f.e.Tenant+"/audit", nil)
+	if status != 200 {
+		t.Fatalf("owner audit status %d", status)
+	}
+	var stagePage AuditPage
+	must(t, json.Unmarshal(raw, &stagePage))
+	visibleStage := false
+	for _, item := range stagePage.Items {
+		if item.Operation == staged.Operation && item.Action == "STAGE_RETENTION_STEP" && item.State == "ADMITTED" {
+			visibleStage = true
+		}
+	}
+	if !visibleStage {
+		t.Fatal("HTTP audit omitted a recorded, unpublished retention step")
+	}
 	f.reopen(t)
 	plan, e := f.r.RegisterRetentionPlan(ctx, f.p, f.e.Tenant, trust.Domain, planInput)
 	must(t, e)
@@ -207,6 +222,39 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 	requireReconcile(t, []Principal{f.p}, closeReq.Operation, "WAITING_PREREQUISITE")
 	if replay := stage(f, closeReq); replay != staged {
 		t.Fatal("stage replay changed original receipt", replay)
+	}
+	wantStage := Audit{
+		Sequence: staged.StagingRevision, Actor: staged.Actor, Tenant: f.e.Tenant, Domain: trust.Domain,
+		Operation: closeReq.Operation, Reason: closeReq.Reason, Action: "STAGE_RETENTION_STEP",
+		State: "ADMITTED", ObservedUnix: staged.StagedUnix, RequestDigest: staged.RequestDigest,
+	}
+	audit, _, e := f.r.Audit(ctx, f.p, f.e.Tenant, wantStage.Sequence-1, 1)
+	must(t, e)
+	if len(audit) != 1 || audit[0] != wantStage {
+		t.Fatalf("original staged audit unavailable while waiting: %+v", audit)
+	}
+	otherDomain := Principal{Actor: f.p.Actor, Roles: []string{"owner"}, Scopes: []Scope{{f.e.Tenant, id("unrelated audit domain")}}}
+	sameDomainOperator := Principal{Actor: f.p.Actor, Roles: []string{"operator"}, Scopes: []Scope{{f.e.Tenant, trust.Domain}}}
+	for _, restricted := range []Principal{otherDomain, sameDomainOperator} {
+		hidden, _, err := f.r.Audit(ctx, restricted, f.e.Tenant, wantStage.Sequence-1, 256)
+		must(t, err)
+		for _, item := range hidden {
+			if item.Action == wantStage.Action && item.Operation == wantStage.Operation {
+				t.Fatalf("staged owner operation escaped the audit scope: %+v", item)
+			}
+		}
+	}
+	stream, snapshotTrust, _ := snapshotBytes(t, f)
+	inspection, e := InspectSnapshot(ctx, bytes.NewReader(stream), snapshotTrust, 8<<20)
+	must(t, e)
+	auditMatches := 0
+	for _, item := range inspection.Audit {
+		if item == wantStage {
+			auditMatches++
+		}
+	}
+	if auditMatches != 1 {
+		t.Fatalf("snapshot did not retain the original staging audit exactly once: %d matches", auditMatches)
 	}
 
 	protection := func(peer *fixture, operation, action string) generation.RetentionProtection {
@@ -287,12 +335,26 @@ func TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases(t *te
 		t.Fatal("staging fault was not reached", e)
 	}
 	f.reopen(t)
-	stage(a, a1Req)
+	stagedHold := stage(a, a1Req)
 	requireReconcile(t, nil, a1Req.Operation, "BLOCKED")
 	requireReconcile(t, []Principal{f.p}, a1Req.Operation, "PUBLISHED")
 	a1, ack, node := queue(a, ra, a1Req)
 	_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, a.e.Node, a1.Operation, ack)
 	must(t, e)
+	lifecycle, _, e := f.r.Audit(ctx, f.p, f.e.Tenant, stagedHold.StagingRevision-1, 256)
+	must(t, e)
+	var holdAudits []Audit
+	for _, item := range lifecycle {
+		if item.Operation == a1.Operation {
+			holdAudits = append(holdAudits, item)
+		}
+	}
+	if len(holdAudits) != 2 || holdAudits[0].Sequence != stagedHold.StagingRevision ||
+		holdAudits[0].Action != "STAGE_RETENTION_STEP" || holdAudits[0].State != "ADMITTED" ||
+		holdAudits[1].Sequence <= holdAudits[0].Sequence || holdAudits[1].Action != "COMMAND_RETENTION" ||
+		holdAudits[1].State != "COMPLETE" || holdAudits[1].RequestDigest != holdAudits[0].RequestDigest {
+		t.Fatalf("staging history and worker outcome were not retained separately: %+v", holdAudits)
+	}
 	a2, ack, node := hold(a, ra, authorityA, "a2")
 	_, e = f.r.AcknowledgeCommand(ctx, node, f.e.Tenant, a.e.Node, a2.Operation, ack)
 	must(t, e)

@@ -20,6 +20,8 @@ Read the receipt after a lost reply; retrying configuration requires selecting t
 
 The English/Russian interface uses native controls, explicit labels, visible keyboard focus, status text, bounded tables and a narrow-screen layout. Loading, empty, missing, forbidden, offline, stale and invalid states remain distinct. Automated browser checks, manual accessibility inspection and installed-service acceptance are separate gates. This document defines the interface contract before its implementation and does not grant permission to expose a port or change a working service.
 
+Selecting a generation moves keyboard focus to the exact generation field when it is enabled. If the field is disabled, focus moves to the Operations heading and Tab advances to the available controls.
+
 ## Isolated checks
 
 The [browser suite](../../scripts/browser/check.mjs) runs a real loopback mTLS management fixture with disposable identities. Thirty-one browser journeys cover original report age, unknown space, bounded tables, keyboard focus, English/Russian accessibility scans, 320-pixel reflow and 200% text size, scope changes, offline/forbidden/empty states, role isolation and storage failure before mutation. It drops responses after actual command/configuration admission, reloads the page and verifies identical request bytes and operation identifiers. A competing signed policy publication rejects a stale browser preview.

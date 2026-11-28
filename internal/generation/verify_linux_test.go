@@ -96,6 +96,12 @@ func TestContentVerificationIndependentVersionsAndKnownDamage(t *testing.T) {
 	if !known.Damaged || len(known.Affected) != 1 || known.Affected[0].Version != first.Version || len(known.Affected[0].Objects) != 1 {
 		t.Fatal(known)
 	}
+	passive, e := ReadRecordedDamageAt(ctx, nil, dir, trust, key, id)
+	ok(t, e)
+	if passive.State != "DAMAGE_RECORDED" || len(passive.Affected) != 1 ||
+		passive.Affected[0] != (RecordedDamageVersion{File: first.File, Version: first.Version}) {
+		t.Fatal(passive)
+	}
 	ok(t, r.Close())
 	ok(t, os.Remove(filepath.Join(dir, "state.json")))
 	report, e = VerifyMaterialized(ctx, dir, id, trust, owner, nil)

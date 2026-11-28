@@ -98,7 +98,7 @@ func openNewDestination(path string) (*os.Root, string, error) {
 }
 func run(ctx context.Context, args []string) (any, error) {
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" {
-		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-native-btrfs-export --input PRIVATE_REQUEST --key PRODUCER_KEY --output PRIVATE_MANIFEST", "source-native-release-ticket --bootstrap FILE --operation ID --output TICKET", "source-native-btrfs-dispose --input PRIVATE_REQUEST --trust SOURCE_TRUST --key PRODUCER_KEY", "source-prepared-export-create --bootstrap SOURCE_FILE --key PRODUCER_KEY --input CLAIM --output NEW_SIGNED_MANIFEST", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT] [--companion NEW_SIGNED_COMPANION_AUTHORITY] [--reserve NEW_SIGNED_RESERVE_AUTHORITY]", "source-receipt-recovery-preview --bootstrap FILE --output NEW_REQUEST", "source-receipt-recovery-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "worker-ingress-receipt-recover --bootstrap FILE --domain ID --input SIGNED_ADMISSION", "source-unstarted-preview --bootstrap FILE --output NEW_REQUEST", "source-unstarted-sign --key OWNER_KEY --input REQUEST --output NEW_RETIREMENT", "source-unstarted-retire --bootstrap FILE --input SIGNED_RETIREMENT", "source-settlement-preview --bootstrap FILE [--purpose publish-staged|inspect-active|retire-unadmitted|retire-unsealed] [--node RECEIVER_ID] --output NEW_REQUEST", "source-settlement-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "source-settle --bootstrap FILE --input SIGNED_ADMISSION [--companion SIGNED_COMPANION_ADMISSION]", "source-reconcile --bootstrap FILE --input SIGNED_ADMISSION", "source-retire-active --bootstrap FILE --input SIGNED_ADMISSION [--companion SIGNED_ADMISSION] [--superseded SIGNED_ADMISSION]", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE [--input SIGNED_RELAY_RECIPIENT_AUTHORITY]", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "source-writer-fence-sign --key OLD_SOURCE_OWNER_KEY --input PRIVATE_REQUEST --output NEW_SIGNED_FENCE", "source-writer-fence --bootstrap OLD_SOURCE_FILE --input SIGNED_FENCE", "source-recovery-export --bootstrap FILE --input PRIVATE_EXPORT_PROFILE --output NEW_PRIVATE_PACKAGE", "owner-epoch-create --input PRIVATE_REQUEST --key OWNER_AUTHORITY --output NEW_PRIVATE_DIRECTORY", "owner-epoch-inspect --input PREPARATION_RECEIPT --trust OWNER_PUBLIC_KEY", "recovery-package-inspect --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256", "recovery-package-extract --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256 --output NEW_PRIVATE_DIRECTORY", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-snapshot-stage --input PRIVATE_SNAPSHOT --trust CHECKPOINT_TRUST --output NEW_PRIVATE_DIRECTORY --max-bytes COUNT", "management-registry-recover --input PRIVATE_PROFILE", "management-registry-copy-enable --input PRIVATE_NEXT_PROFILE", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "maintenance-permit-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_PERMIT --output NEW_SIGNED_PERMIT", "retention-protection-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_GRANT --output NEW_SIGNED_GRANT", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "worker-ingress-renew --bootstrap FILE --domain ID --trust PREVIOUS_SIGNED_AUTHORITY --input NEW_SIGNED_AUTHORITY", "worker-ingress-journal-enable --bootstrap FILE --domain ID --input SIGNED_AUTHORITY", "worker-ingress-journal-recover --bootstrap FILE --domain ID --input SIGNED_AUTHORITY", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "replica-retention-export --bootstrap FILE --domain ID --output NEW_PRIVATE_FILE", "replica-retention-protect --bootstrap FILE --domain ID --input SIGNED_GRANT", "replica-retention-restore --bootstrap FILE --domain ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256", "replica-index-mirror-enable --bootstrap FILE --domain ID", "replica-index-recover --bootstrap FILE --domain ID", "replica-metadata-export --bootstrap FILE --domain ID --output NEW_PRIVATE_FILE", "replica-metadata-restore --bootstrap FILE --domain ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256", "replica-maintenance-plan-export --bootstrap FILE --domain ID --operation ID --output NEW_PRIVATE_FILE", "replica-maintenance-plan-restore --bootstrap FILE --domain ID --operation ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256", "replica-maintenance-preview --bootstrap FILE --domain ID --input PRIVATE_SELECTION --output NEW_PERMIT_DRAFT", "config-apply --bootstrap FILE --input FILE", "config-routes --input SIGNED_CONFIG --trust OWNER_PUBLIC_KEY --node NODE_ID --domain DOMAIN_ID", "config-route-compare --input SIGNED_CONFIG --node NODE_ID --peer-config SIGNED_PEER_CONFIG --peer PEER_ID --trust OWNER_PUBLIC_KEY --domain DOMAIN_ID", "config-route-audit --input SIGNED_CONFIG --node NODE_ID --peer-configs PRIVATE_INDEX --trust OWNER_PUBLIC_KEY --domain DOMAIN_ID", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]", "restore-external --bootstrap PRIVATE_READER --key FILE --trust FILE --generation ID --output DIRECTORY [--version ID | --input SELECTION_FILE]", "archive-external-status --bootstrap PRIVATE_READER --trust FILE --key FILE --input SIGNED_PLAN --sha256 PLAN_SHA256 --generation ID [--version ID]", "archive-external-request --bootstrap PRIVATE_READER --trust FILE --key FILE --input SIGNED_PLAN --sha256 PLAN_SHA256 --generation ID --max-requests COUNT [--version ID]", "audit-external --bootstrap PRIVATE_READER --trust FILE --generation ID [--output NEW_PRIVATE_REPORT]", "worker-external-audit-init --bootstrap FILE --operation UPLOAD_ID --input WINDOW_PROFILE", "worker-external-audit --bootstrap FILE --operation UPLOAD_ID --input WINDOW_PROFILE", "worker-external-audit-status --bootstrap FILE --operation UPLOAD_ID", "worker-upload-staging-status --bootstrap FILE --domain ID --operation ID [--after BUCKET]", "worker-upload-staging-check --bootstrap FILE --domain ID --operation ID --input PRIVATE_READER --temporary NAME [--after BUCKET]", "worker-upload-abandon-preview --bootstrap FILE --domain ID --operation ID --output NEW_PRIVATE_REQUEST", "upload-abandon-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_REQUEST --output NEW_SIGNED_GRANT", "worker-upload-abandon --bootstrap FILE --domain ID --operation ID --input SIGNED_GRANT", "upload-plan-build --key PLANNER_KEY --trust FILE --store REPLICA --generation ID --input PLAN_REQUEST --output NEW_SIGNED_PLAN"}}, nil
+		return map[string]any{"format": "outpost-cli-1", "commands": []string{"version", "runtime-observe", "runtime-check", "source-probe --store SOURCE --node ORIGIN_ID --output NEW_TREE_BINDING", "source-native-btrfs-export --input PRIVATE_REQUEST --key PRODUCER_KEY --output PRIVATE_MANIFEST", "source-native-release-ticket --bootstrap FILE --operation ID --output TICKET", "source-native-btrfs-dispose --input PRIVATE_REQUEST --trust SOURCE_TRUST --key PRODUCER_KEY", "source-prepared-export-create --bootstrap SOURCE_FILE --key PRODUCER_KEY --input CLAIM --output NEW_SIGNED_MANIFEST", "source-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "observation-grant-sign --key OWNER_KEY --input GRANT --output NEW_SIGNED_GRANT", "upload-delegation-sign --key PLANNER_KEY --input DELEGATION --output NEW_SIGNED_DELEGATION", "source-init --bootstrap FILE", "source-next --bootstrap FILE", "source-renew --bootstrap FILE --input NEW_SIGNED_AUTHORITY [--trust NEW_OBSERVATION_GRANT] [--companion NEW_SIGNED_COMPANION_AUTHORITY] [--reserve NEW_SIGNED_RESERVE_AUTHORITY]", "source-receipt-recovery-preview --bootstrap FILE --output NEW_REQUEST", "source-receipt-recovery-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "worker-ingress-receipt-recover --bootstrap FILE --domain ID --input SIGNED_ADMISSION", "source-unstarted-preview --bootstrap FILE --output NEW_REQUEST", "source-unstarted-sign --key OWNER_KEY --input REQUEST --output NEW_RETIREMENT", "source-unstarted-retire --bootstrap FILE --input SIGNED_RETIREMENT", "source-settlement-preview --bootstrap FILE [--purpose publish-staged|inspect-active|retire-unadmitted|retire-unsealed] [--node RECEIVER_ID] --output NEW_REQUEST", "source-settlement-sign --key OWNER_KEY --input REQUEST --output NEW_ADMISSION", "source-settle --bootstrap FILE --input SIGNED_ADMISSION [--companion SIGNED_COMPANION_ADMISSION]", "source-reconcile --bootstrap FILE --input SIGNED_ADMISSION", "source-retire-active --bootstrap FILE --input SIGNED_ADMISSION [--companion SIGNED_ADMISSION] [--superseded SIGNED_ADMISSION]", "source-prepare --bootstrap FILE --input SIGNED_INTENT", "source-run --bootstrap FILE [--input SIGNED_RELAY_RECIPIENT_AUTHORITY] [--observe-direct-source-bodies]", "source-schedule-set --bootstrap FILE --input SCHEDULE", "source-schedule-status --bootstrap FILE", "source-loop --bootstrap FILE", "source-status --bootstrap FILE [--capture-measurements]", "source-checkpoint --bootstrap FILE --output NEW_CHECKPOINT", "source-writer-fence-sign --key OLD_SOURCE_OWNER_KEY --input PRIVATE_REQUEST --output NEW_SIGNED_FENCE", "source-writer-fence --bootstrap OLD_SOURCE_FILE --input SIGNED_FENCE", "source-recovery-export --bootstrap FILE --input PRIVATE_EXPORT_PROFILE --output NEW_PRIVATE_PACKAGE", "owner-epoch-create --input PRIVATE_REQUEST --key OWNER_AUTHORITY --output NEW_PRIVATE_DIRECTORY", "owner-epoch-inspect --input PREPARATION_RECEIPT --trust OWNER_PUBLIC_KEY", "recovery-package-inspect --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256", "recovery-package-extract --input PRIVATE_PACKAGE --sha256 EXPECTED_PACKAGE_SHA256 --output NEW_PRIVATE_DIRECTORY", "volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE", "volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE [--volume-authority SYSTEM_DIRECTORY --volume-worker-directory WORKER_DIRECTORY --trust OWNER_PUBLIC_KEY]", "worker-volume-transition-sign --input PRIVATE_REQUEST --key OWNER_KEY --output SIGNED_PERMIT", "worker-volume-transition --bootstrap FILE --input SIGNED_PERMIT --output NEW_PRIVATE_BOOTSTRAP", "management-init --input PRIVATE_PROFILE", "management-run --input PRIVATE_PROFILE", "management-status --input PRIVATE_PROFILE", "management-profile-set --input PRIVATE_PROFILE", "management-reconcile --input PRIVATE_PROFILE", "management-snapshot --input PRIVATE_PROFILE --output NEW_PRIVATE_FILE [--max-bytes BYTES]", "management-snapshot-inspect --input PRIVATE_SNAPSHOT --trust EXPECTED_CHECKPOINT [--max-bytes BYTES]", "management-snapshot-stage --input PRIVATE_SNAPSHOT --trust CHECKPOINT_TRUST --output NEW_PRIVATE_DIRECTORY --max-bytes COUNT", "management-registry-recover --input PRIVATE_PROFILE", "management-registry-copy-enable --input PRIVATE_NEXT_PROFILE", "management-enrollment-sign --key OWNER_KEY --input ENROLLMENT --output NEW_SIGNED_ENROLLMENT", "worker-telemetry-init --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-status --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-once --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-loop --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-renew --bootstrap FILE --input TELEMETRY_PROFILE", "worker-telemetry-discard --bootstrap FILE --input TELEMETRY_PROFILE --operation EXPECTED_REQUEST_DIGEST", "worker-report-init --bootstrap FILE --input REPORT_PROFILE", "worker-report-set --bootstrap FILE --input REPORT_PROFILE", "worker-report-renew --bootstrap FILE --input REPORT_PROFILE", "worker-report-status --bootstrap FILE --input REPORT_PROFILE", "worker-report-loop --bootstrap FILE --input REPORT_PROFILE", "command-authority-sign --key OWNER_KEY --input AUTHORITY --output NEW_SIGNED_AUTHORITY", "maintenance-permit-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_PERMIT --output NEW_SIGNED_PERMIT", "retention-protection-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_GRANT --output NEW_SIGNED_GRANT", "worker-controls-migrate --bootstrap FILE", "worker-controls-rollback --bootstrap FILE", "worker-command-apply --bootstrap FILE --input SIGNED_ENVELOPE", "worker-command-once --bootstrap FILE --input COMMAND_PROFILE", "worker-command-loop --bootstrap FILE --input COMMAND_PROFILE", "recovery-init --input PRIVATE_PROFILE", "trusted-worker-run --bootstrap FILE --input PRIVATE_PROFILE", "worker-init --bootstrap FILE", "worker-run --bootstrap FILE", "worker-status --bootstrap FILE", "worker-discovery-status --bootstrap FILE", "worker-observation-status --bootstrap FILE", "worker-retry --bootstrap FILE --operation ID", "worker-ingress-renew --bootstrap FILE --domain ID --trust PREVIOUS_SIGNED_AUTHORITY --input NEW_SIGNED_AUTHORITY", "worker-ingress-journal-enable --bootstrap FILE --domain ID --input SIGNED_AUTHORITY", "worker-ingress-journal-recover --bootstrap FILE --domain ID --input SIGNED_AUTHORITY", "replica-migrate --bootstrap FILE --domain ID", "replica-rollback --bootstrap FILE --domain ID", "replica-retention-export --bootstrap FILE --domain ID --output NEW_PRIVATE_FILE", "replica-retention-protect --bootstrap FILE --domain ID --input SIGNED_GRANT", "replica-retention-restore --bootstrap FILE --domain ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256", "replica-index-mirror-enable --bootstrap FILE --domain ID", "replica-index-recover --bootstrap FILE --domain ID", "replica-metadata-export --bootstrap FILE --domain ID --output NEW_PRIVATE_FILE", "replica-metadata-restore --bootstrap FILE --domain ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256", "replica-maintenance-plan-export --bootstrap FILE --domain ID --operation ID --output NEW_PRIVATE_FILE", "replica-maintenance-plan-restore --bootstrap FILE --domain ID --operation ID --input PRIVATE_FILE --sha256 EXPECTED_SHA256", "replica-maintenance-preview --bootstrap FILE --domain ID --input PRIVATE_SELECTION --output NEW_PERMIT_DRAFT", "config-apply --bootstrap FILE --input FILE", "config-routes --input SIGNED_CONFIG --trust OWNER_PUBLIC_KEY --node NODE_ID --domain DOMAIN_ID", "config-route-compare --input SIGNED_CONFIG --node NODE_ID --peer-config SIGNED_PEER_CONFIG --peer PEER_ID --trust OWNER_PUBLIC_KEY --domain DOMAIN_ID", "config-route-audit --input SIGNED_CONFIG --node NODE_ID --peer-configs PRIVATE_INDEX --trust OWNER_PUBLIC_KEY --domain DOMAIN_ID", "config-sign --key FILE --input FILE --output FILE", "restore-kit --key FILE --store DIRECTORY --version ID --output DIRECTORY", "verify-kit --key FILE --store DIRECTORY --version ID", "verify-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output NEW_REPORT [--input VERSION_SELECTION]", "restore-replica --key FILE --trust FILE --store DIRECTORY --generation ID --output DIRECTORY [--input SELECTION_FILE]", "restore-external --bootstrap PRIVATE_READER --key FILE --trust FILE --generation ID --output DIRECTORY [--version ID | --input SELECTION_FILE]", "archive-external-status --bootstrap PRIVATE_READER --trust FILE --key FILE --input SIGNED_PLAN --sha256 PLAN_SHA256 --generation ID [--version ID]", "archive-external-request --bootstrap PRIVATE_READER --trust FILE --key FILE --input SIGNED_PLAN --sha256 PLAN_SHA256 --generation ID --max-requests COUNT [--version ID]", "audit-external --bootstrap PRIVATE_READER --trust FILE --generation ID [--output NEW_PRIVATE_REPORT]", "worker-external-audit-init --bootstrap FILE --operation UPLOAD_ID --input WINDOW_PROFILE", "worker-external-audit --bootstrap FILE --operation UPLOAD_ID --input WINDOW_PROFILE", "worker-external-audit-status --bootstrap FILE --operation UPLOAD_ID", "worker-peer-object-transfer-status --bootstrap FILE --domain DOMAIN_ID --peer PEER_ID", "worker-replica-damage-status --bootstrap FILE --domain DOMAIN_ID --generation ID", "worker-external-transfer-status --bootstrap FILE --operation UPLOAD_ID", "worker-upload-staging-status --bootstrap FILE --domain ID --operation ID [--after BUCKET]", "worker-upload-staging-check --bootstrap FILE --domain ID --operation ID --input PRIVATE_READER --temporary NAME [--after BUCKET]", "worker-upload-abandon-preview --bootstrap FILE --domain ID --operation ID --output NEW_PRIVATE_REQUEST", "upload-abandon-sign --key PRIVATE_MAINTENANCE_KEY --input PRIVATE_REQUEST --output NEW_SIGNED_GRANT", "worker-upload-abandon --bootstrap FILE --domain ID --operation ID --input SIGNED_GRANT", "upload-plan-build --key PLANNER_KEY --trust FILE --store REPLICA --generation ID --input PLAN_REQUEST --output NEW_SIGNED_PLAN"}}, nil
 	}
 	if args[0] == "runtime-observe" || args[0] == "runtime-check" {
 		if len(args) != 1 {
@@ -142,10 +142,20 @@ func run(ctx context.Context, args []string) (any, error) {
 	peerConfig := flags.String("peer-config", "", "signed peer configuration file")
 	peerConfigs := flags.String("peer-configs", "", "private index of signed peer configurations")
 	purpose := flags.String("purpose", "", "settlement purpose")
+	captureMeasurements := flags.Bool("capture-measurements", false, "measure verified receipts for the current local capture")
+	directSourceBodies := flags.Bool("observe-direct-source-bodies", false, "include volatile object body samples from this source run")
 	maxBytes := flags.Int64("max-bytes", 16<<20, "bounded private snapshot bytes")
 	epoch := flags.Uint64("epoch", 0, "explicit admission epoch")
+	volumeAuthority := flags.String("volume-authority", "", "private local volume authority directory")
+	volumeWorkerDirectory := flags.String("volume-worker-directory", "", "explicit worker state directory for migratable enrollment")
 	maxRequests := flags.Int("max-requests", 0, "maximum paid archive requests in one invocation")
 	if flags.Parse(args[1:]) != nil || flags.NArg() != 0 {
+		return nil, errUsage
+	}
+	if *captureMeasurements && args[0] != "source-status" {
+		return nil, errUsage
+	}
+	if *directSourceBodies && args[0] != "source-run" {
 		return nil, errUsage
 	}
 	if *companionFile != "" && args[0] != "source-renew" && args[0] != "source-settle" && args[0] != "source-retire-active" ||
@@ -155,7 +165,8 @@ func run(ctx context.Context, args []string) (any, error) {
 	if args[0] != "config-route-audit" && *peerConfigs != "" {
 		return nil, errUsage
 	}
-	if args[0] != "config-route-compare" && (*peerID != "" || *peerConfig != "") {
+	if args[0] != "config-route-compare" && *peerConfig != "" ||
+		args[0] != "config-route-compare" && args[0] != "worker-peer-object-transfer-status" && *peerID != "" {
 		return nil, errUsage
 	}
 	if (args[0] == "archive-external-request") != (*maxRequests > 0) || *maxRequests < 0 {
@@ -444,11 +455,17 @@ func run(ctx context.Context, args []string) (any, error) {
 			}
 		case "source-run":
 			if *input == "" {
+				if *directSourceBodies {
+					return a.RunWithObjectBodyObservations(ctx, nil)
+				}
 				e = a.Run(ctx)
 			} else {
 				raw, err := worker.ReadPrivate(*input, ingress.MaxDocument)
 				if err != nil {
 					return nil, err
+				}
+				if *directSourceBodies {
+					return a.RunWithObjectBodyObservations(ctx, raw)
 				}
 				e = a.RunWithRelay(ctx, raw)
 			}
@@ -463,6 +480,9 @@ func run(ctx context.Context, args []string) (any, error) {
 			if e = writeNew(*output, raw); e != nil {
 				return nil, e
 			}
+		}
+		if *captureMeasurements {
+			return a.StatusWithCaptureMeasurements(ctx)
 		}
 		return a.Status(ctx)
 	case "volume-probe":
@@ -496,7 +516,22 @@ func run(ctx context.Context, args []string) (any, error) {
 		if worker.DecodeInput(raw, &observation, 4096) != nil {
 			return nil, errUsage
 		}
-		binding, e := volume.Enroll(ctx, *store, observation, *nodeID, *epoch)
+		var binding volume.Binding
+		if *volumeAuthority == "" {
+			if *volumeWorkerDirectory != "" {
+				return nil, errUsage
+			}
+			binding, e = volume.Enroll(ctx, *store, observation, *nodeID, *epoch)
+		} else {
+			if *epoch != 1 || *volumeWorkerDirectory == "" {
+				return nil, errUsage
+			}
+			owner, keyErr := readRouteOwner(*trustFile)
+			if keyErr != nil {
+				return nil, keyErr
+			}
+			binding, e = volume.EnrollFenced(ctx, *store, *volumeWorkerDirectory, observation, *nodeID, *volumeAuthority, owner)
+		}
 		if e != nil {
 			return nil, e
 		}
@@ -507,7 +542,11 @@ func run(ctx context.Context, args []string) (any, error) {
 		if e = writeNew(*output, raw); e != nil {
 			return nil, e
 		}
-		return map[string]any{"format": volume.Format, "enrolled": true, "scope": binding.Scope, "epoch": binding.Epoch}, nil
+		return map[string]any{"format": binding.Format, "enrolled": true, "scope": binding.Scope, "epoch": binding.Epoch}, nil
+	case "worker-volume-transition-sign":
+		return signVolumeTransition(*input, *key, *output)
+	case "worker-volume-transition":
+		return transitionWorkerVolume(ctx, *bootstrap, *input, *output)
 	case "owner-epoch-create":
 		return createOwnerEpoch(ctx, *input, *key, *output)
 	case "owner-epoch-inspect":
@@ -559,7 +598,7 @@ func run(ctx context.Context, args []string) (any, error) {
 		defer close()
 		proof, err := w.AuditExternal(ctx, *operation, profile, args[0] == "worker-external-audit-init")
 		return proof, externalRecoveryError(err)
-	case "worker-external-audit-status":
+	case "worker-external-audit-status", "worker-external-transfer-status":
 		b, err := worker.LoadBootstrap(*bootstrap)
 		if err != nil {
 			return nil, err
@@ -569,6 +608,9 @@ func run(ctx context.Context, args []string) (any, error) {
 			return nil, err
 		}
 		defer close()
+		if args[0] == "worker-external-transfer-status" {
+			return w.ExternalTransferStatus(ctx, *operation)
+		}
 		return w.ScheduledExternalAuditStatus(ctx, *operation)
 	case "worker-upload-staging-status", "worker-upload-staging-check", "worker-upload-abandon-preview", "worker-upload-abandon":
 		if !storage.ID(*domain) || !storage.ID(*operation) {
@@ -978,7 +1020,7 @@ func run(ctx context.Context, args []string) (any, error) {
 		return runReporting(ctx, args[0], *bootstrap, *input)
 	case "worker-command-once", "worker-command-loop":
 		return runCommands(ctx, args[0], *bootstrap, *input)
-	case "worker-init", "worker-run", "worker-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "worker-ingress-receipt-recover", "worker-ingress-renew", "worker-ingress-journal-enable", "worker-ingress-journal-recover", "replica-migrate", "replica-rollback", "replica-retention-export", "replica-retention-restore", "replica-retention-protect", "replica-index-mirror-enable", "replica-index-recover", "replica-metadata-export", "replica-metadata-restore", "replica-maintenance-plan-export", "replica-maintenance-plan-restore", "replica-maintenance-preview", "worker-controls-migrate", "worker-controls-rollback", "worker-command-apply":
+	case "worker-init", "worker-run", "worker-status", "worker-peer-object-transfer-status", "worker-replica-damage-status", "worker-discovery-status", "worker-observation-status", "worker-retry", "config-apply", "worker-ingress-receipt-recover", "worker-ingress-renew", "worker-ingress-journal-enable", "worker-ingress-journal-recover", "replica-migrate", "replica-rollback", "replica-retention-export", "replica-retention-restore", "replica-retention-protect", "replica-index-mirror-enable", "replica-index-recover", "replica-metadata-export", "replica-metadata-restore", "replica-maintenance-plan-export", "replica-maintenance-plan-restore", "replica-maintenance-preview", "worker-controls-migrate", "worker-controls-rollback", "worker-command-apply":
 		b, e := worker.LoadBootstrap(*bootstrap)
 		if e != nil {
 			return nil, e
@@ -992,7 +1034,14 @@ func run(ctx context.Context, args []string) (any, error) {
 		case "worker-init":
 			return map[string]any{"node": b.Node, "initialized": true}, nil
 		case "worker-status":
+			if b.ObserveIngressObjectBodies {
+				return w.LocalStatus(ctx)
+			}
 			return w.Status(ctx)
+		case "worker-peer-object-transfer-status":
+			return w.PeerObjectTransferStatus(ctx, *domain, *peerID)
+		case "worker-replica-damage-status":
+			return w.ReplicaDamageStatus(ctx, *domain, *generationID)
 		case "worker-controls-migrate", "worker-controls-rollback":
 			e = w.MigrateControls(ctx, args[0] == "worker-controls-rollback")
 			return map[string]any{"node": b.Node, "action": args[0], "completed": e == nil}, e

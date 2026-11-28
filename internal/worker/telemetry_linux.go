@@ -29,6 +29,9 @@ type TelemetryProfile struct {
 	MaxItems        int    `json:"maxItems"`
 	IntervalSeconds int    `json:"intervalSeconds"`
 	Enabled         bool   `json:"enabled"`
+
+	ObserveLocalReplicaDamage bool `json:"observeLocalReplicaDamage,omitempty"`
+	ObserveRestoreFailures    bool `json:"observeRestoreFailures,omitempty"`
 }
 
 func (p TelemetryProfile) Validate() error {
@@ -79,8 +82,8 @@ func (w *Worker) OpenTelemetry(ctx context.Context, p TelemetryProfile, enrollme
 		return nil, e
 	}
 	relative := "telemetry/otlp/" + storage.Hash([]byte(p.Identity+"/"+p.Domain))
-	// Endpoint/identity/domain/limits/owner are immutable. Schedule and the local
-	// grant file path are not export authority and can change without a reset.
+	// Endpoint/identity/domain/limits/owner are immutable. Sampling options,
+	// schedule and local grant file path are not export authority.
 	binding, _ := json.Marshal(struct {
 		Endpoint, Identity, Domain string
 		Bytes, Items               int
@@ -107,6 +110,10 @@ func (w *Worker) OpenTelemetry(ctx context.Context, p TelemetryProfile, enrollme
 // text, job payloads or source names. Verification remains the original age of
 // the latest complete local generation, never the time of this observation.
 func TelemetryRecord(s management.Snapshot, node string) (telemetry.Record, error) {
+	return telemetryRecord(s, node, false)
+}
+
+func telemetryRecord(s management.Snapshot, node string, observeLocalDamage bool) (telemetry.Record, error) {
 	r := telemetry.Record{ObservedUnix: s.ObservedUnix}
 	number := func(v int64) *int64 { return &v }
 	add := func(name string, value *int64) {
@@ -144,16 +151,31 @@ func TelemetryRecord(s management.Snapshot, node string) (telemetry.Record, erro
 	}
 	var latest management.Generation
 	complete := int64(0)
+	var localDamage *int64
 	event := telemetry.Event{Kind: "STATE_CHANGED", State: "UNAVAILABLE", Target: node}
 	if s.InventoryState == "OBSERVED" {
 		add("inventory_available", number(1))
+		damageKnown := s.Generations != nil
+		damaged := int64(0)
 		for _, g := range s.Generations {
-			if g.Status == "COMPLETE" {
+			if g.Target != node {
+				damageKnown = false
+			}
+			switch g.Status {
+			case "COMPLETE":
 				complete++
 				if g.Sequence > latest.Sequence {
 					latest = g
 				}
+			case "CORRUPT":
+				damaged++
+			case "INCOMPLETE":
+			default:
+				damageKnown = false
 			}
+		}
+		if damageKnown {
+			localDamage = number(damaged)
 		}
 		if latest.Sequence > math.MaxInt64 {
 			return r, telemetry.ErrInvalid
@@ -169,6 +191,9 @@ func TelemetryRecord(s management.Snapshot, node string) (telemetry.Record, erro
 		add("inventory_available", number(0))
 		add("complete_generations", nil)
 		add("latest_generation_sequence", nil)
+	}
+	if observeLocalDamage {
+		add("damaged_local_generations", localDamage)
 	}
 	var verified *int64
 	if latest.Verification == "CIPHERTEXT" && latest.VerifiedUnix > 0 {
@@ -202,9 +227,12 @@ func (w *Worker) TelemetryOnce(ctx context.Context, p TelemetryProfile, q *Telem
 	if e != nil {
 		return out, e
 	}
-	record, e := TelemetryRecord(snapshot, w.node)
+	record, e := telemetryRecord(snapshot, w.node, p.ObserveLocalReplicaDamage)
 	if e != nil {
 		return out, e
+	}
+	if p.ObserveRestoreFailures {
+		appendRestoreFailureMetrics(&record, snapshot)
 	}
 	w.addExternalHTTPMetrics(ctx, p.Domain, p.IntervalSeconds, snapshot, &record)
 	sampled, e := q.Observe(ctx, record, time.Duration(p.IntervalSeconds)*time.Second)

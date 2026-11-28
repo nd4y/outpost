@@ -158,6 +158,7 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	if e != nil {
 		return out, e
 	}
+	out.RestoreCommandsObserved = status.Format == RecoveryFormat
 	for _, j := range status.Jobs {
 		if j.Job.Domain != domain {
 			continue

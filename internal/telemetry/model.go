@@ -52,6 +52,8 @@ var metricNames = map[string]bool{
 	"jobs_queued": true, "jobs_running": true, "jobs_retry_wait": true, "jobs_blocked": true,
 	"space_physical_bytes": true, "space_free_bytes": true, "space_accounted_bytes": true, "space_reserved_bytes": true,
 	"inventory_available": true, "complete_generations": true, "latest_generation_sequence": true,
+	"damaged_local_generations":         true,
+	"restore_command_failures_retained": true, "restore_last_failure_timestamp_seconds": true,
 	"copy_verified_timestamp_seconds": true,
 	"external_http_targets_in_scope":  true, "external_http_targets_selected": true,
 	"external_http_attempt_requests": true, "external_http_attempt_request_body_bytes": true,
@@ -79,6 +81,9 @@ func (r Record) Validate() error {
 	for _, m := range r.Metrics {
 		key := m.Name + "/" + m.Target
 		if !metricNames[m.Name] || !optionalID(m.Target) || seen[key] || m.Value != nil && *m.Value < 0 {
+			return ErrInvalid
+		}
+		if m.Target != "" && member(m.Name, "damaged_local_generations", "restore_command_failures_retained", "restore_last_failure_timestamp_seconds") {
 			return ErrInvalid
 		}
 		if m.Name == "external_audit_result" && (m.Target == "" || m.Value != nil && (*m.Value < 1 || *m.Value > 4)) {

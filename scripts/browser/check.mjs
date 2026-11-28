@@ -356,8 +356,65 @@ try {
     await page.setViewportSize({ width: 1280, height: 900 });
   });
   await test("320px reflow and 200 percent text size retain operable controls", async () => {
-    await page.setViewportSize({ width: 320, height: 900 });
+    await page.setViewportSize({ width: 320, height: 800 });
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    const generation = page.locator("#generation");
+    const kind = page.locator("#kind");
+    const originalKind = await kind.inputValue();
+    const useGeneration = async (targetID) => {
+      for (const [language, label] of [
+        ["en", "Use this generation"],
+        ["ru", "Выбрать это поколение"],
+      ]) {
+        await page.locator("#language").selectOption(language);
+        if (targetID === "generation") await generation.clear();
+        const button = page
+          .locator("#generations")
+          .getByRole("button", { name: label, exact: true });
+        await button.focus();
+        await page.keyboard.press("Enter");
+        assert.equal(await generation.inputValue(), meta.generation);
+        const focused = page.locator(":focus-visible");
+        assert.equal(await focused.getAttribute("id"), targetID);
+        assert(
+          await focused.evaluate((element) => {
+            const { top, bottom } = element.getBoundingClientRect();
+            return top >= 0 && bottom <= innerHeight;
+          }),
+        );
+        if (targetID === "commands-title") {
+          await page.keyboard.press("Tab");
+          assert.equal(await focused.getAttribute("id"), "kind");
+        }
+      }
+      await page.locator("#language").selectOption("en");
+    };
+    await kind.selectOption("restore");
+    assert.equal(await generation.isEnabled(), true);
+    await useGeneration("generation");
+    await generation.clear();
+    const limitedPolicy = "**/domains/**/policy";
+    await page.route(limitedPolicy, async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      for (const capability of json.capabilities) {
+        capability.kinds = capability.kinds.filter((kind) => !["restore", "scrub"].includes(kind));
+      }
+      await route.fulfill({ response, json });
+    });
+    try {
+      await page.locator("#refresh").click();
+      await contains(page, "#notice", "View loaded");
+      assert.equal(await kind.locator('option[value="restore"]').count(), 0);
+      await kind.selectOption("pause");
+      assert.equal(await generation.isDisabled(), true);
+      await useGeneration("commands-title");
+    } finally {
+      await page.unroute(limitedPolicy);
+      await page.locator("#refresh").click();
+      await contains(page, "#notice", "View loaded");
+      await kind.selectOption(originalKind);
+    }
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "32px";

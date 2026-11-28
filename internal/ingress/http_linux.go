@@ -255,6 +255,9 @@ func newServer(s *Session, cert tls.Certificate, roots *x509.CertPool, limits pe
 			jsonReply(w, http.StatusOK, struct {
 				Created bool `json:"created"`
 			}{created})
+			if s.observeObjectBody != nil {
+				s.observeObjectBody(len(b), !created)
+			}
 		case http.MethodGet:
 			b, e := s.Read(ctx, ref)
 			if e != nil {
@@ -299,6 +302,8 @@ type Client struct {
 	bodyBudgets                  peer.BodyBudgets
 	catalogResume                atomic.Pointer[catalogContinuation]
 	UploadedBytes, ReadbackBytes atomic.Int64
+	// ObserveObjectWrite is set before use and must return without waiting.
+	ObserveObjectWrite func(ObjectWriteObservation)
 }
 type countedBody struct {
 	r     *bytes.Reader
@@ -371,6 +376,10 @@ func (c *Client) request(ctx context.Context, method, resource string, ref *file
 }
 
 func (c *Client) requestCatalog(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int, catalogID string) (int, http.Header, []byte, error) {
+	return c.requestObserved(ctx, method, resource, ref, payload, max, catalogID, nil)
+}
+
+func (c *Client) requestObserved(ctx context.Context, method, resource string, ref *filekit.Object, payload []byte, max int, catalogID string, observation *objectWriteAttempt) (int, http.Header, []byte, error) {
 	if catalogID != "" && (resource != "catalog" || method != http.MethodPut || len(payload) != 0 || !storage.ID(catalogID)) {
 		return 0, nil, nil, ErrDenied
 	}
@@ -463,6 +472,9 @@ func (c *Client) requestCatalog(ctx context.Context, method, resource string, re
 	if paceUpload {
 		c.bodyBudgets.Send.PaceRequest(r)
 	}
+	if observation != nil {
+		observation.track(r, time.Now())
+	}
 	response, e := c.http.Do(r)
 	if e != nil {
 		return 0, nil, nil, e
@@ -530,6 +542,9 @@ func (c *Client) requestCatalog(ctx context.Context, method, resource string, re
 			return 0, nil, nil, e
 		}
 	}
+	if observation != nil {
+		observation.acknowledged = time.Now()
+	}
 	return response.StatusCode, response.Header, body, nil
 }
 func decodeReply(raw []byte, v any) error {
@@ -578,7 +593,11 @@ func (c *Client) Write(ctx context.Context, ref filekit.Object, b []byte) (bool,
 	if !validObject(ref) || len(b) != ref.Bytes || storage.Hash(b) != ref.ID {
 		return false, ErrDenied
 	}
-	status, _, raw, e := c.request(ctx, http.MethodPut, "objects/"+ref.ID, &ref, b, 4096)
+	var attempt *objectWriteAttempt
+	if c.ObserveObjectWrite != nil {
+		attempt = &objectWriteAttempt{}
+	}
+	status, _, raw, e := c.requestObserved(ctx, http.MethodPut, "objects/"+ref.ID, &ref, b, 4096, "", attempt)
 	if e != nil {
 		return false, e
 	}
@@ -594,6 +613,11 @@ func (c *Client) Write(ctx context.Context, ref filekit.Object, b []byte) (bool,
 	}
 	if !bytes.Equal(readback, b) {
 		return false, ErrProtocol
+	}
+	if attempt != nil && ctx.Err() == nil {
+		if sample, ok := attempt.confirmed(raw, ref.Bytes, time.Now()); ok {
+			c.ObserveObjectWrite(sample)
+		}
 	}
 	return result.Created, nil
 }

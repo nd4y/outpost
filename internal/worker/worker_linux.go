@@ -42,6 +42,9 @@ type Options struct {
 	Recovery    *recovery.Executor
 	Fetcher     *control.Fetcher
 	PeerBodies  peer.BodyBudgets
+
+	ObserveIngressObjectBodies bool
+	ObservePeerObjectBodies    bool
 	// Resolve is local, bounded and context-aware. No secrets enter shared state.
 	Resolve func(context.Context, storage.Profile) (*storage.Backend, error)
 }
@@ -68,6 +71,8 @@ type view struct {
 	requestGates          map[string]*storage.RequestGate
 	nextScrubScan         time.Time
 	nextExternalAuditScan time.Time
+	ingressBodies         chan IngressObjectBodyObservation
+	peerObjectBodies      chan PeerObjectBodyObservation
 }
 type Worker struct {
 	// Fault is a local test hook, never accepted from shared configuration.
@@ -83,6 +88,9 @@ type Worker struct {
 	fetcher      *control.Fetcher
 	resolve      func(context.Context, storage.Profile) (*storage.Backend, error)
 	peerBodies   peer.BodyBudgets
+
+	observeIngressObjectBodies bool
+	observePeerObjectBodies    bool
 	// Only the execution lease owner replaces this map. Each view reads its own map.
 	requestGates map[string]*storage.RequestGate
 	mu           sync.Mutex
@@ -108,7 +116,7 @@ func Open(o Options) (*Worker, error) {
 	if !ok || !publicOK || len(private) != ed25519.PrivateKeySize || !bytes.Equal(public, private.Public().(ed25519.PublicKey)) {
 		return nil, ErrDenied
 	}
-	w := &Worker{recovery: o.Recovery, guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...), peerBodies: o.PeerBodies}
+	w := &Worker{recovery: o.Recovery, guard: o.Guard, dir: o.Directory, node: o.Node, cert: o.Certificate, roots: o.Roots.Clone(), fetcher: o.Fetcher, resolve: o.Resolve, owner: append(ed25519.PublicKey(nil), o.Owner...), peerBodies: o.PeerBodies, observeIngressObjectBodies: o.ObserveIngressObjectBodies, observePeerObjectBodies: o.ObservePeerObjectBodies}
 	if e = w.check(context.Background()); e != nil {
 		return nil, e
 	}
@@ -248,6 +256,18 @@ func (w *Worker) checkPublication(ctx context.Context, peak diskbudget.Peak) err
 	}
 	return w.budget.CheckPeak(ctx, peak)
 }
+func (w *Worker) checkUploadWrite(ctx context.Context, name string, size int) error {
+	if err := w.check(ctx); err != nil {
+		return err
+	}
+	if w.budget == nil {
+		return ErrDenied
+	}
+	if err := w.budget.CheckWrite(ctx, name, size); err != nil {
+		return err
+	}
+	return w.check(ctx)
+}
 func (w *Worker) relative(dir string) string {
 	rel, e := filepath.Rel(w.dir, dir)
 	if e != nil {
@@ -360,6 +380,12 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		return nil, ErrDenied
 	}
 	v := &view{cfg: c, done: make(chan struct{}), metadata: make(chan struct{}, c.Limits.Parallel), domains: map[string]*domainState{}, controls: status.Controls}
+	if w.observeIngressObjectBodies {
+		v.ingressBodies = make(chan IngressObjectBodyObservation, 16)
+	}
+	if w.observePeerObjectBodies {
+		v.peerObjectBodies = make(chan PeerObjectBodyObservation, 16)
+	}
 	var compileError error
 	v.autonomy, compileError = c.CompileAutonomy()
 	if compileError != nil {
@@ -492,7 +518,7 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 					return e
 				}
 				return w.budget.Remove(ctx, filepath.ToSlash(filepath.Join(relative, "current/objects", name)), size)
-			}})
+			}, ObserveObjectBody: ingressBodyObserver(v, a)})
 			return e
 		})
 		if e != nil {
@@ -523,9 +549,19 @@ func (w *Worker) start(ctx context.Context, c control.Config) (*view, error) {
 		go func() { discovery <- w.discover(v) }()
 		observations := make(chan error, 1)
 		go func() { observations <- w.observe(v) }()
+		bodyObservations := make(chan struct{})
+		if v.ingressBodies != nil || v.peerObjectBodies != nil {
+			go func() {
+				defer close(bodyObservations)
+				w.recordObjectBodies(v)
+			}()
+		} else {
+			close(bodyObservations)
+		}
 		v.err = w.jobs(v)
 		v.cancel()
 		v.err = errors.Join(v.err, <-discovery, <-observations)
+		<-bodyObservations
 		close(v.done)
 	}()
 	return v, nil
@@ -886,6 +922,9 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 			return nil, e
 		}
 		defer client.Close()
+		if j.Kind == "push" && j.Repair == "" {
+			client.ObservePushedObject = peerObjectBodyObserver(v, d.Trust, w.node, j.Peer)
+		}
 		var result peer.Result
 		if j.Repair != "" && j.Kind == "push" {
 			result, e = client.RepairPush(ctx, j.Operation, j.Generation, j.Repair, local.replica)
@@ -921,7 +960,13 @@ func (w *Worker) attempt(ctx context.Context, v *view, j control.Job) (json.RawM
 		if err != nil || w.budget == nil {
 			return ErrDenied
 		}
-		queue, e = openExternalQueue(w.root, w.relative(dir), w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, init, v.cfg.Limits.OperationMillis, w.admission(filepath.ToSlash(relative)))
+		prefix := filepath.ToSlash(relative)
+		queue, e = openExternalQueue(w.root, relative, w.node, upload.Authority{Generation: d.Trust, Planner: d.Planner}, init, v.cfg.Limits.OperationMillis, w.admission(prefix))
+		if e == nil {
+			queue.CheckWrite = func(ctx context.Context, name string, size int) error {
+				return w.checkUploadWrite(ctx, prefix+"/"+name, size)
+			}
+		}
 		return e
 	})
 	if e != nil {

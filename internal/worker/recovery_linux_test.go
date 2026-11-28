@@ -12,6 +12,7 @@ import (
 	"github.com/nd4y/outpost/internal/management"
 	"github.com/nd4y/outpost/internal/recovery"
 	"github.com/nd4y/outpost/internal/storage"
+	"github.com/nd4y/outpost/internal/telemetry"
 	"github.com/nd4y/outpost/internal/volume"
 	"os"
 	"os/exec"
@@ -308,9 +309,40 @@ func TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin(t *testing.T) {
 	close(unblock)
 	after := waitAction(t, w, raw)
 	wait(t, func() bool { return !actionRecord(t, w, raw).Work.CleanupPending })
+	// A durable command result can precede the worker applying the signed revision.
+	wait(t, func() bool {
+		status, err := w.Status(ctx)
+		return err == nil && status.Revision == cfg.Revision && status.Phase == "ACTIVE"
+	})
 	stop()
-	if verifyWorkerAck(t, w, raw, after.Ack).State != "FAILED" {
+	failed := verifyWorkerAck(t, w, raw, after.Ack)
+	if failed.State != "FAILED" {
 		t.Fatal("withdrawn restore completed")
+	}
+	enrollment := commandEnrollment(t, f)
+	snapshot, e := w.ManagementSnapshot(ctx, enrollment, f.domain.Trust.Domain)
+	must(t, e)
+	var observed telemetry.Record
+	appendRestoreFailureMetrics(&observed, snapshot)
+	if len(observed.Metrics) != 2 || observed.Metrics[0].Value == nil || *observed.Metrics[0].Value != 1 ||
+		observed.Metrics[1].Value == nil || *observed.Metrics[1].Value != failed.ObservedUnix {
+		t.Fatal("durable failed restore was not measured with its original finish time", observed)
+	}
+	telemetrySpec := telemetryProfile(f, f.nodes[1].node, "https://127.0.0.1:1")
+	telemetrySpec.ObserveRestoreFailures = true
+	queue, e := w.OpenTelemetry(ctx, telemetrySpec, enrollment, true)
+	must(t, e)
+	defer queue.Close()
+	emitted := false
+	_, e = w.TelemetryOnce(ctx, telemetrySpec, queue, telemetrySendFunc(func(_ context.Context, m telemetry.Message) telemetry.Outcome {
+		emitted = m.Signal == "metrics" &&
+			bytes.Contains(m.Body, []byte(`"name":"outpost_restore_command_failures_retained"`)) &&
+			bytes.Contains(m.Body, []byte(`"name":"outpost_restore_last_failure_timestamp_seconds"`))
+		return telemetry.Outcome{State: "ACCEPTED"}
+	}))
+	must(t, e)
+	if !emitted {
+		t.Fatal("opt-in worker telemetry omitted the scoped restore failure")
 	}
 	if _, e = os.Stat(filepath.Join(p.Directory, "results", env.Request.Operation)); !os.IsNotExist(e) {
 		t.Fatal("withdrawn output published", e)

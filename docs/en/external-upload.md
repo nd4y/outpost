@@ -81,6 +81,8 @@ The [bounded signing receipt](../s3-signing-evidence.json) records six focused a
 
 ## Complete generations and recovery
 
+When retrying an already prepared part, the worker checks its current volume guard, spool quota and physical free-space reserve before network work. The worker reads the capacity ledger and then checks the live volume again before proceeding. Durable preparation and verified completion still reserve space and update the journal through their normal admission paths.
+
 The [polling receipt](../upload-idle-evidence.json) records38/39 original versus5/5 candidate marker GETs per2.1s, real idle-process restart and cancellation, and ordinary old/new cloud restoration on both protocols. The unchanged12s rotation/lost-part test fails on both original and candidate binaries while sharing the HDD with a full-size job, including without race instrumentation. That regression and the150ms throughput profile remain unaccepted; no identical retry or relaxed assertion is used.
 
 Completed immutable parts remain completed when assignment slots rotate. If a publication read discovers an absent part, only that part loses its local completion mark. Other verified progress survives. This prevents a slow executor from repeatedly restarting its completed prefix while preserving full publication checks. A delayed-slot test also physically removes an acknowledged fixture part and requires its independent reupload before recovery.

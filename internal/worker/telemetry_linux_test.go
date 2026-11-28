@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -244,5 +245,147 @@ func TestWorkerTelemetryProjectionKeepsOriginalAgeAndDomainScope(t *testing.T) {
 	_, e = w.TelemetryOnce(ctx, p, q, nil)
 	if !errors.Is(e, management.ErrDenied) {
 		t.Fatal("revoked telemetry sampled", e)
+	}
+}
+
+func TestWorkerTelemetryReportsObservedLocalReplicaDamage(t *testing.T) {
+	f := newFixture(t)
+	f.endpoint(t, nil)
+	ctx := context.Background()
+	w := f.nodes[0]
+	must(t, w.admit(ctx, f.config(t, 0, nil)))
+	enrollment := workerEnrollment(t, f, 0)
+	domain := f.domain.Trust.Domain
+	gauge := func(s management.Snapshot) *int64 {
+		t.Helper()
+		r, err := telemetryRecord(s, w.node, true)
+		must(t, err)
+		if r.ObservedUnix != s.ObservedUnix {
+			t.Fatal("new timestamp assigned to local damage observation")
+		}
+		for _, m := range r.Metrics {
+			if m.Name != "damaged_local_generations" {
+				continue
+			}
+			if m.Target != "" {
+				t.Fatal("local inventory metric acquired another scope", m)
+			}
+			messages, err := telemetry.Encode(w.node, domain, telemetry.Record{ObservedUnix: r.ObservedUnix, Metrics: []telemetry.Metric{m}})
+			must(t, err)
+			if len(messages) != 1 || messages[0].Signal != "metrics" ||
+				bytes.Contains(messages[0].Body, []byte(`"name":"outpost_damaged_local_generations"`)) != (m.Value != nil) ||
+				!bytes.Contains(messages[0].Body, []byte(`"name":"outpost_damaged_local_generations_known"`)) {
+				t.Fatal("unexpected OTLP encoding for local damage", m)
+			}
+			return m.Value
+		}
+		t.Fatal("local damage metric missing")
+		return nil
+	}
+
+	s, err := w.ManagementSnapshot(ctx, enrollment, domain)
+	must(t, err)
+	if got := gauge(s); got == nil || *got != 0 {
+		t.Fatal("observed intact replica did not yield a known zero")
+	}
+	catalog := filepath.Join(DomainDirectory(w.dir, f.domain.Trust), "replica", "catalogs", f.generation)
+	must(t, os.WriteFile(catalog, []byte("intentionally damaged fixture"), 0600))
+	s, err = w.ManagementSnapshot(ctx, enrollment, domain)
+	must(t, err)
+	if len(s.Generations) != 1 || s.Generations[0].Status != "CORRUPT" {
+		t.Fatalf("authenticated local inventory did not retain catalog damage: %+v", s.Generations)
+	}
+	if got := gauge(s); got == nil || *got != 1 {
+		t.Fatal("observed corruption did not yield one damaged generation")
+	}
+	unconfigured, err := TelemetryRecord(s, w.node)
+	must(t, err)
+	for _, m := range unconfigured.Metrics {
+		if m.Name == "damaged_local_generations" {
+			t.Fatal("default sampling introduced a new metric into a compatible queue")
+		}
+	}
+	s.Generations[0].Target = f.nodes[1].node
+	if gauge(s) != nil {
+		t.Fatal("another target's status was used as measured local damage")
+	}
+	s.Generations = nil
+	if gauge(s) != nil {
+		t.Fatal("missing inventory entries were reported as measured zero")
+	}
+	s.InventoryState = "UNAVAILABLE"
+	s.Generations = []management.Generation{}
+	if gauge(s) != nil {
+		t.Fatal("unavailable inventory was reported as measured zero")
+	}
+}
+
+func TestWorkerTelemetryLocalDamageProfilePreservesQueueOnReopen(t *testing.T) {
+	f := newFixture(t)
+	f.endpoint(t, nil)
+	ctx := context.Background()
+	w := f.nodes[0]
+	must(t, w.admit(ctx, f.config(t, 0, nil)))
+	p := telemetryProfile(f, f.nodes[1].node, "https://127.0.0.1:1")
+	legacyProfile, err := json.Marshal(p)
+	must(t, err)
+	if bytes.Contains(legacyProfile, []byte("observeLocalReplicaDamage")) {
+		t.Fatal("default telemetry profile acquired a schema field")
+	}
+	profile := filepath.Join(f.base, "telemetry-profile.json")
+	must(t, os.WriteFile(profile, legacyProfile, 0600))
+	loaded, err := LoadTelemetryProfile(profile)
+	must(t, err)
+	if loaded != p {
+		t.Fatal("existing profile did not round trip")
+	}
+	enrollment := workerEnrollment(t, f, 0)
+	q, err := w.OpenTelemetry(ctx, p, enrollment, true)
+	must(t, err)
+	at := time.Now().Unix()
+	legacy := telemetry.Record{ObservedUnix: at, Metrics: []telemetry.Metric{{Name: "report_observed_timestamp_seconds", Value: &at}}}
+	must(t, q.Enqueue(ctx, 1, legacy))
+	existing, err := q.Status(ctx)
+	must(t, err)
+	must(t, q.Close())
+
+	p.ObserveLocalReplicaDamage = true
+	q, err = w.OpenTelemetry(ctx, p, nil, false)
+	must(t, err)
+	reopened, err := q.Status(ctx)
+	must(t, err)
+	if reopened != existing {
+		t.Fatal("sampling option changed the legacy pending receipt")
+	}
+	step, err := w.TelemetryOnce(ctx, p, q, telemetrySendFunc(func(_ context.Context, m telemetry.Message) telemetry.Outcome {
+		if m.Digest != existing.Digest {
+			t.Fatal("first delivery was not the already accepted record")
+		}
+		return telemetry.Outcome{State: "ACCEPTED"}
+	}))
+	must(t, err)
+	if step.Queue.Pending != 1 || step.Queue.Accepted != 1 {
+		t.Fatal("sampling option lost the held record or its new measurement", step)
+	}
+	must(t, q.Close())
+
+	p.ObserveLocalReplicaDamage = false
+	q, err = w.OpenTelemetry(ctx, p, nil, false)
+	must(t, err)
+	defer q.Close()
+	delivered := 0
+	for range 2 {
+		_, err = q.Deliver(ctx, telemetrySendFunc(func(_ context.Context, m telemetry.Message) telemetry.Outcome {
+			if m.Signal == "metrics" && bytes.Contains(m.Body, []byte(`"name":"outpost_damaged_local_generations"`)) {
+				delivered++
+			}
+			return telemetry.Outcome{State: "ACCEPTED"}
+		}))
+		must(t, err)
+	}
+	end, err := q.Status(ctx)
+	must(t, err)
+	if delivered != 1 || end.Pending != 0 || end.Accepted != 3 {
+		t.Fatal("new samples could not be drained after disabling the option", delivered, end)
 	}
 }

@@ -314,14 +314,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
+		var alreadyPresent bool
 		if repair != "" {
 			e = h.replica.RepairPutFor(ctx, id, parts[6], repair, b)
 		} else {
-			e = h.replica.Put(ctx, id, parts[6], b)
+			alreadyPresent, e = h.replica.PutWithPresence(ctx, id, parts[6], b)
 		}
 		if e != nil {
 			fail(w, e)
 			return
+		}
+		if repair == "" {
+			w.Header().Set(objectAlreadyPresentHeader, strconv.FormatBool(alreadyPresent))
 		}
 		respond(w, map[string]string{"object": parts[6], "state": "HASH_VERIFIED_DURABLE"})
 		return

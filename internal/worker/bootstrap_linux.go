@@ -27,6 +27,7 @@ const BootstrapFormat = "outpost-bootstrap-2"
 // Bootstrap is local-only. It cannot be supplied or expanded by a remote job.
 type Bootstrap struct {
 	Volume                 volume.Binding          `json:"volume"`
+	VolumeAuthority        string                  `json:"volumeAuthority,omitempty"`
 	Format                 string                  `json:"format"`
 	Directory              string                  `json:"directory"`
 	Node                   string                  `json:"node"`
@@ -44,6 +45,8 @@ type Bootstrap struct {
 
 	PeerReceiveBodyBytesPerSecond int64 `json:"peerReceiveBodyBytesPerSecond,omitempty"`
 	PeerSendBodyBytesPerSecond    int64 `json:"peerSendBodyBytesPerSecond,omitempty"`
+	ObserveIngressObjectBodies    bool  `json:"observeIngressObjectBodies,omitempty"`
+	ObservePeerObjectBodies       bool  `json:"observePeerObjectBodies,omitempty"`
 }
 
 // ExternalRequestBudget is one local account allowance for a private set of
@@ -198,7 +201,7 @@ func LoadBootstrap(path string) (Bootstrap, error) {
 	if e != nil {
 		return b, e
 	}
-	if DecodeInput(raw, &b, 65536) != nil || b.Format != BootstrapFormat || b.Volume.Scope != b.Node || !filepath.IsAbs(b.Directory) || !storage.ID(b.Node) || len(b.Owner) != 32 || len(b.Credentials) > 128 {
+	if DecodeInput(raw, &b, 65536) != nil || b.Format != BootstrapFormat || b.Volume.Scope != b.Node || !b.validVolumeAuthority() || !filepath.IsAbs(b.Directory) || !storage.ID(b.Node) || len(b.Owner) != 32 || len(b.Credentials) > 128 {
 		return b, ErrDenied
 	}
 	if b.Listen != "" {
@@ -249,17 +252,28 @@ func (b Bootstrap) TLS() (tls.Certificate, *x509.CertPool, error) {
 	}
 	return pair, roots, nil
 }
+func (b Bootstrap) validVolumeAuthority() bool {
+	switch b.Volume.Format {
+	case volume.Format:
+		return b.VolumeAuthority == ""
+	case volume.FencedFormat:
+		return b.VolumeAuthority != "/" && filepath.IsAbs(b.VolumeAuthority) && filepath.Clean(b.VolumeAuthority) == b.VolumeAuthority
+	default:
+		return false
+	}
+}
+
 func (b Bootstrap) Open(initialize bool) (*Worker, func(), error) { return b.open(initialize, nil) }
 
 // OpenTrusted is explicit local enrollment; ordinary Open never loads recovery keys.
 func (b Bootstrap) OpenTrusted(x *recovery.Executor) (*Worker, func(), error) {
-	if x == nil || x.NodeIdentity() != b.Node {
+	if x == nil || x.NodeIdentity() != b.Node || b.Volume.Format == volume.FencedFormat {
 		return nil, nil, ErrDenied
 	}
 	return b.open(false, x)
 }
 func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(), error) {
-	if b.Format != BootstrapFormat || b.Volume.Scope != b.Node {
+	if b.Format != BootstrapFormat || b.Volume.Scope != b.Node || !b.validVolumeAuthority() {
 		return nil, nil, ErrDenied
 	}
 	peerBodies, e := b.peerBodyBudgets()
@@ -270,8 +284,10 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 	if e != nil {
 		return nil, nil, e
 	}
-	if e := b.Volume.Check(context.Background(), b.Directory, initialize); e != nil {
-		return nil, nil, e
+	if b.Volume.Format == volume.Format {
+		if e := b.Volume.Check(context.Background(), b.Directory, initialize); e != nil {
+			return nil, nil, e
+		}
 	}
 
 	cert, roots, e := b.TLS()
@@ -285,7 +301,7 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 			return nil, nil, e
 		}
 	}
-	root, e := b.Volume.Open(context.Background(), b.Directory, initialize)
+	root, guard, closeVolume, e := b.openVolume(initialize)
 	if e != nil {
 		if fetcher != nil {
 			fetcher.Close()
@@ -293,9 +309,9 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 		return nil, nil, e
 	}
 	// The guard owns this descriptor until cleanup; Worker keeps its own clone.
-	w, e := Open(Options{Recovery: x, Root: root, Guard: func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: resolve, PeerBodies: peerBodies})
+	w, e := Open(Options{Recovery: x, Root: root, Guard: guard, Directory: b.Directory, Node: b.Node, Owner: b.Owner, Certificate: cert, Roots: roots, Initialize: initialize, Fetcher: fetcher, Resolve: resolve, PeerBodies: peerBodies, ObserveIngressObjectBodies: b.ObserveIngressObjectBodies, ObservePeerObjectBodies: b.ObservePeerObjectBodies})
 	if e != nil {
-		root.Close()
+		closeVolume()
 		if fetcher != nil {
 			fetcher.Close()
 		}
@@ -303,11 +319,24 @@ func (b Bootstrap) open(initialize bool, x *recovery.Executor) (*Worker, func(),
 	}
 	return w, func() {
 		w.Close()
-		root.Close()
+		closeVolume()
 		if fetcher != nil {
 			fetcher.Close()
 		}
 	}, nil
+}
+
+func (b Bootstrap) openVolume(initialize bool) (*os.Root, func(context.Context) error, func(), error) {
+	ctx := context.Background()
+	if b.Volume.Format == volume.FencedFormat {
+		return volume.OpenFenced(ctx, b.Volume, b.Directory, b.VolumeAuthority, b.Owner, initialize)
+	}
+	root, e := b.Volume.Open(ctx, b.Directory, initialize)
+	if e != nil {
+		return nil, nil, nil, e
+	}
+	guard := func(ctx context.Context) error { return b.Volume.CheckHandle(ctx, b.Directory, root) }
+	return root, guard, func() { root.Close() }, nil
 }
 
 func (b Bootstrap) storageResolver() (func(context.Context, storage.Profile) (*storage.Backend, error), error) {

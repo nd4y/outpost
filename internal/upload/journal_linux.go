@@ -58,6 +58,7 @@ type Journal struct {
 	authority      Authority
 	tasks          map[string]bool
 	Admit          statefile.Admission
+	CheckWrite     func(context.Context, string, int) error
 	Readback       ReadbackOptions
 	Guard          func(context.Context) error
 	Fault          func(string) error
@@ -329,10 +330,9 @@ func (j *Journal) beginPart(ctx context.Context, id string, round int64) error {
 	})
 }
 
-// checkPreparedPart re-admits a retry of an intent already durable in this Run.
-// Admission is cancelled rather than committed: no state file is rewritten and
-// the earlier pending intent still protects crash recovery. Completed progress
-// is always saved separately. Attempts counts durable preparations, not RPCs.
+// checkPreparedPart rechecks capacity for a retry of an already durable intent.
+// The earlier pending intent still protects crash recovery. Completed progress
+// is saved separately. Attempts counts durable preparations, not RPCs.
 func (j *Journal) checkPreparedPart(ctx context.Context, id string, round int64) error {
 	if j.Guard != nil {
 		if err := j.Guard(ctx); err != nil {
@@ -359,9 +359,14 @@ func (j *Journal) checkPreparedPart(ctx context.Context, id string, round int64)
 	if err != nil || len(raw) > maxJournal {
 		return ErrDenied
 	}
+	if j.CheckWrite != nil {
+		return j.CheckWrite(ctx, "state.json", len(raw))
+	}
 	if j.Admit == nil {
 		return ctx.Err()
 	}
+	// Keep the existing admission contract for callers without a read-only
+	// capacity check. Its completion result follows the caller's policy.
 	finish, err := j.Admit("state.json", len(raw))
 	if err != nil {
 		return err

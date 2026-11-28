@@ -86,6 +86,22 @@ groups:
         annotations:
           runbook: recovery
 
+      - alert: OutpostLocalReplicaCorrupt
+        expr: |
+          (outpost_damaged_local_generations > 0)
+            and on (outpost_node, outpost_domain) (outpost_damaged_local_generations_known == 1)
+            and on (outpost_node, outpost_domain) outpost:telemetry_fresh
+            and on (outpost_node, outpost_domain)
+              (timestamp(outpost_damaged_local_generations)
+                == on (outpost_node, outpost_domain) outpost_report_observed_timestamp_seconds)
+            and on (outpost_node, outpost_domain)
+              (timestamp(outpost_damaged_local_generations_known)
+                == on (outpost_node, outpost_domain) outpost_report_observed_timestamp_seconds)
+        labels:
+          severity: warning
+        annotations:
+          runbook: integrity
+
       - alert: OutpostExternalAuditFailed
         expr: |
           (outpost_external_audit_result >= 2)

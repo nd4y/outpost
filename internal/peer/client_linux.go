@@ -20,6 +20,10 @@ import (
 )
 
 type Client struct {
+	// ObservePushedObject is set before use and should return without waiting
+	// for telemetry storage. It never receives object contents or identifiers.
+	ObservePushedObject func(PushedObjectBodyObservation)
+
 	http        *http.Client
 	endpoint    *url.URL
 	peer        string
@@ -78,9 +82,10 @@ func (c *Client) authorized(push bool) error {
 }
 
 type response struct {
-	data   []byte
-	header http.Header
-	status int
+	data       []byte
+	header     http.Header
+	status     int
+	objectBody PushedObjectBodyObservation
 }
 
 func (c *Client) request(ctx context.Context, op, id, mode, method, resource string, payload []byte, max int, submitted *atomic.Int64) (response, error) {
@@ -129,8 +134,17 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 		if paceUpload {
 			c.limits.Bodies.Send.PaceRequest(req)
 		}
+		var body *countedPushRequestBody
+		if c.ObservePushedObject != nil && c.repair == "" && mode == "push" &&
+			method == http.MethodPut && strings.HasPrefix(resource, "objects/") {
+			body = countPushRequestBody(req)
+		}
 		if submitted != nil {
 			submitted.Add(int64(len(payload)))
+		}
+		var started time.Time
+		if body != nil {
+			started = time.Now()
 		}
 		res, e := c.http.Do(req)
 		retry := e != nil
@@ -151,10 +165,20 @@ func (c *Client) request(ctx context.Context, op, id, mode, method, resource str
 					reader = c.limits.Bodies.Receive.PaceResponse(bounded, reader)
 				}
 				b, readErr := io.ReadAll(io.LimitReader(reader, int64(max)+1))
+				var objectBody PushedObjectBodyObservation
+				if readErr == nil && len(b) <= max {
+					if n := body.completeBytes(len(payload)); n > 0 {
+						finished := time.Now()
+						if elapsed := finished.Sub(started); elapsed > 0 && bounded.Err() == nil &&
+							finished.Before(deadline) && certCurrent(res.TLS.PeerCertificates[0], finished) {
+							objectBody = PushedObjectBodyObservation{ObservedUnixMillis: finished.UnixMilli(), TransportReadBodyBytes: n, ElapsedNanos: elapsed.Nanoseconds()}
+						}
+					}
+				}
 				res.Body.Close()
 				cancel()
 				if readErr == nil && len(b) <= max {
-					return response{b, res.Header.Clone(), res.StatusCode}, nil
+					return response{data: b, header: res.Header.Clone(), status: res.StatusCode, objectBody: objectBody}, nil
 				}
 				if len(b) > max {
 					return result, ErrProtocol
@@ -294,14 +318,21 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 		return result, e
 	}
 	defer unlock()
-	if _, err = c.journal.Begin(ctx, binding); err != nil {
+	job, err := c.journal.Begin(ctx, binding)
+	if err != nil {
 		return result, err
+	}
+	// A historical pull can be durably refused after its lease was released.
+	// Replaying that exact operation must not pin the retired generation again.
+	if !push && c.repair == "" && job.Phase == "RELEASED" {
+		return result, errors.Join(ErrConflict, generation.ErrProtected)
 	}
 	var submitted, received, readback atomic.Int64
 	counters := func() Counters { return Counters{submitted.Load(), received.Load(), readback.Load()} }
+	releaseConfirmed := false
 	defer func() {
 		result.Counters = counters()
-		if err != nil {
+		if err != nil && !releaseConfirmed {
 			bounded, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			_ = c.journal.Update(bounded, binding, "RETRYABLE", nil, counters())
@@ -344,6 +375,28 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			_, err = local.Begin(ctx, raw)
 			if errors.Is(err, generation.ErrRollback) && c.policy.Peers[c.peer].History {
 				_, err = local.BeginHistorical(ctx, raw)
+				if errors.Is(err, generation.ErrProtected) {
+					result.CleanupPending = true
+					release, releaseErr := c.request(ctx, operation, id, kind, http.MethodDelete, "lease", nil, 1024, nil)
+					if releaseErr != nil {
+						return result, errors.Join(err, releaseErr)
+					}
+					var reply struct {
+						Generation string `json:"generation"`
+						State      string `json:"state"`
+					}
+					if decode(release.data, &reply, 1024) != nil || reply.Generation != id || reply.State != "RELEASED" {
+						return result, errors.Join(err, ErrProtocol)
+					}
+					result.CleanupPending = false
+					// An uncertain local write may already have committed RELEASED.
+					// Avoid overwriting that marker with RETRYABLE in the defer.
+					releaseConfirmed = true
+					if journalErr := c.journal.Update(ctx, binding, "RELEASED", nil, counters()); journalErr != nil {
+						return result, errors.Join(err, journalErr)
+					}
+					return result, errors.Join(ErrConflict, err)
+				}
 			}
 		}
 		if err != nil {
@@ -393,6 +446,11 @@ func (c *Client) transfer(ctx context.Context, operation, id string, local *gene
 			}
 			if e = decode(r.data, &ack, 1024); e != nil || ack.Object != ref.ID || ack.State != "HASH_VERIFIED_DURABLE" {
 				return ErrProtocol
+			}
+			if c.ObservePushedObject != nil && r.objectBody.ElapsedNanos > 0 && r.objectBody.TransportReadBodyBytes == ref.Bytes {
+				r.objectBody.AcknowledgedBodyBytes = ref.Bytes
+				r.objectBody.AlreadyPresentBodyBytes = alreadyPresentBodyBytes(r.header, ref.Bytes)
+				c.ObservePushedObject(r.objectBody)
 			}
 			return nil
 		})

@@ -100,7 +100,7 @@ func InspectRoot(ctx context.Context, root *os.Root) (Observation, error) {
 	}
 	return result, ctx.Err()
 }
-func sentinel(root *os.Root) ([]byte, error) {
+func sentinel(root *os.Root, format string) ([]byte, error) {
 	f, e := localfs.OpenFile(root, Sentinel, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
@@ -116,7 +116,7 @@ func sentinel(root *os.Root) ([]byte, error) {
 	}
 	b, e := io.ReadAll(io.LimitReader(f, 1025))
 	var m marker
-	if e != nil || storage.Decode(b, &m, 1024) != nil || m.Format != Format || !storage.ID(m.Scope) || m.Epoch == 0 || !storage.ID(m.Nonce) {
+	if e != nil || storage.Decode(b, &m, 1024) != nil || m.Format != format || !storage.ID(m.Scope) || m.Epoch == 0 || !storage.ID(m.Nonce) {
 		return nil, ErrUnavailable
 	}
 	canonical, _ := json.Marshal(m)
@@ -150,7 +150,7 @@ func Enroll(ctx context.Context, path string, expected Observation, scope string
 	if e != nil || current != expected || current.ReadOnly {
 		return result, ErrUnavailable
 	}
-	b, e := sentinel(r)
+	b, e := sentinel(r, Format)
 	if errors.Is(e, os.ErrNotExist) {
 		entries, err := f.ReadDir(1)
 		if len(entries) != 0 || err != io.EOF {
@@ -187,10 +187,14 @@ func Enroll(ctx context.Context, path string, expected Observation, scope string
 	return result, ctx.Err()
 }
 func (b Binding) Check(ctx context.Context, directory string, initialize bool) error {
+	return b.check(ctx, directory, initialize, Format)
+}
+
+func (b Binding) check(ctx context.Context, directory string, initialize bool, format string) error {
 	if e := ctx.Err(); e != nil {
 		return e
 	}
-	if b.Format != Format || !storage.ID(b.Scope) || b.Epoch == 0 || b.Root == "/" || !filepath.IsAbs(b.Root) || filepath.Clean(b.Root) != b.Root || !storage.ID(b.SentinelDigest) || !filepath.IsAbs(directory) || filepath.Clean(directory) != directory {
+	if b.Format != format || !storage.ID(b.Scope) || b.Epoch == 0 || b.Root == "/" || !filepath.IsAbs(b.Root) || filepath.Clean(b.Root) != b.Root || !storage.ID(b.SentinelDigest) || !filepath.IsAbs(directory) || filepath.Clean(directory) != directory {
 		return ErrUnavailable
 	}
 	rel, e := filepath.Rel(b.Root, directory)
@@ -211,7 +215,7 @@ func (b Binding) Check(ctx context.Context, directory string, initialize bool) e
 	if e != nil || o.ReadOnly || o.Filesystem != b.Filesystem || o.FSID != b.FSID || o.RootInode != b.RootInode {
 		return ErrUnavailable
 	}
-	raw, e := sentinel(r)
+	raw, e := sentinel(r, format)
 	if e != nil || storage.Hash(raw) != b.SentinelDigest {
 		return ErrUnavailable
 	}
@@ -241,7 +245,11 @@ func (b Binding) Check(ctx context.Context, directory string, initialize bool) e
 // Open validates the binding and creates/opens only through the verified root.
 // It never reopens the requested worker directory by its absolute pathname.
 func (b Binding) Open(ctx context.Context, directory string, initialize bool) (*os.Root, error) {
-	if e := b.Check(ctx, directory, initialize); e != nil {
+	return b.open(ctx, directory, initialize, Format)
+}
+
+func (b Binding) open(ctx context.Context, directory string, initialize bool, format string) (*os.Root, error) {
+	if e := b.check(ctx, directory, initialize, format); e != nil {
 		return nil, e
 	}
 	r, e := localfs.OpenRoot(b.Root)
@@ -258,7 +266,7 @@ func (b Binding) Open(ctx context.Context, directory string, initialize bool) (*
 	if e != nil || o.ReadOnly || o.Filesystem != b.Filesystem || o.FSID != b.FSID || o.RootInode != b.RootInode {
 		return nil, ErrUnavailable
 	}
-	raw, e := sentinel(r)
+	raw, e := sentinel(r, format)
 	if e != nil || storage.Hash(raw) != b.SentinelDigest {
 		return nil, ErrUnavailable
 	}
@@ -280,7 +288,11 @@ func (b Binding) Open(ctx context.Context, directory string, initialize bool) (*
 // CheckHandle additionally detects replacement of the worker directory itself.
 // The existing descriptor stays on the old volume; new work must stop.
 func (b Binding) CheckHandle(ctx context.Context, directory string, held *os.Root) error {
-	r, e := b.Open(ctx, directory, false)
+	return b.checkHandle(ctx, directory, held, Format)
+}
+
+func (b Binding) checkHandle(ctx context.Context, directory string, held *os.Root, format string) error {
+	r, e := b.open(ctx, directory, false, format)
 	if e != nil {
 		return e
 	}

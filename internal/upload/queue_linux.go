@@ -72,8 +72,10 @@ type Queue struct {
 	authority        Authority
 	limits           QueueLimits
 	// Fault is a development-test hook; production callers leave it nil.
-	Fault              func(string) error
-	Admit              statefile.Admission
+	Fault func(string) error
+	Admit statefile.Admission
+	// CheckWrite checks the same allowance as Admit without reserving or writing.
+	CheckWrite         func(context.Context, string, int) error
 	Readback           ReadbackOptions
 	Guard              func(context.Context) error
 	ObserveHTTPAttempt func(context.Context, HTTPAttempt)
@@ -334,6 +336,11 @@ func (q *Queue) journal(job QueueJob, resumeAdmission bool) (*Journal, error) {
 	}
 	if e == nil && q.Admit != nil {
 		j.Admit = func(child string, size int) (func(bool) error, error) { return q.Admit(name+"/"+child, size) }
+	}
+	if e == nil && q.CheckWrite != nil {
+		j.CheckWrite = func(ctx context.Context, child string, size int) error {
+			return q.CheckWrite(ctx, name+"/"+child, size)
+		}
 	}
 	return j, e
 }

@@ -36,6 +36,7 @@ class Fixture:
     def __init__(self):
         self.lock = threading.Lock()
         self.blocked = 0
+        self.damaged = 0
         self.report = None
         self.replay_report = False
         self.replayed_scrapes = 0
@@ -49,14 +50,16 @@ class Fixture:
                 if self.replay_report:
                     self.replayed_scrapes += 1
                 else:
-                    self.report = (now, self.blocked)
-                observed, blocked = self.report
+                    self.report = (now, self.blocked, self.damaged)
+                observed, blocked, damaged = self.report
                 scope = 'outpost_node="node",outpost_domain="domain"'
                 return (
                     f"outpost_expected_telemetry_max_age_seconds{{{scope}}} 6\n"
                     f"outpost_report_observed_timestamp_seconds{{{scope}}} {observed} {observed * 1000}\n"
                     f"outpost_inventory_available{{{scope}}} 1 {observed * 1000}\n"
                     f"outpost_jobs_blocked{{{scope}}} {blocked} {observed * 1000}\n"
+                    f"outpost_damaged_local_generations{{{scope}}} {damaged} {observed * 1000}\n"
+                    f"outpost_damaged_local_generations_known{{{scope}}} 1 {observed * 1000}\n"
                 )
             scope = f'outpost_monitor="{MONITOR}"'
             metrics = f"outpost_expected_monitor_max_age_seconds{{{scope}}} 5\n"
@@ -70,7 +73,7 @@ class Fixture:
         phase = message["status"]
         expected = {
             "/heartbeat": ("OutpostMonitorHeartbeat",),
-            "/primary": ("OutpostJobsBlocked", "OutpostTelemetryMissing"),
+            "/primary": ("OutpostJobsBlocked", "OutpostTelemetryMissing", "OutpostLocalReplicaCorrupt"),
             "/watchdog": ("OutpostMonitoringDeliveryMissing",),
         }
         if alert not in expected.get(path, ()) or phase not in ("firing", "resolved"):
@@ -197,9 +200,9 @@ def prometheus_args(data):
     return [f"--storage.tsdb.path={data}", "--rules.alert.resend-delay=1s"]
 
 
-def primary_scrapes_retained_report(port, observed):
+def primary_scrapes_value(port, metric, expected):
     query = (
-        'outpost_report_observed_timestamp_seconds{outpost_node="node",outpost_domain="domain"} '
+        f'{metric}{{outpost_node="node",outpost_domain="domain"}} '
         'and on (job, instance) (up{job="fixture"} == 1)'
     )
     connection = HTTPConnection("127.0.0.1", port, timeout=1)
@@ -210,7 +213,7 @@ def primary_scrapes_retained_report(port, observed):
         if response.status != 200 or len(body) > 16384:
             return False
         result = json.loads(body)["data"]["result"]
-        return len(result) == 1 and float(result[0]["value"][1]) == observed
+        return len(result) == 1 and float(result[0]["value"][1]) == expected
     except (OSError, HTTPException, ValueError, KeyError, TypeError, IndexError):
         return False
     finally:
@@ -270,13 +273,32 @@ def test_delivery(prometheus, alertmanager, rules, work):
                 fixture.blocked = 0
             wait_for(lambda: fixture.count(blocked, "resolved") == 1, "recovery was not delivered")
 
+            corrupt = "OutpostLocalReplicaCorrupt"
+            with fixture.lock:
+                fixture.damaged = 1
+            wait_for(lambda: fixture.count(corrupt, "firing") == 1, "local corruption alert was not delivered")
+            with fixture.lock:
+                fixture.damaged = 2
+            wait_for(
+                lambda: primary_scrapes_value(primary_prom, "outpost_damaged_local_generations", 2),
+                "evaluator did not observe the changed positive damage count",
+            )
+            time.sleep(4)
+            if fixture.count(corrupt, "firing") != 1 or fixture.count(corrupt, "resolved") != 0:
+                raise AssertionError("the same local corruption alert repeated or resolved while damage was observed")
+            with fixture.lock:
+                fixture.damaged = 0
+            wait_for(lambda: fixture.count(corrupt, "resolved") == 1, "fresh local corruption recovery was not delivered")
+            if not primary_scrapes_value(primary_prom, "outpost_damaged_local_generations", 0):
+                raise AssertionError("local corruption resolved without the evaluator observing an explicit zero")
+
             missing = "OutpostTelemetryMissing"
             if fixture.count(missing, "firing") != 0:
                 raise AssertionError("fresh reports triggered a telemetry outage before replay")
             with fixture.lock:
-                observed, blocked_jobs = fixture.report
-                if blocked_jobs != 0:
-                    raise AssertionError("retained fixture report should describe an unblocked job queue")
+                observed, blocked_jobs, damaged_generations = fixture.report
+                if blocked_jobs != 0 or damaged_generations != 0:
+                    raise AssertionError("retained fixture report should describe no blocked jobs or observed damage")
                 fixture.replay_report = True
             try:
                 wait_for(lambda: fixture.count(missing, "firing") == 1, "replayed stale telemetry was treated as fresh")
@@ -292,7 +314,7 @@ def test_delivery(prometheus, alertmanager, rules, work):
                         continued
                         and time.monotonic() >= quiet_until
                         and fixture.count(heartbeat, "firing") > heartbeats_at_firing
-                        and primary_scrapes_retained_report(primary_prom, observed)
+                        and primary_scrapes_value(primary_prom, "outpost_report_observed_timestamp_seconds", observed)
                     )
 
                 wait_for(continued_replay, "original report or heartbeat was not observed after the stale-report alert")
@@ -317,9 +339,13 @@ def test_delivery(prometheus, alertmanager, rules, work):
             wait_for(lambda: fixture.count(delivery, "resolved") == 1, "independent route missed recovery")
             if fixture.count(missing, "firing") != 1 or fixture.count(missing, "resolved") != 1:
                 raise AssertionError("fresh reports did not stay quiet after recovery")
+            if fixture.count(corrupt, "firing") != 1 or fixture.count(corrupt, "resolved") != 1:
+                raise AssertionError("local corruption did not stay quiet after recovery")
             return {
                 "blockedFiring": fixture.count(blocked, "firing"),
                 "blockedResolved": fixture.count(blocked, "resolved"),
+                "localCorruptionFiring": fixture.count(corrupt, "firing"),
+                "localCorruptionResolved": fixture.count(corrupt, "resolved"),
                 "telemetryMissingFiring": fixture.count(missing, "firing"),
                 "telemetryMissingResolved": fixture.count(missing, "resolved"),
                 "telemetryReplayedScrapes": replayed_scrapes,

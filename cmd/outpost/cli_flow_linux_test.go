@@ -245,10 +245,11 @@ func TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory(t *testing.T)
 		run(true, "config-apply", "--bootstrap", bootstrap.path, "--input", signed)
 	}
 	run(true, "source-init", "--bootstrap", sourcePath)
-	sourceStatus := func() sourceagent.Status {
+	sourceStatus := func(flags ...string) sourceagent.Status {
 		t.Helper()
 		var out struct{ Result sourceagent.Status }
-		containerMust(t, json.Unmarshal(run(true, "source-status", "--bootstrap", sourcePath), &out))
+		args := append([]string{"source-status", "--bootstrap", sourcePath}, flags...)
+		containerMust(t, json.Unmarshal(run(true, args...), &out))
 		return out.Result
 	}
 	workerStatus := func(path string) worker.Status {
@@ -280,12 +281,28 @@ func TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory(t *testing.T)
 	}
 	primary := startCLIFlowProcess(t, binary, logs, "worker-run", "--bootstrap", aPath)
 	wait(primary, func() bool { return workerStatus(aPath).Phase == "ACTIVE" && centerRequests.Load() > 0 })
-	run(true, "source-run", "--bootstrap", sourcePath)
+	var observedRun struct{ Result sourceagent.Status }
+	containerMust(t, json.Unmarshal(run(true, "source-run", "--bootstrap", sourcePath, "--observe-direct-source-bodies"), &observedRun))
 	first := sourceStatus()
 	if first.Phase != "COMPLETE" || first.Sequence != 1 || first.Milestones == nil || first.Milestones.FirstReplicaVerifiedUnix == 0 {
 		t.Fatal("actual source/receiver processes did not publish first generation")
 	}
+	if first.CaptureMeasurements != nil {
+		t.Fatal("ordinary source-status included opt-in measurements")
+	}
+	bodies := observedRun.Result.OutgoingIngressObjectBodies
+	if observedRun.Result.Generation != first.Generation || bodies == nil || bodies.Retention != "CURRENT_PROCESS_RUN" ||
+		len(bodies.Samples) != 1 || bodies.Samples[0].TransportReadPutBodyBytes < 1 || first.OutgoingIngressObjectBodies != nil {
+		t.Fatal("direct PUT observation escaped its source-run process or was missing")
+	}
+	run(false, "source-status", "--bootstrap", sourcePath, "--observe-direct-source-bodies")
 	primary.Stop(t)
+	measured := sourceStatus("--capture-measurements")
+	m := measured.CaptureMeasurements
+	if measured.Generation != first.Generation || m == nil || m.IncludedEntries < 1 || m.SourceReadBytes != int64(len(oldBytes)) ||
+		m.NewPayloadBytes <= 0 || m.NewMetadataBytes <= 0 || m.NewObjects <= 0 {
+		t.Fatalf("source-status could not read local receipts with the receiver stopped: %+v", m)
+	}
 	primary = startCLIFlowProcess(t, binary, logs, "worker-run", "--bootstrap", aPath)
 	wait(primary, func() bool { return workerStatus(aPath).Phase == "ACTIVE" })
 	newBytes := bytes.Clone(oldBytes)

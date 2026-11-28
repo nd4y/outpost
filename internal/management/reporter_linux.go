@@ -29,6 +29,10 @@ type Snapshot struct {
 	Jobs                  []Job
 	Commands              []CommandObservation
 	Space                 Space
+
+	// RestoreCommandsObserved indicates a validated restore-capable local journal.
+	// This is local sampling metadata, not part of the signed management report.
+	RestoreCommandsObserved bool `json:"-"`
 }
 type ReporterOptions struct {
 	Root           *os.Root

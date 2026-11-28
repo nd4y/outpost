@@ -117,6 +117,58 @@ tests:
         alertname: OutpostTelemetryMissing
         exp_alerts: []
 
+  - name: Local replica corruption follows current known inventory with stable alert labels
+    start_timestamp: 2000
+    interval: 1m
+    input_series:
+      - series: 'outpost_expected_telemetry_max_age_seconds{outpost_node="node",outpost_domain="domain"}'
+        values: "30+0x8"
+      - series: 'outpost_report_observed_timestamp_seconds{outpost_node="node",outpost_domain="domain"}'
+        values: "2000 2060 2120 2180 2240 2300 2360 _ 2480"
+      - series: 'outpost_damaged_local_generations{outpost_node="node",outpost_domain="domain"}'
+        values: "0 1 2 _ 2 _ 1 _ 0"
+      - series: 'outpost_damaged_local_generations_known{outpost_node="node",outpost_domain="domain"}'
+        values: "1 1 1 1 _ 0 1 _ 1"
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts:
+          - exp_labels: { outpost_node: node, outpost_domain: domain, severity: warning }
+            exp_annotations: { runbook: integrity }
+      - eval_time: 2m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts:
+          - exp_labels: { outpost_node: node, outpost_domain: domain, severity: warning }
+            exp_annotations: { runbook: integrity }
+      - eval_time: 3m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts:
+          - exp_labels: { outpost_node: node, outpost_domain: domain, severity: warning }
+            exp_annotations: { runbook: integrity }
+      - eval_time: 7m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: OutpostTelemetryMissing
+        exp_alerts:
+          - exp_labels: { outpost_node: node, outpost_domain: domain, severity: warning }
+            exp_annotations: { runbook: connectivity }
+      - eval_time: 8m
+        alertname: OutpostLocalReplicaCorrupt
+        exp_alerts: []
+
   - name: The independent watchdog ages the receiver heartbeat even without primary metrics
     start_timestamp: 1000
     interval: 1m

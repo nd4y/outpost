@@ -34,6 +34,16 @@ Authorized push/pull repair checks the previously accepted catalog digest, lengt
 
 Reporting processes use the same shared write budget for new diagnosis. They do not clear another process's reservations. A generation with an unavailable catalog retains its opaque ID, sequence and pin status, with `metadataState: UNAVAILABLE`, `CORRUPT`, zero unknown creation/object counters and null logical size. It claims no verification. These records require signed report4, report view4 and generation page2; older formats reject the new field. Healthy entries keep their own metadata and original verification age.
 
+## Read the local damage ledger
+
+Run the following command on the worker host with its existing private bootstrap. The worker must be a current holder in the signed domain policy. The command reads the selected catalog and the recorded damage ledger without reading payload objects.
+
+```sh
+outpost worker-replica-damage-status --bootstrap FILE --domain DOMAIN_ID --generation ID
+```
+
+The command prints opaque file/version IDs for recorded damage in the selected replica. `CATALOG_UNAVAILABLE` has a null affected list because the catalog cannot supply that mapping. `RECHECK_PENDING` identifies a generation that still needs verification. `NO_RECORDED_DAMAGE` describes the ledger at read time. Scheduled scrubs and trusted content checks establish health. Permanent loss across holders requires separate evidence; offline holders remain unknown.
+
 ## Evidence and remaining acceptance
 
 Short isolated tests cover shared dependencies, pins, missing/empty/unsafe entries, quota denial, quarantine tampering, six actual SIGKILL boundaries, both HTTPS directions, stale-token rejection and independent restoration. A three-node worker scenario repairs both a relay and an outbound-only receiver after restart from unchanged signed configuration. Exact command/source evidence is retained by the owner; these checks do not establish large-scale or production acceptance.

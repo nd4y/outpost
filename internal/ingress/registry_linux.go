@@ -49,7 +49,10 @@ type RegistryOptions struct {
 	CheckRegistryWrite func(context.Context, int) error
 	CheckPublication   func(context.Context, diskbudget.Peak) error
 	RemoveObject       func(context.Context, string, int64) error
-	recoverJournal     bool
+	// ObserveObjectBody receives accepted source PUTs. It must return without
+	// waiting for telemetry storage or delivery.
+	ObserveObjectBody func(bytes int, alreadyPresent bool)
+	recoverJournal    bool
 }
 type registryState struct {
 	Format            string              `json:"format"`
@@ -302,7 +305,7 @@ func (g *Registry) sessionOptions(raw []byte) SessionOptions {
 	if bytes.Equal(raw, g.state.Intent) {
 		authority = g.intentAuthority()
 	}
-	return SessionOptions{Parent: g.root, Directory: "current", Authority: authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject, CheckPublication: g.options.CheckPublication}
+	return SessionOptions{Parent: g.root, Directory: "current", Authority: authority, Intent: raw, Owner: g.options.Owner, Replica: g.options.Replica, Initialize: true, AdmitState: g.admission("current/state"), AdmitObject: g.admission("current/objects"), RemoveObject: g.options.RemoveObject, CheckPublication: g.options.CheckPublication, observeObjectBody: g.options.ObserveObjectBody}
 }
 
 func (g *Registry) sessionServer() (*http.Server, error) {

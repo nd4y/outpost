@@ -59,6 +59,12 @@ For an active or completed operation, `source-status` reports `result.milestones
 
 `replicas` lists the targets and original ciphertext verification times in the accepted checkpoint. `firstReplicaVerifiedUnix` is the earliest of those times. A staged coverage receipt supplies neither field. Use worker reports for later followers outside the source checkpoint and record a separate independent restore receipt to establish successful decryption.
 
+Run `source-status --bootstrap /private/source.json --capture-measurements` to inspect the current route's committed file receipts. `result.captureMeasurements` shows the number of included entries, plaintext bytes read by their successful capture attempts, and ciphertext payload bytes, metadata bytes and object count recorded as new by the file packer. The measurement verifies the writer signatures and operation binding. It can return the same totals after a restart with the receiver offline. The field is omitted when there are no committed receipts, a completed checkpoint has no local capture job, or the route inherited a sealed catalog. Missing or invalid metadata of a present local job fails the measurement.
+
+The command opens the source agent as ordinary status does, including the usual local journal and space-accounting reconciliation. The optional scan reads existing job metadata and up to 4,096 local receipt records of at most 64 KiB each. It does not reopen the source view or contact the receiver. The scan holds the source execution lease and checks cancellation between receipts.
+
+The counters cover only the included entries. They exclude reads from failed attempts, abandoned routes, producer-side validation and catalog construction. The packer counts do not establish per-route traffic, cluster-wide unique occupancy or the first independent successful restore.
+
 The `two-holder-coverage` policy requires two holders for every dependency.
 
 Set `profile.releasePolicy` to `paired-split-coverage` to accept one staged copy per dependency before release. New object ownership is stable across retries and derived from its opaque ID and the two holder identities. Both holders retain the final catalog. The source validates the union by recomputing the assigned dependency list for each holder. A required dependency cannot be covered by an unrelated holder or intent.

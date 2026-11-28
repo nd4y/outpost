@@ -33,6 +33,7 @@ type SessionOptions struct {
 	AdmitState, AdmitObject statefile.Admission
 	RemoveObject            func(context.Context, string, int64) error
 	CheckPublication        func(context.Context, diskbudget.Peak) error
+	observeObjectBody       func(int, bool)
 	publishGrant            []byte
 }
 
@@ -93,6 +94,8 @@ type Session struct {
 	publishGrant     []byte
 	inspection       bool
 	Fault            func(string) error
+
+	observeObjectBody func(int, bool)
 }
 
 func (s *Session) point(name string) error {
@@ -258,7 +261,7 @@ func openSessionFor(ctx context.Context, o SessionOptions, mode sessionOpenMode)
 		return nil, ErrConflict
 	}
 	owned = true
-	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, admitPublication: o.CheckPublication, inspection: inspection, publishGrant: bytes.Clone(o.publishGrant)}
+	s := &Session{root: r, intent: i, owner: bytes.Clone(o.Owner), lease: lease, replica: o.Replica, refs: map[string]generation.Object{}, base: map[string]generation.Object{}, removeObject: o.RemoveObject, admitPublication: o.CheckPublication, observeObjectBody: o.observeObjectBody, inspection: inspection, publishGrant: bytes.Clone(o.publishGrant)}
 	fail := func(e error) (*Session, error) { s.Close(); return nil, e }
 	s.meta, e = statefile.OpenAt(r, "state", maxSessionDocument, o.Initialize)
 	if e != nil {

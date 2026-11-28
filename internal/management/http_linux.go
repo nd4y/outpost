@@ -319,7 +319,11 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(out.Document)
 		return
 	}
-	if r.URL.RawQuery != "" {
+	const earliestWholeRestoreQuery = "include=earliest-retained-whole-restore"
+	includeEarliestWholeRestore := r.URL.RawQuery == earliestWholeRestoreQuery && r.Method == http.MethodGet &&
+		len(parts) == 9 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "tenants" && storage.ID(parts[3]) &&
+		parts[4] == "nodes" && storage.ID(parts[5]) && parts[6] == "domains" && storage.ID(parts[7]) && parts[8] == "verified-restores"
+	if r.URL.RawQuery != "" && !includeEarliestWholeRestore {
 		paged := r.Method == http.MethodGet && (len(parts) == 5 && (parts[4] == "nodes" || parts[4] == "audit") || len(parts) == 9 && (parts[8] == "generations" || parts[8] == "jobs" || parts[8] == "command-status") || len(parts) == 7 && parts[6] == "commands")
 		if !paged {
 			failHTTP(w, ErrInvalid)
@@ -603,9 +607,9 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeHTTP(w, 200, out)
 			return
 		}
-		if kind == "verified-restores" && r.URL.RawQuery == "" {
+		if kind == "verified-restores" {
 			var restores []VerifiedRestore
-			view, e := h.registry.report(ctx, p, tenant, node, domain, h.maxAge, &restores)
+			view, e := h.registry.report(ctx, p, tenant, node, domain, h.maxAge, &restores, includeEarliestWholeRestore)
 			if e != nil {
 				failHTTP(w, e)
 				return

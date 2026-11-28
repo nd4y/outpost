@@ -10,9 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/nd4y/outpost/internal/diskbudget"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
@@ -170,6 +172,113 @@ func TestPreparedPartRetryRechecksGuardAndCancelsQuotaReservation(t *testing.T) 
 	must(t, err)
 	if !released || before.Revision != after.Revision || before.Parts[part] != after.Parts[part] {
 		t.Fatal("retry changed its durable preparation instead of rechecking admission")
+	}
+}
+
+func TestPreparedPartReadOnlyAdmissionPreservesBudgetAndFloor(t *testing.T) {
+	f := fixtureBytes(t, 4096)
+	target := f.server(t, "webdav", 0, nil)
+	raw := f.plan(t, target, 1, 10000)
+	plan, err := Verify(raw, f.authority)
+	must(t, err)
+	ctx := t.Context()
+	dir := filepath.Join(f.base, "prepared-budget")
+	must(t, os.Mkdir(dir, 0700))
+	limits := diskbudget.Limits{Capacity: 64 << 20, Reserve: 2 << 20, Spool: 8 << 20, Telemetry: 1 << 20}
+	budget, err := diskbudget.Open(ctx, dir, limits, true)
+	must(t, err)
+	defer budget.Close()
+
+	queueDir := filepath.Join(dir, "queue")
+	must(t, os.Mkdir(queueDir, 0700))
+	q, err := OpenQueueAdmitted(queueDir, f.workers[0].ID, f.authority,
+		QueueLimits{MaxJobs: 1, Parallel: 1, AttemptMillis: 5000, RetryBaseMillis: 100, RetryMaxMillis: 1000},
+		true, budget.Admission("queue"))
+	must(t, err)
+	defer q.Close()
+	q.CheckWrite = func(ctx context.Context, name string, size int) error {
+		if name != "jobs/"+plan.Operation+"/state.json" || size < 1 {
+			t.Fatal("wrong prepared part budget scope", name, size)
+		}
+		return budget.CheckWrite(ctx, "queue/"+name, size)
+	}
+	must(t, q.Enqueue(ctx, f.replicas[0], raw))
+	queue, err := q.Status(ctx)
+	must(t, err)
+	j, err := q.journal(queue.Jobs[plan.Operation], false)
+	must(t, err)
+	defer j.Close()
+	tasks, err := plan.Tasks()
+	must(t, err)
+	part := tasks[0].Part.ID
+	must(t, j.beginPart(ctx, part, 0))
+	before, err := budget.Status(ctx)
+	must(t, err)
+	beforeState, err := j.Status(ctx)
+	must(t, err)
+
+	for range 3 {
+		must(t, j.checkPreparedPart(ctx, part, 1))
+	}
+	after, err := budget.Status(ctx)
+	must(t, err)
+	afterState, err := j.Status(ctx)
+	must(t, err)
+	if after.Revision != before.Revision || after.Used["spool"] != before.Used["spool"] || len(after.Pending) != 0 ||
+		afterState.Revision != beforeState.Revision || afterState.Parts[part] != beforeState.Parts[part] {
+		t.Fatal("check changed the budget or durable part preparation")
+	}
+
+	func() {
+		const name, block = "quota-pending", 4096
+		must(t, budget.CheckWrite(ctx, name, block))
+		// Find the greatest admitted whole block using the same read-only
+		// check, including its protected ledger reserve and physical floor.
+		lower, upper := 1, int(limits.Spool)/block
+		for lower < upper {
+			probe := lower + (upper-lower+1)/2
+			err := budget.CheckWrite(ctx, name, probe*block)
+			if errors.Is(err, diskbudget.ErrCapacity) {
+				upper = probe - 1
+				continue
+			}
+			must(t, err)
+			lower = probe
+		}
+		release, err := budget.Reserve(ctx, name, lower*block)
+		must(t, err)
+		defer func() { must(t, release(false)) }()
+		pending, err := budget.Status(ctx)
+		must(t, err)
+		if len(pending.Pending) != 1 || pending.Used["spool"] != after.Used["spool"] {
+			t.Fatal("fixture did not isolate the pending spool reservation")
+		}
+		if err = j.checkPreparedPart(ctx, part, 2); !errors.Is(err, diskbudget.ErrCapacity) {
+			t.Fatal("check ignored a real pending spool reservation", err)
+		}
+		unchanged, err := budget.Status(ctx)
+		must(t, err)
+		if unchanged.Revision != pending.Revision || len(unchanged.Pending) != 1 {
+			t.Fatal("failed read changed the reservation ledger")
+		}
+	}()
+
+	// Reconcile the synthetic unsuccessful reservation, then prove the
+	// identical prepared check admits under the original logical limits.
+	must(t, budget.Reconcile(ctx, limits))
+	must(t, j.checkPreparedPart(ctx, part, 3))
+	var fs syscall.Statfs_t
+	must(t, syscall.Statfs(dir, &fs))
+	if fs.Bsize <= 0 || fs.Bavail > uint64((1<<60)-(128<<20))/uint64(fs.Bsize) {
+		t.Fatal("unsupported fixture filesystem size")
+	}
+	// Admit the same retained files and ample logical quota, but place the
+	// physical floor above measured availability without allocating test data.
+	limits.Reserve = int64(fs.Bavail)*fs.Bsize + (8 << 20)
+	limits.Capacity = limits.Reserve + (64 << 20)
+	must(t, budget.Reconcile(ctx, limits))
+	if err = j.checkPreparedPart(ctx, part, 3); !errors.Is(err, diskbudget.ErrCapacity) {
+		t.Fatal("check ignored the physical free-space floor", err)
 	}
 }
 

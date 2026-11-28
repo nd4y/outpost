@@ -614,6 +614,14 @@ func (r *Registry) Audit(ctx context.Context, p Principal, tenant string, after 
 				out = append(out, o.Audit)
 			}
 		}
+		if p.Role("owner") {
+			for _, step := range s.RetentionSteps {
+				a := step.audit()
+				if a.Tenant == tenant && a.Sequence > after && p.Allows(tenant, a.Domain) {
+					out = append(out, a)
+				}
+			}
+		}
 		for _, v := range s.Resolutions {
 			if v.Audit.Tenant == tenant && v.Audit.Sequence > after && allowsDomains(p, tenant, v.Domains) {
 				out = append(out, v.Audit)

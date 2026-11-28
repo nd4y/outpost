@@ -59,10 +59,11 @@ type Bootstrap struct {
 	IngressBodyBytesPerSecond int64 `json:"ingressBodyBytesPerSecond,omitempty"`
 }
 
-func (b Bootstrap) validIngressBodyRate() bool {
+func (b Bootstrap) validIngressSettings() bool {
 	rate := b.IngressBodyBytesPerSecond
 	return (rate == 0 || rate >= peer.MinBodyBytesPerSecond && rate <= 1<<30) &&
-		b.Local.PeerReceiveBodyBytesPerSecond == 0 && b.Local.PeerSendBodyBytesPerSecond == 0
+		b.Local.PeerReceiveBodyBytesPerSecond == 0 && b.Local.PeerSendBodyBytesPerSecond == 0 &&
+		!b.Local.ObserveIngressObjectBodies && !b.Local.ObservePeerObjectBodies
 }
 
 func Load(path string) (Bootstrap, error) {
@@ -71,7 +72,7 @@ func Load(path string) (Bootstrap, error) {
 	if e != nil {
 		return b, e
 	}
-	if worker.DecodeInput(raw, &b, 65536) != nil || !b.validIngressBodyRate() {
+	if worker.DecodeInput(raw, &b, 65536) != nil || !b.validIngressSettings() {
 		return b, ErrInvalid
 	}
 	return b, nil
@@ -126,6 +127,9 @@ type Status struct {
 	Pending           *PendingStatus     `json:"pending,omitempty"`
 	Milestones        *Milestones        `json:"milestones,omitempty"`
 	WriterFence       *WriterFenceStatus `json:"writerFence,omitempty"`
+
+	CaptureMeasurements         *capture.CaptureMeasurements `json:"captureMeasurements,omitempty"`
+	OutgoingIngressObjectBodies *SourceObjectBodySnapshot    `json:"outgoingIngressObjectBodies,omitempty"`
 }
 
 type Milestones struct {
@@ -185,7 +189,7 @@ func open(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool) (*Age
 }
 
 func openAt(ctx context.Context, b Bootstrap, initialize, scheduleOnly bool, directory string, fault func(string) error) (*Agent, error) {
-	if !b.validIngressBodyRate() {
+	if !b.validIngressSettings() {
 		return nil, ErrInvalid
 	}
 	if (b.Format != Format && b.Format != PreparedAgentFormat) || b.Local.Format != worker.BootstrapFormat || b.Local.Volume.Scope != b.Local.Node || len(b.Local.Owner) != 32 || b.Local.ControlEndpoint != "" || b.Local.Listen != "" || len(b.Local.Credentials) != 0 || b.Profile.View != "" || b.Profile.Origin != b.Tree.Origin {
@@ -756,6 +760,16 @@ func (a *Agent) prepare(ctx context.Context, raw []byte) error {
 func (a *Agent) openJob(ctx context.Context, s state) (*capture.Job, func(), error) {
 	return a.openJobMode(ctx, s, false, nil)
 }
+func (a *Agent) capturePaths(s state, operation, receiver string) (string, string) {
+	operationPrefix := path.Join("operations", operation)
+	if a.routed() {
+		return operationPrefix, path.Join(operationPrefix, "route-"+routeScope(operation, s.Route))
+	}
+	if a.b.Standby {
+		return operationPrefix, path.Join(operationPrefix, "receiver-"+receiver)
+	}
+	return operationPrefix, operationPrefix
+}
 func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settlement []byte, companionSettlement ...[]byte) (*capture.Job, func(), error) {
 	if s.Phase == "PREPARING" && (inspect || len(settlement) != 0) {
 		return nil, nil, ErrInvalid
@@ -805,14 +819,11 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 		return nil, nil, e
 	}
 	client.SetPayloadBudget(a.payloadBudget)
-	initialize := s.Phase == "PREPARING" || s.RoutePreparing && !inspect
-	operationPrefix := path.Join("operations", i.Operation)
-	prefix := operationPrefix
-	if a.routed() {
-		prefix = path.Join(operationPrefix, "route-"+routeScope(i.Operation, s.Route))
-	} else if a.b.Standby {
-		prefix = path.Join(operationPrefix, "receiver-"+i.Ingress)
+	if !cleanup {
+		client.ObserveObjectWrite = a.outgoingObjectObserver(ctx, authority, i.Operation)
 	}
+	initialize := s.Phase == "PREPARING" || s.RoutePreparing && !inspect
+	operationPrefix, prefix := a.capturePaths(s, i.Operation, i.Ingress)
 	provider, e := a.openProvider(ctx, operationPrefix, i, initialize && s.RouteCatalog == "")
 	if e != nil {
 		client.Close()
@@ -844,6 +855,9 @@ func (a *Agent) openJobMode(ctx context.Context, s state, inspect bool, settleme
 			provider.Close()
 			client.Close()
 			return nil, nil, err
+		}
+		if !cleanup && len(grant) == 0 {
+			group.companion.ObserveObjectWrite = a.outgoingObjectObserver(ctx, companionAuthority, i.Operation)
 		}
 		group.recoverRoute = len(s.Superseded) != 0 && !cleanup
 		group.replaying = group.replaying || group.recoverRoute
@@ -1058,6 +1072,14 @@ func (a *Agent) fenceCapture(ctx context.Context, s *state) error {
 }
 
 func (a *Agent) Status(ctx context.Context) (Status, error) {
+	return a.status(ctx, false, nil)
+}
+
+func (a *Agent) StatusWithCaptureMeasurements(ctx context.Context) (Status, error) {
+	return a.status(ctx, true, nil)
+}
+
+func (a *Agent) status(ctx context.Context, measure bool, bodies *sourceObjectSamples) (Status, error) {
 	var out Status
 	e := a.lease.WithLock(ctx, func() error {
 		if e := a.guard(ctx); e != nil {
@@ -1087,6 +1109,9 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 			out.Receiver = i.Ingress
 			if a.routed() {
 				out.Receiver, out.Receivers, out.Superseded = s.Route[0], s.Route, s.Superseded
+			}
+			if bodies != nil && out.WriterFence == nil {
+				out.OutgoingIngressObjectBodies = a.outgoingObjectStatus(ctx, s, i, bodies)
 			}
 			if s.Phase == "PREPARING" || s.Phase == "ACTIVE" {
 				action := "RESUME"
@@ -1133,18 +1158,43 @@ func (a *Agent) Status(ctx context.Context) (Status, error) {
 				}
 			}
 		}
-		if s.Phase == "ACTIVE" && !s.RoutePreparing {
+		active := s.Phase == "ACTIVE" && !s.RoutePreparing
+		measureComplete := measure && s.Phase == "COMPLETE" && s.RouteCatalog == ""
+		if measureComplete {
+			// Recovery can adopt a completed checkpoint without local job receipts.
+			// Missing metadata inside a local job must still fail measurement.
+			_, prefix := a.capturePaths(s, out.Operation, out.Receiver)
+			localJob, e := localfs.OpenAt(a.root, prefix+"/job", false)
+			if errors.Is(e, os.ErrNotExist) {
+				return nil
+			}
+			if e != nil {
+				return e
+			}
+			if e = localJob.Close(); e != nil {
+				return e
+			}
+		}
+		if active || measureComplete {
 			job, close, e := a.openJobMode(ctx, s, true, nil)
 			if e != nil {
 				return e
 			}
 			defer close()
-			j, e := job.Status(ctx)
-			if e != nil {
-				return e
+			if active {
+				j, e := job.Status(ctx)
+				if e != nil {
+					return e
+				}
+				out.Job = &j
+				out.Milestones.addReplicas(j.Copies)
 			}
-			out.Job = &j
-			out.Milestones.addReplicas(j.Copies)
+			if measure {
+				out.CaptureMeasurements, e = job.Measurements(ctx)
+				if e != nil {
+					return e
+				}
+			}
 		}
 		return nil
 	})

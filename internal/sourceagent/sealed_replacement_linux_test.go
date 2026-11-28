@@ -224,6 +224,11 @@ func TestSourceSealedReceiverReplacementAndReclaimsSlot(t *testing.T) {
 		t.Logf("retry publication after bounded transport error: %v", err)
 	}
 	must(t, err)
+	measured, err := f.a.StatusWithCaptureMeasurements(ctx)
+	must(t, err)
+	if measured.Phase != "COMPLETE" || measured.CaptureMeasurements != nil {
+		t.Fatal("inherited sealed catalog reported measurements for the replacement route", measured)
+	}
 	raw, err := f.a.Checkpoint(ctx)
 	must(t, err)
 	c, err := capture.VerifyCheckpoint(raw, f.grant.Trust)

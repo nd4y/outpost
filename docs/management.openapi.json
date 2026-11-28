@@ -2715,6 +2715,13 @@
             "in": "path",
             "required": true,
             "schema": { "$ref": "#/components/schemas/ID" }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "description": "Include the earliest retained authenticated whole-generation restore for each node and generation.",
+            "schema": { "const": "earliest-retained-whole-restore" }
           }
         ],
         "responses": {
@@ -4951,6 +4958,7 @@
       "Audit": {
         "type": "object",
         "additionalProperties": false,
+        "description": "An audited operation at its durable registry sequence. STAGE_RETENTION_STEP with ADMITTED records the original scoped staging event before publication. A later command audit entry carries the execution result.",
         "properties": {
           "sequence": {
             "type": "integer",
@@ -5072,6 +5080,16 @@
                     "operationId": { "$ref": "#/components/schemas/ID" },
                     "logicalBytes": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,17})$" },
                     "measuredUnix": { "type": "integer", "minimum": 1, "maximum": 1125899906842624 }
+                  }
+                },
+                "earliestRetainedWholeRestore": {
+                  "type": "object",
+                  "description": "Optional original-time whole-generation restore proof from the retained authenticated history for this node and generation.",
+                  "additionalProperties": false,
+                  "required": ["operationId", "verifiedUnix"],
+                  "properties": {
+                    "operationId": { "$ref": "#/components/schemas/ID" },
+                    "verifiedUnix": { "type": "integer", "minimum": 1, "maximum": 1125899906842624 }
                   }
                 }
               }

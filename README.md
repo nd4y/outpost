@@ -4,7 +4,7 @@
 
 [Copy verification](docs/en/copy-observations.md) can advance across several bounded batches per attempt after it saves progress. A signed observation retains the time of the oldest supporting read. The [asymmetric test profile](docs/en/asymmetric-source.md) records why the previous one-hour synthetic window could not finish a full-size case and defines the window for a corrected run.
 
-The [management UI](docs/en/management-ui.md) shows the original verification time and scope of a confirmed restore. A verified whole-generation restore provides a dated measurement of logical bytes. [Policy preview](docs/en/management-api.md) flags a shortfall supported by a fresh signed volume report. The [Btrfs producer](docs/en/prepared-exports.md) checks the retained snapshot count and optional free-space floor before each new snapshot attempt.
+The [management UI](docs/en/management-ui.md) shows the original verification time and scope of a confirmed restore. A verified whole-generation restore provides a dated measurement of logical bytes. The management API can also show the earliest full restore retained in the node's report. [Policy preview](docs/en/management-api.md) flags a shortfall supported by a fresh signed volume report. The [Btrfs producer](docs/en/prepared-exports.md) checks the retained snapshot count and optional free-space floor before each new snapshot attempt.
 
 [Source](docs/en/source-agent.md) and [worker](docs/en/peer-transfer.md) HTTP body limits are configured locally. [File-kit repack and export](docs/en/file-kit-format.md) check peak extra allocation before writing and support an optional free-space reserve.
 
@@ -40,6 +40,8 @@ The [G2 generation/replica candidate](docs/en/generation-replicas.md) adds signe
 
 The [bounded G2 receipt](docs/g2-history-evidence.json) records180actual64KiB updates with the third holder offline, interrupted direct catch-up and independent old/new recovery. A separate holder check covers real TLS epoch transition, old-branch revocation and persistent rollback fences. These checks do not accept full distributed scale.
 
+When an [approved historical pull](docs/en/peer-transfer.md#retry-durability-and-resource-limits) finds the exact generation already retired locally, it releases its own source lease and keeps the existing replica head.
+
 The [specification 1.5](docs/en/specification.md) requires parallel capture across authorized receivers, forwarding before generation sealing and a policy-defined release threshold. The [two-holder source candidate](docs/en/source-agent.md#parallel-capture-to-two-required-holders) forwards accepted packs before seal, keeps the verified two-full-copy default and offers explicit early release when both holders each cover the whole catalog or their assigned share. Workers can finish publication with the source offline. The candidate renews both grants in one signed source update.
 
 The [asymmetric source method](docs/en/asymmetric-source.md) compares a single initial recipient with the adaptive pair under declared 500/500/100 Mbit/s body caps, separately from wire throughput. Equal-rate split writes can use an idle initial receiver while their required owner is occupied. Exact owner delivery, release proofs, retained recovery and the separate physical 100 GiB gate remain explicit.
@@ -63,6 +65,8 @@ The [native Btrfs producer](docs/en/prepared-exports.md#native-btrfs-producer) c
 The `source-status` command reports the expiry of pending work and indicates whether the operator can resume it or needs owner action or receiver reconciliation. An expired operation prepared locally can be retired with owner approval until execution reaches the receiver fence.
 
 For active and completed operations, `source-status` reports when the source observed release of its view and when checkpointed replicas verified their ciphertext. Independent decryption has its own restore receipt.
+
+Ask for `--capture-measurements` to see plaintext bytes read and new ciphertext recorded in the current route's verified file receipts. [Source status fields](docs/en/source-agent.md) describe the measurement limits.
 
 [Automatic receiver replacement](docs/en/source-agent.md#automatic-replacement-after-active) supports a standby for one copy and a reserve for two. Paired capture adjusts initial transfers to measured receiver throughput, including split coverage with a direct handoff to the assigned holder. Before full publication the worker estimates additional space from the signed catalog. With a complete surviving closure, the pair replays the signed catalog and reclaims the old slot after catch-up. [Scoped recovery](docs/en/source-settlement.md) lets both holders finish staged publication after expiry and distinguishes an unadmitted source operation from retained receiver work.
 
@@ -150,6 +154,8 @@ Owners can now review and abandon an admitted request only while its effect rema
 
 The [private management snapshot](docs/en/management-snapshots.md) preserves administrative history and independently verifies a selected checkpoint without activating historical commands.
 
+The [owner audit](docs/en/management-api.md) also records the original admission of staged retention steps, including steps still waiting to publish.
+
 The interface now shows [external-copy observations](docs/en/external-copy-reporting.md) with their original verification time and explicit unknown state.
 
 The [Linux distribution candidate](docs/en/distribution.md) builds source-bound amd64/arm64 archives and a shellless container input; installation and runtime acceptance remain explicit gates.
@@ -157,6 +163,10 @@ The [Linux distribution candidate](docs/en/distribution.md) builds source-bound 
 The [durable telemetry process](docs/en/telemetry.md) provides a signed bounded OTLP queue, retained source positions, explicit scope renewal and independent delivery. A transport outage keeps accepted records pending across restart for delivery to the same admitted recipient; arbitrary recipient diagnostics are excluded from the journal and status. Short checks include a real collector and backup/restore during a slow sink; complete instrumentation and operational acceptance remain open.
 
 The [monitoring rules](docs/en/telemetry.md#monitoring-rules-and-independent-watchdog) distinguish missing telemetry from measured failures and provide a separate watchdog for receipt of the monitoring heartbeat.
+
+With `observeLocalReplicaDamage` enabled, `OutpostLocalReplicaCorrupt` reports damage recorded in the latest known local inventory. The worker keeps damage unknown when the inventory cannot be read.
+
+The opt-in `observeRestoreFailures` measurement shows retained terminal failures of managed restore commands and their latest original finish time.
 
 The [owner recovery package](docs/en/owner-recovery-package.md) keeps read-only decryption material, original checkpoint age and selected offline tools in private owner storage. The [key epoch preparation](docs/en/owner-recovery-package.md#prepare-a-new-key-epoch) creates a separate domain and records the authenticated prior package and checkpoint. Activation, retirement and full-scale acceptance have separate gates.
 
@@ -189,3 +199,5 @@ The [replacement dataset check](docs/dataset-rebuild-evidence.json) exercises a 
 The [guest-kernel evidence](docs/vm-powerloss-evidence.json) records four actual virtual power cuts and five cold volume-ordering cases using independently selected recovery CLIs. All 14 phases passed in a bounded networkless guest; physical host power loss, real disk unlocking and full-scale acceptance remain separate.
 
 The [catalog publication evidence](docs/catalog-publication-evidence.json) records the original100GiB catalog timeout and its exact partial batch, followed by a bounded8MiB publication fix,48 ordinary ingress regressions, a cancellation-bound race control and128MiB two-version recovery through fresh independently selected CLI consumers. The corrected100GiB and G3 quantitative gates remain open; see [publication behavior](docs/en/catalog-publication.md).
+
+[Cold receiver volume transition](docs/en/runtime-volume.md#cold-disk-transition-on-one-host) is available for a separately enrolled receiver on one host. Its host authority fences the previous disk's writable epoch before the prepared copy can start. Physical acceptance requires a site test.

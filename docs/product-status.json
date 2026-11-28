@@ -334,6 +334,10 @@
           "name": "TestAsymmetricSourceScale"
         },
         {
+          "path": "internal/sourceagent/asymmetric_scale_serial_linux_test.go",
+          "name": "TestAsymmetricSerialFixtureEpochIsSharedAndPrivate"
+        },
+        {
           "path": "internal/sourceagent/unavailable_linux_test.go",
           "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
         }
@@ -511,6 +515,10 @@
         {
           "path": "internal/sourceagent/asymmetric_scale_linux_test.go",
           "name": "TestAsymmetricSourceScale"
+        },
+        {
+          "path": "internal/sourceagent/asymmetric_scale_serial_linux_test.go",
+          "name": "TestAsymmetricSerialFixtureEpochIsSharedAndPrivate"
         },
         {
           "path": "internal/sourceagent/asymmetric_linux_test.go",
@@ -1410,6 +1418,14 @@
         {
           "path": "internal/worker/operation_window_linux_test.go",
           "name": "TestWorkerLongOperationKeepsShortRequestsAndConfigurationExpiry"
+        },
+        {
+          "path": "internal/upload/claim_batch_linux_test.go",
+          "name": "TestPreparedPartReadOnlyAdmissionPreservesBudgetAndFloor"
+        },
+        {
+          "path": "internal/worker/upload_capacity_linux_test.go",
+          "name": "TestWorkerPreparedUploadCapacityRechecksGuardAfterBudget"
         },
         {
           "path": "internal/upload/claim_slot_linux_test.go",
@@ -3362,6 +3378,10 @@
       "checks": [
         {
           "path": "internal/peer/history_linux_test.go",
+          "name": "TestRetiredHistoricalPullReleasesOnlyItsBoundLease"
+        },
+        {
+          "path": "internal/peer/history_linux_test.go",
           "name": "TestHTTPSRetainedHistoryRequiresGrantAndPreservesNewerHead"
         },
         {
@@ -4053,6 +4073,10 @@
       ],
       "checks": [
         {
+          "path": "internal/peer/history_linux_test.go",
+          "name": "TestRetiredHistoricalPullReleasesOnlyItsBoundLease"
+        },
+        {
           "path": "internal/storage/move_book_linux_test.go",
           "name": "TestMoveStagingInspectionPreservesUncertainAndPublishedAttempts"
         },
@@ -4324,6 +4348,14 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/worker/recorded_damage_linux_test.go",
+          "name": "TestWorkerRecordedDamageStatusIsScopedAndReadOnly"
+        },
+        {
+          "path": "internal/worker/recorded_damage_linux_test.go",
+          "name": "TestWorkerRecordedDamageStatusRejectsWithdrawnHolder"
+        },
         {
           "path": "internal/generation/integrity_linux_test.go",
           "name": "TestDetectedCorruptionRevokesEveryDependentPublication"
@@ -5367,6 +5399,7 @@
       "implementation": [
         "internal/management",
         "internal/managementservice",
+        "internal/volume",
         "internal/worker",
         "internal/diskbudget",
         "cmd/outpost",
@@ -5377,6 +5410,18 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "cmd/outpost/volume_transition_linux_test.go",
+          "name": "TestCLIFencedVolumePermitKeepsPrivateOwnerKeyOffline"
+        },
+        {
+          "path": "internal/volume/transition_linux_test.go",
+          "name": "TestFencedVolumePermitAndCopyRefusals"
+        },
+        {
+          "path": "internal/volume/transition_linux_test.go",
+          "name": "TestFencedVolumeRetiresBeforeActivationAndPreservesCopy"
+        },
         {
           "path": "internal/worker/capacity_linux_test.go",
           "name": "TestCapacityBlockedNewGenerationPreservesCompleteHistory"
@@ -5663,7 +5708,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
+      "remaining": "Cold same-host file-level receiver volume transition has an opt-in authority profile with the earlier disk fenced before activation. Named CLI and three-volume isolated tests require exact execution. Direct v1 migration, raw clones, physical cold boot and unlock remain separate. Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills."
     },
     {
       "id": "REQ-40",
@@ -6207,6 +6252,8 @@
       "implementation": [
         "internal/management",
         "internal/managementservice",
+        "internal/ingress",
+        "internal/peer",
         "internal/worker",
         "internal/capture",
         "internal/sourceagent",
@@ -6219,6 +6266,86 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/worker/telemetry_restore_linux_test.go",
+          "name": "TestWorkerRestoreFailureMetricsRequireObservedTerminalCommands"
+        },
+        {
+          "path": "internal/worker/recovery_linux_test.go",
+          "name": "TestWorkerRecoveryWithdrawalRetainsStageAndCleansOnlyOwnPin"
+        },
+        {
+          "path": "internal/management/verified_restores_linux_test.go",
+          "name": "TestManagementVerifiedRestoresUseExactAuthenticatedScope"
+        },
+        {
+          "path": "internal/management/verified_restores_linux_test.go",
+          "name": "TestVerifiedRestoreEarliestRetainedWholePreservesLatestAndLegacyJSON"
+        },
+        {
+          "path": "internal/capture/measurements_linux_test.go",
+          "name": "TestCaptureMeasurementsRequireAuthenticatedCommittedReceipts"
+        },
+        {
+          "path": "internal/sourceagent/capture_measurements_linux_test.go",
+          "name": "TestSourceCaptureMeasurementsDistinguishUnavailableJobFromDamagedMetadata"
+        },
+        {
+          "path": "cmd/outpost/cli_flow_linux_test.go",
+          "name": "TestCLIProcessSourceAndOutboundFollowerKeepIndependentHistory"
+        },
+        {
+          "path": "internal/sourceagent/sealed_replacement_linux_test.go",
+          "name": "TestSourceSealedReceiverReplacementAndReclaimsSlot"
+        },
+        {
+          "path": "internal/worker/ingress_body_observation_linux_test.go",
+          "name": "TestWorkerIngressObjectBodyObservationRestartsAndQuotaDoesNotRefusePut"
+        },
+        {
+          "path": "internal/sourceagent/body_pacing_linux_test.go",
+          "name": "TestSourceBootstrapRejectsWorkerObjectObservers"
+        },
+        {
+          "path": "internal/peer/object_body_observation_linux_test.go",
+          "name": "TestPushedObjectBodyCountsActualReadsAndOmitsReplay"
+        },
+        {
+          "path": "internal/peer/object_body_observation_linux_test.go",
+          "name": "TestPeerObjectAlreadyPresentHintIsOptional"
+        },
+        {
+          "path": "internal/peer/object_body_observation_linux_test.go",
+          "name": "TestPeerObjectObservationMeasuresAcknowledgedRetryUnderMTLS"
+        },
+        {
+          "path": "internal/worker/peer_object_body_observation_linux_test.go",
+          "name": "TestWorkerPeerObjectBodyAcknowledgementPersistsOnAuthorizedRoute"
+        },
+        {
+          "path": "internal/worker/peer_object_body_observation_linux_test.go",
+          "name": "TestWorkerPeerObjectBodyV2PreservesStrictLegacyReadback"
+        },
+        {
+          "path": "internal/ingress/object_write_observation_linux_test.go",
+          "name": "TestIngressObjectWriteObservationRequiresUnambiguousCompleteBody"
+        },
+        {
+          "path": "internal/ingress/object_write_observation_linux_test.go",
+          "name": "TestIngressObjectWriteObservationRequiresAuthenticatedReadback"
+        },
+        {
+          "path": "internal/ingress/object_write_observation_linux_test.go",
+          "name": "TestIngressObjectWriteObservationPreservesPacedCancellation"
+        },
+        {
+          "path": "internal/sourceagent/outgoing_object_observation_linux_test.go",
+          "name": "TestSourceOutgoingObjectObservationIsTransientAndScoped"
+        },
+        {
+          "path": "internal/sourceagent/outgoing_object_observation_linux_test.go",
+          "name": "TestSourceOutgoingObjectObservationDoesNotAllocateTelemetryStorage"
+        },
         {
           "path": "internal/sourceagent/native_release_linux_test.go",
           "name": "TestNativeReleaseTicketFollowsDurableCheckpointWithoutExecutionLease"
@@ -6344,6 +6471,10 @@
           "name": "TestWorkerHTTPObservationCapacityDoesNotStopExternalRecovery"
         },
         {
+          "path": "internal/worker/external_transfer_status_linux_test.go",
+          "name": "TestExternalTransferStatusRequiresExactCompletedAttempt"
+        },
+        {
           "path": "internal/worker/link_budget_linux_test.go",
           "name": "TestBootstrapLinkBudgetPacesSharedS3AndWebDAVBodyTraffic"
         },
@@ -6365,7 +6496,7 @@
         }
       ],
       "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
-      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. Full-scale snapshot retention, first independent restore and readiness timing for every assigned replica remain open."
+      "remaining": "Never-admitted request refusal has a bounded candidate; manual accessibility, published-command uncertainty and journal lifecycle, installation/distribution, complete telemetry instrumentation and audit lifecycle, full resource accounting, migration/rollback and operational drills. Source status exposes the durable provider-release observation and ciphertext verification times from the signed checkpoint. The management API can project the earliest retained authenticated whole restore per node and generation. Full-scale snapshot retention, globally first independent restore and readiness timing for every assigned replica remain open."
     },
     {
       "id": "REQ-43",
@@ -6384,6 +6515,26 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/management/retention_draft_linux_test.go",
+          "name": "TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetryReportsObservedLocalReplicaDamage"
+        },
+        {
+          "path": "internal/worker/telemetry_linux_test.go",
+          "name": "TestWorkerTelemetryLocalDamageProfilePreservesQueueOnReopen"
+        },
+        {
+          "path": "packaging/monitoring/rules.test.yml",
+          "name": "Local replica corruption follows current known inventory with stable alert labels"
+        },
+        {
+          "path": "scripts/check-monitoring-delivery.py",
+          "name": "test_delivery"
+        },
         {
           "path": "internal/management/registry_linux_test.go",
           "name": "TestManagementEnrollmentDurableIntentIdentityScopeAndFences"
@@ -9072,6 +9223,10 @@
       "checks": [
         {
           "path": "packaging/monitoring/rules.test.yml",
+          "name": "Local replica corruption follows current known inventory with stable alert labels"
+        },
+        {
+          "path": "packaging/monitoring/rules.test.yml",
           "name": "Original observation times distinguish current failures and missing telemetry"
         },
         {
@@ -9228,6 +9383,14 @@
         {
           "path": "internal/upload/claim_slot_linux_test.go",
           "name": "TestSlowClaimRespectsSlotEvenWithLongerOperation"
+        },
+        {
+          "path": "internal/upload/claim_batch_linux_test.go",
+          "name": "TestPreparedPartReadOnlyAdmissionPreservesBudgetAndFloor"
+        },
+        {
+          "path": "internal/worker/upload_capacity_linux_test.go",
+          "name": "TestWorkerPreparedUploadCapacityRechecksGuardAfterBudget"
         },
         {
           "path": "internal/upload/scale_linux_test.go",

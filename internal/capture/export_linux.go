@@ -1,13 +1,6 @@
 package capture
 
-import (
-	"bytes"
-	"context"
-	"crypto/ed25519"
-	"encoding/json"
-
-	"github.com/nd4y/outpost/internal/storage"
-)
+import "context"
 
 // Export returns a verified checkpoint and the completed file lineage. It does
 // not reopen the source or require the ingress endpoint to be available.
@@ -41,25 +34,11 @@ func (j *Job) Export(ctx context.Context) ([]byte, map[string]string, error) {
 			return err
 		}
 		for _, file := range j.plan.Files {
-			raw, e := j.files.Read(file.File)
+			stats, e := j.readFileReceipt(s.Plan, file.File)
 			if e != nil {
 				return e
 			}
-			var r fileReceipt
-			if storage.Decode(raw, &r, 65536) != nil || r.Plan != s.Plan || r.Stats.File != file.File || !storage.ID(r.Stats.Version) {
-				return ErrInvalid
-			}
-			canonical, _ := json.Marshal(r)
-			if !bytes.Equal(raw, canonical) {
-				return ErrInvalid
-			}
-			signature := r.Signature
-			r.Signature = nil
-			payload, _ := json.Marshal(r)
-			if !ed25519.Verify(j.authority.Trust.Writer, payload, signature) {
-				return ErrInvalid
-			}
-			heads[file.File] = r.Stats.Version
+			heads[file.File] = stats.Version
 		}
 		return nil
 	})

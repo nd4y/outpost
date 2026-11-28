@@ -493,6 +493,9 @@ func inspectSnapshot(ctx context.Context, reader io.Reader, trust SnapshotTrust,
 		out.Receipts = append(out.Receipts, resolutionReceipt(state, op.Receipt))
 		out.Audit = append(out.Audit, op.Audit)
 	}
+	for _, step := range state.RetentionSteps {
+		out.Audit = append(out.Audit, step.audit())
+	}
 	for _, resolution := range state.Resolutions {
 		out.Receipts = append(out.Receipts, resolution.Receipt)
 		out.Audit = append(out.Audit, resolution.Audit)
