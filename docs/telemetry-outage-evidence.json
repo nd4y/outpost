@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_SCOPED_TELEMETRY_TCP_OUTAGE_AND_REGULAR_RACE_CONTROLS",
+  "observedAt": "2026-11-17T08:45:18.004464+00:00",
+  "executedTree": "74f1369b61258b8a05c2933f00e563af4d7a919a",
+  "sourceInputCount": 527,
+  "previous525InputsUnchanged": true,
+  "changedExistingTestInputs": {
+    "internal/worker/telemetry_linux_test.go": {
+      "previous": "86a75e99e328c3b4a29bd5cda771e17220f558624c761f52b62e9bbcd93eb696",
+      "current": "b93a0721149f2bb727f750ad4cc1a7cbb5a0f01b0ac9ab9855f0cbc48e602b97"
+    }
+  },
+  "addedTestSHA256": "92fb26e0cb4364c28d52ab66daeda602f40071191a699a51279b9bba2c8d252c",
+  "requirements": ["REQ-42", "REQ-43"],
+  "scenario": "AT-26",
+  "goVersion": "go1.27.3 linux/amd64",
+  "runtimeImageDigest": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef",
+  "nativeFormatModulesAndVetPass": true,
+  "ordinaryAndRaceTopLevelObservations": 30,
+  "observations": {
+    "telemetry": {
+      "TestTelemetrySIGKILLPreservesCursorAndUnknownAck": 1.35,
+      "TestTelemetryHTTPOutcomesAndBoundedResponses": 0.13,
+      "TestTelemetryTLSIdentityRedirectAndRetryAfter": 0.01,
+      "TestTelemetryTCPOutageReopenAndSameTargetRecovery": 0.51,
+      "TestTelemetryTypedPayloadPrivacyAndUnknown": 0.0,
+      "TestTelemetryJournalAtomicCursorQuotaAndRestart": 0.24,
+      "TestTelemetryUncertainAckAndExplicitRejection": 0.37,
+      "TestTelemetrySlowDeliveryDoesNotLockProducer": 0.33,
+      "TestTelemetryPersistedRetryGuardAndByteLimit": 0.39,
+      "TestTelemetryFullByteQueueRetainsOutcomeHeadroom": 0.47,
+      "TestTelemetryOwnerScopeRevocationRenewalAndNoReplay": 0.44,
+      "TestTelemetryQuietEventsHeartbeatAndRejectedSample": 0.46
+    },
+    "telemetry-race": {
+      "TestTelemetrySIGKILLPreservesCursorAndUnknownAck": 2.28,
+      "TestTelemetryHTTPOutcomesAndBoundedResponses": 0.78,
+      "TestTelemetryTLSIdentityRedirectAndRetryAfter": 0.06,
+      "TestTelemetryTCPOutageReopenAndSameTargetRecovery": 0.93,
+      "TestTelemetryTypedPayloadPrivacyAndUnknown": 0.0,
+      "TestTelemetryJournalAtomicCursorQuotaAndRestart": 0.54,
+      "TestTelemetryUncertainAckAndExplicitRejection": 0.61,
+      "TestTelemetrySlowDeliveryDoesNotLockProducer": 0.48,
+      "TestTelemetryPersistedRetryGuardAndByteLimit": 0.87,
+      "TestTelemetryFullByteQueueRetainsOutcomeHeadroom": 0.8,
+      "TestTelemetryOwnerScopeRevocationRenewalAndNoReplay": 0.83,
+      "TestTelemetryQuietEventsHeartbeatAndRejectedSample": 0.64
+    },
+    "worker": {
+      "TestWorkerTelemetrySharedQuotaRefusesSendWithoutLosingQueue": 2.62,
+      "TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore": 7.81,
+      "TestWorkerTelemetryProjectionKeepsOriginalAgeAndDomainScope": 2.93
+    },
+    "worker-race": {
+      "TestWorkerTelemetrySharedQuotaRefusesSendWithoutLosingQueue": 4.32,
+      "TestWorkerTelemetrySlowSinkFullQueueDoesNotStopBackupRestore": 23.5,
+      "TestWorkerTelemetryProjectionKeepsOriginalAgeAndDomainScope": 3.91
+    }
+  },
+  "outage": {
+    "telemetry": {
+      "requests": "2",
+      "reopens": "2",
+      "cursor": "2",
+      "accepted": "1",
+      "pending": "1",
+      "warning": "1",
+      "rejected": "1",
+      "maxObservedJournalBytes": "1744",
+      "maxBytes": "8192",
+      "sameTarget": "true",
+      "sameRequest": "true",
+      "remoteDiagnosticsExcluded": "true"
+    },
+    "telemetry-race": {
+      "requests": "2",
+      "reopens": "2",
+      "cursor": "2",
+      "accepted": "1",
+      "pending": "1",
+      "warning": "1",
+      "rejected": "1",
+      "maxObservedJournalBytes": "1744",
+      "maxBytes": "8192",
+      "sameTarget": "true",
+      "sameRequest": "true",
+      "remoteDiagnosticsExcluded": "true"
+    }
+  },
+  "blockedWorker": {
+    "worker": {
+      "bytes": "262144",
+      "rpcMillis": "5000",
+      "operationMillis": "5000",
+      "receiverStillBlocked": "true"
+    },
+    "worker-race": {
+      "bytes": "262144",
+      "rpcMillis": "5000",
+      "operationMillis": "5000",
+      "receiverStillBlocked": "true"
+    }
+  },
+  "logSHA256": {
+    "telemetry": "1f9ce0ed2851994e7ff84990bbaa09334c38ac8a0b54dfe3c54ab254b3abe6bf",
+    "telemetry-race": "26d90446d93f95f5a870223cd9f397a282a203aa2877c809a717f4708194edcc",
+    "worker": "444fb0e5ddc15a3f1e736b02cdbabdfae006504688ab8488c6eafe1d463ac662",
+    "worker-race": "a49df5f5bef1f4c9756b6f697f8b4d12d14d6dc44547079bbc88f5e59e315467"
+  },
+  "resources": {
+    "cpuQuota": 1,
+    "cpuMax": "100000 100000",
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 530403328,
+    "memoryLimitEvents": 0,
+    "cpuUsageMicroseconds": 72407335,
+    "cpuThrottledMicroseconds": 421481,
+    "pidsMax": 128,
+    "swapBytes": 0,
+    "oom": 0,
+    "privateRuntimeIdleBeforeStart": true,
+    "reservePercent": 20
+  },
+  "resourcesLogSHA256": "7ed963211a517bd5ae711383a34d1b94ff87531fdcdf6d4141e67d90f0345e35",
+  "compiledSourceAgentTestSHA256": "896483804c27355b5bf40e7b4f0ea90a7f4f3a79b14ece5c526abe62ea481967",
+  "limits": [
+    "Synthetic same-endpoint TCP outage/reopen/return; no elapsed-backoff guarantee.",
+    "REQ-43 sensitive-data exclusion only; this case does not certify every audited operation.",
+    "The separate SIGKILL and slow-sink worker cases retain their own assertions and small corpus.",
+    "Whole-container memory includes compiler, child processes and charged page cache; no separate cache quota or host-wide measurement.",
+    "No real Collector endpoint, live monitoring route, selected product executable rebuild or whole AT-26/product acceptance."
+  ],
+  "fullProductAcceptance": false
+}

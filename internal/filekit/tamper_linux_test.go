@@ -67,7 +67,12 @@ func forgedDescriptor(t *testing.T, s *Store, e Envelope, d Descriptor) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err = s.Owner.seal(e.File, "descriptor", b)
+	forgedDescriptorBytes(t, s, e, b)
+}
+
+func forgedDescriptorBytes(t *testing.T, s *Store, e Envelope, b []byte) {
+	t.Helper()
+	b, err := s.Owner.seal(e.File, "descriptor", b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,6 +92,17 @@ func forgedDescriptor(t *testing.T, s *Store, e Envelope, d Descriptor) {
 	}
 	if err = s.writeEnvelope("kit.json", e); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func assertRestoreUnpublished(t *testing.T, out string) {
+	t.Helper()
+	if _, err := os.Lstat(out); !os.IsNotExist(err) {
+		t.Fatal("failed recovery published output", err)
+	}
+	stages, err := filepath.Glob(filepath.Join(filepath.Dir(out), ".outpost-restore-*"))
+	if err != nil || len(stages) != 0 {
+		t.Fatal("failed recovery retained plaintext staging", stages, err)
 	}
 }
 
@@ -177,6 +193,13 @@ func TestTamperedKitNeverPublishesOutput(t *testing.T) {
 				t.Fatal(err)
 			}
 		},
+		"descriptor-extra-data": func(t *testing.T, k *Store, e *Envelope, d *Descriptor) {
+			b, err := json.Marshal(d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			forgedDescriptorBytes(t, k, *e, append(b, []byte("\n{}")...))
+		},
 		"reordered-blocks": func(t *testing.T, k *Store, e *Envelope, d *Descriptor) {
 			if len(d.Blocks) < 2 {
 				t.Fatal("need multiple blocks")
@@ -226,9 +249,7 @@ func TestTamperedKitNeverPublishesOutput(t *testing.T) {
 			if _, err = k.Restore(ctx, v.Version, out); err == nil {
 				t.Fatal("tamper accepted")
 			}
-			if _, err = os.Lstat(out); !os.IsNotExist(err) {
-				t.Fatal("failed recovery published output", err)
-			}
+			assertRestoreUnpublished(t, out)
 		})
 	}
 	if _, err := os.Stat(filepath.Join(base, "escaped")); !os.IsNotExist(err) {
@@ -258,16 +279,20 @@ func TestMultipartDescriptorIsSelfContained(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := Descriptor{Format: Format, Domain: s.Owner.Domain, File: file, Names: []string{"multipart"}, Size: 30000, SHA256: digest(bytes.Repeat(plain, 30000)), Metadata: meta}
-	for range 30000 {
+	const blocks = 60000
+	d := Descriptor{Format: Format, Domain: s.Owner.Domain, File: file, Names: []string{"multipart"}, Size: blocks, SHA256: digest(bytes.Repeat(plain, blocks)), Metadata: meta}
+	for range blocks {
 		d.Blocks = append(d.Blocks, Block{Hash: hash, Bytes: 1, Object: ref, CipherBytes: len(ciphertext)})
 	}
 	e, err := s.sealDescriptor(d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(e.Parts) < 2 {
-		t.Fatal("multipart case not exercised")
+	if len(e.Parts) < 3 || e.Parts[0].Bytes != DescriptorPart || e.Parts[1].Bytes != DescriptorPart {
+		t.Fatal("two full-size descriptor parts and a final part required")
+	}
+	if e.Parts[0].ID == e.Parts[1].ID {
+		t.Fatal("reordering must change descriptor ciphertext")
 	}
 	if err = s.writeEnvelope("versions/"+e.Version+".json", e); err != nil {
 		t.Fatal(err)
@@ -281,17 +306,43 @@ func TestMultipartDescriptorIsSelfContained(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer k.Close()
-	mustRestore(t, k, e.Version, filepath.Join(base, "good"), bytes.Repeat(plain, 30000), true)
-	e.Parts[0], e.Parts[1] = e.Parts[1], e.Parts[0]
-	e, err = s.Owner.sign(e)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = k.writeEnvelope("kit.json", e); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = k.Restore(context.Background(), e.Version, filepath.Join(base, "reordered")); err == nil {
-		t.Fatal("reordered descriptor parts accepted")
+	mustRestore(t, k, e.Version, filepath.Join(base, "good"), bytes.Repeat(plain, blocks), true)
+	for _, name := range []string{"missing-final-part", "reordered-full-size-parts"} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(base, name+"-kit")
+			if err := s.Export(context.Background(), e.Version, dir); err != nil {
+				t.Fatal(err)
+			}
+			bad, err := OpenStore(dir, s.Owner, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer bad.Close()
+			changed := e
+			changed.Parts = append([]Object(nil), e.Parts...)
+			if name == "missing-final-part" {
+				if err := bad.root.Remove(objectPath(changed.Parts[len(changed.Parts)-1].ID)); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				changed.Parts[0], changed.Parts[1] = changed.Parts[1], changed.Parts[0]
+				changed, err = s.Owner.sign(changed)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := s.Owner.verifyEnvelope(changed, e.Version); err != nil {
+					t.Fatal("reordered envelope must pass size/signature admission", err)
+				}
+				if err := bad.writeEnvelope("kit.json", changed); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out := filepath.Join(base, name+"-output")
+			if _, err := bad.Restore(context.Background(), e.Version, out); err == nil {
+				t.Fatal("invalid multipart kit accepted")
+			}
+			assertRestoreUnpublished(t, out)
+		})
 	}
 }
 
@@ -323,6 +374,7 @@ func TestCrossFileCiphertextAndVersionSubstitution(t *testing.T) {
 	if _, err = k.Restore(ctx, b.Version, filepath.Join(base, "wrong-version")); err == nil {
 		t.Fatal("substituted version accepted")
 	}
+	assertRestoreUnpublished(t, filepath.Join(base, "wrong-version"))
 	otherCipher, err := s.readObject(other.Blocks[0].Object)
 	if err != nil {
 		t.Fatal(err)
@@ -338,4 +390,5 @@ func TestCrossFileCiphertextAndVersionSubstitution(t *testing.T) {
 	if _, err = k.Restore(ctx, a.Version, filepath.Join(base, "wrong-file")); err == nil {
 		t.Fatal("other file ciphertext accepted")
 	}
+	assertRestoreUnpublished(t, filepath.Join(base, "wrong-file"))
 }

@@ -33,38 +33,43 @@ func must(t *testing.T, e error) {
 }
 
 type fixture struct {
-	base, input, id, version string
-	data                     []byte
-	owner                    filekit.Owner
-	store                    *filekit.Store
-	authority                Authority
-	planner, writer          ed25519.PrivateKey
-	replicas                 []*generation.Replica
-	dirs                     []string
-	workers                  []Worker
-	keys                     []ed25519.PrivateKey
-	serial                   int
+	base, input, id, version     string
+	data                         []byte
+	owner                        filekit.Owner
+	store                        *filekit.Store
+	authority                    Authority
+	planner, writer, maintenance ed25519.PrivateKey
+	replicas                     []*generation.Replica
+	dirs                         []string
+	workers                      []Worker
+	keys                         []ed25519.PrivateKey
+	serial                       int
+	childTimeout                 time.Duration
 }
 
 func newFixture(t *testing.T) *fixture {
+	return fixtureBytes(t, 3<<20)
+}
+func fixtureBytes(t *testing.T, size int) *fixture {
 	f := &fixture{base: teststore.Root(t)}
 	var e error
 	f.owner, e = filekit.NewOwner()
 	must(t, e)
 	pub, key, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
-	maintenance, _, e := ed25519.GenerateKey(rand.Reader)
+	maintenance, maintenanceKey, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	plannerPub, planner, e := ed25519.GenerateKey(rand.Reader)
 	must(t, e)
 	f.writer = key
 	f.planner = planner
+	f.maintenance = maintenanceKey
 	f.authority = Authority{generation.Trust{Domain: f.owner.Domain, Repository: storage.Hash([]byte("synthetic repository")), Epoch: 1, Writer: pub, Maintenance: maintenance}, plannerPub}
 	f.store, e = filekit.OpenStore(filepath.Join(f.base, "source-store"), f.owner, true)
 	must(t, e)
 	t.Cleanup(func() { f.store.Close() })
 	f.input = filepath.Join(f.base, "input")
-	f.data = make([]byte, 3<<20)
+	f.data = make([]byte, size)
 	_, e = rand.Read(f.data)
 	must(t, e)
 	copy(f.data, []byte("private-source-marker-not-for-external-plaintext"))
@@ -79,7 +84,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Cleanup(func() { r.Close() })
 		pub, key, e := ed25519.GenerateKey(rand.Reader)
 		must(t, e)
-		f.workers = append(f.workers, Worker{Identity(pub), "trusted", pub})
+		f.workers = append(f.workers, Worker{ID: Identity(pub), Class: "trusted", PublicKey: pub})
 		f.keys = append(f.keys, key)
 	}
 	f.id, f.version = f.capture(t, 1, "")
@@ -102,27 +107,41 @@ func (f *fixture) capture(t *testing.T, seq uint64, parent string) (string, stri
 	return id, v.Version
 }
 func (f *fixture) server(t *testing.T, kind string, delay time.Duration, before teststore.Hook) *teststore.Server {
+	return f.externalServer(t, teststore.Options{Kind: kind, Delay: delay, Before: before})
+}
+
+func (f *fixture) externalServer(t *testing.T, options teststore.Options) *teststore.Server {
+	t.Helper()
 	logins := map[string]teststore.Login{}
 	for i, w := range f.workers {
 		logins[w.ID] = teststore.Login{Secret: "test-secret-" + string(rune('a'+i))}
 	}
-	return teststore.New(t, teststore.Options{Kind: kind, Namespace: storage.Hash([]byte(f.authority.Generation.Domain + "/" + f.authority.Generation.Repository)), Logins: logins, Delay: delay, Before: before})
+	options.Namespace = storage.Hash([]byte(f.authority.Generation.Domain + "/" + f.authority.Generation.Repository))
+	options.Logins = logins
+	return teststore.New(t, options)
 }
 func profile(s *teststore.Server) storage.Profile {
 	p := storage.Profile{Kind: s.Options.Kind, Endpoint: s.Endpoint(), Namespace: s.Options.Namespace, MaxObjectBytes: 64 << 10, Concurrency: 1, RequestsPerSecond: 1000, Attempts: 2, TimeoutMillis: 3000, CredentialScope: "namespace", NoDelete: true}
 	if p.Kind == "s3" {
 		p.Region = s.Options.Region
 	}
+	if s.Options.MoveOnly {
+		p.WriteMode = storage.WebDAVMoveMode
+		p.MaxStagingAttempts = 3
+	}
 	return p
 }
 func (f *fixture) backend(t *testing.T, s *teststore.Server, worker int) *storage.Backend {
-	b, e := storage.New(profile(s), storage.Credentials{Access: f.workers[worker].ID, Secret: s.Options.Logins[f.workers[worker].ID].Secret, ExpiresUnix: time.Now().Add(time.Minute).Unix()}, s.Roots)
+	b, e := storage.New(profile(s), storage.Credentials{Access: f.workers[worker].ID, Secret: s.Options.Logins[f.workers[worker].ID].Secret, ExpiresUnix: f.expiresUnix()}, s.Roots)
 	must(t, e)
 	t.Cleanup(b.Close)
 	return b
 }
+func (f *fixture) expiresUnix() int64 {
+	return time.Now().Add(max(time.Minute, 2*f.childTimeout)).Unix()
+}
 func (f *fixture) plan(t *testing.T, s *teststore.Server, workers int, slot int64) []byte {
-	p := Plan{Format: Format, Operation: storage.Hash([]byte(s.Endpoint() + "/" + f.id)), Profile: profile(s), AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: f.workers[:workers], StartMillis: time.Now().Add(200 * time.Millisecond).UnixMilli(), ExpiresUnix: time.Now().Add(60 * time.Second).Unix(), SlotMillis: slot}
+	p := Plan{Format: Format, Operation: storage.Hash([]byte(s.Endpoint() + "/" + f.id)), Profile: profile(s), AllowExternal: true, AllowedClasses: []string{"trusted"}, Workers: f.workers[:workers], StartMillis: time.Now().Add(200 * time.Millisecond).UnixMilli(), ExpiresUnix: f.expiresUnix(), SlotMillis: slot}
 	raw, e := Build(context.Background(), f.replicas[0], f.id, p, f.planner)
 	must(t, e)
 	return raw
@@ -135,6 +154,7 @@ type childConfig struct {
 	Profile                                            storage.Profile
 	CA                                                 []byte
 	ExpiresUnix                                        int64
+	Timeout                                            time.Duration
 }
 type child struct {
 	cmd    *exec.Cmd
@@ -151,7 +171,7 @@ func (f *fixture) prepare(t *testing.T, s *teststore.Server, raw []byte, worker 
 	j, e := Open(dir, raw, f.workers[worker].ID, f.authority, true)
 	must(t, e)
 	must(t, j.Close())
-	cfg := childConfig{Directory: dir, Replica: f.dirs[worker], Worker: f.workers[worker].ID, Result: dir + "/result.json", Access: f.workers[worker].ID, Secret: s.Options.Logins[f.workers[worker].ID].Secret, Key: f.keys[worker], Authority: f.authority, Profile: profile(s), CA: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.HTTP.Certificate().Raw}), ExpiresUnix: time.Now().Add(60 * time.Second).Unix()}
+	cfg := childConfig{Directory: dir, Replica: f.dirs[worker], Worker: f.workers[worker].ID, Result: dir + "/result.json", Access: f.workers[worker].ID, Secret: s.Options.Logins[f.workers[worker].ID].Secret, Key: f.keys[worker], Authority: f.authority, Profile: profile(s), CA: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.HTTP.Certificate().Raw}), ExpiresUnix: f.expiresUnix(), Timeout: max(20*time.Second, f.childTimeout)}
 	data, e := json.Marshal(cfg)
 	must(t, e)
 	path := dir + "/child.json"
@@ -162,7 +182,7 @@ func (c *child) start(t *testing.T) {
 	t.Helper()
 	binary, e := os.Executable()
 	must(t, e)
-	c.cmd = exec.Command(binary, "-test.run=^TestExternalUploadWorkerProcess$", "-test.timeout=25s")
+	c.cmd = exec.Command(binary, "-test.run=^TestExternalUploadWorkerProcess$", "-test.timeout="+(c.config.Timeout+5*time.Second).String())
 	c.cmd.Env = append(os.Environ(), "OUTPOST_UPLOAD_CHILD="+c.path)
 	c.cmd.Stdout = &c.log
 	c.cmd.Stderr = &c.log
@@ -185,7 +205,7 @@ func (c *child) wait(t *testing.T, success bool) {
 		if !success && e == nil {
 			t.Fatal("killed worker unexpectedly succeeded")
 		}
-	case <-time.After(25 * time.Second):
+	case <-time.After(c.config.Timeout + 5*time.Second):
 		_ = c.cmd.Process.Kill()
 		t.Fatal("worker deadline exceeded")
 	}
@@ -214,7 +234,7 @@ func TestExternalUploadWorkerProcess(t *testing.T) {
 	b, e := storage.New(cfg.Profile, storage.Credentials{Access: cfg.Access, Secret: cfg.Secret, ExpiresUnix: cfg.ExpiresUnix}, roots)
 	must(t, e)
 	defer b.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 	defer cancel()
 	result, e := j.Run(ctx, r, b, cfg.Key)
 	must(t, e)
@@ -260,18 +280,64 @@ func recoverBytes(t *testing.T, f *fixture, s *teststore.Server, id, version str
 		t.Fatal("restored attributes differ")
 	}
 }
+
+// Profile observations cover the whole process group: workers and the synthetic
+// endpoint share the admitted CPU and HDD. They do not attribute a bottleneck.
+func logUploadProfile(t *testing.T, phase string, s *teststore.Server, children []*child) {
+	t.Helper()
+	snapshot := s.Snapshot()
+	var first, last time.Time
+	var childCPU time.Duration
+	for _, event := range snapshot.Events {
+		if first.IsZero() || event.Start.Before(first) {
+			first = event.Start
+		}
+		if event.End.After(last) {
+			last = event.End
+		}
+	}
+	for _, child := range children {
+		if state := child.cmd.ProcessState; state != nil {
+			childCPU += state.UserTime() + state.SystemTime()
+		}
+	}
+	t.Logf("upload profile phase=%s requests=%d part-write-span=%s child-cpu=%s", phase, snapshot.Requests, last.Sub(first), childCPU)
+	for _, name := range []string{"cpu.stat", "io.stat", "cpu.pressure", "io.pressure"} {
+		if raw, err := os.ReadFile("/sys/fs/cgroup/" + name); err == nil {
+			t.Logf("upload profile phase=%s cgroup-%s=%s", phase, name, strings.Join(strings.Fields(string(raw)), " "))
+		}
+	}
+}
+
 func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
+	latency := 40 * time.Millisecond
+	profiled := os.Getenv("OUTPOST_UPLOAD_LATENCY_PROFILE") == "1"
+	if profiled {
+		if os.Getenv("OUTPOST_TEST_ROOT") == "" {
+			t.Fatal("OUTPOST_UPLOAD_LATENCY_PROFILE=1 requires nonempty OUTPOST_TEST_ROOT")
+		}
+		latency = 150 * time.Millisecond
+	}
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
-			baseline := f.server(t, kind, 40*time.Millisecond, nil)
-			single := f.prepare(t, baseline, f.plan(t, baseline, 1, 60000), 0)
+			// Bound child execution and assignment independently of per-part delay.
+			f.childTimeout = 120 * time.Second
+			const slotMillis = 180000
+			baseline := f.server(t, kind, latency, nil)
+			single := f.prepare(t, baseline, f.plan(t, baseline, 1, slotMillis), 0)
+			if profiled {
+				logUploadProfile(t, kind+"-before-single", baseline, nil)
+			}
 			start := time.Now()
 			single.start(t)
 			single.wait(t, true)
 			singleTime := time.Since(start)
-			target := f.server(t, kind, 40*time.Millisecond, nil)
-			raw := f.plan(t, target, 3, 60000)
+			if profiled {
+				logUploadProfile(t, kind+"-after-single", baseline, []*child{single})
+			}
+			target := f.server(t, kind, latency, nil)
+			raw := f.plan(t, target, 3, slotMillis)
 			children := []*child{}
 			for i := 0; i < 3; i++ {
 				children = append(children, f.prepare(t, target, raw, i))
@@ -284,6 +350,10 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 				c.wait(t, true)
 			}
 			parallelTime := time.Since(start)
+			if profiled {
+				logUploadProfile(t, kind+"-after-three", target, children)
+			}
+			speedup := float64(singleTime) / float64(parallelTime)
 			snapshot := target.Snapshot()
 			actors := map[string]int{}
 			for _, event := range snapshot.Events {
@@ -297,7 +367,10 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 					t.Fatal("physical object rewritten", key)
 				}
 			}
-			t.Logf("bounded delayed-endpoint fixture: single=%s three=%s ratio=%.2f physical-parts=%d", singleTime, parallelTime, float64(singleTime)/float64(parallelTime), len(snapshot.Events))
+			t.Logf("bounded delayed-endpoint fixture: input-bytes=%d single=%s three=%s single-ns=%d three-ns=%d speedup=%.6f latency=%s workers=%d/%d physical-parts=%d", len(f.data), singleTime, parallelTime, singleTime.Nanoseconds(), parallelTime.Nanoseconds(), speedup, latency, 1, 3, len(snapshot.Events))
+			if profiled && speedup < 1.5 {
+				t.Errorf("latency profile speedup below 1.5: single=%s three=%s speedup=%.2f input-bytes=%d latency=%s workers=%d/%d events=%d", singleTime, parallelTime, speedup, len(f.data), latency, 1, 3, len(snapshot.Events))
+			}
 			// A later, incomplete generation cannot replace the retained complete one.
 			oldID, oldVersion, oldBytes := f.id, f.version, append([]byte(nil), f.data...)
 			changed := append([]byte(nil), f.data...)
@@ -338,7 +411,7 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 			// untrusted marker; both retained versions must then recover alone.
 			f.id = next
 			f.version = nextVersion
-			nextRaw := f.plan(t, target, 3, 60000)
+			nextRaw := f.plan(t, target, 3, slotMillis)
 			secondWorkers := []*child{}
 			for i := 0; i < 3; i++ {
 				secondWorkers = append(secondWorkers, f.prepare(t, target, nextRaw, i))
@@ -388,13 +461,26 @@ func TestThreeProcessesAndIndependentCloudRecovery(t *testing.T) {
 			if claims == 0 {
 				t.Fatal("no signed assignment claims observed")
 			}
+			if profiled {
+				t.Log("latency profile correctness: false marker rejected; old and new versions restored independently after source replicas removed; signed claims and ciphertext confidentiality checked")
+			}
 		})
 	}
 }
 func TestWorkerSIGKILLReassignmentAndRestart(t *testing.T) {
+	testWorkerSIGKILLReassignment(t, 0)
+}
+
+func TestWeightedWorkerSIGKILLReassignmentAndRestart(t *testing.T) {
+	testWorkerSIGKILLReassignment(t, MaxWorkerWeight)
+}
+
+func testWorkerSIGKILLReassignment(t *testing.T, weight int) {
+	t.Helper()
 	for _, kind := range []string{"s3", "webdav"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
+			f.workers[0].Weight = weight
 			blocked := make(chan string, 1)
 			var once sync.Once
 			var enabled atomic.Bool

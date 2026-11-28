@@ -1,0 +1,71 @@
+name: Browser interface checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      PYTHONDONTWRITEBYTECODE: "1"
+    container:
+      image: mcr.microsoft.com/playwright@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --cpus 1 --memory 1536m --pids-limit 256 --shm-size 128m
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ env.SOURCE_COMMIT }}
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install checksum-locked test dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci --prefix scripts/browser --ignore-scripts --no-audit --no-fund
+      - name: Compile isolated loopback fixture
+        env:
+          CGO_ENABLED: "0"
+          GOMAXPROCS: "2"
+        run: go test -p=1 -c -o "$RUNNER_TEMP/outpost-browser.test" ./internal/management
+      - name: Authenticated browser journeys and accessibility checks
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/outpost-browser-data"
+          OUTPOST_BROWSER_BINARY="$RUNNER_TEMP/outpost-browser.test" \
+          OUTPOST_BROWSER_ROOT="$RUNNER_TEMP/outpost-browser-results" \
+          OUTPOST_TEST_ROOT="$RUNNER_TEMP/outpost-browser-data" \
+          TMPDIR="$RUNNER_TEMP/outpost-browser-data" \
+          timeout 210 node scripts/browser/check.mjs
+      - name: Package safe synthetic visual evidence
+        run: |
+          python3 scripts/package-browser-evidence.py --root "$RUNNER_TEMP/outpost-browser-results" \
+            --output "$RUNNER_TEMP/visual-evidence" --archive "$RUNNER_TEMP/outpost-browser-visual.tar.gz" \
+            --repository "$GITHUB_REPOSITORY" --commit "$SOURCE_COMMIT" \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/visual-receipt.json"
+      - name: Preserve safe visual evidence
+        id: visual_upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: outpost-browser-${{ env.SOURCE_COMMIT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/outpost-browser-visual.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+      - name: Record independent visual selection
+        env:
+          ARTIFACT_ID: ${{ steps.visual_upload.outputs.artifact-id }}
+          ARTIFACT_SHA256: ${{ steps.visual_upload.outputs.artifact-digest }}
+        run: |
+          python3 scripts/record-candidate-release.py --input "$RUNNER_TEMP/visual-receipt.json" \
+            --artifact-id "$ARTIFACT_ID" --artifact-sha256 "$ARTIFACT_SHA256" --summary "$GITHUB_STEP_SUMMARY"

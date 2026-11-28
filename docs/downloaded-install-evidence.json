@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "status": "DOWNLOADED_AMD64_INSTALL_UPGRADE_ROLLBACK_AND_RECOVERY_PASS",
+  "observedAt": "2026-11-14T13:40:29.492611+00:00",
+  "environment": "Isolated synthetic Linux amd64 container host on a dedicated HDD; no production profile or deployment.",
+  "currentExecutableCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+  "previousExecutableCommit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+  "currentSelection": {
+    "archiveSHA256": "954d66a6c85343fb493a5b7235e4996989cb09e39426a7138a049b7d8bffdc71",
+    "artifactId": 14115396258,
+    "artifactSHA256": "862606aff3dc27c1e23bbcca0dc201e1a659b90335dcd60132ea875ca2c7eb5c",
+    "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43597711032/artifacts/14115396258",
+    "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "format": "outpost-ci-artifact-selection-1",
+    "kind": "outpost-ci-candidate-1",
+    "manifestSHA256": "f7aaa4952308b8b5a80f258d6d7ecdad55e730ccac70e3875898d263f1249fbc",
+    "nativeArchitecture": "amd64",
+    "repository": "nd4y/outpost",
+    "runAttempt": 1,
+    "runId": 43597711032
+  },
+  "previousSelection": {
+    "archiveSHA256": "f5bd67f34de9fcd75fd80bbc7e7af43c9588e98db6e83c3e178f77d93f2151ed",
+    "artifactId": 14110515525,
+    "artifactSHA256": "18837a5f81d787c21a2aa002258c759d1b11a8adae567b880051255b93abd2be",
+    "artifactURL": "https://github.com/nd4y/outpost/actions/runs/43584314070/artifacts/14110515525",
+    "commit": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+    "format": "outpost-ci-artifact-selection-1",
+    "kind": "outpost-ci-candidate-1",
+    "manifestSHA256": "6be7729fa9bf59fcf0f1c982d3007c43fce85ba84e2f13871ae614e8c1c87d5c",
+    "nativeArchitecture": "amd64",
+    "repository": "nd4y/outpost",
+    "runAttempt": 1,
+    "runId": 43584314070
+  },
+  "currentDistribution": {
+    "architectures": ["amd64", "arm64"],
+    "format": "outpost-distribution-1",
+    "manifestSHA256": "4affc1f23e6d0073b21b9f4769735f3d749a6469994bb9d4b58b22361071a66a",
+    "revision": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "runtimeAcceptance": false,
+    "sourceDigest": "6748a1e93c9c3b5ff5ef6a7cfae32fffb221b8eabfd5e256a91c1f94c84f92a5",
+    "state": "VERIFIED_ARTIFACTS"
+  },
+  "previousDistribution": {
+    "architectures": ["amd64", "arm64"],
+    "format": "outpost-distribution-1",
+    "manifestSHA256": "6d89bf20379cf08f0e34a4b437138278897f1f25bd3b2b632fc5b172ad32701f",
+    "revision": "f2f332121efa9cf07af9fd9861afb4f63c7744f3",
+    "runtimeAcceptance": false,
+    "sourceDigest": "89aa4f05840eb19d20b1ccbd74366917dee19a10d406404b0b916da5dae96079",
+    "state": "VERIFIED_ARTIFACTS"
+  },
+  "image": "sha256:221a54be158c5bcfa2aa85003be69b6051ad7e17bcefadc5dabd620a716afb05",
+  "previousImage": "sha256:4aa7612c8a460b791994566cc61ed95025b899d4284c9dde3b2cd3fcab0c7617",
+  "imagesAreLocalTestBuildsFromDownloadedBinaries": true,
+  "workerBinariesRebuilt": false,
+  "fixtureHelperCommit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+  "fixtureHelperSHA256": "0c6f439522cdd917402abc9b44631cc20879ffd61f833358da7be90069dabbb0",
+  "downloadedArchitecturesVerified": ["amd64", "arm64"],
+  "runtimeArchitecture": "amd64",
+  "nativeCIArchitectures": ["amd64", "arm64"],
+  "checks": [
+    {
+      "architecture": "amd64",
+      "state": "PASS",
+      "test": "image_and_enforced_isolation"
+    },
+    {
+      "cases": 3,
+      "state": "PASS",
+      "test": "unsafe_runtime_rejected_before_profile"
+    },
+    {
+      "clearSourceAbsent": true,
+      "state": "PASS",
+      "test": "explicit_installation"
+    },
+    {
+      "ciphertextObjects": 4,
+      "revision": 2,
+      "state": "PASS",
+      "test": "cached_start_upgrade_stop_and_rollback"
+    },
+    {
+      "services": 4,
+      "state": "PASS",
+      "test": "compose_profile_preserves_runtime_constraints"
+    },
+    {
+      "state": "PASS",
+      "test": "missing_or_readonly_volume_fails_without_fallback"
+    },
+    {
+      "bytes": 19456,
+      "sha256": "64d0df35d001f0834e61831fa3139d8a205473196231b9913fd0be08115c0d74",
+      "state": "PASS",
+      "test": "independent_recovery_after_source_removal"
+    }
+  ],
+  "ciphertextObjectsPreserved": 4,
+  "restoredFixtureBytes": 19456,
+  "resources": {
+    "cpuMax": "100000 100000",
+    "memoryMaxBytes": 805306368,
+    "swapAdditionalBytes": 0,
+    "pidsLimit": 128,
+    "network": "none",
+    "ownedContainersRemoved": 23,
+    "oomKilled": 0,
+    "sampledCgroups": 9,
+    "maxObservedCgroupPeakBytes": 5619712,
+    "shortLivedCgroupsNotRecorded": 14,
+    "fixtureCompilerPeakBytes": 301084672,
+    "archiveInspectorPeakBytes": 178728960,
+    "limitation": "Cgroup peaks were readable for nine longer-lived containers. Fourteen short-lived cgroups disappeared before sampling; their peaks remain NOT_RECORDED. The 19 KiB recovery fixture and these peaks do not establish production RAM headroom or large-file throughput."
+  },
+  "testTools": {
+    "compose": {
+      "version": "2.39.4",
+      "bytes": 76361386,
+      "sha256": "7af95166a730b87e172d4fc9aefea8725d3c6c7327d59149267b452114ddb7d4"
+    },
+    "buildx": {
+      "version": "0.28.0",
+      "bytes": 68174008,
+      "sha256": "696bc104bac3bb708eff1af3f8bbc09fda0fd88f5757c1f9b404a35117889224"
+    },
+    "placement": "Private test-only CLI configuration; no global installation. BuildKit uses the built-in Docker driver and the explicitly selected isolated daemon."
+  },
+  "failuresRetained": [
+    "First image build refused COPY --chmod because the isolated CLI lacked Buildx and selected the legacy builder. No worker started; Dockerfile permissions were unchanged.",
+    "A later preparatory observer used unsupported buildx inspect --format. Corrected plaintext inspection plus independent default-context JSON verified the exact isolated daemon. The plugin was reused after a fresh length/SHA check; no duplicate download or test-threshold change."
+  ],
+  "requiredCI": [
+    {
+      "name": "browser-ui",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711050/job/132455660797"
+    },
+    {
+      "name": "documentation",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711035/job/132455661023"
+    },
+    {
+      "name": "container (ubuntu-24.04, amd64)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711032/job/132455660945"
+    },
+    {
+      "name": "go-prototype",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711043/job/132455660994"
+    },
+    {
+      "name": "repository-standard",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711040/job/132455660782"
+    },
+    {
+      "name": "container (ubuntu-24.04-arm, arm64)",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/nd4y/outpost/actions/runs/43597711032/job/132455660821"
+    }
+  ],
+  "pending": [
+    "Cold host unlock/mount/start ordering and admitted infrastructure",
+    "Actual endpoint/source profiles and operational lifecycle",
+    "Full-size source ingress and separate full-size offline consumers",
+    "Separate G3 throughput gates and whole-product acceptance"
+  ],
+  "fullProductAcceptance": false
+}

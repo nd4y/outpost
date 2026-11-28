@@ -1,0 +1,13 @@
+groups:
+  - name: outpost-independent-watchdog
+    rules:
+      - alert: OutpostMonitoringDeliveryMissing
+        expr: |
+          (outpost_expected_monitor_max_age_seconds > 0)
+            unless on (outpost_monitor)
+              (((time() - outpost_monitor_heartbeat_received_timestamp_seconds) >= 0)
+                <= on (outpost_monitor) outpost_expected_monitor_max_age_seconds)
+        labels:
+          severity: critical
+        annotations:
+          runbook: monitoring

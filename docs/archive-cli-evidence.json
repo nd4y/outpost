@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_BOUNDED_NATIVE_ARCHIVE_STATUS_PROCESS",
+  "sourceCommit": "056661c86476bada41f83fd431147548c6914983",
+  "observedAt": "2026-11-16T19:38:04.902089+00:00",
+  "runId": 43936282604,
+  "sourceInputs": [
+    {
+      "path": "cmd/outpost/external_archive_linux_test.go",
+      "sha256": "401d5b456c75f6f672cb63bba89abce0b5eb957a8e3baddb8f75803df00d487f"
+    },
+    {
+      "path": ".github/workflows/distribution.yml",
+      "sha256": "ec0a97fd496d0ba09cdd62b4b24da5a13e7c11d095a616ae85903be01e5086c4"
+    }
+  ],
+  "case": "TestCLIArchiveRetrievalRestartsExpiresAndRestoresSelectedVersion",
+  "nativeJobs": [
+    {
+      "architecture": "amd64",
+      "jobId": 133541607140,
+      "currentCLIRevision": "056661c86476bada41f83fd431147548c6914983",
+      "caseSeconds": 0.39,
+      "decodedLogSHA256": "3b01f693fcb03dd7cedc80d176b0dfa1cac92c7368d0d9c93ab3d5a3838d3a8f",
+      "logURL": "https://github.com/nd4y/outpost/actions/runs/43936282604/job/133541607140"
+    },
+    {
+      "architecture": "arm64",
+      "jobId": 133541606651,
+      "currentCLIRevision": "056661c86476bada41f83fd431147548c6914983",
+      "caseSeconds": 0.4,
+      "decodedLogSHA256": "d05d19cb40351e8f43dc8f3da54bf24fc4589abca2ac24db322dfa192ca67617",
+      "logURL": "https://github.com/nd4y/outpost/actions/runs/43936282604/job/133541606651"
+    }
+  ],
+  "allSixExactHeadCISuccess": true,
+  "selectedFileBytes": 118784,
+  "selectedFileVersions": 1,
+  "componentRestoresOfSelectedVersion": 2,
+  "separateCLIProcess": "Status reconciliation only, after a synthetic target accepted retrieval and dropped the reply",
+  "assertions": [
+    "Hot catalog and encrypted kit metadata remain independently readable",
+    "Changed signed-plan digest sends no targetrequest; overcostbatch refused",
+    "Lost accepted retrievalreply reconciled by separately executed selectedcurrentCLI without repeating that request",
+    "Unrelated version never requested or restored",
+    "Insufficient temporarywindow notREADY; expiredrestore leaves outputunpublished",
+    "A second explicitretrieval afterexpiry restores identicalselectedfilebytes"
+  ],
+  "limits": [
+    "Synthetic HTTPS S3-compatible delayed-class fixture; no realarchive-class/retention/cost/RTO admission.",
+    "Other request/restore phases call the handler in the testprocess; only the named statusstep is a separateactualCLIprocess.",
+    "No complete-generation archive or fullproduct acceptance. Ordinary packageexecution without selectedCLI uses sameprocessfallback and is separate evidence."
+  ]
+}

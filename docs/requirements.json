@@ -22,10 +22,11 @@
     "G1": {
       "milestone": "M0",
       "requirements": ["REQ-09", "REQ-10", "REQ-11"],
-      "status": "NOT_VERIFIED",
+      "status": "PASS",
       "evidencePlan": "docs/en/g1-acceptance.md",
       "limits": "docs/g1-acceptance.json",
-      "implementation": "internal/filekit"
+      "implementation": "internal/filekit",
+      "scaleEvidence": "docs/g1-scale-evidence.json"
     }
   },
   "standardVersion": "0.4.0",
@@ -209,7 +210,7 @@
       "stage": "release",
       "milestones": ["M1", "M2"],
       "level": "MUST",
-      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-23", "AT-29"],
+      "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
       "id": "REQ-05"
     },
     {
@@ -233,7 +234,7 @@
       "stage": "release",
       "milestones": ["M1"],
       "level": "MUST",
-      "acceptance": ["AT-01", "AT-24"],
+      "acceptance": ["AT-01", "AT-18", "AT-24"],
       "id": "REQ-08"
     },
     {
@@ -369,7 +370,7 @@
       "stage": "release",
       "milestones": ["M2"],
       "level": "MUST",
-      "acceptance": ["AT-01", "AT-07", "AT-08"],
+      "acceptance": ["AT-01", "AT-07", "AT-08", "AT-10"],
       "id": "REQ-25"
     },
     {
@@ -505,7 +506,7 @@
       "stage": "release",
       "milestones": ["M4"],
       "level": "MUST",
-      "acceptance": ["AT-22", "AT-25", "AT-26"],
+      "acceptance": ["AT-22", "AT-25", "AT-26", "AT-30"],
       "id": "REQ-42"
     },
     {
@@ -598,7 +599,7 @@
       "stage": "release"
     }
   ],
-  "specVersion": "1.4",
+  "specVersion": "1.5",
   "schemaVersion": 1,
   "normativeSources": {
     "ru": "docs/ru/specification.md",

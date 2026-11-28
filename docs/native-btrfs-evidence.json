@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_BOUNDED",
+  "scope": "Synthetic native Btrfs kernel snapshot acquisition/reuse, signed disposal/release and two independently restored small-file versions. No production source/profile, large native snapshot-retention, application consistency, cold boot, G2/G3 or whole-product acceptance.",
+  "source": {
+    "commit": "1cb174ef12357c288233e9d3cf4e887d55b1ed05",
+    "tree": "abf1f57ecbbd00b99663a12d78bfccee86caa2d3",
+    "files": 648
+  },
+  "environment": {
+    "os": "Linux amd64",
+    "kernel": "6.12.116+deb13-amd64",
+    "tools": "btrfs-progs6.14",
+    "filesystemImageBytes": 1073741824,
+    "filesystemImageAllocatedBytes": 7577600,
+    "imageIsCapacityNotCorpus": true,
+    "stateStorage": "Dedicated HDD; new regular-file image and private mount/network namespaces; no physical block-device formatting",
+    "cpuQuotaPercent": 100,
+    "memoryMaxBytes": 805306368,
+    "memoryPeakBytes": 76902400,
+    "swapMaxBytes": 0,
+    "swapUsedBytes": 0,
+    "oom": 0,
+    "pidsMax": 128,
+    "runtimeSeconds": 50.679
+  },
+  "binaries": {
+    "outpost": "e280aed38bd55177a8643807abd3cdac0a504b0462e83695b36e68a4653fc9b4",
+    "capture.test": "19bd6802459899489665966a4415700c531034dbcc5c6edde01dd3d16579cb4e",
+    "sourceagent.test": "666840c637d38b1cb22e543bd46f319ed5016e08815432fc999ef90801302473"
+  },
+  "kernelLogSHA256": "aad4abb458130443da2c3eb5c37cd962eef04e4a021e035a7deb1abb00ac42df",
+  "tests": [
+    {
+      "path": "internal/capture/btrfs_producer_linux_test.go",
+      "name": "TestNativeBtrfsProducerRejectsOrdinaryTreeBeforeState",
+      "mode": "unprivileged-consumer",
+      "seconds": 0.27,
+      "status": "PASS",
+      "skipped": false
+    },
+    {
+      "path": "internal/capture/btrfs_producer_linux_test.go",
+      "name": "TestNativeBtrfsProducerReusesExactKernelSnapshot",
+      "mode": "unprivileged-consumer",
+      "seconds": 1.43,
+      "status": "PASS",
+      "skipped": false
+    },
+    {
+      "path": "internal/capture/btrfs_producer_linux_test.go",
+      "name": "TestNativeBtrfsProducerReusesExactKernelSnapshot",
+      "mode": "privileged-producer-disposal",
+      "seconds": 3.42,
+      "status": "PASS",
+      "skipped": false
+    },
+    {
+      "path": "internal/sourceagent/btrfs_snapshot_linux_test.go",
+      "name": "TestPreparedBtrfsSnapshotRestoresIndependentVersions",
+      "mode": "unprivileged-consumer",
+      "seconds": 23.26,
+      "status": "PASS",
+      "skipped": false
+    },
+    {
+      "path": "internal/sourceagent/native_release_linux_test.go",
+      "name": "TestNativeReleaseTicketFollowsDurableCheckpointWithoutExecutionLease",
+      "mode": "unprivileged-consumer",
+      "seconds": 14.32,
+      "status": "PASS",
+      "skipped": false
+    }
+  ],
+  "cleanup": {
+    "ownedLoopDetached": true,
+    "ownedMountAbsent": true,
+    "globalMountsIdentical": true,
+    "introducedModulesRemoved": true,
+    "moduleNamesAdded": [],
+    "moduleNamesRemoved": []
+  },
+  "limitations": [
+    "The1GiBimage is sparse capacity, not an incompressible scale corpus.",
+    "Both standalone file-kit100GiB versions have separate G1 evidence on their recorded source.",
+    "Exact private raw logs are retained by the maintainer; this public metadata is a scoped receipt, not independent execution certification.",
+    "Userspace packages were checksum/length verified and privately extracted; no host package installation.",
+    "An initial pre-format missing-library failure and the owned loop-module cleanup are retained in private execution history."
+  ]
+}

@@ -26,6 +26,8 @@ chmod 755 out/restic
 timeout 420 sh experiments/g1/run.sh "$PWD/out/g1-run" "$PWD/out/outpost-lab" "$PWD/out/restic"
 ```
 
+CI retrieves the same restic 0.19.1 archive through the official release asset API with a 45-second download limit. It verifies the SHA-256 above before unpacking and running the isolated fixture.
+
 The destination must not exist. The script creates synthetic data and disposable containers; it removes only its own container/image and retains experiment files for inspection. Do not publish the generated password or repository. It uses one CPU, 768 MiB container memory, no network, a read-only image and scoped mounts. The 1 GiB disk condition is checked against bounded fixture inputs and actual usage; it is not an enforced filesystem quota. A compiler container needs an executable temporary filesystem for Go test binaries; the experiment container does not.
 
 The fixture creates a 32 MiB random file, changes a 32 KiB segment and builds two versions. It checks producer failure, prunes old primary history, maintains the kit, restores independently with only kit/key and repeats with an optional truth oracle. The oracle compares output only after restoration; recovery does not depend on it. Wrong password and corrupted encrypted pack must fail. Successful output is JSON with `G1: PARTIAL_FIXTURE_ONLY`; `prepare` alone never reports recovery success.

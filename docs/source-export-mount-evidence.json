@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "status": "BOUNDED_OWNER_EXPORT_GUARD_FIX_AND_ALL_INGRESS_REFUSAL_HDD_PASS",
+  "observedAt": "2026-11-16T21:27:00.689219+00:00",
+  "source": {
+    "executedTree": "a497487ed11b4050d59621251bd33f9cb1bd66b3",
+    "goModuleInputCount": 526,
+    "productionChanges": ["internal/sourceagent/recovery_linux.go"],
+    "selectedInputs": {
+      "internal/sourceagent/recovery_linux.go": "c7c1cafde026e205214ad93576192d35f9c3d9d33c9fdb60745c6b15d3e1f295",
+      "internal/sourceagent/recovery_mount_linux_test.go": "b4ba78cbe5fe592618b4835d673a513b993c796a7e9b86de1b4715143ccacf3e",
+      "internal/sourceagent/unavailable_linux_test.go": "98b357695beba7dbefd86f927bbbacecb518ea814a044bd70a3be58f249f26ad",
+      "internal/sourceagent/standby_linux_test.go": "a18835ea47cd558389c968374416691c7fe954ee524820afb2758fc43729cca6",
+      "internal/sourceagent/recovery_linux_test.go": "b651371a742303fc3869f0aacb3fa5a3721b1cb010dc45416d610122c69d0f66"
+    },
+    "testBinary": {
+      "bytes": 19048416,
+      "sha256": "896483804c27355b5bf40e7b4f0ea90a7f4f3a79b14ece5c526abe62ea481967"
+    },
+    "compiler": "go1.27.3 linux/amd64",
+    "runtimeImageDigest": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef"
+  },
+  "control": {
+    "executedTree": "1c44c5b75928c529bc4bdb57bba2f93bb43e47f6",
+    "testBinary": {
+      "bytes": 19044312,
+      "sha256": "f4400aba54fa40fddf187398e522ca51b30e43e1308ce3de292beb6bf18252ea"
+    },
+    "testExitCode": 1,
+    "expectedFailure": "owner recovery package private boundary rejected",
+    "storedNamespaceMountID": 246,
+    "currentNamespaceMountID": 245,
+    "stableEnrollmentFieldsUnchanged": true,
+    "positiveTestPreludeUnchanged": true,
+    "boundary": "The original test remains failed. The later, previously unreachable assertion was corrected to preserve intentionally retained private failed-export candidates; it does not change the reproduced positive admission path."
+  },
+  "fixed": {
+    "testExitCode": 0,
+    "testGroups": 4,
+    "subtests": 7,
+    "modulesVerified": true,
+    "vetExitCode": 0,
+    "export": {
+      "seconds": 17.86,
+      "completedCheckpointPreserved": true,
+      "stableIdentityRefusals": ["filesystem", "fsid", "root-inode", "read-only"],
+      "midExportRootReplacementRefused": true,
+      "failedCandidateRetainedPrivate": true,
+      "failedCandidateNotPublished": true
+    },
+    "unavailableIngress": {
+      "seconds": 27.57,
+      "configuredReceivers": 2,
+      "failedAttemptsWithReopen": 3,
+      "readinessRequestsPerReceiver": 3,
+      "payloadAdmissions": 0,
+      "cacheLogicalBytes": 584,
+      "cacheLogicalLimitBytes": 2097152,
+      "cacheInventoryAndBytesUnchanged": true,
+      "oldRestores": 2,
+      "newRestores": 1,
+      "afterSourceRemoval": true
+    },
+    "standbyControl": {
+      "seconds": 71.96,
+      "subtests": 3
+    }
+  },
+  "resources": {
+    "privateRuntimeIdle": true,
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 222982144,
+    "memoryLimitEvents": 0,
+    "oom": 0,
+    "swapBytes": 0,
+    "freeReservePercent": 20,
+    "additionalFreeAdmissionBytes": 4294967296
+  },
+  "precedingScaleRun": {
+    "sourceCommit": "9f0f71299a83a62768bbea3b20ca6be8952d52cb",
+    "executedTree": "ffd8543464c5062126496d4bab836295094f9c39",
+    "testExitCode": 1,
+    "wholeCase": "FAIL_NOT_RELABELLED",
+    "completeCaptures": 3,
+    "unchangedFilePayloadBytes": 0,
+    "unchangedSourceAllocatedBytes": 4042752,
+    "restores": "NOT_RUN",
+    "failure": "ingress_scale_linux_test.go:358: owner recovery package private boundary rejected",
+    "memoryPeakBytes": 805572608,
+    "memoryLimitEvents": 99998,
+    "oom": 0,
+    "swapBytes": 0,
+    "logSHA256": "b25e31741486655a9944089ac1248a4438163d7344425ef114114b485d04a51d"
+  },
+  "scope": [
+    "Same stable source root after a namespace-local ID change; fresh complete observation remains pinned during export. No persisted bootstrap or authority rewritten.",
+    "Private owner/runtime/source separation, stable filesystem/FSID/root-inode/read-only refusal and private candidate retention remain enforced.",
+    "Small two-ingress refusal fixture with exact cache inventory and independently restored versions, not full-size physical cache or every topology.",
+    "The failed100GiB container did not save a separate final namespace observation. Actual retained-data export/recovery after the fix remains pending; short controls establish the code path and preserve the full failure.",
+    "Current native execution, real artifact installation, full100GiB recovery/cloud/asymmetric acceptance and whole product acceptance are separate."
+  ]
+}

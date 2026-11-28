@@ -44,6 +44,10 @@ func run(ctx context.Context, args []string) (any, error) {
 	previous := fs.String("previous", "", "authenticated previous version used for chunk reuse")
 	name := fs.String("name", "", "relative restored filename")
 	aliases := fs.String("aliases", "", "additional relative names separated by commas")
+	var minFree uint64
+	if args[0] == "repack" || args[0] == "export" {
+		fs.Uint64Var(&minFree, "min-free-bytes", 0, "free space to preserve during admission")
+	}
 	if err := fs.Parse(args[1:]); err != nil {
 		return nil, err
 	}
@@ -84,7 +88,7 @@ func run(ctx context.Context, args []string) (any, error) {
 		}
 		return s.Backup(ctx, *source, filekit.BackupOptions{File: *file, Previous: *previous, Names: names})
 	case "export":
-		err = s.Export(ctx, *version, *dest)
+		err = s.ExportWithOptions(ctx, *version, *dest, filekit.ExportOptions{MinFreeBytes: minFree})
 		return s.Stats, err
 	case "restore", "restore-store":
 		var d filekit.Descriptor
@@ -102,7 +106,7 @@ func run(ctx context.Context, args []string) (any, error) {
 			Aliases int           `json:"aliases"`
 		}{s.Stats, d.Size, len(d.Names)}, nil
 	case "repack":
-		return s.Repack(ctx)
+		return s.RepackWithOptions(ctx, filekit.RepackOptions{MinFreeBytes: minFree})
 	case "retire":
 		return s.Retire(ctx, strings.Split(*version, ","))
 	case "gc":

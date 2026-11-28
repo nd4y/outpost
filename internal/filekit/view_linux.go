@@ -10,6 +10,7 @@ import (
 // The callback must finish reading objects before WithSealedKits returns.
 type SealedKit struct {
 	File, Version string
+	Format        string
 	Root          []byte
 	Objects       []Object
 }
@@ -17,7 +18,7 @@ type SealedKit struct {
 // WithSealedKits holds one shared maintenance lock across all selected versions
 // and their copying. No decryption key or plaintext metadata leaves this API.
 func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume func([]SealedKit, func(Object) ([]byte, error)) error) error {
-	if len(versions) == 0 || len(versions) > 64 || consume == nil {
+	if len(versions) == 0 || len(versions) > 4096 || consume == nil {
 		return ErrInvalid
 	}
 	unlock, err := s.lock(ctx, false)
@@ -35,7 +36,7 @@ func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume f
 			return ErrInvalid
 		}
 		seen[version] = true
-		e, d, err := s.LoadVersion(version)
+		e, d, err := s.LoadVersionContext(ctx, version)
 		if err != nil {
 			return err
 		}
@@ -47,7 +48,7 @@ func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume f
 		if err != nil {
 			return err
 		}
-		kit := SealedKit{File: e.File, Version: version, Root: root}
+		kit := SealedKit{File: e.File, Version: version, Format: e.Format, Root: root}
 		for _, ref := range refs {
 			kit.Objects = append(kit.Objects, ref)
 		}
@@ -58,6 +59,6 @@ func (s *Store) WithSealedKits(ctx context.Context, versions []string, consume f
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		return s.readObject(ref)
+		return s.readObjectContext(ctx, ref)
 	})
 }

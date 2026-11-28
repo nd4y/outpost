@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "status": "BOUNDED_ADMITTED_PROFILE_PASS_PUBLICATION_PENDING",
+  "sourceTree": "933215ca8871e25fbba4a50942bd81d8fdf83a94",
+  "baseCommit": "597fb533d7007d96ce1b5f7e9e84da3638cb0a31",
+  "sourceInputs": {
+    "internal/control/config_linux.go": "0f4716fceed334ce29f4ece32e5d6503296089f198b9ca5682fd606045014f77",
+    "internal/control/operation_limits_linux_test.go": "d3e21efad68a2c5ce54d0a038ede579f21e56eb7b84dc272da6c048ba09cac9a",
+    "internal/upload/claim_slot_linux_test.go": "79d2e33a320b6ab102bce334d8df08e550b37860616fc75a21bb524a7fea9331",
+    "internal/upload/queue_linux.go": "f3b84b67f459a878857f612c280c1b3ed06fc3b2b18d73d0e3c6f1a1a6c46a65",
+    "internal/upload/queue_window_linux_test.go": "5db82c254438ff782eabf1772b451bb93b8cf7e52f50c484991381e0bff752bd",
+    "internal/worker/actions_linux.go": "f41885ec8cdb040e65a64f424072930398b8e3159d12e07edfb583aea11a3cff",
+    "internal/worker/external_audit_linux.go": "4200449c07f3f51389807776f15267330feff93e9d2cf336481f583c31a622f4",
+    "internal/worker/external_queue_linux.go": "9e4d676d6a4d6afdc3b57501ee1ca39fe8a4742a0ecc8b64af5728c404308e2c",
+    "internal/worker/external_queue_linux_test.go": "73da513977df2ee101f84f422b1c8f85fe01345fa43a5142ee164f313fb8941c",
+    "internal/worker/external_repair_linux_test.go": "be8e0f3aa75e5427a005cc786929d8f01dd8f92137f5f7a29ccdfd61638c7a12",
+    "internal/worker/external_schedule_linux.go": "9ee9a16da47028ac631f962e48ccb9f605b327b5c3f826855ca94fcbc9ffdd7f",
+    "internal/worker/jobs_linux.go": "99758dc19248f58510e66e2db8af910dfe92fef029fbce7c4d3db97ec13943de",
+    "internal/worker/operation_window_linux_test.go": "0b49c219c54bbfe24bcf9b9533c062c3a44e1d35c7fa66c4c2c2e2780a3767a9",
+    "internal/worker/retry_linux.go": "ab3577e048c96574099647977b822d040aa70a000c0b7924e4294bc55b40eb18",
+    "internal/worker/retry_linux_test.go": "c1ddd5c548fedc2b62abeb8759f25eb6bc790eddbe2c0c4b68850267b5ac2a06",
+    "internal/worker/upload_abandonment_linux.go": "f2d1bf696fe41e92a945bd12da106cad98ebd828d5f862f9344b05fde749fb53",
+    "internal/worker/worker_linux.go": "fe5cbd73337568cf6d11eaa09a833a8a4ecf8de27195e06044d4980ff6f8f92f"
+  },
+  "mechanism": {
+    "oldWholeOperationMaxMillis": 300000,
+    "oneRead100GiBAt100MbpsSeconds": 8589.934592,
+    "oneRead100GiBAt500MbpsSeconds": 1717.9869184,
+    "extrapolation": "Arithmetic lower bounds for one read, not measured transfer/RPO/RTO or a budget recommendation"
+  },
+  "policy": {
+    "optionalField": "limits.operationMillis",
+    "maxMillis": 86400000,
+    "minimumNonzero": "at least existing attemptMillis",
+    "zeroOrOmitted": "same effective operation budget and canonical zero-field omission",
+    "individualAttemptMillisRange": [100, 300000],
+    "networkClaimPlanCredentialConfigurationExpiry": "unchanged; earlier parent/config/command/plan cancellation wins",
+    "defaultQueueCeilingMillis": 300000,
+    "newExplicitLongQueueCeilingMillis": 86400000,
+    "retainedIdentity": "exact known old/new ceilings only; no migration, reset or widening of old queues"
+  },
+  "ordinary": {
+    "tree": "95d1da6d016c921a3d06913a0d1c7e9f45b62aaa",
+    "topLevelTests": 4,
+    "status": "PASS",
+    "controlLogSHA256": "d95cbf8d4d62fa973bbdd36006a6ea0c45f40b7e742230d0116a98c84b3bdf34",
+    "uploadLogSHA256": "1ee9558c15c5d5503c7bc87600e4cecbadad449cf9342012d9fe3e85050a16d9",
+    "workerLogSHA256": "c51f86b44393769ee9e0a6c024929a079c2aaa5ef3a0e8c190eee08dbeb879eb"
+  },
+  "race": {
+    "tree": "933215ca8871e25fbba4a50942bd81d8fdf83a94",
+    "topLevelTests": 7,
+    "status": "PASS",
+    "cpu": 1,
+    "memoryMaxBytes": 805306368,
+    "peakBytes": 315527168,
+    "swapBytes": 0,
+    "oom": 0,
+    "guard": "Fresh owned ext4 HDD UUID, idle private test runtime, free reserve and RAM admission; nonroot/caps0/ROroot/networknone",
+    "controlLogSHA256": "d541094c6fdca76fa7aa05819c13a9aa6db221f62b28dc06814644382d5c0c1b",
+    "uploadLogSHA256": "545ec2d25528084c55d69c9b7a7a5ecea29e69959139e65f2b07f18b8305acef",
+    "workerLogSHA256": "95562e3c95dc30f02f07effc98ba47559b84632ecdf1205f7720290a5292ba5c",
+    "functionalWorkerProfile": {
+      "signedSlotMillis": 5000,
+      "pollWindowSecondsPerCondition": 60,
+      "sourceBytes": 262144,
+      "retainedAuditRepairSeconds": 99.49,
+      "retryCrashReopenSeconds": 34.44,
+      "scope": "New explicitly admitted functional profile; original default500ms retry/1000ms audit and12s waits remain unchanged."
+    }
+  },
+  "claimSlotControl": {
+    "delayMillis": 1200,
+    "negative": {
+      "signedSlotMillis": 500,
+      "operationSeconds": 6,
+      "claimAttempts": 12,
+      "payloadPUTs": 0,
+      "phase": "RETRYABLE",
+      "sourcePinRetained": true,
+      "status": "PASS_EXPECTED_REFUSAL"
+    },
+    "positive": {
+      "signedSlotMillis": 4000,
+      "operationSeconds": 12,
+      "claimAttempts": 2,
+      "payloadPUTs": 4,
+      "phase": "COMPLETE",
+      "independentRestore": true,
+      "status": "PASS"
+    },
+    "scope": "Different owner-signed profiles before admission, never extending a live claim or reclassifying an old failure"
+  },
+  "failuresRetained": [
+    {
+      "tree": "977637e87b6b29e183a3fd4c34a0a692d9bdf24d",
+      "result": "control/upload/identity PASS; worker fixture correctly rejected plan120s beyondconfig8s; only fixture expiry corrected"
+    },
+    {
+      "tree": "fcff62f3123ee313d1cea1cedd24fc86bd24cc0e",
+      "result": "core race controlsPASS; original/default and newlong inherited12s worker completion waits FAIL"
+    },
+    {
+      "tree": "658a341cfcee43131ba8804a0393cb9158e5142c",
+      "result": "newlong60s polling with unchanged500/1000ms assignment slots stillFAIL; not fixed by waiting longer"
+    },
+    {
+      "tree": "52f0e288df492e88cba5270f9ef1ba47e9fcd815",
+      "result": "one diagnostic500ms retry stillFAIL;7prepared/0durableACKs,5partPUTs,113partGETs; all after bounded stop, no claim zero remote progress or successful complete copy"
+    }
+  ],
+  "limits": [
+    "Current new functional5000ms profile is separate from failed original short HDD profiles; old failures remain failures",
+    "Original G3 quantitative500ms/12s and150ms1.5 threshold are unchanged; prior acceptance belongs to597fb53",
+    "No multi-hour transfer, final100GiB, real topology/endpoint, RPO/RTO or full-product acceptance",
+    "Required exact published-source CI and draftPR readback still pending"
+  ],
+  "controlFlowReview": {
+    "scope": "Primary source review: whole-operation context never extends per-part claim expiry; actual IO cost is a measured profile property.",
+    "validation": "Controlled1200msclaimdelay refuses500msslot with0payloads and preservespin; independently signed4000mscontrol completes.",
+    "limitation": "No universal single hardware cause or acceptance of failed shorter full-worker profiles is asserted."
+  }
+}

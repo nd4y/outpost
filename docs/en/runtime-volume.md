@@ -1,0 +1,37 @@
+# Runtime volume admission
+
+[Русский](../ru/runtime-volume.md)
+
+An installable worker must bind its private runtime directory to an explicitly enrolled local filesystem before initialization. A missing, replaced, locked or read-only volume must not cause creation of replacement state on an underlying directory. Enrollment is a separate local owner operation; remote configuration cannot select a new volume.
+
+The local binding records the approved absolute volume root, filesystem type and filesystem ID, root inode and digest of a private random sentinel. These identify the observed filesystem/directory; a filesystem ID is not presented as a universally available UUID. Enrollment compares a supplied probe with a fresh observation before writing the sentinel. Paths are opened component by component without symbolic links. The worker directory must be a strict descendant, with no symlink or nested mount in existing components. The runtime filesystem must support the admitted local locking/fsync model; the first profile allows ext4, Btrfs and XFS only.
+
+Bootstrap, each active loop/request and write admission recheck the binding. Mount identities are current observations, not persistent values assumed to survive reboot. A failed check stops new work and preserves retained data. Removing a sentinel or changing the binding is not a cleanup or migration command. Recovery from an available materialized replica remains a separate read-only input workflow.
+
+Bootstrap format `outpost-bootstrap-2` requires the `volume` binding, with its scope equal to the node identity and a nonzero admission epoch. State, control cache, capacity ledger, replicas, peer journals, ingress sessions, upload queues and explicit index migration open relative to the retained worker directory descriptor. A path replacement cannot redirect their writes. A joined monitor cancels active work on identity loss; write admission checks the binding before writes and again before reporting success. This does not make an unresponsive kernel I/O syscall cancellable.
+
+Local enrollment uses `volume-probe --store DIRECTORY --output PRIVATE_PROBE_FILE`, then `volume-enroll --store DIRECTORY --input PRIVATE_PROBE_FILE --node NODE_ID --epoch 1 --output NEW_BINDING_FILE`. Keep both files private. First enrollment requires an empty selected directory. Existing state with a missing marker blocks enrollment. Repeating enrollment with the same valid scope/epoch is idempotent; changing either is refused. Enrollment creates no source snapshot and changes no host mount, unlock or network configuration.
+
+The old unbound bootstrap is refused. A supported migration of an existing bound volume requires a separate fenced identity-transition procedure; deleting the sentinel or editing JSON is not such a procedure. Initialization durably creates owned directory entries and syncs their parents. Missing mandatory identity or an unsupported filesystem fails closed. Synthetic tests can prove rejection and absence of fallback writes; cold boot, real unlock ordering and volume loss during I/O still require the owner's separate infrastructure acceptance.
+
+## Cold disk transition on one host
+
+Choose migration-capable enrollment when initializing a new receiver. In addition to the verified data root, provide a private mode-`0700` authority directory on the host system filesystem and the owner's public key. The data and authority filesystems must have distinct identities. The authority directory and node credentials stay off the data copy. Place the authority directory inside the private profile mount so runtime containers keep it read-only. The operator runs transition commands with access to the same directory and the runtime UID. Keep the existing version 1 profile for installed receivers that use it.
+
+```sh
+outpost volume-enroll --store DATA_ROOT --input PRIVATE_PROBE --node NODE_ID --epoch 1 \
+  --volume-authority SYSTEM_AUTHORITY --volume-worker-directory WORKER_DIRECTORY \
+  --trust OWNER_PUBLIC_KEY --output NEW_BINDING
+outpost worker-volume-transition-sign --input PRIVATE_REQUEST --key OWNER_KEY --output SIGNED_PERMIT
+outpost worker-volume-transition --bootstrap CURRENT_BOOTSTRAP --input SIGNED_PERMIT --output NEW_BOOTSTRAP
+```
+
+For managed enrollment, use the resulting `outpost-volume-2` binding and add `volumeAuthority` to the local bootstrap. Preserve the absolute paths in the helper and runtime environments. The existing distribution includes a configurable `OUTPOST_RUNTIME_DATA_PATH` for a new verified data mount. Its default remains `/var/lib/outpost`. When using containers, join the worker and its command, report and telemetry processes before preparing a copy. They hold a shared authority lock for their lifetime. The transition refuses a held lock.
+
+Copy the existing worker directory into the same relative path under a distinct mounted data root under the same owner's control. Use a file-level copy that preserves bytes, modes and ownership. Preserve the original volume and its marker. The new root needs the prepared copy and no volume marker. The verifier checks regular files and directories through held local descriptors, compares contents and permissions, and syncs the new copy. It refuses aliases, links, nested mounts, copied filesystem identities and extra or absent files. Submit the mount observation generated by `volume-probe` with the owner request. Probe and apply in the same mount namespace before the first attempt. The operation can take as long as a full byte comparison of the retained data.
+
+The private request contains `format: "outpost-volume-transition-1"`, a unique `operation` ID, the exact `current` binding and worker `directory` from the current private bootstrap, the approved absolute `nextRoot` and its `probe` object. The owner signs it away from the receiver. The receiver needs the signed permit and its existing public trust. Write the new bootstrap to a new file inside the authority directory. Its scope and worker credentials stay pinned. After reading back the result, select it explicitly and start the same worker using the newly admitted volume.
+
+The durable authority records the pending operation and blocks runtime admission while the marker changes. It retires the original marker before installing the new marker and advances the writable epoch only after both steps are durable. The immutable old volume remains readable with the independent offline reader. When a transition is interrupted, restore access to both approved mounts and replay the same permit. A lost result after activation can be read back with the same permit and a new bootstrap output path. Recovering after loss of the old volume before activation requires a separately enrolled replacement. Keep the system authority with the host. Pre-existing v1 data, raw disk clones and copies of the entire host or private credential mount fall outside this profile. Test physical disk identity, cold boot and unlock ordering for each actual site.
+
+The named opt-in regression uses three separate test filesystems and checks independent restoration from two retained checkpoints after the original and source paths become unavailable. Run it with `OUTPOST_FENCED_VOLUME_FIXTURE` pointed at an isolated root containing `original`, `candidate` and `authority` mounts. Its interruption boundary is immediately after fsync of the original retirement marker. Physical site acceptance remains separate.

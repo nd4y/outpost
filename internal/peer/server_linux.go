@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/storage"
 )
 
 type handler struct {
@@ -54,13 +55,16 @@ func (h *handler) bind(op, peer, id, kind string) Binding {
 func leasePin(b Binding) string {
 	return generation.Hash([]byte(Format + "/lease/" + b.Executor + "/" + b.Peer + "/" + b.Operation + "/" + b.Generation))
 }
-func body(w http.ResponseWriter, r *http.Request, max int) ([]byte, error) {
+func body(ctx context.Context, w http.ResponseWriter, r *http.Request, max int, budget *storage.HTTPBodyBudget) ([]byte, error) {
 	if r.ContentLength > int64(max) || r.Header.Get("Content-Encoding") != "" {
 		return nil, ErrProtocol
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, int64(max))
-	b, e := io.ReadAll(r.Body)
+	b, e := io.ReadAll(budget.PaceResponse(ctx, r.Body))
 	if e != nil {
+		if ctxErr := ctx.Err(); budget != nil && ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, ErrProtocol
 	}
 	return b, nil
@@ -74,7 +78,9 @@ func fail(w http.ResponseWriter, e error) {
 	switch {
 	case errors.Is(e, ErrDenied):
 		status = http.StatusForbidden
-	case errors.Is(e, ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, generation.ErrRollback):
+	case errors.Is(e, ErrCapacity):
+		status = http.StatusInsufficientStorage
+	case errors.Is(e, ErrConflict), errors.Is(e, generation.ErrConflict), errors.Is(e, generation.ErrRollback), errors.Is(e, generation.ErrProtected):
 		status = http.StatusConflict
 	case errors.Is(e, generation.ErrIncomplete):
 		status = http.StatusPreconditionFailed
@@ -102,6 +108,16 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	push := mode == "push"
+	repair := r.Header.Get("Outpost-Repair")
+	if repair != "" && (!validID(repair) || !h.policy.Peers[peer].Repair) {
+		fail(w, ErrDenied)
+		return
+	}
+	window := r.Header.Get(windowHeader)
+	if window != "" && window != "1" {
+		fail(w, ErrProtocol)
+		return
+	}
 	if e := h.policy.grant(peer, push, time.Now()); e != nil {
 		fail(w, e)
 		return
@@ -116,6 +132,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, resource := parts[4], parts[5]
+	history := r.Header.Get("Outpost-History")
+	if history != "" && (history != "1" || !push || r.Method != http.MethodPut || resource != "catalog" || !h.policy.Peers[peer].History) {
+		fail(w, ErrDenied)
+		return
+	}
 	if (resource == "objects" && len(parts) != 7) || (resource != "objects" && len(parts) != 6) {
 		fail(w, ErrProtocol)
 		return
@@ -136,13 +157,20 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithDeadline(r.Context(), deadline)
 	defer cancel()
+	if repair != "" && push {
+		if e := h.replica.CheckRepair(ctx, id, repair); e != nil {
+			fail(w, e)
+			return
+		}
+	}
 	kind := "serve"
 	if push {
 		kind = "receive"
 	}
 	binding := h.bind(op, peer, id, kind)
+	binding.Repair = repair
 	if push && r.Method == http.MethodPut && resource == "catalog" {
-		raw, e := body(w, r, generation.MaxCatalog)
+		raw, e := body(ctx, w, r, generation.MaxCatalog, h.limits.Bodies.Receive)
 		if e != nil {
 			fail(w, e)
 			return
@@ -163,7 +191,15 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if _, e = h.replica.Begin(ctx, raw); e != nil {
+		if repair != "" {
+			e = h.replica.RepairCatalogFor(ctx, id, repair, raw)
+		} else {
+			_, e = h.replica.Begin(ctx, raw)
+			if errors.Is(e, generation.ErrRollback) && history == "1" {
+				_, e = h.replica.BeginHistorical(ctx, raw)
+			}
+		}
+		if e != nil {
 			fail(w, e)
 			return
 		}
@@ -175,7 +211,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !push && r.Method == http.MethodPost && resource == "lease" {
-		if _, e := body(w, r, 0); e != nil {
+		if _, e := body(ctx, w, r, 0, nil); e != nil {
 			fail(w, e)
 			return
 		}
@@ -208,7 +244,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !push && r.Method == http.MethodDelete && resource == "lease" {
-		if _, e = body(w, r, 0); e != nil {
+		if _, e = body(ctx, w, r, 0, nil); e != nil {
 			fail(w, e)
 			return
 		}
@@ -237,7 +273,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if resource == "catalog" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Content-Length", strconv.Itoa(len(raw)))
-			_, _ = w.Write(raw)
+			_ = h.limits.Bodies.Send.WriteBody(ctx, w, raw)
 			return
 		}
 		if resource == "objects" && validID(parts[6]) {
@@ -256,7 +292,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/octet-stream")
 					w.Header().Set("Content-Length", strconv.Itoa(len(b)))
 					w.Header().Set("ETag", `"`+ref.ID+`"`)
-					_, _ = w.Write(b)
+					_ = h.limits.Bodies.Send.WriteBody(ctx, w, b)
 					return
 				}
 			}
@@ -269,7 +305,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if resource == "objects" && r.Method == http.MethodPut && validID(parts[6]) {
-		b, e := body(w, r, generation.MaxObject)
+		b, e := body(ctx, w, r, generation.MaxObject, h.limits.Bodies.Receive)
 		if e != nil {
 			fail(w, e)
 			return
@@ -278,9 +314,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if e = h.replica.Put(ctx, id, parts[6], b); e != nil {
+		var alreadyPresent bool
+		if repair != "" {
+			e = h.replica.RepairPutFor(ctx, id, parts[6], repair, b)
+		} else {
+			alreadyPresent, e = h.replica.PutWithPresence(ctx, id, parts[6], b)
+		}
+		if e != nil {
 			fail(w, e)
 			return
+		}
+		if repair == "" {
+			w.Header().Set(objectAlreadyPresentHeader, strconv.FormatBool(alreadyPresent))
 		}
 		respond(w, map[string]string{"object": parts[6], "state": "HASH_VERIFIED_DURABLE"})
 		return
@@ -289,13 +334,21 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(w, ErrProtocol)
 		return
 	}
-	if _, e = body(w, r, 0); e != nil {
+	if _, e = body(ctx, w, r, 0, nil); e != nil {
 		fail(w, e)
 		return
 	}
 	switch resource {
 	case "missing":
-		refs, e := h.replica.Missing(ctx, id)
+		var refs []generation.Object
+		var e error
+		if repair != "" {
+			refs, e = h.replica.RepairMissing(ctx, id)
+		} else if window == "1" {
+			refs, e = h.replica.MissingMetadata(ctx, id)
+		} else {
+			refs, e = h.replica.Missing(ctx, id)
+		}
 		if e != nil {
 			fail(w, e)
 			return
@@ -306,11 +359,35 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, e)
 			return
 		}
-		if e = h.replica.Complete(ctx, id); e != nil {
-			fail(w, e)
-			return
-		}
 		receipt := Receipt{Format, h.policy.Self, id, id, op, "target-full-read", time.Now().Unix()}
+		if window == "1" {
+			var result generation.BatchResult
+			var e error
+			if repair != "" {
+				result, e = h.replica.RepairWindowFor(ctx, id, verificationWindow(binding), repair, windowObjects, windowBytes, nil)
+			} else {
+				result, e = h.replica.VerifyWindow(ctx, id, verificationWindow(binding), windowObjects, windowBytes)
+			}
+			if e != nil {
+				fail(w, e)
+				return
+			}
+			if !result.Complete {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusAccepted)
+				_ = json.NewEncoder(w).Encode(windowProgress{windowProgressFormat, op, id, result.VerifiedObjects, result.TotalObjects})
+				return
+			}
+			receipt.Format = WindowReceiptFormat
+			receipt.Verification = "target-window-read"
+			receipt.ObservedUnix = result.VerifiedAt
+		} else {
+			if e = h.replica.Complete(ctx, id); e != nil {
+				fail(w, e)
+				return
+			}
+			receipt.ObservedUnix = time.Now().Unix()
+		}
 		if e = h.journal.Update(ctx, binding, "COMPLETE", &receipt, Counters{}); e != nil {
 			fail(w, e)
 			return

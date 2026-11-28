@@ -11,40 +11,59 @@ import (
 	"time"
 
 	"github.com/nd4y/outpost/internal/generation"
+	"github.com/nd4y/outpost/internal/readback"
+	"github.com/nd4y/outpost/internal/statefile"
+	"github.com/nd4y/outpost/internal/storage"
 )
 
 const Format = "outpost-peer-1"
+
+// MinBodyBytesPerSecond is the minimum configured peer or ingress body rate.
+const MinBodyBytesPerSecond = 1 << 20
 
 var (
 	ErrDenied      = errors.New("peer operation denied")
 	ErrProtocol    = errors.New("invalid peer protocol response")
 	ErrUnavailable = errors.New("peer unavailable or retry required")
 	ErrConflict    = errors.New("operation binding conflict")
+	ErrCapacity    = statefile.ErrCapacity
 )
 
 type Grant struct {
 	Class       string `json:"class"`
 	Push        bool   `json:"push"`
 	Pull        bool   `json:"pull"`
+	History     bool   `json:"history,omitempty"`
+	Repair      bool   `json:"repair,omitempty"`
 	ExpiresUnix int64  `json:"expiresUnix"`
 }
 
 // Policy is an explicit domain-specific edge list, supplied out of band. A
 // trusted worker is still keyless; category membership never grants an edge.
 type Policy struct {
-	Self           string           `json:"self"`
-	Class          string           `json:"class"`
-	Domain         string           `json:"domain"`
-	Repository     string           `json:"repository"`
-	Epoch          uint64           `json:"epoch"`
-	AllowedClasses []string         `json:"allowedClasses"`
-	Peers          map[string]Grant `json:"peers"`
+	ReadbackMaxAgeSeconds int64            `json:"readbackMaxAgeSeconds,omitempty"`
+	RequiredRevision      uint64           `json:"requiredRevision,omitempty"`
+	Self                  string           `json:"self"`
+	Class                 string           `json:"class"`
+	Domain                string           `json:"domain"`
+	Repository            string           `json:"repository"`
+	Epoch                 uint64           `json:"epoch"`
+	AllowedClasses        []string         `json:"allowedClasses"`
+	Peers                 map[string]Grant `json:"peers"`
 }
 
 type Limits struct {
 	Concurrency int
 	Timeout     time.Duration
 	Attempts    int
+	Bodies      BodyBudgets
+}
+
+// BodyBudgets bounds local bulk traffic per direction, independently of the
+// TLS connection initiator. The owning process can share it across routes.
+type BodyBudgets struct {
+	Receive *storage.HTTPBodyBudget
+	Send    *storage.HTTPBodyBudget
 }
 
 func (l Limits) valid() bool {
@@ -64,6 +83,9 @@ func (p Policy) allowed(c string) bool {
 	return false
 }
 func (p Policy) validate(t generation.Trust) error {
+	if p.ReadbackMaxAgeSeconds < 0 || p.ReadbackMaxAgeSeconds > readback.MaxAgeSeconds {
+		return ErrDenied
+	}
 	if !validID(p.Self) || p.Domain != t.Domain || p.Repository != t.Repository || p.Epoch != t.Epoch || !category(p.Class) || !p.allowed(p.Class) || len(p.AllowedClasses) == 0 || len(p.AllowedClasses) > 2 || len(p.Peers) == 0 || len(p.Peers) > 128 {
 		return ErrDenied
 	}

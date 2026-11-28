@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 func validateMetadata(m Metadata) error {
@@ -16,7 +17,7 @@ func validateMetadata(m Metadata) error {
 	}
 	total := 0
 	for name, value := range m.Xattrs {
-		if name == "" || len(name) > 255 || strings.ContainsRune(name, 0) || len(value) > 65536 {
+		if name == "" || len(name) > 255 || !utf8.ValidString(name) || strings.ContainsRune(name, 0) || len(value) > 65536 {
 			return ErrInvalid
 		}
 		total += len(name) + len(value)
@@ -29,7 +30,10 @@ func validateMetadata(m Metadata) error {
 func fdPath(f *os.File) string { return fmt.Sprintf("/proc/self/fd/%d", f.Fd()) }
 func readXattrs(f *os.File) (map[string][]byte, error) {
 	p := fdPath(f)
-	n, err := syscall.Listxattr(p, nil)
+	return readAttributeSet(func(b []byte) (int, error) { return syscall.Listxattr(p, b) }, func(name string, b []byte) (int, error) { return syscall.Getxattr(p, name, b) })
+}
+func readAttributeSet(list func([]byte) (int, error), get func(string, []byte) (int, error)) (map[string][]byte, error) {
+	n, err := list(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +44,7 @@ func readXattrs(f *os.File) (map[string][]byte, error) {
 		return nil, nil
 	}
 	b := make([]byte, n)
-	n, err = syscall.Listxattr(p, b)
+	n, err = list(b)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +59,10 @@ func readXattrs(f *os.File) (map[string][]byte, error) {
 	attrs := make(map[string][]byte, len(names))
 	total := 0
 	for _, name := range names {
-		if name == "" || len(name) > 255 {
+		if name == "" || len(name) > 255 || !utf8.ValidString(name) {
 			return nil, ErrInvalid
 		}
-		size, err := syscall.Getxattr(p, name, nil)
+		size, err := get(name, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +70,7 @@ func readXattrs(f *os.File) (map[string][]byte, error) {
 			return nil, ErrInvalid
 		}
 		value := make([]byte, size)
-		got, err := syscall.Getxattr(p, name, value)
+		got, err := get(name, value)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +91,7 @@ func captureMetadata(f *os.File) (Metadata, error) {
 	if err != nil {
 		return m, err
 	}
-	if !st.Mode().IsRegular() {
+	if !st.Mode().IsRegular() && !st.IsDir() {
 		return m, ErrInvalid
 	}
 	s, ok := st.Sys().(*syscall.Stat_t)
@@ -100,6 +104,11 @@ func captureMetadata(f *os.File) (Metadata, error) {
 		return m, err
 	}
 	return m, validateMetadata(m)
+}
+func sameInodeSnapshot(a, b os.FileInfo) bool {
+	x, ok := a.Sys().(*syscall.Stat_t)
+	y, yes := b.Sys().(*syscall.Stat_t)
+	return ok && yes && x.Dev == y.Dev && x.Ino == y.Ino && x.Mode == y.Mode && x.Uid == y.Uid && x.Gid == y.Gid && x.Nlink == y.Nlink && x.Size == y.Size && x.Mtim == y.Mtim && x.Ctim == y.Ctim
 }
 func sameMetadata(a, b Metadata) bool {
 	return a.Mode == b.Mode && a.UID == b.UID && a.GID == b.GID && a.MtimeNS == b.MtimeNS && maps.EqualFunc(a.Xattrs, b.Xattrs, bytes.Equal)

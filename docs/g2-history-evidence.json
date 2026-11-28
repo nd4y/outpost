@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_BOUNDED",
+  "scope": "Actual180small-file updates and holder epoch-transition scenarios; no180wall-clock days,100GiB distributed run, independent physical domains or fullG2/product acceptance.",
+  "environment": {
+    "os": "Linux amd64",
+    "go": "1.27.3",
+    "stateStorage": "Dedicated ext4 HDD; isolated containers, synthetic fixtures and private loopback TLS endpoints",
+    "cpuQuotaPercent": 100,
+    "memoryMaxBytes": 805306368,
+    "swapMaxBytes": 0,
+    "oom": 0,
+    "pidsMax": 128,
+    "raceEnabled": true
+  },
+  "history": {
+    "baseCommit": "89eb2c5ba3d3a3b613b8560d16e5353b186f0682",
+    "tree": "0c675c4656404cc497c9081629b1926af7f75571",
+    "test": {
+      "path": "internal/peer/offline_history_linux_test.go",
+      "name": "TestOfflineHistoryAcrossMaintenanceAndPolicyChange"
+    },
+    "testSourceSHA256": "31bcf7cf313098bdef60b8f7487e05adc0e381ba0e5a8e3baf5f6c50916f646f",
+    "updates": 180,
+    "finalSequence": 181,
+    "fileBytes": 65536,
+    "testAuthorityDays": 187,
+    "runtimeSeconds": 1598.41,
+    "memoryPeakBytes": 160845824,
+    "binarySHA256": "10b54b357ca6b85678127d39a0ded020abd97c0c2940e7a8a0b39d0f91ce98bd",
+    "logSHA256": "34cff14e58e8b95f8d2b9655c24408b8d692bcaddb9000368a8facecf65bc075",
+    "assertions": [
+      "Third holder closed during180updates; admitted peer set changes",
+      "Separate signed maintenance leaves only final complete generation on online holders",
+      "Interrupted final receive preserves original complete and pending closure",
+      "Direct final catch-up needs no intervening catalogs",
+      "Old and new bytes restore after source and bridge stop"
+    ]
+  },
+  "holderEpoch": {
+    "baseCommit": "89eb2c5ba3d3a3b613b8560d16e5353b186f0682",
+    "tree": "9d5fba6ea6de1bcede7d4ec18b83d54a130bfcff",
+    "test": {
+      "path": "internal/worker/epoch_history_linux_test.go",
+      "name": "TestHolderEpochTransitionRevokesOldBranchAndPreservesIndependentHistory"
+    },
+    "testSourceSHA256": "ce0f50b274e95db3890a550591f02ec425f80033284d7bbf9fed49480e4664bf",
+    "runtimeSeconds": 24.59,
+    "memoryPeakBytes": 119443456,
+    "binarySHA256": "c17680d01811b792d0f146ad320eb3e12b1b12f83f1cc4a06ab6320eaf68fa39",
+    "logSHA256": "ca3e85e549d6653933347fb410ca17a92ca594a4cbb8ba2ba1b46b230605d872",
+    "assertions": [
+      "Real worker mTLS old/new epoch transfers into distinct persistent directories",
+      "Old configuration and operation denied by current policy",
+      "New-epoch replica rejects old catalog before any object fetch",
+      "Higher configuration revision cannot lower remembered epoch after worker reopen",
+      "Both retained epochs restore offline using distinct read-only owner material; wrong material fails"
+    ]
+  },
+  "limits": [
+    "Owner epoch generation and source old-writer fence have separate CLI tests; this holder receipt does not claim their re-execution",
+    "No automatic destruction of old keys",
+    "No hardware power-loss, complete volume loss or real credential/profile acceptance",
+    "Original100GiB G1 receipt remains separate and source-bound"
+  ]
+}

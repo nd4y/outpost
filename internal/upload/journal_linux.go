@@ -6,16 +6,26 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/nd4y/outpost/internal/localfs"
 	"io"
 	"os"
 	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
 )
 
 const maxJournal = 8 << 20
+const moveJournalFormat = "outpost-external-move-journal-1"
+
+func journalFormat(p Plan) string {
+	if p.Profile.WriteMode == storage.WebDAVMoveMode {
+		return moveJournalFormat
+	}
+	return Format
+}
 
 type Progress struct {
 	Round          int64  `json:"round"`
@@ -32,13 +42,14 @@ type Receipt struct {
 	ObservedUnix int64  `json:"observedUnix"`
 }
 type State struct {
-	Format   string              `json:"format"`
-	Plan     string              `json:"planDigest"`
-	Worker   string              `json:"worker"`
-	Revision uint64              `json:"revision"`
-	Phase    string              `json:"phase"`
-	Parts    map[string]Progress `json:"parts"`
-	Receipt  *Receipt            `json:"receipt,omitempty"`
+	Format        string              `json:"format"`
+	Plan          string              `json:"planDigest"`
+	Worker        string              `json:"worker"`
+	Revision      uint64              `json:"revision"`
+	Phase         string              `json:"phase"`
+	Parts         map[string]Progress `json:"parts"`
+	Receipt       *Receipt            `json:"receipt,omitempty"`
+	MoveBookReady bool                `json:"moveBookReady,omitempty"`
 }
 type Journal struct {
 	root           *os.Root
@@ -46,14 +57,22 @@ type Journal struct {
 	planID, worker string
 	authority      Authority
 	tasks          map[string]bool
+	Admit          statefile.Admission
+	CheckWrite     func(context.Context, string, int) error
+	Readback       ReadbackOptions
+	Guard          func(context.Context) error
+	Fault          func(string) error
 }
 
 func regular(root *os.Root, name string, max int) ([]byte, error) {
-	f, e := root.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	f, e := localfs.OpenFile(root, name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
 	if e != nil {
 		return nil, e
 	}
 	defer f.Close()
+	return readRegular(f, max)
+}
+func readRegular(f *os.File, max int) ([]byte, error) {
 	s, e := f.Stat()
 	if e != nil {
 		return nil, e
@@ -84,7 +103,7 @@ func atomicFile(root *os.Root, name string, data []byte) error {
 		return e
 	}
 	temp := ".pending-" + hex.EncodeToString(nonce[:])
-	f, e := root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, e := localfs.OpenFile(root, temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if e != nil {
 		return e
 	}
@@ -106,7 +125,7 @@ func atomicFile(root *os.Root, name string, data []byte) error {
 	return syncDir(root)
 }
 func lock(ctx context.Context, root *os.Root, name string) (func(), error) {
-	f, e := root.OpenFile(name, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	f, e := localfs.OpenFile(root, name, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
 	if e != nil {
 		return nil, e
 	}
@@ -180,7 +199,7 @@ func openJournalRoot(r *os.Root, raw []byte, worker string, a Authority, initial
 			r.Close()
 			return nil, e
 		}
-		if e = j.save(State{Format: Format, Plan: j.planID, Worker: worker, Phase: "PENDING", Parts: map[string]Progress{}}); e != nil {
+		if e = j.save(State{Format: journalFormat(p), Plan: j.planID, Worker: worker, Phase: "PENDING", Parts: map[string]Progress{}}); e != nil {
 			r.Close()
 			return nil, e
 		}
@@ -205,15 +224,22 @@ func (j *Journal) save(s State) error {
 	if len(raw) > maxJournal {
 		return ErrDenied
 	}
-	return atomicFile(j.root, "state.json", raw)
+	return statefile.Guard(j.Admit, "state.json", len(raw), func() error { return atomicFile(j.root, "state.json", raw) })
 }
 func (j *Journal) load() (State, error) {
-	var s State
 	raw, e := regular(j.root, "state.json", maxJournal)
 	if e != nil {
-		return s, e
+		return State{}, e
 	}
-	if storage.Decode(raw, &s, maxJournal) != nil || s.Format != Format || s.Plan != j.planID || s.Worker != j.worker || s.Parts == nil || len(s.Parts) > MaxTasks {
+	return j.decodeState(raw)
+}
+
+func (j *Journal) decodeState(raw []byte) (State, error) {
+	var s State
+	if storage.Decode(raw, &s, maxJournal) != nil || s.Format != journalFormat(j.plan) || s.Plan != j.planID || s.Worker != j.worker || s.Parts == nil || len(s.Parts) > MaxTasks {
+		return s, ErrConflict
+	}
+	if s.Format == moveJournalFormat && !s.MoveBookReady && (len(s.Parts) != 0 || s.Receipt != nil) || s.Format != moveJournalFormat && s.MoveBookReady {
 		return s, ErrConflict
 	}
 	if s.Phase != "PENDING" && s.Phase != "TRANSFERRING" && s.Phase != "RETRYABLE" && s.Phase != "COMPLETE" {
@@ -226,7 +252,7 @@ func (j *Journal) load() (State, error) {
 	}
 	if s.Receipt != nil {
 		r := s.Receipt
-		if r.Target != j.plan.Profile.ID() || r.Generation != j.plan.Generation || r.Operation != j.plan.Operation || r.Executor != j.worker || r.Verification != "full-target-readback" || r.ObservedUnix < 1 {
+		if r.Target != j.plan.Profile.ID() || r.Generation != j.plan.Generation || r.Operation != j.plan.Operation || r.Executor != j.worker || !validVerification(r.Verification) || r.ObservedUnix < 1 {
 			return s, ErrDenied
 		}
 	}
@@ -262,6 +288,40 @@ func (j *Journal) Status(ctx context.Context) (State, error) {
 	defer unlock()
 	return j.load()
 }
+
+func (j *Journal) moveBookOptions() storage.MoveBookOptions {
+	return storage.MoveBookOptions{Parent: j.root, Directory: "move-attempts",
+		Scope:   storage.Hash([]byte(moveJournalFormat + "/" + j.planID + "/" + j.worker)),
+		Profile: j.plan.Profile, Guard: j.Guard}
+}
+
+// openMoveBook runs under the worker lease, before the first external write.
+// Its ready bit prevents a lost directory from becoming a fresh attempt scope.
+func (j *Journal) openMoveBook(ctx context.Context) (*storage.MoveBook, error) {
+	s, e := j.Status(ctx)
+	if e != nil {
+		return nil, e
+	}
+	var admit statefile.Admission
+	if j.Admit != nil {
+		admit = func(name string, size int) (func(bool) error, error) {
+			return j.Admit("move-attempts/"+name, size)
+		}
+	}
+	options := j.moveBookOptions()
+	options.Initialize, options.Admission, options.Fault = !s.MoveBookReady, admit, j.Fault
+	book, e := storage.OpenMoveBook(ctx, options)
+	if e != nil {
+		return nil, e
+	}
+	if !s.MoveBookReady {
+		if e = j.edit(ctx, func(s *State) error { s.MoveBookReady = true; return nil }); e != nil {
+			book.Close()
+			return nil, e
+		}
+	}
+	return book, nil
+}
 func (j *Journal) beginPart(ctx context.Context, id string, round int64) error {
 	return j.edit(ctx, func(s *State) error {
 		p := s.Parts[id]
@@ -276,13 +336,62 @@ func (j *Journal) beginPart(ctx context.Context, id string, round int64) error {
 		return nil
 	})
 }
-func (j *Journal) donePart(ctx context.Context, id string, submitted int64) error {
+
+// checkPreparedPart rechecks capacity for a retry of an already durable intent.
+// The earlier pending intent still protects crash recovery. Completed progress
+// is saved separately. Attempts counts durable preparations, not RPCs.
+func (j *Journal) checkPreparedPart(ctx context.Context, id string, round int64) error {
+	if j.Guard != nil {
+		if err := j.Guard(ctx); err != nil {
+			return err
+		}
+	}
+	unlock, err := lock(ctx, j.root, "state.lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	s, err := j.load()
+	if err != nil {
+		return err
+	}
+	p, ok := s.Parts[id]
+	if !ok || !j.tasks[id] || p.Complete || round < 0 || p.Attempts == ^uint64(0) || s.Revision == ^uint64(0) {
+		return ErrDenied
+	}
+	p.Round, p.Attempts = round, p.Attempts+1
+	s.Parts[id] = p
+	s.Revision++
+	raw, err := json.Marshal(s)
+	if err != nil || len(raw) > maxJournal {
+		return ErrDenied
+	}
+	if j.CheckWrite != nil {
+		return j.CheckWrite(ctx, "state.json", len(raw))
+	}
+	if j.Admit == nil {
+		return ctx.Err()
+	}
+	// Keep the existing admission contract for callers without a read-only
+	// capacity check. Its completion result follows the caller's policy.
+	finish, err := j.Admit("state.json", len(raw))
+	if err != nil {
+		return err
+	}
+	if finish == nil {
+		return ErrDenied
+	}
+	return finish(false)
+}
+
+func (j *Journal) donePart(ctx context.Context, id string, round, submitted int64) error {
 	return j.edit(ctx, func(s *State) error {
 		p, ok := s.Parts[id]
-		if !ok || submitted < 0 || p.SubmittedBytes > int64(^uint64(0)>>1)-submitted {
+		if !ok || round < 0 || submitted < 0 || p.SubmittedBytes > int64(^uint64(0)>>1)-submitted {
 			return ErrDenied
 		}
 		p.Complete = true
+		p.Round = round
 		p.SubmittedBytes += submitted
 		s.Parts[id] = p
 		return nil

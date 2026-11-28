@@ -1,0 +1,1526 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS_128MIB_STREAMING_AND_24_FRESH_READERS_FULL100GIB_PENDING",
+  "sourceTree": "5855bfa5381685e5b2bb120b8d43d83a083eb565",
+  "sourceInputs": {
+    "internal/sourceagent/asymmetric_linux_test.go": "3429c81dadce4da05da5a3010865b8946b0200a2ceeb5dbfcc8d4a8e4c6aa1e1",
+    "internal/sourceagent/asymmetric_scale_linux_test.go": "449414e4b4c95b079ff56d57ea01d5bbe4ce820568d175eb5f51b667980c0a7f",
+    "internal/sourceagent/ingress_distribution_linux.go": "2fc015497ae2a2cb056d83171d0f984529b2e703e824802272bb052f54dbd4b5",
+    "internal/sourceagent/parallel_linux.go": "e4e329fdb8c552c31033d1056f55bd0c7449bd02c7fb1972c1bb7766d3faee77",
+    "internal/sourceagent/ingress_distribution_linux_test.go": "7199f8e2ffe6608fc24871c83dc7b6842003e69cb89ee303044814fa63046142",
+    "internal/sourceagent/parallel_linux_test.go": "c10746eab45cf5c47067b9c93e9546cfd3f5831988a655211e32eba0696bbcce"
+  },
+  "baseCommit": "ec63bb70b7cea411ebb04248d7bbb919dd84bfaa",
+  "observedAt": "2026-11-15T08:42:24.148684+00:00",
+  "producerFinishedAt": "2026-11-15T08:22:12.809026+00:00",
+  "sourceBytes": 134217728,
+  "changedBytes": 8388608,
+  "compiler": "go1.27.3 linux/amd64",
+  "runtimeImageDigest": "sha256:ff83b502cc6317906d9588103ac5dfcf1bed82cd2ecd386f144647f4cf91c5ef",
+  "testBinarySHA256": "88b1c3bdf64e78d9f232ed21475825a9147a3e2391ff3d150abe9b85ff415a10",
+  "oracleSHA256": "7aa16e002a72b26171373fe3f230f0ff831201c7d5765d2780e1ac7a4b40484d",
+  "sourceStateLimitBytes": 2147483648,
+  "observedSourceStateAllocatedBytes": [69632, 110592, 69632, 110592, 73728, 118784, 73728, 118784],
+  "producerRecoveryMarker": "PENDING until separately admitted consumers actually passed",
+  "inProcessRecoveryDeferred": true,
+  "producerLogSHA256": "287fe85364284167b1a8359eb3ea24431e353c78eb2fe4899968446e30f65038",
+  "originalControl": {
+    "sourceTree": "8a0df05cb2eaf0a6a8338a0ef62f06c9680876fc",
+    "logSHA256": "770fb19584582f11d6a99b8a27fbccb190434cec8d4dddac63e17329d0b841d8",
+    "captures": 8,
+    "inProcessByteAttributeRestores": 36,
+    "scope": "Separate original 128 MiB control; not relabelled as fresh-reader evidence"
+  },
+  "reader": {
+    "commit": "0ad4d17f51f7dfd334eae02eb9cfc3bc06bc72c6",
+    "binarySHA256": "dd15b70c98f59a020194b870f814a4d524720705d39fd89855576a78215fa540",
+    "restores": 24,
+    "namespace": "Each new no-network/non-root process mounts only immutable catalogs/objects, owner read-only recovery material/public trust, pinned executable and its empty output. No source/global index/runtime/operational keys. Hardlink immutable views share inodes and are not additional physical copies."
+  },
+  "profile": {
+    "cpu": 0.5,
+    "memoryMaxBytes": 536870912,
+    "memoryPeakBytes": 505868288,
+    "memoryLimitEvents": 0,
+    "swapBytes": 0,
+    "oom": 0,
+    "readerCPU": 0.5,
+    "readerMemoryMaxBytes": 402653184,
+    "cohostedWithSoleSeparate100GiBProducer": true,
+    "applicationBodyCapsMbit": {
+      "a": 500,
+      "b": 500,
+      "c": 100,
+      "source": 1000
+    }
+  },
+  "captures": [
+    {
+      "case": "complete-single",
+      "phase": "base",
+      "generation": "09c77be9a73a9c66954ec0e1821b96c3944781b77acb269b084c346efb26064e",
+      "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 134245367,
+      "allSourceRequestBodyBytes": 134314917,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 24269,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 668795.4997457863,
+      "initialBodyBytesPerSecondToSeal": 668933.222527217,
+      "largePutIntervalsOverlap": false,
+      "sealedSeconds": 200.685752298,
+      "providerReleasedSeconds": 327.116845392,
+      "completeSeconds": 360.800659842,
+      "followerReadySeconds": 423.720563785,
+      "requestBodyBytes": {
+        "source>a": 134257707,
+        "source>b": 57210,
+        "b>a": 42075
+      },
+      "responseBodyBytes": {
+        "a>c": 134268455,
+        "a>source": 134341579,
+        "a>b": 134287442,
+        "b>source": 27120
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "71bdee6b52fadca1ca44aeacffa0f9ee3615a6f587de6cab8ef23b122183db39",
+          "bytes": 5366822,
+          "startedAt": "2026-11-15T07:37:00.184194532Z",
+          "durableResponseAt": "2026-11-15T07:37:02.220639588Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "65f119c9e36a89ff9ace4a98514f0ad06913a9705916674a4e24d200709e59be",
+          "bytes": 8282892,
+          "startedAt": "2026-11-15T07:37:10.16128566Z",
+          "durableResponseAt": "2026-11-15T07:37:14.116169781Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "a8cfa6afaa58e01a3fb731bd713faeb5cd99d3a03b1707ea3af52fdcc28e3ac2",
+          "bytes": 6268464,
+          "startedAt": "2026-11-15T07:37:21.467811268Z",
+          "durableResponseAt": "2026-11-15T07:37:23.616850831Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "e94310f1dd5428ff8eb21d3aa9cc402cfe7688e18a3691fadd3fcee164c3f043",
+          "bytes": 7862094,
+          "startedAt": "2026-11-15T07:37:30.463561166Z",
+          "durableResponseAt": "2026-11-15T07:37:32.336989744Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "eb230e3944509bbea32c4bd9db33a76be01488fa74283f1dc97a37516e826738",
+          "bytes": 7761116,
+          "startedAt": "2026-11-15T07:37:41.040264349Z",
+          "durableResponseAt": "2026-11-15T07:37:42.63838417Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "26ced18e97451e080344b1d47fb756c212e8deddca21d7f983f89def0d892a5e",
+          "bytes": 8356963,
+          "startedAt": "2026-11-15T07:37:49.662754907Z",
+          "durableResponseAt": "2026-11-15T07:37:52.159006645Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "18485a6a2c0876c9446a402bfb0aded442818028d19531e76050b254d4c212cb",
+          "bytes": 6745097,
+          "startedAt": "2026-11-15T07:38:02.066830213Z",
+          "durableResponseAt": "2026-11-15T07:38:04.248666889Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "6bdedacdfd6e1f6399a08a46ea3110e51f4e0fc11e0a8ad715cc14a3bfdd3abe",
+          "bytes": 7519739,
+          "startedAt": "2026-11-15T07:38:11.920591775Z",
+          "durableResponseAt": "2026-11-15T07:38:14.043850467Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "ebb912039e8458da046c16609fc4269abd655837e5a1311b3a2af09cab8585c9",
+          "bytes": 6998317,
+          "startedAt": "2026-11-15T07:38:22.420468034Z",
+          "durableResponseAt": "2026-11-15T07:38:24.607836763Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "80c5daf5000f94e2ec2955cf52a88b2c03229afa0d69a058a25798d78cec26c9",
+          "bytes": 8213082,
+          "startedAt": "2026-11-15T07:38:31.930564638Z",
+          "durableResponseAt": "2026-11-15T07:38:33.666522476Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "ec814e71732a0289ad7ac783ef820677e28ab25ba28c25c938fcca76bdc83d67",
+          "bytes": 8353541,
+          "startedAt": "2026-11-15T07:38:40.349264284Z",
+          "durableResponseAt": "2026-11-15T07:38:42.983359893Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "5a0b93472204ef3c73957d7e74bbe403f99457489fb6cb04a75541277df2631b",
+          "bytes": 8231192,
+          "startedAt": "2026-11-15T07:38:51.559901493Z",
+          "durableResponseAt": "2026-11-15T07:38:53.912590589Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "158c8375575249a6ef552050f7957f0c40b5cd552124cd5d44b2fc645bc804f4",
+          "bytes": 6408800,
+          "startedAt": "2026-11-15T07:39:01.751670913Z",
+          "durableResponseAt": "2026-11-15T07:39:03.522087116Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "f3d6b98d3de8fc902ae79992b4e4bebfd3cb8fed37823ebb3c42839765ede916",
+          "bytes": 7761047,
+          "startedAt": "2026-11-15T07:39:13.044121954Z",
+          "durableResponseAt": "2026-11-15T07:39:15.213313574Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "c8b7a13bf83405aa0032f12afa7c9ef0bfa9ea9ccaa61a47e51440aae8bdc4be",
+          "bytes": 7875076,
+          "startedAt": "2026-11-15T07:39:23.421235673Z",
+          "durableResponseAt": "2026-11-15T07:39:25.232206291Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "9726f4395e7f035cefca589fb717df409acec62087b32ddfcbd044eb5ef2ecac",
+          "bytes": 7758985,
+          "startedAt": "2026-11-15T07:39:34.788457796Z",
+          "durableResponseAt": "2026-11-15T07:39:36.987846248Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "3dd398995fc4d812644eb87d61e85b9ad01d0b093b29091406f840eef2311308",
+          "bytes": 7975722,
+          "startedAt": "2026-11-15T07:39:45.86086322Z",
+          "durableResponseAt": "2026-11-15T07:39:48.655995706Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "90641a00783be0b7c4943e370cc68e295ff63a601059e75640bf7a3a483c927d",
+          "bytes": 6481691,
+          "startedAt": "2026-11-15T07:39:56.762924082Z",
+          "durableResponseAt": "2026-11-15T07:39:59.290655222Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "960af123282e554896fc44100ca43a06d0aac9dd40f6d9127996f9abecc51746",
+          "bytes": 24269,
+          "startedAt": "2026-11-15T07:40:07.353839408Z",
+          "durableResponseAt": "2026-11-15T07:40:08.77410111Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "bc37f4310d10bd7809b01dbec4e27b40af3e7bce31e06bc02c62f0eba87d52a0",
+          "bytes": 458,
+          "startedAt": "2026-11-15T07:40:10.802617504Z",
+          "durableResponseAt": "2026-11-15T07:40:10.941524716Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 134245367,
+      "stagedPeerBodyBytesBeforeSeal": 134245367,
+      "requiredReplicaTimes": [
+        {
+          "node": "a",
+          "verifiedUnix": 1794728498
+        },
+        {
+          "node": "b",
+          "verifiedUnix": 1794728500
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794728498,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "09c77be9a73a9c66954ec0e1821b96c3944781b77acb269b084c346efb26064e",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 38.06844338699011,
+          "oracleSeconds": 14.816316534997895,
+          "restoreMemoryPeakBytes": 227803136,
+          "oracleMemoryPeakBytes": 121470976,
+          "restoreLogSHA256": "daafc9b8b5155aba5f1a7f71404b5593236e061edbbc782674eed0b2440111ad",
+          "oracleLogSHA256": "28828d5dd2fca33b3152bd44144c9b6e58efd43624053dcd4f6f229c925bf840"
+        },
+        {
+          "holder": 1,
+          "generation": "09c77be9a73a9c66954ec0e1821b96c3944781b77acb269b084c346efb26064e",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 37.56431836500997,
+          "oracleSeconds": 13.52275110204937,
+          "restoreMemoryPeakBytes": 234815488,
+          "oracleMemoryPeakBytes": 131072000,
+          "restoreLogSHA256": "c1dfeaf7b51368b57c4ce50d80aa77189d04baba0c184f4c9b26b50a33c316b8",
+          "oracleLogSHA256": "0005daeb14e51c41a472c61db57dec62e896685bfb64cc589bbfb23f94980159"
+        },
+        {
+          "holder": 2,
+          "generation": "09c77be9a73a9c66954ec0e1821b96c3944781b77acb269b084c346efb26064e",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 38.72164226998575,
+          "oracleSeconds": 11.842923996970057,
+          "restoreMemoryPeakBytes": 234348544,
+          "oracleMemoryPeakBytes": 111267840,
+          "restoreLogSHA256": "284f2219f1449cd005925fec4f1362a62124df145dfb8db7bf2c15a4d998335a",
+          "oracleLogSHA256": "0ab0a4a1c2da0ccf2df88797223cc3d30590900acfaa1d821f43e8649dd561e8"
+        }
+      ]
+    },
+    {
+      "case": "complete-single",
+      "phase": "patched",
+      "generation": "b14ef0105bc171ba78afcb9cf97c7cbfe9c69fd5bab7f9a47ced969cea21ca6d",
+      "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 12885727,
+      "allSourceRequestBodyBytes": 12905291,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 49452,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 2282669.102680032,
+      "initialBodyBytesPerSecondToSeal": 219150.26671044427,
+      "largePutIntervalsOverlap": false,
+      "sealedSeconds": 58.798591457,
+      "providerReleasedSeconds": 200.258279486,
+      "completeSeconds": 213.326295784,
+      "followerReadySeconds": 245.370530144,
+      "requestBodyBytes": {
+        "source>a": 12891077,
+        "source>b": 14214,
+        "b>a": 67815
+      },
+      "responseBodyBytes": {
+        "a>c": 12901859,
+        "a>source": 13063204,
+        "a>b": 12953542,
+        "b>source": 10688
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "42992958ea004107fc9d98778008d6d86d0dc15dc74ee0dc811d42674e34790e",
+          "bytes": 7339753,
+          "startedAt": "2026-11-15T07:44:35.72058193Z",
+          "durableResponseAt": "2026-11-15T07:44:37.519149161Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "5259287cb1ece1926f7f8b08400b9cc920ba20ee38276da1e956c7eb6e33ff38",
+          "bytes": 5520333,
+          "startedAt": "2026-11-15T07:44:52.920845683Z",
+          "durableResponseAt": "2026-11-15T07:44:54.682271461Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "8cb0cb868cdb6bfcbab94825c40483301dd3ff4b039ecc6f4c8033c14676b39f",
+          "bytes": 25183,
+          "startedAt": "2026-11-15T07:45:00.571963026Z",
+          "durableResponseAt": "2026-11-15T07:45:00.937585351Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "9be4439580cbd5f33949dc52c1de395095b14f8a6ba4e514d07eecce03575f9e",
+          "bytes": 458,
+          "startedAt": "2026-11-15T07:45:04.546421869Z",
+          "durableResponseAt": "2026-11-15T07:45:05.769095028Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 12885727,
+      "stagedPeerBodyBytesBeforeSeal": 12885727,
+      "requiredReplicaTimes": [
+        {
+          "node": "a",
+          "verifiedUnix": 1794728769
+        },
+        {
+          "node": "b",
+          "verifiedUnix": 1794728773
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794728769,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "b14ef0105bc171ba78afcb9cf97c7cbfe9c69fd5bab7f9a47ced969cea21ca6d",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 35.635704957006965,
+          "oracleSeconds": 14.031334382947534,
+          "restoreMemoryPeakBytes": 229842944,
+          "oracleMemoryPeakBytes": 117665792,
+          "restoreLogSHA256": "a86ee441ecb88adb245b38476719693aeb8a09b4c68df1eb3bbb50dc831d4cf5",
+          "oracleLogSHA256": "0e0517f66c4d6272a98a8c2aef81334d7e43945326a78a23d27ef29237f169a6"
+        },
+        {
+          "holder": 1,
+          "generation": "b14ef0105bc171ba78afcb9cf97c7cbfe9c69fd5bab7f9a47ced969cea21ca6d",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 38.60075911000604,
+          "oracleSeconds": 13.617664514982607,
+          "restoreMemoryPeakBytes": 233115648,
+          "oracleMemoryPeakBytes": 131186688,
+          "restoreLogSHA256": "56bb3d92e92cb5652210d87303bf269e8ab02458a71b17c7ee5d4aaa696697d7",
+          "oracleLogSHA256": "1450758a6104579bf9f44ae80ed8c47e40086623ee5fc48b73f174252a34d480"
+        },
+        {
+          "holder": 2,
+          "generation": "b14ef0105bc171ba78afcb9cf97c7cbfe9c69fd5bab7f9a47ced969cea21ca6d",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 36.133795508998446,
+          "oracleSeconds": 11.75004276499385,
+          "restoreMemoryPeakBytes": 237166592,
+          "oracleMemoryPeakBytes": 123449344,
+          "restoreLogSHA256": "3477271096255debd17d9ab4b1fcbeaf7b31d4774cf3bb2d845799a7ce7c8115",
+          "oracleLogSHA256": "25feef0c2e706d57573567ed44a58300422ed06a26277340e99a1b6b7d37c039"
+        }
+      ]
+    },
+    {
+      "case": "complete-paired",
+      "phase": "base",
+      "generation": "a92e47f779082abf3b8b5dc5d7686fa05bd93b59425f6f3aecc04d4710f1863f",
+      "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 134245367,
+      "allSourceRequestBodyBytes": 134314917,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 24269,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 909909.2199606621,
+      "initialBodyBytesPerSecondToSeal": 910096.5944700151,
+      "largePutIntervalsOverlap": true,
+      "sealedSeconds": 147.506723809,
+      "providerReleasedSeconds": 269.781634501,
+      "completeSeconds": 315.693075281,
+      "followerReadySeconds": 371.708755501,
+      "requestBodyBytes": {
+        "source>b": 76655985,
+        "source>a": 57658932,
+        "b>a": 46530
+      },
+      "responseBodyBytes": {
+        "b>source": 76644326,
+        "b>a": 76616935,
+        "a>c": 134266157,
+        "a>source": 57721285,
+        "a>b": 57674962
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "a29ed6fe2ec1772f99ef1085ad1db068b07e2803c2cebb9f7307476057205ec2",
+          "bytes": 5366822,
+          "startedAt": "2026-11-15T07:48:42.234648136Z",
+          "durableResponseAt": "2026-11-15T07:48:46.296899322Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "222f1a03d587ab724c873286c1a5c6278bd1cc939c3a43e769d3d1a5cdfa9c72",
+          "bytes": 8282892,
+          "startedAt": "2026-11-15T07:48:44.561215463Z",
+          "durableResponseAt": "2026-11-15T07:48:47.1707768Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "d8e9d30df7f1cf87815a3850b6e65b9d8b13f3f7c6c2ea5f7b85781130516353",
+          "bytes": 6268464,
+          "startedAt": "2026-11-15T07:48:54.420028051Z",
+          "durableResponseAt": "2026-11-15T07:48:58.956000572Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "cfb896be8768e3b9f51c1e9c2978cf7c6028d74bebc4e46e6d7e5c38cc2a9296",
+          "bytes": 7862094,
+          "startedAt": "2026-11-15T07:48:57.431487008Z",
+          "durableResponseAt": "2026-11-15T07:49:00.268120968Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "d2711e22ef1fe5be41bb098c6f0f65eb639e62a9ed5dd2ab7cbd0ec97a91fd54",
+          "bytes": 7761116,
+          "startedAt": "2026-11-15T07:49:09.52043598Z",
+          "durableResponseAt": "2026-11-15T07:49:14.630097172Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "d6bd46bc53162981060ccb71581a0f0d8ce98e253e967d3b6766ebac7c3bb1ad",
+          "bytes": 8356963,
+          "startedAt": "2026-11-15T07:49:13.557163298Z",
+          "durableResponseAt": "2026-11-15T07:49:17.210239603Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "3bb03799943aebe6e913a91fcd4655b685830d53209b58b9bf7622643fd0fc6a",
+          "bytes": 6745097,
+          "startedAt": "2026-11-15T07:49:25.976026284Z",
+          "durableResponseAt": "2026-11-15T07:49:28.744010874Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "7fda06005fdfe8430f8f24559dae4cb8f9c7eca03f6a215f39f801d009e93daf",
+          "bytes": 7519739,
+          "startedAt": "2026-11-15T07:49:30.160001762Z",
+          "durableResponseAt": "2026-11-15T07:49:33.65240495Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "76de6976062f2abf3166e5bcb49b00bacc84c05668d895a51c7fde14579b6b96",
+          "bytes": 6998317,
+          "startedAt": "2026-11-15T07:49:43.230394955Z",
+          "durableResponseAt": "2026-11-15T07:49:47.8383984Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "b7aeeae5b15ed41a4065c8192c996b6bf990f1d501d3dfd706c26c9d2715b4e1",
+          "bytes": 8213082,
+          "startedAt": "2026-11-15T07:49:44.333810989Z",
+          "durableResponseAt": "2026-11-15T07:49:48.088695431Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "e1dd88117e87fb6ff0f940f713c02dd0bad4f2a43af91c6c5d5b2a43a37acdd3",
+          "bytes": 8353541,
+          "startedAt": "2026-11-15T07:49:55.939031086Z",
+          "durableResponseAt": "2026-11-15T07:50:01.462876272Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "9669b28dce02242cc2361fbd17d978f95cab1997a7e0d7eba3176e2a073495a5",
+          "bytes": 8231192,
+          "startedAt": "2026-11-15T07:49:59.160370967Z",
+          "durableResponseAt": "2026-11-15T07:50:01.607203034Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "639dd3c45c44ddbe6ec2785c639a2af4c52b6b3a6d3abae75252aca8cbe0e108",
+          "bytes": 6408800,
+          "startedAt": "2026-11-15T07:50:10.536855893Z",
+          "durableResponseAt": "2026-11-15T07:50:14.7536513Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "c594b9daddd73038f0280d1ee50e92eae5bcee9b43dc2375447b986169bc4a87",
+          "bytes": 7761047,
+          "startedAt": "2026-11-15T07:50:12.648277162Z",
+          "durableResponseAt": "2026-11-15T07:50:15.980950979Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "5d0e9083fa46e776a4a9aa5fff34456c706ee65065d790049ad3dd0133a75846",
+          "bytes": 7875076,
+          "startedAt": "2026-11-15T07:50:25.570453297Z",
+          "durableResponseAt": "2026-11-15T07:50:29.61481186Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "ac7f2479ffd6af96b3092374f599668df29fc63b1817b16407b70a36e70b3bb1",
+          "bytes": 7758985,
+          "startedAt": "2026-11-15T07:50:28.619937091Z",
+          "durableResponseAt": "2026-11-15T07:50:31.839063526Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "8289ff3f6bb4755a6804bce59e7e800e456ad3c2e931e27a561b8af9d9cdc079",
+          "bytes": 7975722,
+          "startedAt": "2026-11-15T07:50:42.952743286Z",
+          "durableResponseAt": "2026-11-15T07:50:45.773448159Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "c36d14846d83edadc143d2ccf256f08156c7b9e51162619bea741ed1ca5c9773",
+          "bytes": 6481691,
+          "startedAt": "2026-11-15T07:50:44.937380191Z",
+          "durableResponseAt": "2026-11-15T07:50:47.622677805Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "6b8bfb7c17b6e7270c28fcbeb590e7eddb5cdabf438cb3800663ad4fabca22c3",
+          "bytes": 24269,
+          "startedAt": "2026-11-15T07:50:56.503897512Z",
+          "durableResponseAt": "2026-11-15T07:50:56.983413783Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "c782c6ce1275f6d4f2345ff48291d00af12e9e8b44020234de210d6a5da79da4",
+          "bytes": 458,
+          "startedAt": "2026-11-15T07:51:01.946457139Z",
+          "durableResponseAt": "2026-11-15T07:51:02.11583542Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 134245367,
+      "stagedPeerBodyBytesBeforeSeal": 134245367,
+      "requiredReplicaTimes": [
+        {
+          "node": "b",
+          "verifiedUnix": 1794729147
+        },
+        {
+          "node": "a",
+          "verifiedUnix": 1794729144
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794729144,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "a92e47f779082abf3b8b5dc5d7686fa05bd93b59425f6f3aecc04d4710f1863f",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 37.87572962598642,
+          "oracleSeconds": 12.731565477035474,
+          "restoreMemoryPeakBytes": 228655104,
+          "oracleMemoryPeakBytes": 78598144,
+          "restoreLogSHA256": "74e4443d36090dfc3eaae613adf94f222050872041a5eabb4171799076a8bc3a",
+          "oracleLogSHA256": "b48620aadbfc69b11c0370caa8a26a7f8a13419b92972ed99de23fdd40ad840c"
+        },
+        {
+          "holder": 1,
+          "generation": "a92e47f779082abf3b8b5dc5d7686fa05bd93b59425f6f3aecc04d4710f1863f",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 38.16637258999981,
+          "oracleSeconds": 12.191582725965418,
+          "restoreMemoryPeakBytes": 233582592,
+          "oracleMemoryPeakBytes": 89927680,
+          "restoreLogSHA256": "19be7e5c0fe8fa7cae76f2230a2208eabe96e9fbe7554ee08a7c15c29619bf80",
+          "oracleLogSHA256": "df099a287ee05197aa8725716a6f01e6240dcabaffd7c15c0824460cac683d01"
+        },
+        {
+          "holder": 2,
+          "generation": "a92e47f779082abf3b8b5dc5d7686fa05bd93b59425f6f3aecc04d4710f1863f",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 35.242293683986645,
+          "oracleSeconds": 14.95234093797626,
+          "restoreMemoryPeakBytes": 222367744,
+          "oracleMemoryPeakBytes": 135421952,
+          "restoreLogSHA256": "52bd5e2811496474950a9fcdd6053decedc481a1964f4e0fc9c771ab38008968",
+          "oracleLogSHA256": "da745e03d19d2bd153f4740040cbf9b60164229a862b70d0cf94785a0cea4311"
+        }
+      ]
+    },
+    {
+      "case": "complete-paired",
+      "phase": "patched",
+      "generation": "17483b1d05c6f74393e6fff6577b8ee343189e855c23cd1d6cdabb3d981e89e2",
+      "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 12885727,
+      "allSourceRequestBodyBytes": 12905291,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 49452,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 2164822.737770195,
+      "initialBodyBytesPerSecondToSeal": 207836.2912110934,
+      "largePutIntervalsOverlap": false,
+      "sealedSeconds": 61.999407923,
+      "providerReleasedSeconds": 196.091840052,
+      "completeSeconds": 206.054757778,
+      "followerReadySeconds": 238.495219858,
+      "requestBodyBytes": {
+        "source>b": 5554548,
+        "source>a": 7350743,
+        "b>a": 65340
+      },
+      "responseBodyBytes": {
+        "b>source": 5556748,
+        "b>a": 5545974,
+        "a>c": 12901758,
+        "a>source": 7511592,
+        "a>b": 7405093
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "3b4af0e34325eb473e5bbc7f1186649269c5e6801e06b9f733940ff58f6b9e00",
+          "bytes": 7339753,
+          "startedAt": "2026-11-15T07:55:27.655794213Z",
+          "durableResponseAt": "2026-11-15T07:55:30.815366956Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "c4c7e1515510a2e8188aa16da8894c3fba36dff5d19634c9eed7865de4da2580",
+          "bytes": 5520333,
+          "startedAt": "2026-11-15T07:55:44.643239019Z",
+          "durableResponseAt": "2026-11-15T07:55:47.448777305Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "d190dd5c2d9805bd4a0aefb5044d29e73b5c3ddbd9c6416e21b500c74cf3ac73",
+          "bytes": 25183,
+          "startedAt": "2026-11-15T07:55:53.035049471Z",
+          "durableResponseAt": "2026-11-15T07:55:53.672899369Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "2ad43c22289f4b6e126c6d7190f4da0a365aee4070078180b56e6684081c31f6",
+          "bytes": 458,
+          "startedAt": "2026-11-15T07:55:56.987792787Z",
+          "durableResponseAt": "2026-11-15T07:55:57.516270725Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 12885727,
+      "stagedPeerBodyBytesBeforeSeal": 12885727,
+      "requiredReplicaTimes": [
+        {
+          "node": "b",
+          "verifiedUnix": 1794729420
+        },
+        {
+          "node": "a",
+          "verifiedUnix": 1794729416
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794729416,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "17483b1d05c6f74393e6fff6577b8ee343189e855c23cd1d6cdabb3d981e89e2",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 37.9330393379787,
+          "oracleSeconds": 12.518814917013515,
+          "restoreMemoryPeakBytes": 230019072,
+          "oracleMemoryPeakBytes": 109555712,
+          "restoreLogSHA256": "8e693a6fcebe3f7443501d4189342ce76179ee5a83bd31935690b22f1cf83257",
+          "oracleLogSHA256": "4c7b04c3737fc589240542ca27ad45af28106e067efbd2225d8b21e3fae5cabd"
+        },
+        {
+          "holder": 1,
+          "generation": "17483b1d05c6f74393e6fff6577b8ee343189e855c23cd1d6cdabb3d981e89e2",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 33.82276130601531,
+          "oracleSeconds": 12.14851957000792,
+          "restoreMemoryPeakBytes": 231747584,
+          "oracleMemoryPeakBytes": 126398464,
+          "restoreLogSHA256": "77ac680e9c62220508bdaf6524e1be7375ebe97a2a44351744fd3fb3e3bb1568",
+          "oracleLogSHA256": "53a859cef05ce3854d2af363aa033f9219b6b98b44f78d028e335b01a40e633d"
+        },
+        {
+          "holder": 2,
+          "generation": "17483b1d05c6f74393e6fff6577b8ee343189e855c23cd1d6cdabb3d981e89e2",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 37.24177372502163,
+          "oracleSeconds": 12.677085379953496,
+          "restoreMemoryPeakBytes": 231075840,
+          "oracleMemoryPeakBytes": 119377920,
+          "restoreLogSHA256": "53216fc4ef9e9a863afce6efcb3088bb3cb4c31058be8c7a45dd0ba3acb2b21f",
+          "oracleLogSHA256": "147f380c7f488388da456b83a0620e4bbcb3867db81a17270c945610d36cc854"
+        }
+      ]
+    },
+    {
+      "case": "split-single",
+      "phase": "base",
+      "generation": "a934da33ae211ea540a4395b6cccbb626e0f7eb9e2a97a5e869df6fb74abac68",
+      "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 134245367,
+      "allSourceRequestBodyBytes": 134348335,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 24269,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 882335.4443653374,
+      "initialBodyBytesPerSecondToSeal": 882517.1407009125,
+      "largePutIntervalsOverlap": false,
+      "sealedSeconds": 152.116441493,
+      "providerReleasedSeconds": 156.686437631,
+      "completeSeconds": 366.026054596,
+      "followerReadySeconds": 444.402672153,
+      "requestBodyBytes": {
+        "source>b": 82164,
+        "source>a": 134266171,
+        "b>a": 47025
+      },
+      "responseBodyBytes": {
+        "b>source": 27469,
+        "a>source": 134399436,
+        "a>c": 142137255,
+        "a>b": 134292392
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "f6072efaeb037da0add0b2c8ab5cda22c6411b572d72139955b2163958f4a7b9",
+          "bytes": 5366822,
+          "startedAt": "2026-11-15T07:59:28.871577648Z",
+          "durableResponseAt": "2026-11-15T07:59:30.288836617Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "f40ca6210ef82112a406ef5bce6967b1fcf5a466a22418c309f93a104d0e0d46",
+          "bytes": 8282892,
+          "startedAt": "2026-11-15T07:59:34.7233941Z",
+          "durableResponseAt": "2026-11-15T07:59:37.094446758Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "06a5ce98ca2107d00bb25fb6d3e17b5e27840717bdfb98271a4b2ec903b52c4f",
+          "bytes": 6268464,
+          "startedAt": "2026-11-15T07:59:40.571548232Z",
+          "durableResponseAt": "2026-11-15T07:59:42.044488928Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "c07ec41cf15d544ab7d745163a827a8e8979a87e07111badfe4194f056e17831",
+          "bytes": 7862094,
+          "startedAt": "2026-11-15T07:59:47.839772242Z",
+          "durableResponseAt": "2026-11-15T07:59:49.496224005Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "1fa87a5c555b4f98f3828c72cf17dc681aff38a701ba62fafd92a15c75ef0f0b",
+          "bytes": 7761116,
+          "startedAt": "2026-11-15T07:59:57.140196705Z",
+          "durableResponseAt": "2026-11-15T07:59:58.906462375Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "934f49ac8d1f2b74dcecf5dd5fc0330eb74d1b3800b345cfd9849312efa7cb27",
+          "bytes": 8356963,
+          "startedAt": "2026-11-15T08:00:03.348271697Z",
+          "durableResponseAt": "2026-11-15T08:00:05.313633537Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "461d06b5401c60ee2ce1b7c05a974ccddd048dac253ebe91366cc943134b4020",
+          "bytes": 6745097,
+          "startedAt": "2026-11-15T08:00:10.319918048Z",
+          "durableResponseAt": "2026-11-15T08:00:12.154270922Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "13b4c2cfd655d4bc491eb8bf1f4f20e7aeac5257652ccd4b899ae1d8aaf3ce52",
+          "bytes": 7519739,
+          "startedAt": "2026-11-15T08:00:17.919526071Z",
+          "durableResponseAt": "2026-11-15T08:00:20.610721623Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "22ad44b3fa08381761cfb7a22e79afd9b58ffe548e16bb4ea32f43b3d2ac762c",
+          "bytes": 6998317,
+          "startedAt": "2026-11-15T08:00:24.650402222Z",
+          "durableResponseAt": "2026-11-15T08:00:26.515492849Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "d2e8e9844fe5a45e27670cfada44c6ff4c7ac59ca8d0e7f0400db673121f30e8",
+          "bytes": 8213082,
+          "startedAt": "2026-11-15T08:00:35.619569083Z",
+          "durableResponseAt": "2026-11-15T08:00:37.689056465Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "41db6b1e3b1f0c055e4bfefe151c60a228cda2aa70e042eb2b713f0cc21468aa",
+          "bytes": 8353541,
+          "startedAt": "2026-11-15T08:00:41.862909902Z",
+          "durableResponseAt": "2026-11-15T08:00:44.401242128Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "a201b5d0aeda12fa824dba12e18933be2cddf8ba2f7c27e62515bce68b126deb",
+          "bytes": 8231192,
+          "startedAt": "2026-11-15T08:00:52.530316095Z",
+          "durableResponseAt": "2026-11-15T08:00:54.6223976Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "7a14e33a9c4772b3e0d835fd4d60301cafa957c3b53b0d333de45c3c99e1253c",
+          "bytes": 6408800,
+          "startedAt": "2026-11-15T08:01:01.620357454Z",
+          "durableResponseAt": "2026-11-15T08:01:03.409426769Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "6ce2617202bfbbfc3babb185549c9da3cd28ce9079f28862846c6c7ae3796d30",
+          "bytes": 7761047,
+          "startedAt": "2026-11-15T08:01:06.72129215Z",
+          "durableResponseAt": "2026-11-15T08:01:09.063209661Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "9f1dd9df43d9361290bb7d0f73c25bedd6ef55407ff0487de555c777f5c95128",
+          "bytes": 7875076,
+          "startedAt": "2026-11-15T08:01:17.244930514Z",
+          "durableResponseAt": "2026-11-15T08:01:20.052988364Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "f1b25c5f1448c9dfec53b32f3799109f8cfff8185a8b781002ba9a4a4e06de1d",
+          "bytes": 7758985,
+          "startedAt": "2026-11-15T08:01:24.878405182Z",
+          "durableResponseAt": "2026-11-15T08:01:26.98101011Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "992fd69c4b7638a82d1953e7d599041fc105664891e6a24c79b111bd9d042dfe",
+          "bytes": 7975722,
+          "startedAt": "2026-11-15T08:01:31.56213842Z",
+          "durableResponseAt": "2026-11-15T08:01:34.360665106Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "8bf61f1b41565e845194c6edd965082211a9160ec65afa76e076a49d9b4dec74",
+          "bytes": 6481691,
+          "startedAt": "2026-11-15T08:01:38.52048586Z",
+          "durableResponseAt": "2026-11-15T08:01:40.462097949Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "9528c9579deb2e6511f30a2f0535f7399ab76d09ab625ba2062b7bd822aa1666",
+          "bytes": 24269,
+          "startedAt": "2026-11-15T08:01:45.479545923Z",
+          "durableResponseAt": "2026-11-15T08:01:46.177888857Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "08d2132ac8142231b740b26675844765b1198c8c6ab6f4afe2e6a01513833292",
+          "bytes": 458,
+          "startedAt": "2026-11-15T08:01:49.950898164Z",
+          "durableResponseAt": "2026-11-15T08:01:50.411824178Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 134245367,
+      "stagedPeerBodyBytesBeforeSeal": 58701901,
+      "requiredReplicaTimes": [
+        {
+          "node": "b",
+          "verifiedUnix": 1794729856
+        },
+        {
+          "node": "a",
+          "verifiedUnix": 1794729786
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794729786,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "a934da33ae211ea540a4395b6cccbb626e0f7eb9e2a97a5e869df6fb74abac68",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 38.44700810301583,
+          "oracleSeconds": 12.088097341998946,
+          "restoreMemoryPeakBytes": 234217472,
+          "oracleMemoryPeakBytes": 126590976,
+          "restoreLogSHA256": "1aa42940d1ee6eecc007b0edf63096eeddf93d1fe45bde3bf6cb54c7e0a862d8",
+          "oracleLogSHA256": "c555f9bc11115f0a055b819a8342f36a1d4c40261db010c3382566dc158f2393"
+        },
+        {
+          "holder": 1,
+          "generation": "a934da33ae211ea540a4395b6cccbb626e0f7eb9e2a97a5e869df6fb74abac68",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 37.073027051985264,
+          "oracleSeconds": 13.35084976698272,
+          "restoreMemoryPeakBytes": 232071168,
+          "oracleMemoryPeakBytes": 110907392,
+          "restoreLogSHA256": "32b91def1e388856c0e3b32a7cdcb2620c003a7b18cbf3730bc3e34ddbb9cefa",
+          "oracleLogSHA256": "77d64b986a7daf7e5379a547711a47f287cbddae941ffea7ed34aa082dad9f23"
+        },
+        {
+          "holder": 2,
+          "generation": "a934da33ae211ea540a4395b6cccbb626e0f7eb9e2a97a5e869df6fb74abac68",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 39.40063790202839,
+          "oracleSeconds": 13.27740207198076,
+          "restoreMemoryPeakBytes": 231960576,
+          "oracleMemoryPeakBytes": 116416512,
+          "restoreLogSHA256": "287b680d603af0a05e6689cdb87055edb632232e39b54efd7e277b7866e8fe25",
+          "oracleLogSHA256": "45d41a2c8847b08f96613747e146c053def93bb73c4b4cd0ecec8477d1658b1a"
+        }
+      ]
+    },
+    {
+      "case": "split-single",
+      "phase": "patched",
+      "generation": "65b2251f6ada91a4bd5075c846f730a4629e95cb358024742b1f679a5a0cf7f3",
+      "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 12885727,
+      "allSourceRequestBodyBytes": 12923193,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 49452,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 2738692.2580669858,
+      "initialBodyBytesPerSecondToSeal": 262931.29305887764,
+      "largePutIntervalsOverlap": false,
+      "sealedSeconds": 49.007962689,
+      "providerReleasedSeconds": 55.199949907,
+      "completeSeconds": 214.584687051,
+      "followerReadySeconds": 260.565797677,
+      "requestBodyBytes": {
+        "source>b": 23216,
+        "source>a": 12899977,
+        "b>a": 68805
+      },
+      "responseBodyBytes": {
+        "b>source": 9280,
+        "a>source": 13075062,
+        "a>c": 12909286,
+        "a>b": 12954532
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "70d0bf1716015baca40972dc1118bde17c1d3098f3d3b8b52f2a327b3016b746",
+          "bytes": 7339753,
+          "startedAt": "2026-11-15T08:07:22.419767009Z",
+          "durableResponseAt": "2026-11-15T08:07:24.345170226Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "e12c625ceda1a075f048c0872212c91d03d5a605ff72ec30630909f60366a2ec",
+          "bytes": 5520333,
+          "startedAt": "2026-11-15T08:07:36.591118428Z",
+          "durableResponseAt": "2026-11-15T08:07:38.829205365Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "159aabfecb08632051ff41a907b4084c5fbfc6e30b4cd8d089fa28775cbe2f2d",
+          "bytes": 25183,
+          "startedAt": "2026-11-15T08:07:43.98766823Z",
+          "durableResponseAt": "2026-11-15T08:07:45.051906856Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "d75b745fc6ad082778cba286e95b7ce271a965bed7fc12979538fcdbc8650777",
+          "bytes": 458,
+          "startedAt": "2026-11-15T08:07:46.996622358Z",
+          "durableResponseAt": "2026-11-15T08:07:48.064724413Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 12885727,
+      "stagedPeerBodyBytesBeforeSeal": 5520333,
+      "requiredReplicaTimes": [
+        {
+          "node": "b",
+          "verifiedUnix": 1794730145
+        },
+        {
+          "node": "a",
+          "verifiedUnix": 1794730134
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794730134,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "65b2251f6ada91a4bd5075c846f730a4629e95cb358024742b1f679a5a0cf7f3",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 35.936955439974554,
+          "oracleSeconds": 11.055835701990873,
+          "restoreMemoryPeakBytes": 234823680,
+          "oracleMemoryPeakBytes": 112189440,
+          "restoreLogSHA256": "0f4cf42d01ae01396575d874c077c8e2e09785ee158407b212950b421c7d9a82",
+          "oracleLogSHA256": "e44cc77b0c9ce2238a45fab01fe0a00799b3cfe9997106e220c28f19a2bdc37b"
+        },
+        {
+          "holder": 1,
+          "generation": "65b2251f6ada91a4bd5075c846f730a4629e95cb358024742b1f679a5a0cf7f3",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 35.72903716901783,
+          "oracleSeconds": 12.275597569998354,
+          "restoreMemoryPeakBytes": 233164800,
+          "oracleMemoryPeakBytes": 106930176,
+          "restoreLogSHA256": "a5a29c7dff8d4634f0e67def4afeb56c5e75c42578d0c8916c7c5ba6af3b0e79",
+          "oracleLogSHA256": "382f4abfd0979f86f8a3eb4145a719f68c03126d484a8ec12149ff7ab7bbfade"
+        },
+        {
+          "holder": 2,
+          "generation": "65b2251f6ada91a4bd5075c846f730a4629e95cb358024742b1f679a5a0cf7f3",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 37.623764454969205,
+          "oracleSeconds": 14.043543729989324,
+          "restoreMemoryPeakBytes": 230576128,
+          "oracleMemoryPeakBytes": 128012288,
+          "restoreLogSHA256": "1469d87024f56d4924a2009dbbe8845440c608d46abc1ea6df1917dba837d1f5",
+          "oracleLogSHA256": "4aa7a42bd26b474b3c24d4a4fbfe1b5e720e6c95f4f865ae45ee12e62f410fa8"
+        }
+      ]
+    },
+    {
+      "case": "split-paired",
+      "phase": "base",
+      "generation": "8395cee03ef1545c497db91dd64a93b0ed12cfd14210b2715f76dedf361e9bbb",
+      "inputSHA256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 134245367,
+      "allSourceRequestBodyBytes": 134348913,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 24269,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 1010384.9791831842,
+      "initialBodyBytesPerSecondToSeal": 1010593.0443237269,
+      "largePutIntervalsOverlap": true,
+      "sealedSeconds": 132.838205996,
+      "providerReleasedSeconds": 138.951192723,
+      "completeSeconds": 306.373842555,
+      "followerReadySeconds": 375.568282475,
+      "requestBodyBytes": {
+        "source>a": 63282770,
+        "source>b": 71066143,
+        "b>a": 41580
+      },
+      "responseBodyBytes": {
+        "a>source": 63271189,
+        "a>b": 63268792,
+        "a>c": 134269503,
+        "b>source": 71069425,
+        "b>a": 71018155
+      },
+      "initialObjectRequests": [
+        {
+          "node": "b",
+          "object": "1ee01e0bb80cb13f72a6f9ed4cce4550a9dda56828c06032ce8323b54ff29dac",
+          "bytes": 5366822,
+          "startedAt": "2026-11-15T08:11:53.220902662Z",
+          "durableResponseAt": "2026-11-15T08:11:57.859684043Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "dfea19cf832000c40a8ada527d5d0aa51362749b13400f83168b3bd7141e200a",
+          "bytes": 8282892,
+          "startedAt": "2026-11-15T08:11:59.320106663Z",
+          "durableResponseAt": "2026-11-15T08:12:04.139246024Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "d3d21d660a6d31f77c1e59c152777c2fdfbce0c76ff1b3e33d72af07a688474c",
+          "bytes": 6268464,
+          "startedAt": "2026-11-15T08:12:03.357614944Z",
+          "durableResponseAt": "2026-11-15T08:12:06.148046221Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "00bd1e8cb9833bc40f59aea63dfdda420977a9935804770247d1c6fdb9691ae8",
+          "bytes": 7862094,
+          "startedAt": "2026-11-15T08:12:13.535608164Z",
+          "durableResponseAt": "2026-11-15T08:12:17.79588327Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "0704d82ad05616054a4304adee31ccdef58098c00a7e394663e0f28d08531dde",
+          "bytes": 7761116,
+          "startedAt": "2026-11-15T08:12:18.483326738Z",
+          "durableResponseAt": "2026-11-15T08:12:21.970286226Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "b7fc20bc61d78e2a695d51f8514db3e31057cfa188f99d6c0e9b89d54d3c2ad4",
+          "bytes": 8356963,
+          "startedAt": "2026-11-15T08:12:23.819897717Z",
+          "durableResponseAt": "2026-11-15T08:12:27.42097617Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "988daa6d1c4f14255e12b877254850c4dac11c2074fb3806cf7edd6a97dda905",
+          "bytes": 6745097,
+          "startedAt": "2026-11-15T08:12:33.236926554Z",
+          "durableResponseAt": "2026-11-15T08:12:37.095117728Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "7ac54cf253f4b8ac686983dcf2c9e42ed99da23bc23f6074621b85c09740bc42",
+          "bytes": 7519739,
+          "startedAt": "2026-11-15T08:12:43.120570033Z",
+          "durableResponseAt": "2026-11-15T08:12:46.152001182Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "56125c4ade2b9d346b909a97bb6ad5cac2a29384eac599c51c7d6be69829851d",
+          "bytes": 6998317,
+          "startedAt": "2026-11-15T08:12:46.956004152Z",
+          "durableResponseAt": "2026-11-15T08:12:52.538707422Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "31019052ca26649009205d7eb4a929aae9b0319c0fff8f4511ac193f2aa53027",
+          "bytes": 8213082,
+          "startedAt": "2026-11-15T08:12:49.93193779Z",
+          "durableResponseAt": "2026-11-15T08:12:53.041459512Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "9aaf25adc9dc1a71d35ff217c39549d2084b459e90ef402af110c183a91d11fb",
+          "bytes": 8353541,
+          "startedAt": "2026-11-15T08:13:02.022460843Z",
+          "durableResponseAt": "2026-11-15T08:13:06.573891957Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "31aeaa4a4cf0282b0e2cb650531d6a5556169da4df7e6215a88495d7c00fce5e",
+          "bytes": 8231192,
+          "startedAt": "2026-11-15T08:13:02.635337742Z",
+          "durableResponseAt": "2026-11-15T08:13:06.732087915Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "1757cdbe84b9e288214067cb955fc4ed348256b4657f0a0af467cbf879e49962",
+          "bytes": 6408800,
+          "startedAt": "2026-11-15T08:13:16.425556783Z",
+          "durableResponseAt": "2026-11-15T08:13:19.203790412Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "b5924230cd8a9f95e110bf8fb427319f3ce07c4aad4baa5a9af9c18e75acad2d",
+          "bytes": 7761047,
+          "startedAt": "2026-11-15T08:13:16.856902422Z",
+          "durableResponseAt": "2026-11-15T08:13:19.737297076Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "ca2b4d8feacd990031dba7fecd43764624c2580c8b14bcc02047780250e1790a",
+          "bytes": 7875076,
+          "startedAt": "2026-11-15T08:13:26.751012771Z",
+          "durableResponseAt": "2026-11-15T08:13:29.899148115Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "eab86688901fc82f32623cb0f1e6c8ab77d9ba40f95e1fccaae62f6d62268715",
+          "bytes": 7758985,
+          "startedAt": "2026-11-15T08:13:28.276133547Z",
+          "durableResponseAt": "2026-11-15T08:13:30.311464468Z",
+          "status": 200
+        },
+        {
+          "node": "a",
+          "object": "1a25c6ff37ad6c12775064b7c5bebdca200fd07c291fce4f1a9298941d4cdf89",
+          "bytes": 7975722,
+          "startedAt": "2026-11-15T08:13:38.69233909Z",
+          "durableResponseAt": "2026-11-15T08:13:41.897962604Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "9ecc3e25ef6f1236849ca62ab9f7bd30d0d704c50f58a533c464dbd2243bfca4",
+          "bytes": 6481691,
+          "startedAt": "2026-11-15T08:13:40.431615499Z",
+          "durableResponseAt": "2026-11-15T08:13:42.820483361Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "773587f4a25b4712cd8ad5bd3f0bb680c117e5b5e2e4ec0108cb4f6fc167c96f",
+          "bytes": 24269,
+          "startedAt": "2026-11-15T08:13:50.028813836Z",
+          "durableResponseAt": "2026-11-15T08:13:51.461287949Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "9beec954b43ddb0b883b2568fdc60448d20becfabe959f97a5b68507d6c3a7cd",
+          "bytes": 458,
+          "startedAt": "2026-11-15T08:13:53.998950032Z",
+          "durableResponseAt": "2026-11-15T08:13:55.172300827Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 134245367,
+      "stagedPeerBodyBytesBeforeSeal": 63242325,
+      "requiredReplicaTimes": [
+        {
+          "node": "a",
+          "verifiedUnix": 1794730562
+        },
+        {
+          "node": "b",
+          "verifiedUnix": 1794730542
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794730542,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "8395cee03ef1545c497db91dd64a93b0ed12cfd14210b2715f76dedf361e9bbb",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 39.5032223679591,
+          "oracleSeconds": 13.839010974974371,
+          "restoreMemoryPeakBytes": 224378880,
+          "oracleMemoryPeakBytes": 132947968,
+          "restoreLogSHA256": "fef5968b916f69e94a5b19a666f9c17e05ac8fc9eb80cc6bddb33a9b1e3af430",
+          "oracleLogSHA256": "f87452f7edaac9be4a8020b4d2883641733e82e7c4705673c628949b5d00883f"
+        },
+        {
+          "holder": 1,
+          "generation": "8395cee03ef1545c497db91dd64a93b0ed12cfd14210b2715f76dedf361e9bbb",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 37.09306983498391,
+          "oracleSeconds": 11.330790302949026,
+          "restoreMemoryPeakBytes": 235421696,
+          "oracleMemoryPeakBytes": 115384320,
+          "restoreLogSHA256": "ccd72d07e1e0ec9688fee283a6b8ba5253a4b09e09d6985885f9827899567b0a",
+          "oracleLogSHA256": "075306dc647d79335bb2f4b229bf674d9c651c980ac8eecec0be552933c08734"
+        },
+        {
+          "holder": 2,
+          "generation": "8395cee03ef1545c497db91dd64a93b0ed12cfd14210b2715f76dedf361e9bbb",
+          "bytes": 134217728,
+          "sha256": "b0d6e2fb70797be14e02951a7cc4908e2e27f54e0f0d0046f8589ca49b67d025",
+          "attributesVerified": true,
+          "restoreSeconds": 35.21189463901101,
+          "oracleSeconds": 11.421079355990514,
+          "restoreMemoryPeakBytes": 224022528,
+          "oracleMemoryPeakBytes": 110092288,
+          "restoreLogSHA256": "7e0987481d0118fce6b7c45c0345e5434c78d7c3fc2f3c504fc8cef0f54e67bd",
+          "oracleLogSHA256": "b6c59483de2404ea600fb84150a0d202ea7aaa5f6ee3a4d4025c6a3084ee2580"
+        }
+      ]
+    },
+    {
+      "case": "split-paired",
+      "phase": "patched",
+      "generation": "b55d8491afcd3023706b478edb3e486c53106c0fa290d6cd9196e821e6f6103f",
+      "inputSHA256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+      "sourceReadBytes": 134217728,
+      "initialObjectBodyBytes": 12885727,
+      "allSourceRequestBodyBytes": 12916217,
+      "duplicateObjectBodyBytes": 0,
+      "ciphertextReadbackBytes": 49452,
+      "requiredProofRefused": true,
+      "sourceReadBytesPerSecondToSeal": 3378803.583534835,
+      "initialBodyBytesPerSecondToSeal": 324385.9154287843,
+      "largePutIntervalsOverlap": false,
+      "sealedSeconds": 39.723447866,
+      "providerReleasedSeconds": 45.103979727,
+      "completeSeconds": 191.364172915,
+      "followerReadySeconds": 231.884184388,
+      "requestBodyBytes": {
+        "source>a": 7359099,
+        "source>b": 5557118,
+        "b>a": 55935
+      },
+      "responseBodyBytes": {
+        "a>source": 7466148,
+        "a>b": 7395688,
+        "a>c": 12907852,
+        "b>source": 5604504,
+        "b>a": 5545974
+      },
+      "initialObjectRequests": [
+        {
+          "node": "a",
+          "object": "2c3204b24c49601a816d7b8bcee05763047fa9782af9efabfd567b306249f54a",
+          "bytes": 7339753,
+          "startedAt": "2026-11-15T08:18:38.819906349Z",
+          "durableResponseAt": "2026-11-15T08:18:43.001183462Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "d693fb8bbf19843ec7bb3829bc0be7094651a666c41bd1e102812dc86fa6aa2a",
+          "bytes": 5520333,
+          "startedAt": "2026-11-15T08:18:49.445995448Z",
+          "durableResponseAt": "2026-11-15T08:18:50.971194025Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "98d0a2265a7c5e3df23790abfa79833a26d06e928496a1dd7397e902be144d72",
+          "bytes": 25183,
+          "startedAt": "2026-11-15T08:18:52.279429758Z",
+          "durableResponseAt": "2026-11-15T08:18:53.905462395Z",
+          "status": 200
+        },
+        {
+          "node": "b",
+          "object": "d21bf42d3fe258fd775a87ac090c96ed1a8f8a7c012f080b06da634fb79eb63d",
+          "bytes": 458,
+          "startedAt": "2026-11-15T08:18:55.805151162Z",
+          "durableResponseAt": "2026-11-15T08:18:56.312752575Z",
+          "status": 200
+        }
+      ],
+      "stagedPeerBodyBytes": 12885727,
+      "stagedPeerBodyBytesBeforeSeal": 0,
+      "requiredReplicaTimes": [
+        {
+          "node": "a",
+          "verifiedUnix": 1794730807
+        },
+        {
+          "node": "b",
+          "verifiedUnix": 1794730802
+        }
+      ],
+      "firstRequiredReplicaVerifiedUnix": 1794730802,
+      "freshReaderChecks": [
+        {
+          "holder": 0,
+          "generation": "b55d8491afcd3023706b478edb3e486c53106c0fa290d6cd9196e821e6f6103f",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 38.70511784404516,
+          "oracleSeconds": 12.361848897009622,
+          "restoreMemoryPeakBytes": 220811264,
+          "oracleMemoryPeakBytes": 115130368,
+          "restoreLogSHA256": "f6bf88a7cb1e91a9ab1a1bc8e2d463e02009a6386c285f81e2204114b3e8e2a3",
+          "oracleLogSHA256": "18019dd5c035ad174e11c9d1bc21a9a3f5cc8944744d053c260edbad2884cfea"
+        },
+        {
+          "holder": 1,
+          "generation": "b55d8491afcd3023706b478edb3e486c53106c0fa290d6cd9196e821e6f6103f",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 38.1537623120239,
+          "oracleSeconds": 13.596012183988933,
+          "restoreMemoryPeakBytes": 230420480,
+          "oracleMemoryPeakBytes": 118468608,
+          "restoreLogSHA256": "c19098204aa7e0114f889481b589e740cfe8c6014c7b2f1da958d2d1819369cf",
+          "oracleLogSHA256": "68093101230d72d76599222e979fafd1de5cac28c4769250842257180c4b252e"
+        },
+        {
+          "holder": 2,
+          "generation": "b55d8491afcd3023706b478edb3e486c53106c0fa290d6cd9196e821e6f6103f",
+          "bytes": 134217728,
+          "sha256": "3e39fd9435ff234bf967cc83e41ed3069e6eb153e6d486b60d2137e66ebfaa0c",
+          "attributesVerified": true,
+          "restoreSeconds": 35.10955664998619,
+          "oracleSeconds": 11.553440390038304,
+          "restoreMemoryPeakBytes": 232701952,
+          "oracleMemoryPeakBytes": 107163648,
+          "restoreLogSHA256": "48eee9e7902c82726c1bf3766de5d3b3bdb9878876207f46f9582274ecaa5990",
+          "oracleLogSHA256": "e9b8f747f21ef7a4432778b6c7ad70c9f0f1e8b47cf45fdfb98de34f53430f03"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "128 MiB is a bounded rehearsal, not the specified physical 100 GiB acceptance.",
+    "Changed-input full-byte oracle is a separately reported preparation read before capture counters/timing. All 24 later actual fresh-reader restores independently match the saved input hash and attributes.",
+    "Application-body caps and source/receiver timing are measured under shared CPU/HDD with deliberate proof refusal; no raw-wire saturation, universal PUT overlap or speedup guarantee.",
+    "Holder stores are 3 physically separate complete replicas on one test HDD; no separate host/controller failure-domain claim.",
+    "The selected previous-format executable remains a compatibility check, not a published release or real source/provider/production admission."
+  ]
+}

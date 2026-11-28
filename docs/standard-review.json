@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "observedDate": "2026-11-06",
-  "specVersion": "1.4",
+  "observedDate": "2026-11-09",
+  "specVersion": "1.5",
   "standardVersion": "0.4.0",
   "standardSourceRevision": "75833a42311832d1de665d0e441adac2b5b701d2",
-  "method": "Author design review and source traceability. Specification 1.4 explicitly records the G1 component/format decision while preserving independent offline complete-replica acceptance. File-kit execution is a separate G1 evidence set, not whole-product verification. Exact-commit CI and private owner records remain separate.",
+  "method": "Author design review and source traceability. Specification 1.5 adds parallel ingress, pre-seal forwarding, release thresholds and asymmetric-path acceptance. Rechecked the affected clauses and preserved the G1 format decision and independent offline replica acceptance. Runtime acceptance and exact-commit CI are separate.",
   "specSha256": {
-    "en": "ffe5e4f21f8ddaee074edba5823d093a5b7a8dc97b3529345c1cbc1f4f850b97",
-    "ru": "b02599a63424cc54c8dd085e7a8e323c7786571b81bb8a74ceac324a46d46c32"
+    "en": "1397966cb82177e8b00551354cfdead36455e948efdb467a1b063979211bfc99",
+    "ru": "6b166ad6ef177fe8462f6375069a79b35e21f1ed226fb72d849904041c537828"
   },
   "rules": [
     {
@@ -27,12 +27,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -62,22 +62,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 291,
+          "line": 295,
           "requirement": "REQ-44"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 300,
+          "line": 304,
           "requirement": "REQ-44"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 440,
+          "line": 446,
           "requirement": "REQ-53"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 461,
+          "line": 467,
           "requirement": "REQ-53"
         }
       ]
@@ -99,12 +99,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -130,42 +130,42 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 89,
+          "line": 91,
           "requirement": "REQ-07"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 96,
+          "line": 98,
           "requirement": "REQ-07"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 139,
+          "line": 141,
           "requirement": "REQ-16"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 148,
+          "line": 150,
           "requirement": "REQ-16"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 257,
+          "line": 261,
           "requirement": "REQ-38"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 266,
+          "line": 270,
           "requirement": "REQ-38"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 269,
+          "line": 273,
           "requirement": "REQ-40"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 278,
+          "line": 282,
           "requirement": "REQ-40"
         }
       ]
@@ -187,42 +187,42 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 85,
+          "line": 87,
           "requirement": "REQ-06"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 92,
+          "line": 94,
           "requirement": "REQ-06"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 89,
+          "line": 91,
           "requirement": "REQ-07"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 96,
+          "line": 98,
           "requirement": "REQ-07"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 93,
+          "line": 95,
           "requirement": "REQ-08"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 100,
+          "line": 102,
           "requirement": "REQ-08"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 287,
+          "line": 291,
           "requirement": "REQ-43"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 296,
+          "line": 300,
           "requirement": "REQ-43"
         },
         {
@@ -248,22 +248,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 430,
+          "line": 436,
           "requirement": "REQ-48"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 451,
+          "line": 457,
           "requirement": "REQ-48"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 269,
+          "line": 273,
           "requirement": "REQ-40"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 278,
+          "line": 282,
           "requirement": "REQ-40"
         }
       ]
@@ -285,42 +285,42 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 127,
+          "line": 129,
           "requirement": "REQ-15"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 134,
+          "line": 136,
           "requirement": "REQ-15"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 147,
+          "line": 149,
           "requirement": "REQ-18"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 156,
+          "line": 158,
           "requirement": "REQ-18"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 269,
+          "line": 273,
           "requirement": "REQ-40"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 278,
+          "line": 282,
           "requirement": "REQ-40"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 430,
+          "line": 436,
           "requirement": "REQ-48"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 451,
+          "line": 457,
           "requirement": "REQ-48"
         }
       ]
@@ -342,32 +342,32 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 117,
+          "line": 119,
           "requirement": "REQ-13"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 124,
+          "line": 126,
           "requirement": "REQ-13"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 151,
+          "line": 153,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 160,
+          "line": 162,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 167,
+          "line": 169,
           "requirement": "REQ-22"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 176,
+          "line": 178,
           "requirement": "REQ-22"
         }
       ]
@@ -389,32 +389,32 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 93,
+          "line": 95,
           "requirement": "REQ-08"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 100,
+          "line": 102,
           "requirement": "REQ-08"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 277,
+          "line": 281,
           "requirement": "REQ-41"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 286,
+          "line": 290,
           "requirement": "REQ-41"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 434,
+          "line": 440,
           "requirement": "REQ-50"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 455,
+          "line": 461,
           "requirement": "REQ-50"
         }
       ]
@@ -466,22 +466,22 @@
         },
         {
           "path": "docs/en/specification.md",
-          "line": 151,
+          "line": 153,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 160,
+          "line": 162,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 225,
+          "line": 229,
           "requirement": "REQ-31"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 234,
+          "line": 238,
           "requirement": "REQ-31"
         }
       ]
@@ -503,52 +503,52 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 143,
+          "line": 145,
           "requirement": "REQ-17"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 152,
+          "line": 154,
           "requirement": "REQ-17"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 147,
+          "line": 149,
           "requirement": "REQ-18"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 156,
+          "line": 158,
           "requirement": "REQ-18"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 199,
+          "line": 201,
           "requirement": "REQ-25"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 208,
+          "line": 210,
           "requirement": "REQ-25"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 209,
+          "line": 213,
           "requirement": "REQ-27"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 218,
+          "line": 222,
           "requirement": "REQ-27"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 215,
+          "line": 219,
           "requirement": "REQ-28"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 224,
+          "line": 228,
           "requirement": "REQ-28"
         }
       ]
@@ -570,52 +570,52 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 147,
+          "line": 149,
           "requirement": "REQ-18"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 156,
+          "line": 158,
           "requirement": "REQ-18"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 151,
+          "line": 153,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 160,
+          "line": 162,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 163,
+          "line": 165,
           "requirement": "REQ-21"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 172,
+          "line": 174,
           "requirement": "REQ-21"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 231,
+          "line": 235,
           "requirement": "REQ-33"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 240,
+          "line": 244,
           "requirement": "REQ-33"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 277,
+          "line": 281,
           "requirement": "REQ-41"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 286,
+          "line": 290,
           "requirement": "REQ-41"
         }
       ]
@@ -637,42 +637,42 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 199,
+          "line": 201,
           "requirement": "REQ-25"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 208,
+          "line": 210,
           "requirement": "REQ-25"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 261,
+          "line": 265,
           "requirement": "REQ-39"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 270,
+          "line": 274,
           "requirement": "REQ-39"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 269,
+          "line": 273,
           "requirement": "REQ-40"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 278,
+          "line": 282,
           "requirement": "REQ-40"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 438,
+          "line": 444,
           "requirement": "REQ-52"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 459,
+          "line": 465,
           "requirement": "REQ-52"
         }
       ]
@@ -694,22 +694,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 291,
+          "line": 295,
           "requirement": "REQ-44"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 300,
+          "line": 304,
           "requirement": "REQ-44"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 440,
+          "line": 446,
           "requirement": "REQ-53"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 461,
+          "line": 467,
           "requirement": "REQ-53"
         }
       ]
@@ -741,42 +741,42 @@
         },
         {
           "path": "docs/en/specification.md",
-          "line": 151,
+          "line": 153,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 160,
+          "line": 162,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 283,
+          "line": 287,
           "requirement": "REQ-42"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 292,
+          "line": 296,
           "requirement": "REQ-42"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 291,
+          "line": 295,
           "requirement": "REQ-44"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 300,
+          "line": 304,
           "requirement": "REQ-44"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 430,
+          "line": 436,
           "requirement": "REQ-48"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 451,
+          "line": 457,
           "requirement": "REQ-48"
         }
       ]
@@ -798,22 +798,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 209,
+          "line": 213,
           "requirement": "REQ-27"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 218,
+          "line": 222,
           "requirement": "REQ-27"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 440,
+          "line": 446,
           "requirement": "REQ-53"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 461,
+          "line": 467,
           "requirement": "REQ-53"
         }
       ]
@@ -835,32 +835,32 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 253,
+          "line": 257,
           "requirement": "REQ-37"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 262,
+          "line": 266,
           "requirement": "REQ-37"
-        },
-        {
-          "path": "docs/en/specification.md",
-          "line": 426,
-          "requirement": "REQ-47"
-        },
-        {
-          "path": "docs/ru/specification.md",
-          "line": 447,
-          "requirement": "REQ-47"
         },
         {
           "path": "docs/en/specification.md",
           "line": 432,
-          "requirement": "REQ-49"
+          "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
           "line": 453,
+          "requirement": "REQ-47"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 438,
+          "requirement": "REQ-49"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 459,
           "requirement": "REQ-49"
         },
         {
@@ -890,32 +890,32 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 175,
+          "line": 177,
           "requirement": "REQ-23"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 184,
+          "line": 186,
           "requirement": "REQ-23"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 253,
+          "line": 257,
           "requirement": "REQ-37"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 262,
+          "line": 266,
           "requirement": "REQ-37"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 432,
+          "line": 438,
           "requirement": "REQ-49"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 453,
+          "line": 459,
           "requirement": "REQ-49"
         }
       ]
@@ -937,12 +937,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 432,
+          "line": 438,
           "requirement": "REQ-49"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 453,
+          "line": 459,
           "requirement": "REQ-49"
         }
       ]
@@ -964,42 +964,42 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 139,
+          "line": 141,
           "requirement": "REQ-16"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 148,
+          "line": 150,
           "requirement": "REQ-16"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 151,
+          "line": 153,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 160,
+          "line": 162,
           "requirement": "REQ-19"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 249,
+          "line": 253,
           "requirement": "REQ-36"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 258,
+          "line": 262,
           "requirement": "REQ-36"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 432,
+          "line": 438,
           "requirement": "REQ-49"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 453,
+          "line": 459,
           "requirement": "REQ-49"
         }
       ]
@@ -1021,42 +1021,42 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 175,
+          "line": 177,
           "requirement": "REQ-23"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 184,
+          "line": 186,
           "requirement": "REQ-23"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 253,
+          "line": 257,
           "requirement": "REQ-37"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 262,
+          "line": 266,
           "requirement": "REQ-37"
-        },
-        {
-          "path": "docs/en/specification.md",
-          "line": 283,
-          "requirement": "REQ-42"
-        },
-        {
-          "path": "docs/ru/specification.md",
-          "line": 292,
-          "requirement": "REQ-42"
         },
         {
           "path": "docs/en/specification.md",
           "line": 287,
-          "requirement": "REQ-43"
+          "requirement": "REQ-42"
         },
         {
           "path": "docs/ru/specification.md",
           "line": 296,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 291,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 300,
           "requirement": "REQ-43"
         }
       ]
@@ -1078,32 +1078,32 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 283,
-          "requirement": "REQ-42"
-        },
-        {
-          "path": "docs/ru/specification.md",
-          "line": 292,
-          "requirement": "REQ-42"
-        },
-        {
-          "path": "docs/en/specification.md",
           "line": 287,
-          "requirement": "REQ-43"
+          "requirement": "REQ-42"
         },
         {
           "path": "docs/ru/specification.md",
           "line": 296,
+          "requirement": "REQ-42"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 291,
+          "requirement": "REQ-43"
+        },
+        {
+          "path": "docs/ru/specification.md",
+          "line": 300,
           "requirement": "REQ-43"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 438,
+          "line": 444,
           "requirement": "REQ-52"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 459,
+          "line": 465,
           "requirement": "REQ-52"
         }
       ]
@@ -1125,22 +1125,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 287,
+          "line": 291,
           "requirement": "REQ-43"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 296,
+          "line": 300,
           "requirement": "REQ-43"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 438,
+          "line": 444,
           "requirement": "REQ-52"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 459,
+          "line": 465,
           "requirement": "REQ-52"
         },
         {
@@ -1170,32 +1170,32 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 299,
+          "line": 303,
           "requirement": "REQ-45"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 308,
-          "requirement": "REQ-45"
-        },
-        {
-          "path": "docs/en/specification.md",
           "line": 312,
+          "requirement": "REQ-45"
+        },
+        {
+          "path": "docs/en/specification.md",
+          "line": 316,
           "requirement": "REQ-46"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 321,
+          "line": 325,
           "requirement": "REQ-46"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 434,
+          "line": 440,
           "requirement": "REQ-50"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 455,
+          "line": 461,
           "requirement": "REQ-50"
         }
       ]
@@ -1217,12 +1217,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1252,22 +1252,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 277,
+          "line": 281,
           "requirement": "REQ-41"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 286,
+          "line": 290,
           "requirement": "REQ-41"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 434,
+          "line": 440,
           "requirement": "REQ-50"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 455,
+          "line": 461,
           "requirement": "REQ-50"
         }
       ]
@@ -1289,12 +1289,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1320,22 +1320,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1361,12 +1361,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1396,12 +1396,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1427,12 +1427,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1458,12 +1458,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1493,12 +1493,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1528,12 +1528,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1567,12 +1567,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1598,12 +1598,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1633,12 +1633,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1668,12 +1668,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1703,12 +1703,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1738,12 +1738,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1769,12 +1769,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1804,12 +1804,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
@@ -1843,12 +1843,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1878,12 +1878,12 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
@@ -1909,22 +1909,22 @@
       "references": [
         {
           "path": "docs/en/specification.md",
-          "line": 426,
+          "line": 432,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 447,
+          "line": 453,
           "requirement": "REQ-47"
         },
         {
           "path": "docs/en/specification.md",
-          "line": 436,
+          "line": 442,
           "requirement": "REQ-51"
         },
         {
           "path": "docs/ru/specification.md",
-          "line": 457,
+          "line": 463,
           "requirement": "REQ-51"
         },
         {
