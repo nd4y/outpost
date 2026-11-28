@@ -617,6 +617,121 @@ try {
       await page.unroute(query);
     }
   });
+  await test("owner can preview one exact peer catalog without retaining it", async () => {
+    const query = /\/configuration\/preview\?include=declared-peer-volume$/;
+    const catalog = Buffer.from('{"fixture":"opaque signed catalog bytes"}');
+    const generation = createHash("sha256").update(catalog).digest("hex");
+    const operation = "d".repeat(64);
+    const peer = "b".repeat(64);
+    await page.route(query, async (route) => {
+      const request = route.request().postDataJSON();
+      assert.equal(request.peerOperation, operation);
+      assert.equal(request.catalog, catalog.toString("base64"));
+      assert(!("catalog" in request.mutation));
+      const response = await route.fetch({
+        url: route.request().url().replace("declared-peer-volume", "declared-upload-volume"),
+        postData: JSON.stringify(request.mutation),
+      });
+      assert.equal(response.status(), 200);
+      const body = await response.json();
+      body.format = "outpost-management-preview-with-peer-volume-1";
+      body.peerVolume = {
+        operationId: operation,
+        domain: meta.domain,
+        generation,
+        from: peer,
+        to: meta.node,
+        mode: "pull",
+        uniqueObjectBytes: 122,
+        uniqueObjects: 3,
+        catalogBytes: catalog.length,
+      };
+      await route.fulfill({ response, json: body });
+    });
+    try {
+      await page.locator("#config-file").setInputFiles(meta.config);
+      await page.locator("#peer-catalog").setInputFiles({
+        name: "catalog.json",
+        mimeType: "application/json",
+        buffer: catalog,
+      });
+      await page.locator("#peer-operation").fill(operation);
+      await page
+        .locator("#config-form")
+        .getByRole("button", { name: "Preview changes", exact: true })
+        .click();
+      await contains(page, "#config-changes", "Peer transfer catalog volume");
+      await contains(page, "#config-changes", "122");
+      await contains(page, "#config-changes", generation);
+      await contains(page, "#config-changes", peer);
+      assert(
+        !(await page.evaluate(
+          (raw) => JSON.stringify(localStorage).includes(raw),
+          catalog.toString("base64"),
+        )),
+      );
+      await page.locator("#peer-operation").fill("e".repeat(64));
+      assert(await page.locator("#config-preview").isHidden());
+    } finally {
+      await page.locator("#peer-catalog").setInputFiles([]);
+      await page.locator("#peer-operation").fill("");
+      await page.unroute(query);
+    }
+  });
+  await test("superseded peer preview cannot change the current notice", async () => {
+    const query = /\/configuration\/preview\?include=declared-peer-volume$/;
+    const preview = page
+      .locator("#config-form")
+      .getByRole("button", { name: "Preview changes", exact: true });
+    await page.locator("#config-file").setInputFiles(meta.config);
+    await page.locator("#peer-catalog").setInputFiles({
+      name: "catalog",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("opaque catalog"),
+    });
+    try {
+      for (const [status, json] of [
+        [403, { code: "DENIED" }],
+        [200, { format: "superseded" }],
+      ]) {
+        await page.locator("#peer-operation").fill("d".repeat(64));
+        const gate = Promise.withResolvers();
+        const handled = Promise.withResolvers();
+        await page.route(query, async (route) => {
+          try {
+            await gate.promise;
+            await route.fulfill({ status, json });
+          } catch {
+            // The request may already be canceled by the browser.
+          } finally {
+            handled.resolve();
+          }
+        });
+        try {
+          const requested = page.waitForRequest(query);
+          await preview.click();
+          await requested;
+          const before = await page.locator("#notice").textContent();
+          const canceled = page.waitForEvent("requestfailed", {
+            predicate: (request) => query.test(request.url()),
+            timeout: 5000,
+          });
+          await page.locator("#peer-operation").fill("e".repeat(64));
+          gate.resolve();
+          await canceled;
+          await handled.promise;
+          assert.equal(await page.locator("#notice").textContent(), before);
+          assert(await page.locator("#config-preview").isHidden());
+        } finally {
+          gate.resolve();
+          await page.unroute(query);
+        }
+      }
+    } finally {
+      await page.locator("#peer-catalog").setInputFiles([]);
+      await page.locator("#peer-operation").fill("");
+    }
+  });
   await test("owner signed policy preview and lost apply reply survive reload", async () => {
     await page.locator("#config-file").setInputFiles(meta.config);
     await page
@@ -641,15 +756,43 @@ try {
     await page.reload();
     await selectScope(page, meta);
     await page.locator("#config-file").setInputFiles(meta.config);
-    await page
+    const input = page.locator("#peer-catalog");
+    await input.setInputFiles({
+      name: "catalog",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("unverified catalog for retained preview"),
+    });
+    const preview = page
       .locator("#config-form")
-      .getByRole("button", { name: "Preview changes", exact: true })
-      .click();
-    await page.locator("#apply-config").waitFor({ state: "visible" });
-    await page.locator("#apply-config").click();
-    await contains(page, "#notice", "Receipt received");
+      .getByRole("button", { name: "Preview changes", exact: true });
+    await preview.click();
+    await page.waitForFunction(() => document.querySelector("#notice").dataset.level === "error");
+    assert(await page.locator("#config-preview").isHidden());
+    await page.locator("#peer-operation").fill("a".repeat(64));
+    const peerQuery = /\/configuration\/preview\?include=declared-peer-volume$/;
+    let peerRequests = 0;
+    await page.route(peerQuery, async (route) => {
+      peerRequests++;
+      await route.abort();
+    });
+    try {
+      await preview.click();
+      await contains(
+        page,
+        "#config-changes",
+        "Peer volume is unavailable for this retained preview.",
+      );
+      await page.locator("#apply-config").click();
+      await contains(page, "#notice", "Receipt received");
+      assert.equal(peerRequests, 0);
+    } finally {
+      await page.unroute(peerQuery);
+      await input.setInputFiles([]);
+      await page.locator("#peer-operation").fill("");
+    }
     assert.equal(bodies.length, 2);
     assert.equal(bodies[0], bodies[1]);
+    assert(!("catalog" in JSON.parse(bodies[1])));
     assert.match(await page.locator("#operations").innerText(), /COMPLETE/);
     await page.unroute("**/configuration");
   });

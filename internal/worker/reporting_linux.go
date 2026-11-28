@@ -263,6 +263,7 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 		}
 		accounted, reserved = &a, &b
 	}
+	w.observeUploadProgress(ctx, cfg, d, status, out.Jobs)
 	latest, e := w.cache.Raw(ctx)
 	if e != nil {
 		return out, e
@@ -277,7 +278,13 @@ func (w *Worker) ManagementSnapshot(ctx context.Context, enrollment []byte, doma
 	if e = w.check(ctx); e != nil {
 		return out, e
 	}
-	out.ObservedUnix = time.Now().Unix()
+	now := time.Now()
+	if cfg.Active(now) != nil {
+		for i := range out.Jobs {
+			out.Jobs[i].CompletedBytes, out.Jobs[i].TotalBytes = nil, nil
+		}
+	}
+	out.ObservedUnix = now.Unix()
 	out.Space = management.Space{State: "OBSERVED", Scope: "VOLUME", PhysicalBytes: &used, FreeBytes: &free, AccountedBytes: accounted, ReservedBytes: reserved, ObservedUnix: out.ObservedUnix}
 	return out, nil
 }

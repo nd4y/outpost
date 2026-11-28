@@ -162,12 +162,18 @@
             <legend data-i18n="signedConfig">Signed configuration</legend>
             <label for="config-file"
               ><span data-i18n="configFile">Configuration file (up to 32 MiB)</span
-              ><input
-                id="config-file"
-                type="file"
-                accept="application/json,.json"
-                required /></label
-            ><button type="submit" data-i18n="preview">Preview changes</button>
+              ><input id="config-file" type="file" accept="application/json,.json" required
+            /></label>
+            <label for="peer-catalog"
+              ><span data-i18n="peerCatalog">Signed peer catalog (optional, up to 8 MiB)</span
+              ><input id="peer-catalog" type="file"
+            /></label>
+            <label for="peer-operation"
+              ><span data-i18n="peerOperation"
+                >Peer transfer operation in the signed configuration</span
+              ><input id="peer-operation" maxlength="64" pattern="[a-f0-9]{64}" autocomplete="off"
+            /></label>
+            <button type="submit" data-i18n="preview">Preview changes</button>
           </fieldset>
         </form>
         <div id="config-preview" hidden>

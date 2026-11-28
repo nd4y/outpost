@@ -67,6 +67,18 @@ const words = {
     uniquePartBytes: "Unique part bytes",
     uniqueParts: "Unique parts",
     catalogBytes: "Catalog bytes",
+    peerCatalog: "Signed peer catalog (optional, up to 8 MiB)",
+    peerOperation: "Peer transfer operation in the signed configuration",
+    declaredPeerVolume: "Peer transfer catalog volume",
+    declaredPeerHelp:
+      "The catalog gives the full ciphertext closure before destination reuse. Missing data, transfer overhead and free space require separate checks.",
+    retainedPeerVolume:
+      "Peer volume is unavailable for this retained preview. You can replay the original configuration.",
+    peerFrom: "Sending node",
+    peerTo: "Receiving node",
+    peerMode: "Transfer direction",
+    uniqueObjects: "Unique ciphertext objects",
+    uniqueObjectBytes: "Unique ciphertext object bytes",
     apply: "Apply this preview",
     receiptHelp:
       "Keep the operation identifier. A lost reply does not mean failure. Read the receipt or retry the same request; do not create a replacement operation.",
@@ -110,6 +122,7 @@ const words = {
     copyReportedAt: "Complete in report at",
     retrieved: "View retrieved",
     progress: "Measured progress",
+    uploadProgress: "Parts confirmed by this worker",
     error: "Error",
     source: "Source",
     profile: "Profile",
@@ -293,6 +306,18 @@ const words = {
     uniquePartBytes: "Байты уникальных частей",
     uniqueParts: "Уникальные части",
     catalogBytes: "Байты каталога",
+    peerCatalog: "Подписанный каталог для репликации (необязательно, до 8 МиБ)",
+    peerOperation: "Операция репликации из подписанной конфигурации",
+    declaredPeerVolume: "Объём репликации по каталогу",
+    declaredPeerHelp:
+      "Каталог задаёт полный набор объектов до учёта данных на принимающем узле. Недостающие данные, накладные расходы передачи и свободное место проверяются отдельно.",
+    retainedPeerVolume:
+      "Для сохранённого предпросмотра объём репликации недоступен. Можно повторить исходный запрос применения конфигурации.",
+    peerFrom: "Отправляющий узел",
+    peerTo: "Принимающий узел",
+    peerMode: "Направление передачи",
+    uniqueObjects: "Уникальные объекты шифротекста",
+    uniqueObjectBytes: "Байты уникальных объектов шифротекста",
     apply: "Применить этот вариант",
     receiptHelp:
       "Сохраните идентификатор операции. Потеря ответа не означает отказ. Прочитайте квитанцию или повторите тот же запрос; не создавайте замену с новым идентификатором.",
@@ -335,6 +360,7 @@ const words = {
     copyReportedAt: "Полная копия в отчёте от",
     retrieved: "Представление получено",
     progress: "Измеренный прогресс",
+    uploadProgress: "Части, подтверждённые этим воркером",
     error: "Ошибка",
     source: "Источник",
     profile: "Профиль",
@@ -543,6 +569,7 @@ const state = {
   epoch: 0,
   edit: 0,
   configEdit: 0,
+  configAbort: null,
   abort: null,
   journal: [],
   command: null,
@@ -587,8 +614,9 @@ function recordAllowed(record) {
     domains.every((d) => session.scopes.some((s) => s.tenant === record.tenant && s.domain === d))
   );
 }
-async function currentAuthority(record) {
-  const session = await api("/api/v1/session");
+async function currentAuthority(record, signal) {
+  const session = await api("/api/v1/session", { signal });
+  if (signal?.aborted) return;
   const previous = state.session;
   if (!sessionValid(session) || session.actor !== previous.actor) {
     state.session = null;
@@ -814,7 +842,7 @@ function button(key, action) {
 function resetView() {
   state.loading = false;
   state.edit++;
-  state.configEdit++;
+  invalidateConfigPreview();
   state.epoch++;
   state.abort?.abort();
   state.abort = new AbortController();
@@ -831,7 +859,16 @@ function resetView() {
   $("config-preview").hidden = true;
   $("audit-more").hidden = true;
   $("receipt-result").textContent = "";
-  for (const id of ["generation", "job", "preset", "versions", "permit", "config-file"])
+  for (const id of [
+    "generation",
+    "job",
+    "preset",
+    "versions",
+    "permit",
+    "config-file",
+    "peer-catalog",
+    "peer-operation",
+  ])
     $(id).value = "";
   renderPolicy();
   renderReport();
@@ -947,7 +984,7 @@ async function loadDomain() {
     key = scopeKey();
   const epoch = ++state.epoch;
   state.edit++;
-  state.configEdit++;
+  invalidateConfigPreview();
   state.loading = true;
   state.abort?.abort();
   state.abort = new AbortController();
@@ -1371,7 +1408,13 @@ function renderReport() {
       label(j.kind),
       j.generation,
       label(j.phase),
-      `${text(j.completedBytes)} / ${text(j.totalBytes)} ${tr("bytes")}`,
+      `${text(j.completedBytes)} / ${text(j.totalBytes)} ${tr("bytes")}${
+        j.kind === "UPLOAD" &&
+        Number.isSafeInteger(j.completedBytes) &&
+        Number.isSafeInteger(j.totalBytes)
+          ? ` · ${tr("uploadProgress")}`
+          : ""
+      }`,
       date(j.updatedUnix),
       j.errorCode || "-",
     ]),
@@ -1600,15 +1643,42 @@ async function submit(record, configBody) {
     $("apply-config").disabled = false;
   }
 }
+function invalidateConfigPreview() {
+  state.configEdit++;
+  state.configAbort?.abort();
+  state.configAbort = null;
+}
 async function previewConfig() {
-  const edit = state.configEdit;
-  if (!state.session?.roles.includes("owner")) throw new Error("DENIED");
+  state.configAbort?.abort();
+  const request = new AbortController();
+  state.configAbort = request;
   const s = scope(),
     key = scopeKey(),
-    file = await fileBytes("config-file", 32 << 20),
-    digest = await hash(file);
+    edit = state.configEdit;
+  const current = () => !request.signal.aborted && key === scopeKey() && edit === state.configEdit;
+  try {
+    await prepareConfigPreview(s, request.signal, current);
+  } catch (e) {
+    if (current()) throw e;
+  } finally {
+    if (state.configAbort === request) state.configAbort = null;
+  }
+}
+async function prepareConfigPreview(s, signal, current) {
+  if (!state.session?.roles.includes("owner")) throw new Error("DENIED");
+  const peerOperation = $("peer-operation").value.trim();
+  const hasCatalog = $("peer-catalog").files.length > 0;
+  if (hasCatalog !== Boolean(peerOperation) || (hasCatalog && !ID.test(peerOperation)))
+    throw new Error("INVALID");
+  const file = await fileBytes("config-file", 32 << 20);
+  if (!current()) return;
+  const catalog = hasCatalog ? await fileBytes("peer-catalog", 8 << 20) : null;
+  if (!current()) return;
+  const digest = await hash(file);
+  if (!current()) return;
   const expected = state.policy?.configurationRevision || 0;
   const fingerprint = await hash(JSON.stringify({ tenant: s.tenant, node: s.node, digest }));
+  if (!current()) return;
   const snapshot = journalSnapshot();
   const old = snapshot.records.findLast(
     (r) => r.type === "config" && r.fingerprint === fingerprint,
@@ -1629,7 +1699,8 @@ async function previewConfig() {
     record.accessDomains = state.session.scopes
       .filter((v) => v.tenant === s.tenant)
       .map((v) => v.domain);
-  await currentAuthority(record);
+  await currentAuthority(record, signal);
+  if (!current()) return;
   const body = {
     operationId: record.operation,
     reason: "POLICY_CHANGE",
@@ -1641,25 +1712,31 @@ async function previewConfig() {
   let preview = old?.preview;
   if (preview) {
     try {
-      await api(`/api/v1/tenants/${s.tenant}/operations/${record.operation}`);
+      await api(`/api/v1/tenants/${s.tenant}/operations/${record.operation}`, { signal });
     } catch (e) {
+      if (!current()) return;
       if (e.message !== "UNAVAILABLE") throw e;
       // A retained request may never have reached the service. In that case
       // the original revision must still pass a fresh authorized preview.
       preview = null;
     }
   }
-  let uploadVolumes = [];
+  if (!current()) return;
+  let uploadVolumes = [],
+    peerVolume;
   if (!preview) {
-    const result = await api(
-      `${nodePath(s)}/configuration/preview?include=declared-upload-volume`,
-      {
-        method: "POST",
-        body,
-      },
-    );
+    const query = catalog ? "declared-peer-volume" : "declared-upload-volume";
+    const result = await api(`${nodePath(s)}/configuration/preview?include=${query}`, {
+      signal,
+      method: "POST",
+      body: catalog ? { mutation: body, peerOperation, catalog: base64(catalog) } : body,
+    });
+    if (!current()) return;
+    const format = catalog
+      ? "outpost-management-preview-with-peer-volume-1"
+      : "outpost-management-preview-with-upload-volume-1";
     if (
-      result.format !== "outpost-management-preview-with-upload-volume-1" ||
+      result.format !== format ||
       result.preview?.format !== "outpost-management-preview-1" ||
       !Array.isArray(result.uploadVolumes) ||
       result.uploadVolumes.length > 64 ||
@@ -1677,9 +1754,31 @@ async function previewConfig() {
       throw new Error("INVALID");
     preview = result.preview;
     uploadVolumes = result.uploadVolumes;
+    if (catalog) {
+      const catalogDigest = await hash(catalog);
+      if (!current()) return;
+      const row = result.peerVolume;
+      if (
+        !row ||
+        row.operationId !== peerOperation ||
+        ![row.domain, row.generation, row.from, row.to].every(
+          (id) => typeof id === "string" && ID.test(id),
+        ) ||
+        (row.from !== s.node && row.to !== s.node) ||
+        !["push", "pull"].includes(row.mode) ||
+        row.from === row.to ||
+        row.generation !== catalogDigest ||
+        row.catalogBytes !== catalog.length ||
+        ![row.uniqueObjectBytes, row.uniqueObjects].every(
+          (value) => Number.isSafeInteger(value) && value > 0,
+        )
+      )
+        throw new Error("INVALID");
+      peerVolume = row;
+    }
   }
   if (legacyScope) await journal.authorize(record.operation, record.accessDomains);
-  if (key !== scopeKey() || edit !== state.configEdit) return;
+  if (!current()) return;
   if (
     preview.candidateDigest !== digest ||
     preview.node !== s.node ||
@@ -1731,6 +1830,25 @@ async function previewConfig() {
       ]),
     );
     box.append(el("h3", tr("declaredUploadVolume")), el("p", tr("declaredUploadHelp")), volumes);
+  }
+  if (peerVolume) {
+    const volumes = el("div");
+    pairs(volumes, [
+      ["operationId", peerVolume.operationId],
+      ["domain", peerVolume.domain],
+      ["generation", peerVolume.generation],
+      ["peerFrom", peerVolume.from],
+      ["peerTo", peerVolume.to],
+      ["peerMode", peerVolume.mode],
+      ["uniqueObjects", peerVolume.uniqueObjects],
+      ["uniqueObjectBytes", peerVolume.uniqueObjectBytes],
+      ["catalogBytes", peerVolume.catalogBytes],
+    ]);
+    box.append(el("h3", tr("declaredPeerVolume")), el("p", tr("declaredPeerHelp")), volumes);
+  } else if (catalog) {
+    const unavailable = el("p", tr("retainedPeerVolume"));
+    unavailable.dataset.i18n = "retainedPeerVolume";
+    box.append(unavailable);
   }
   $("config-preview").hidden = false;
   $("apply-config").focus();
@@ -1992,15 +2110,17 @@ on("new-command", "click", () => {
   commandFields();
   notice("newReady");
 });
-on("config-file", "change", () => {
-  state.configEdit++;
-  state.config = null;
-  $("config-preview").hidden = true;
-  if (state.resolution?.original?.configuration) {
-    state.resolution = null;
-    $("resolution-review").hidden = true;
-  }
-});
+for (const id of ["config-file", "peer-catalog", "peer-operation"]) {
+  on(id, id === "peer-operation" ? "input" : "change", () => {
+    invalidateConfigPreview();
+    state.config = null;
+    $("config-preview").hidden = true;
+    if (id === "config-file" && state.resolution?.original?.configuration) {
+      state.resolution = null;
+      $("resolution-review").hidden = true;
+    }
+  });
+}
 on("config-form", "submit", previewConfig);
 on("apply-config", "click", () =>
   state.config ? submit(state.config.record, state.config.body) : null,

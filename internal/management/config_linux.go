@@ -284,8 +284,9 @@ func (r *Registry) PreviewConfiguration(ctx context.Context, p Principal, tenant
 	return r.previewConfiguration(ctx, p, tenant, node, input, 0, nil)
 }
 
-func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation, reportMaxAge time.Duration, volumes *[]DeclaredUploadVolume) (Preview, error) {
+func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant, node string, input SignedMutation, reportMaxAge time.Duration, details *configPreviewDetails) (Preview, error) {
 	var out Preview
+	var admitted peerVolumeAdmission
 	if p.Validate() != nil || !p.Role("owner") || !storage.ID(tenant) || !storage.ID(node) || !storage.ID(input.Operation) || input.Reason != "POLICY_CHANGE" || !safe(input.Expected) {
 		return out, ErrDenied
 	}
@@ -319,6 +320,12 @@ func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant
 				return ErrDenied
 			}
 		}
+		if details != nil && details.peer != nil {
+			admitted, e = r.admitPeerVolume(ctx, s, tenant, next, details.peer, time.Now())
+			if e != nil {
+				return e
+			}
+		}
 		out = previewChanges(old, next)
 		out.CandidateDigest = storage.Hash(input.Document)
 		if reportMaxAge > 0 && r.observedCapacityShortfall(s, tenant, old, next, time.Now(), reportMaxAge) {
@@ -326,8 +333,11 @@ func (r *Registry) previewConfiguration(ctx context.Context, p Principal, tenant
 		}
 		return nil
 	})
-	if e == nil && volumes != nil {
-		*volumes, e = declaredUploadVolumes(ctx, next)
+	if e == nil && details != nil {
+		details.uploadVolumes, e = declaredUploadVolumes(ctx, next)
+		if e == nil && details.peer != nil {
+			details.peerVolume, e = r.peerVolume(ctx, admitted, details.peer.Catalog)
+		}
 	}
 	return out, e
 }

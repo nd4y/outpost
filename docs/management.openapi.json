@@ -703,7 +703,7 @@
     "/api/v1/tenants/{tenant}/nodes/{node}/configuration/preview": {
       "post": {
         "operationId": "previewConfiguration",
-        "summary": "Preview exact signed candidate, observed capacity and optional declared upload volumes",
+        "summary": "Preview exact signed candidate, observed capacity and optional declared ciphertext volumes",
         "x-required-roles": ["owner"],
         "parameters": [
           {
@@ -726,8 +726,8 @@
             "name": "include",
             "in": "query",
             "required": false,
-            "schema": { "const": "declared-upload-volume" },
-            "description": "Include exact declared parts and catalog volumes for applicable signed upload jobs."
+            "schema": { "enum": ["declared-upload-volume", "declared-peer-volume"] },
+            "description": "The legacy request may include declared upload volumes. The peer option requires PeerVolumeRequest and returns the same upload volumes plus the exact catalog volume of one explicit signed peer job."
           },
           {
             "name": "X-Outpost-Request",
@@ -747,7 +747,8 @@
                 "schema": {
                   "oneOf": [
                     { "$ref": "#/components/schemas/Preview" },
-                    { "$ref": "#/components/schemas/UploadVolumePreview" }
+                    { "$ref": "#/components/schemas/UploadVolumePreview" },
+                    { "$ref": "#/components/schemas/PeerVolumePreview" }
                   ]
                 }
               }
@@ -826,10 +827,14 @@
         },
         "requestBody": {
           "required": true,
+          "description": "Use SignedMutation for the ordinary preview and declared-upload-volume. Use PeerVolumeRequest only with declared-peer-volume. The encoded JSON is limited to 44743338 bytes for ordinary requests and 55928149 bytes for a peer preview.",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SignedMutation"
+                "oneOf": [
+                  { "$ref": "#/components/schemas/SignedMutation" },
+                  { "$ref": "#/components/schemas/PeerVolumeRequest" }
+                ]
               }
             }
           }
@@ -4320,6 +4325,61 @@
         },
         "required": ["format", "node", "revision", "digest", "document"]
       },
+      "PeerVolumeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mutation": { "$ref": "#/components/schemas/SignedMutation" },
+          "peerOperation": { "$ref": "#/components/schemas/ID" },
+          "catalog": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "minLength": 4,
+            "maxLength": 11184812,
+            "description": "Exact writer-signed catalog bytes, limited to 8388608 decoded bytes. Its SHA-256 must equal the signed candidate job's generation."
+          }
+        },
+        "required": ["mutation", "peerOperation", "catalog"]
+      },
+      "PeerVolumePreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "format": { "const": "outpost-management-preview-with-peer-volume-1" },
+          "preview": { "$ref": "#/components/schemas/Preview" },
+          "uploadVolumes": {
+            "$ref": "#/components/schemas/UploadVolumePreview/properties/uploadVolumes"
+          },
+          "peerVolume": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "operationId": { "$ref": "#/components/schemas/ID" },
+              "domain": { "$ref": "#/components/schemas/ID" },
+              "generation": { "$ref": "#/components/schemas/ID" },
+              "from": { "$ref": "#/components/schemas/ID" },
+              "to": { "$ref": "#/components/schemas/ID" },
+              "mode": { "enum": ["push", "pull"] },
+              "uniqueObjectBytes": { "type": "integer", "minimum": 1, "maximum": 274877906944 },
+              "uniqueObjects": { "type": "integer", "minimum": 1, "maximum": 32768 },
+              "catalogBytes": { "type": "integer", "minimum": 1, "maximum": 8388608 }
+            },
+            "required": [
+              "operationId",
+              "domain",
+              "generation",
+              "from",
+              "to",
+              "mode",
+              "uniqueObjectBytes",
+              "uniqueObjects",
+              "catalogBytes"
+            ],
+            "description": "Catalog closure and serialized catalog size before destination reuse. These values do not estimate actual transfer bytes or destination capacity."
+          }
+        },
+        "required": ["format", "preview", "uploadVolumes", "peerVolume"]
+      },
       "UploadVolumePreview": {
         "type": "object",
         "additionalProperties": false,
@@ -4955,9 +5015,10 @@
             "type": ["integer", "null"],
             "minimum": 0,
             "maximum": 9007199254740991,
-            "description": "Null means unknown; ciphertext bytes or missing progress must not be presented as a known value."
+            "description": "Null means unknown. For a running external upload, this is the unique ciphertext part bytes confirmed in this worker's exact durable plan journal."
           },
           "totalBytes": {
+            "description": "For a running external upload, all unique ciphertext part bytes in the signed target plan. This total is shared by the plan's workers.",
             "type": ["integer", "null"],
             "minimum": 0
           },

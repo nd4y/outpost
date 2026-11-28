@@ -90,22 +90,11 @@ func OpenQueueAdmitted(dir, worker string, a Authority, limits QueueLimits, init
 	return OpenQueueAt(nil, dir, worker, a, limits, initialize, admit)
 }
 func OpenQueueAt(parent *os.Root, dir, worker string, a Authority, limits QueueLimits, initialize bool, admit statefile.Admission) (*Queue, error) {
-	if !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
-		return nil, ErrDenied
-	}
-	raw, _ := json.Marshal(struct {
-		Worker    string
-		Authority Authority
-		Limits    QueueLimits
-	}{worker, a, limits})
-	a.Planner = append([]byte(nil), a.Planner...)
-	a.Generation.Writer = append([]byte(nil), a.Generation.Writer...)
-	a.Generation.Maintenance = append([]byte(nil), a.Generation.Maintenance...)
-	r, e := localfs.Directory(parent, dir, false)
+	q, e := openQueueRoot(parent, dir, worker, a, limits, admit)
 	if e != nil {
 		return nil, e
 	}
-	q := &Queue{root: r, worker: worker, identity: storage.Hash(raw), authority: a, limits: limits, Admit: admit}
+	r := q.root
 	if initialize {
 		f, e := r.Open(".")
 		if e != nil {
@@ -137,6 +126,30 @@ func OpenQueueAt(parent *os.Root, dir, worker string, a Authority, limits QueueL
 	q.instance = s.Instance
 	return q, nil
 }
+
+func openQueueRoot(parent *os.Root, dir, worker string, a Authority, limits QueueLimits, admit statefile.Admission) (*Queue, error) {
+	if !storage.ID(worker) || !limits.valid() || len(a.Planner) != ed25519.PublicKeySize || !storage.ID(a.Generation.Domain) || !storage.ID(a.Generation.Repository) || a.Generation.Epoch == 0 || len(a.Generation.Writer) != ed25519.PublicKeySize || len(a.Generation.Maintenance) != ed25519.PublicKeySize || bytes.Equal(a.Generation.Writer, a.Generation.Maintenance) {
+		return nil, ErrDenied
+	}
+	identity := queueIdentity(worker, a, limits)
+	a.Planner = append([]byte(nil), a.Planner...)
+	a.Generation.Writer = append([]byte(nil), a.Generation.Writer...)
+	a.Generation.Maintenance = append([]byte(nil), a.Generation.Maintenance...)
+	r, e := localfs.Directory(parent, dir, false)
+	if e != nil {
+		return nil, e
+	}
+	return &Queue{root: r, worker: worker, identity: identity, authority: a, limits: limits, Admit: admit}, nil
+}
+
+func queueIdentity(worker string, a Authority, limits QueueLimits) string {
+	raw, _ := json.Marshal(struct {
+		Worker    string
+		Authority Authority
+		Limits    QueueLimits
+	}{worker, a, limits})
+	return storage.Hash(raw)
+}
 func (q *Queue) Close() error { return q.root.Close() }
 func (q *Queue) checkpoint(point string) error {
 	if q.Fault != nil {
@@ -145,27 +158,52 @@ func (q *Queue) checkpoint(point string) error {
 	return nil
 }
 func (q *Queue) load() (QueueState, error) {
-	var s QueueState
 	raw, e := regular(q.root, "queue.json", maxQueueBytes)
 	if e != nil {
-		return s, e
+		return QueueState{}, e
 	}
-	if storage.Decode(raw, &s, maxQueueBytes) != nil || (s.Format != QueueFormat && s.Format != CommandQueueFormat) || s.Identity != q.identity || !storage.ID(s.Instance) || q.instance != "" && s.Instance != q.instance || s.Jobs == nil || len(s.Jobs) > q.limits.MaxJobs {
+	return q.decodeState(context.Background(), raw, nil)
+}
+
+func (q *Queue) decodeState(ctx context.Context, raw []byte, observation *queueProgressObservation) (QueueState, error) {
+	var s QueueState
+	if err := ctx.Err(); err != nil {
+		return s, err
+	}
+	if storage.Decode(raw, &s, maxQueueBytes) != nil || (s.Format != QueueFormat && s.Format != CommandQueueFormat) || !storage.ID(s.Instance) || q.instance != "" && s.Instance != q.instance || s.Jobs == nil || len(s.Jobs) > q.limits.MaxJobs {
+		return s, ErrConflict
+	}
+	if err := ctx.Err(); err != nil {
+		return s, err
+	}
+	if s.Identity != q.identity && (observation == nil || observation.alternate == "" || s.Identity != observation.alternate) {
 		return s, ErrConflict
 	}
 	if len(s.Retries) > 2048 || (s.Format == CommandQueueFormat) != (len(s.Retries) > 0) {
 		return s, ErrConflict
 	}
 	for token, retry := range s.Retries {
+		if err := ctx.Err(); err != nil {
+			return s, err
+		}
 		j, ok := s.Jobs[retry.Operation]
 		if !storage.ID(token) || !ok || retry.Plan != storage.Hash(j.Plan) {
 			return s, ErrConflict
 		}
 	}
 	for op, j := range s.Jobs {
+		if err := ctx.Err(); err != nil {
+			return s, err
+		}
 		p, e := Verify(j.Plan, q.authority)
+		if err := ctx.Err(); err != nil {
+			return s, err
+		}
 		if e != nil || p.Operation != op {
 			return s, ErrDenied
+		}
+		if observation != nil && op == observation.operation {
+			observation.plan = p
 		}
 		if _, ok := p.worker(q.worker); !ok {
 			return s, ErrDenied
@@ -193,7 +231,7 @@ func (q *Queue) load() (QueueState, error) {
 			}
 		}
 	}
-	return s, nil
+	return s, ctx.Err()
 }
 func (q *Queue) save(s QueueState) error {
 	raw, e := json.Marshal(s)

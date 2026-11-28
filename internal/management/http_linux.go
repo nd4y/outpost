@@ -15,6 +15,7 @@ import (
 
 	"github.com/nd4y/outpost/internal/command"
 	"github.com/nd4y/outpost/internal/control"
+	"github.com/nd4y/outpost/internal/generation"
 	"github.com/nd4y/outpost/internal/peer"
 	"github.com/nd4y/outpost/internal/statefile"
 	"github.com/nd4y/outpost/internal/storage"
@@ -323,10 +324,12 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	includeEarliestWholeRestore := r.URL.RawQuery == earliestWholeRestoreQuery && r.Method == http.MethodGet &&
 		len(parts) == 9 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "tenants" && storage.ID(parts[3]) &&
 		parts[4] == "nodes" && storage.ID(parts[5]) && parts[6] == "domains" && storage.ID(parts[7]) && parts[8] == "verified-restores"
-	includeUploadVolume := r.URL.RawQuery == "include=declared-upload-volume" && r.Method == http.MethodPost &&
-		len(parts) == 8 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "tenants" && storage.ID(parts[3]) &&
+	configPreview := r.Method == http.MethodPost && len(parts) == 8 &&
+		parts[0] == "api" && parts[1] == "v1" && parts[2] == "tenants" && storage.ID(parts[3]) &&
 		parts[4] == "nodes" && storage.ID(parts[5]) && parts[6] == "configuration" && parts[7] == "preview"
-	if r.URL.RawQuery != "" && !includeEarliestWholeRestore && !includeUploadVolume {
+	includeUploadVolume := configPreview && r.URL.RawQuery == "include=declared-upload-volume"
+	includePeerVolume := configPreview && r.URL.RawQuery == "include=declared-peer-volume"
+	if r.URL.RawQuery != "" && !includeEarliestWholeRestore && !includeUploadVolume && !includePeerVolume {
 		paged := r.Method == http.MethodGet && (len(parts) == 5 && (parts[4] == "nodes" || parts[4] == "audit") || len(parts) == 9 && (parts[8] == "generations" || parts[8] == "jobs" || parts[8] == "command-status") || len(parts) == 7 && parts[6] == "commands")
 		if !paged {
 			failHTTP(w, ErrInvalid)
@@ -561,7 +564,7 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeHTTP(w, 200, out)
 		return
 	}
-	if action == "configuration" && (r.URL.RawQuery == "" || includeUploadVolume) {
+	if action == "configuration" && (r.URL.RawQuery == "" || includeUploadVolume || includePeerVolume) {
 		if len(parts) == 7 && r.Method == http.MethodGet {
 			out, e := h.registry.Configuration(ctx, p, tenant, node)
 			if e != nil {
@@ -577,23 +580,35 @@ func (h *httpService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			var input SignedMutation
-			if e := readHTTP(w, r, &input, control.MaxConfig*4/3+4096); e != nil {
+			var details *configPreviewDetails
+			if includePeerVolume {
+				var request PeerVolumeRequest
+				if e := readHTTP(w, r, &request, (control.MaxConfig+generation.MaxCatalog)*4/3+4096); e != nil {
+					failHTTP(w, e)
+					return
+				}
+				input = request.Mutation
+				details = &configPreviewDetails{peer: &request}
+			} else if e := readHTTP(w, r, &input, control.MaxConfig*4/3+4096); e != nil {
 				failHTTP(w, e)
 				return
 			}
 			if r.Method == http.MethodPost {
-				var volumes []DeclaredUploadVolume
-				var measure *[]DeclaredUploadVolume
 				if includeUploadVolume {
-					measure = &volumes
+					details = &configPreviewDetails{}
 				}
-				out, e := h.registry.previewConfiguration(ctx, p, tenant, node, input, h.maxAge, measure)
+				out, e := h.registry.previewConfiguration(ctx, p, tenant, node, input, h.maxAge, details)
 				if e != nil {
 					failHTTP(w, e)
 					return
 				}
+				if includePeerVolume {
+					writeHTTP(w, 200, PeerVolumePreview{Format: PeerVolumePreviewFormat, Preview: out,
+						UploadVolumes: details.uploadVolumes, PeerVolume: details.peerVolume})
+					return
+				}
 				if includeUploadVolume {
-					writeHTTP(w, 200, UploadVolumePreview{Format: UploadVolumePreviewFormat, Preview: out, UploadVolumes: volumes})
+					writeHTTP(w, 200, UploadVolumePreview{Format: UploadVolumePreviewFormat, Preview: out, UploadVolumes: details.uploadVolumes})
 					return
 				}
 				writeHTTP(w, 200, out)

@@ -17,6 +17,34 @@ import (
 
 func TestCapacityBlockedNewGenerationPreservesCompleteHistory(t *testing.T) {
 	f := newFixture(t)
+	// Give both signed peers time for transfer and durable disk work on the test HDD.
+	f.cfg.Limits.AttemptMillis = 30000
+	waitPhase := func(label, operation, wantPhase, wantCode string) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+		defer cancel()
+		tick := time.NewTicker(100 * time.Millisecond)
+		defer tick.Stop()
+		var last JobState
+		for {
+			status, err := f.nodes[0].Status(ctx)
+			if err == nil {
+				last = status.Jobs[operation]
+				if last.Phase == wantPhase && last.ErrorCode == wantCode {
+					t.Logf("%s: phase=%s attempts=%d code=%q", label, last.Phase, last.Attempts, last.ErrorCode)
+					return
+				}
+				if last.Phase == "BLOCKED" || last.Phase == "COMPLETE" {
+					t.Fatalf("%s: want phase=%s code=%q, observed phase=%s attempts=%d code=%q", label, wantPhase, wantCode, last.Phase, last.Attempts, last.ErrorCode)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				t.Fatalf("%s: want phase=%s code=%q, last observed phase=%s attempts=%d code=%q (status error: %v)", label, wantPhase, wantCode, last.Phase, last.Attempts, last.ErrorCode, err)
+			case <-tick.C:
+			}
+		}
+	}
 	f.endpoint(t, nil)
 	push, _ := f.jobs()
 	sourceConfig := f.config(t, 0, []control.Job{push})
@@ -33,7 +61,7 @@ func TestCapacityBlockedNewGenerationPreservesCompleteHistory(t *testing.T) {
 	must(t, f.nodes[1].Accept(context.Background(), raw))
 	stopB := start(t, f.nodes[1])
 	stopA := start(t, f.nodes[0])
-	wait(t, func() bool { return complete(f.nodes[0], push.Operation) })
+	waitPhase("baseline transfer", push.Operation, "COMPLETE", "")
 	stopA()
 	source, e := filekit.OpenStore(filepath.Join(f.base, "source-kit"), f.dataOwner, false)
 	must(t, e)
@@ -65,10 +93,7 @@ func TestCapacityBlockedNewGenerationPreservesCompleteHistory(t *testing.T) {
 		must(t, f.nodes[i].Accept(context.Background(), raw))
 	}
 	stopA = start(t, f.nodes[0])
-	wait(t, func() bool {
-		s, e := f.nodes[0].Status(context.Background())
-		return e == nil && s.Jobs[push.Operation].Phase == "BLOCKED" && s.Jobs[push.Operation].ErrorCode == "CAPACITY_BLOCKED"
-	})
+	waitPhase("new generation admission", push.Operation, "BLOCKED", "CAPACITY_BLOCKED")
 	stopA()
 	stopB()
 	target, e := generation.Open(filepath.Join(DomainDirectory(f.nodes[1].dir, f.domain.Trust), "replica"), f.domain.Trust, false)

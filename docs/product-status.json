@@ -340,6 +340,10 @@
         {
           "path": "internal/sourceagent/unavailable_linux_test.go",
           "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_active_linux_test.go",
+          "name": "TestSourceActiveCaptureSurvivesAllReceiversUnavailable"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-29"],
@@ -531,6 +535,10 @@
         {
           "path": "internal/sourceagent/unavailable_linux_test.go",
           "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_active_linux_test.go",
+          "name": "TestSourceActiveCaptureSurvivesAllReceiversUnavailable"
         }
       ],
       "acceptance": ["AT-01", "AT-02", "AT-06", "AT-07", "AT-10", "AT-23", "AT-29", "AT-30"],
@@ -1139,6 +1147,10 @@
         "cmd/outpost"
       ],
       "checks": [
+        {
+          "path": "internal/management/config_peer_volume_linux_test.go",
+          "name": "TestManagementConfigurationPreviewUsesSignedPeerCatalog"
+        },
         {
           "path": "internal/worker/worker_linux_test.go",
           "name": "TestNewPolicyCancelsInFlightTransferBeforeStartingNextRevision"
@@ -4700,6 +4712,18 @@
       ],
       "checks": [
         {
+          "path": "scripts/browser/check.mjs",
+          "name": "superseded peer preview cannot change the current notice"
+        },
+        {
+          "path": "internal/management/config_peer_volume_linux_test.go",
+          "name": "TestManagementConfigurationPreviewUsesSignedPeerCatalog"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "owner can preview one exact peer catalog without retaining it"
+        },
+        {
           "path": "internal/management/config_upload_volume_linux_test.go",
           "name": "TestManagementConfigurationPreviewUsesSignedUploadVolume"
         },
@@ -6864,6 +6888,10 @@
       ],
       "checks": [
         {
+          "path": "internal/management/config_peer_volume_linux_test.go",
+          "name": "TestManagementConfigurationPreviewUsesSignedPeerCatalog"
+        },
+        {
           "path": "internal/management/config_upload_volume_linux_test.go",
           "name": "TestManagementConfigurationPreviewUsesSignedUploadVolume"
         },
@@ -7242,6 +7270,10 @@
         {
           "path": "internal/sourceagent/unavailable_linux_test.go",
           "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_active_linux_test.go",
+          "name": "TestSourceActiveCaptureSurvivesAllReceiversUnavailable"
         }
       ],
       "acceptance": ["AT-02", "AT-03", "AT-22", "AT-23", "AT-29", "AT-30"],
@@ -7252,6 +7284,7 @@
       "workstream": "operations",
       "state": "IN_DEVELOPMENT",
       "implementation": [
+        "docs/management.openapi.json",
         "internal/management",
         "internal/managementservice",
         "internal/worker",
@@ -7264,6 +7297,22 @@
         "scripts/verify-release.py"
       ],
       "checks": [
+        {
+          "path": "internal/worker/report_progress_linux_test.go",
+          "name": "TestWorkerReportsDurablyConfirmedRunningUploadBytes"
+        },
+        {
+          "path": "internal/upload/report_progress_linux_test.go",
+          "name": "TestUploadObservedProgressRequiresMatchingDurableParts"
+        },
+        {
+          "path": "internal/management/config_peer_volume_linux_test.go",
+          "name": "TestManagementConfigurationPreviewUsesSignedPeerCatalog"
+        },
+        {
+          "path": "scripts/browser/check.mjs",
+          "name": "superseded peer preview cannot change the current notice"
+        },
         {
           "path": "internal/management/retention_draft_linux_test.go",
           "name": "TestManagementRetentionPlanDispatchesSignedStepsAndReconcilesReleases"
@@ -8805,6 +8854,14 @@
       ],
       "checks": [
         {
+          "path": "internal/worker/report_progress_linux_test.go",
+          "name": "TestWorkerReportsDurablyConfirmedRunningUploadBytes"
+        },
+        {
+          "path": "internal/upload/report_progress_linux_test.go",
+          "name": "TestUploadObservedProgressRequiresMatchingDurableParts"
+        },
+        {
           "path": "internal/sourceagent/schedule_linux_test.go",
           "name": "TestSourceSchedulePauseAndStatusRemainResponsiveDuringNetworkRead"
         },
@@ -9459,6 +9516,10 @@
         {
           "path": "internal/sourceagent/unavailable_linux_test.go",
           "name": "TestSourceAllIngressUnavailablePreservesHeadAndBoundedCache"
+        },
+        {
+          "path": "internal/sourceagent/unavailable_active_linux_test.go",
+          "name": "TestSourceActiveCaptureSurvivesAllReceiversUnavailable"
         }
       ],
       "acceptance": ["AT-02", "AT-14", "AT-22", "AT-25", "AT-29", "AT-30"],

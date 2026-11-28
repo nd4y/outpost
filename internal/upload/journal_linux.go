@@ -70,6 +70,9 @@ func regular(root *os.Root, name string, max int) ([]byte, error) {
 		return nil, e
 	}
 	defer f.Close()
+	return readRegular(f, max)
+}
+func readRegular(f *os.File, max int) ([]byte, error) {
 	s, e := f.Stat()
 	if e != nil {
 		return nil, e
@@ -224,11 +227,15 @@ func (j *Journal) save(s State) error {
 	return statefile.Guard(j.Admit, "state.json", len(raw), func() error { return atomicFile(j.root, "state.json", raw) })
 }
 func (j *Journal) load() (State, error) {
-	var s State
 	raw, e := regular(j.root, "state.json", maxJournal)
 	if e != nil {
-		return s, e
+		return State{}, e
 	}
+	return j.decodeState(raw)
+}
+
+func (j *Journal) decodeState(raw []byte) (State, error) {
+	var s State
 	if storage.Decode(raw, &s, maxJournal) != nil || s.Format != journalFormat(j.plan) || s.Plan != j.planID || s.Worker != j.worker || s.Parts == nil || len(s.Parts) > MaxTasks {
 		return s, ErrConflict
 	}
